@@ -278,12 +278,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isFirstLogin: user.isFirstLogin || "no"
       };
       
-      // Redirect based on whether roles are set
-      if (user.isFirstLogin === "yes" || !user.roles || user.roles.length === 0) {
-        res.redirect("/select-role");
-      } else {
-        res.redirect("/");
-      }
+      // Explicitly save session before redirecting
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.redirect("/login?error=session_error");
+        }
+        
+        console.log("Session saved successfully for user:", user.email);
+        
+        // Redirect based on whether roles are set
+        if (user.isFirstLogin === "yes" || !user.roles || user.roles.length === 0) {
+          res.redirect("/select-role");
+        } else {
+          res.redirect("/");
+        }
+      });
     } catch (error) {
       console.error("Zoho OAuth callback error:", error);
       res.redirect("/?error=callback_error");
@@ -369,8 +379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       firstName: name?.split(" ")[0] || "Test",
       lastName: name?.split(" ")[1] || "User",
       roles: [role || "Admin"],
-      isFirstLogin: "no",
-      zohoId: "dev-zoho-id"
+      isFirstLogin: "no"
     };
     
     req.session.save((err) => {

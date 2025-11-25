@@ -40,6 +40,9 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
+// Trust proxy - required for secure cookies when running behind a reverse proxy (like Replit)
+app.set('trust proxy', 1);
+
 // Session store setup
 const SessionStore = MemoryStore(session);
 
