@@ -16,7 +16,7 @@ const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID;
 const ZOHO_CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET;
 const ZOHO_AUTH_URL = "https://accounts.zoho.com.au/oauth/v2/auth";
 const ZOHO_TOKEN_URL = "https://accounts.zoho.com.au/oauth/v2/token";
-const ZOHO_USER_URL = "https://accounts.zoho.com.au/oauth/user/info";
+const ZOHO_USER_URL = "https://accounts.zoho.com.au/oauth/v2/userinfo";
 
 // Get base URL for redirects
 function getBaseUrl(req: Request): string {
@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const authUrl = new URL(ZOHO_AUTH_URL);
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("client_id", ZOHO_CLIENT_ID);
-    authUrl.searchParams.set("scope", "openid,profile,email");
+    authUrl.searchParams.set("scope", "ZohoAccounts.userinfo.READ");
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("access_type", "offline");
     authUrl.searchParams.set("prompt", "consent");
