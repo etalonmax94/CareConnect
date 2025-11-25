@@ -9,6 +9,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
 import ClientProfile from "@/pages/ClientProfile";
+import AddClient from "@/pages/AddClient";
+import EditClient from "@/pages/EditClient";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +18,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/clients" component={Clients} />
+      <Route path="/clients/new" component={AddClient} />
+      <Route path="/clients/:id/edit" component={EditClient} />
       <Route path="/clients/:id" component={ClientProfile} />
       <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
       <Route path="/reports" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Reports</h1><p className="text-muted-foreground mt-2">Reporting features coming soon</p></div>} />

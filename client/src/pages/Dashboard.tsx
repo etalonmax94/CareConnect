@@ -1,19 +1,23 @@
 import { Users, FileCheck, Clock, AlertTriangle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import StatCard from "@/components/StatCard";
 import CategoryBadge from "@/components/CategoryBadge";
 import ComplianceIndicator from "@/components/ComplianceIndicator";
-import { mockClients } from "@/lib/mockData";
+import { useQuery } from "@tanstack/react-query";
+import type { Client } from "@shared/schema";
+import { Link } from "wouter";
 
 export default function Dashboard() {
-  // todo: remove mock functionality
-  const totalClients = mockClients.length;
-  const ndisClients = mockClients.filter(c => c.category === "NDIS").length;
-  const supportClients = mockClients.filter(c => c.category === "Support at Home").length;
-  const privateClients = mockClients.filter(c => c.category === "Private").length;
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  const totalClients = clients.length;
+  const ndisClients = clients.filter(c => c.category === "NDIS").length;
+  const supportClients = clients.filter(c => c.category === "Support at Home").length;
+  const privateClients = clients.filter(c => c.category === "Private").length;
   
-  const upcomingRenewals = mockClients.slice(0, 4);
+  const upcomingRenewals = clients.slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -24,10 +28,12 @@ export default function Dashboard() {
             Overview of client management and compliance status
           </p>
         </div>
-        <Button data-testid="button-add-client">
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Client
-        </Button>
+        <Link href="/clients/new">
+          <Button data-testid="button-add-client">
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Client
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

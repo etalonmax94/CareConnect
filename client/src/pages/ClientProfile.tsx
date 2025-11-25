@@ -6,13 +6,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
-import { mockClients } from "@/lib/mockData";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Users, FileText, DollarSign } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2 } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Client } from "@shared/schema";
 
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
-  const client = mockClients.find(c => c.id === params?.id);
+  
+  const { data: client, isLoading } = useQuery<Client>({
+    queryKey: ["/api/clients", params?.id],
+    enabled: !!params?.id,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!client) {
     return (
@@ -42,10 +55,12 @@ export default function ClientProfile() {
         <div className="flex-1">
           <h1 className="text-2xl font-semibold">Client Profile</h1>
         </div>
-        <Button data-testid="button-edit-client">
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Profile
-        </Button>
+        <Link href={`/clients/${params?.id}/edit`}>
+          <Button data-testid="button-edit-client">
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Profile
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
