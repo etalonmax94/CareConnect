@@ -221,41 +221,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const tokens = await tokenResponse.json();
+      console.log("=== TOKEN RESPONSE DEBUG ===");
       console.log("Token response status:", tokenResponse.status);
+      console.log("Full token response:", JSON.stringify(tokens));
       
       if (tokens.error) {
         console.error("Zoho token error:", tokens);
         return res.redirect("/login?error=token_error");
       }
       
-      console.log("Tokens received successfully");
-      console.log("Token keys received:", Object.keys(tokens));
-      console.log("id_token present:", !!tokens.id_token);
+      console.log("Token keys received:", Object.keys(tokens).join(", "));
+      console.log("Has id_token:", tokens.id_token ? "YES" : "NO");
+      console.log("Has access_token:", tokens.access_token ? "YES" : "NO");
       
       const { access_token, refresh_token, expires_in, id_token } = tokens;
       const expiresAt = new Date(Date.now() + (expires_in * 1000));
       
       // Decode the id_token JWT to get user info (no need for separate API call)
       let zohoUser: any = {};
+      
       if (id_token) {
+        console.log("=== DECODING ID_TOKEN ===");
         console.log("id_token length:", id_token.length);
+        console.log("id_token preview:", id_token.substring(0, 50) + "...");
         try {
           // JWT has 3 parts: header.payload.signature - we need the payload (middle part)
-          const payloadBase64 = id_token.split('.')[1];
+          const parts = id_token.split('.');
+          console.log("JWT parts count:", parts.length);
+          const payloadBase64 = parts[1];
+          console.log("Payload base64 length:", payloadBase64?.length);
           const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
+          console.log("Decoded payload JSON:", payloadJson);
           zohoUser = JSON.parse(payloadJson);
-          console.log("Decoded id_token payload:", JSON.stringify(zohoUser));
+          console.log("Parsed user object keys:", Object.keys(zohoUser).join(", "));
+          console.log("User email from id_token:", zohoUser.email);
         } catch (decodeError) {
+          console.error("=== ID_TOKEN DECODE ERROR ===");
           console.error("Failed to decode id_token:", decodeError);
         }
+      } else {
+        console.log("=== NO ID_TOKEN RECEIVED ===");
       }
       
       // If no id_token or decode failed, try the userinfo endpoint as fallback
       if (!zohoUser.email && !zohoUser.sub) {
-        console.log("Trying userinfo endpoint as fallback...");
+        console.log("=== FALLBACK TO USERINFO ENDPOINT ===");
+        console.log("Calling:", ZOHO_USER_URL);
         const userResponse = await fetch(ZOHO_USER_URL, {
           headers: { "Authorization": `Zoho-oauthtoken ${access_token}` }
         });
+        console.log("Userinfo response status:", userResponse.status);
         zohoUser = await userResponse.json();
         console.log("Zoho userinfo response:", JSON.stringify(zohoUser));
       }
