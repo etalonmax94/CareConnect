@@ -1,16 +1,15 @@
-import { Home, Users, FileText, BarChart3, Settings, Building2 } from "lucide-react";
+import { Home, Users, FileText, BarChart3, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
+import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
 const menuItems = [
   {
@@ -45,32 +44,35 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b p-4">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary rounded-md">
-            <Building2 className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-base">EmpowerLink</h2>
-            <p className="text-xs text-muted-foreground">Client Management</p>
-          </div>
+      <SidebarHeader className="border-b border-sidebar-border p-4">
+        <div className="flex items-center justify-center">
+          <img src={logoImage} alt="EmpowerLink" className="h-8 w-auto" />
         </div>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="px-3 pt-4">
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url}>
+              {menuItems.map((item) => {
+                const isActive = location === item.url;
+                return (
+                  <SidebarMenuItem key={item.title}>
                     <Link href={item.url} data-testid={`link-${item.title.toLowerCase()}`}>
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
+                      <div className={`
+                        flex items-center gap-3 px-3 py-2 rounded-full text-sm font-medium
+                        transition-colors cursor-pointer
+                        ${isActive 
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                        }
+                      `}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </div>
                     </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
