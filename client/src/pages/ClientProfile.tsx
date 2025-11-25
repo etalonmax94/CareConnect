@@ -240,16 +240,16 @@ export default function ClientProfile() {
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Program Details</p>
-                  <p className="text-sm mt-1">{client.supportAtHomeDetails.programDetails}</p>
+                  <p className="text-sm font-medium text-muted-foreground">HCP Number</p>
+                  <p className="text-sm mt-1 font-mono">{client.supportAtHomeDetails.hcpNumber || "Not provided"}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Funding Source</p>
-                  <p className="text-sm mt-1">{client.supportAtHomeDetails.fundingSource}</p>
+                  <p className="text-sm font-medium text-muted-foreground">HCP Funding Level</p>
+                  <p className="text-sm mt-1">{client.supportAtHomeDetails.hcpFundingLevel || "Not specified"}</p>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground">Service Entitlements</p>
-                  <p className="text-sm mt-1">{client.supportAtHomeDetails.serviceEntitlements}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Schedule of Supports</p>
+                  <p className="text-sm mt-1">{client.supportAtHomeDetails.scheduleOfSupports || "Not specified"}</p>
                 </div>
               </CardContent>
             </Card>
@@ -283,7 +283,7 @@ export default function ClientProfile() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="w-4 h-4" />
+                  <User className="w-4 h-4" />
                   Primary Care Team
                 </CardTitle>
               </CardHeader>
