@@ -210,3 +210,92 @@ export const insertInvoiceSchema = createInsertSchema(invoices, {
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
+
+// Settings
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  value: json("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSettingsSchema = createInsertSchema(settings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertSettings = z.infer<typeof insertSettingsSchema>;
+export type Settings = typeof settings.$inferSelect;
+
+// Activity Log for audit trail and recent activity
+export const activityLog = pgTable("activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  description: text("description").notNull(),
+  performedBy: text("performed_by"),
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLog.$inferSelect;
+
+// Incident Reports
+export const incidentReports = pgTable("incident_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  incidentDate: timestamp("incident_date").notNull(),
+  incidentType: text("incident_type").notNull().$type<"fall" | "medication" | "behavioral" | "injury" | "other">(),
+  severity: text("severity").notNull().$type<"low" | "medium" | "high" | "critical">(),
+  description: text("description").notNull(),
+  actionTaken: text("action_taken"),
+  reportedBy: text("reported_by").notNull(),
+  status: text("status").notNull().$type<"open" | "investigating" | "resolved" | "closed">().default("open"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertIncidentReportSchema = createInsertSchema(incidentReports, {
+  incidentType: z.enum(["fall", "medication", "behavioral", "injury", "other"]),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  status: z.enum(["open", "investigating", "resolved", "closed"]),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertIncidentReport = z.infer<typeof insertIncidentReportSchema>;
+export type IncidentReport = typeof incidentReports.$inferSelect;
+
+// Privacy Consent Tracking
+export const privacyConsents = pgTable("privacy_consents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  consentType: text("consent_type").notNull().$type<"data_collection" | "data_sharing" | "marketing" | "research">(),
+  granted: text("granted").notNull().$type<"yes" | "no" | "withdrawn">(),
+  grantedDate: timestamp("granted_date").notNull(),
+  expiryDate: timestamp("expiry_date"),
+  witnessName: text("witness_name"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPrivacyConsentSchema = createInsertSchema(privacyConsents, {
+  consentType: z.enum(["data_collection", "data_sharing", "marketing", "research"]),
+  granted: z.enum(["yes", "no", "withdrawn"]),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrivacyConsent = z.infer<typeof insertPrivacyConsentSchema>;
+export type PrivacyConsent = typeof privacyConsents.$inferSelect;

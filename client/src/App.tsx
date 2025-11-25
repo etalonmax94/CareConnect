@@ -11,6 +11,8 @@ import Clients from "@/pages/Clients";
 import ClientProfile from "@/pages/ClientProfile";
 import AddClient from "@/pages/AddClient";
 import EditClient from "@/pages/EditClient";
+import Settings from "@/pages/Settings";
+import Reports from "@/pages/Reports";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,8 +24,8 @@ function Router() {
       <Route path="/clients/:id/edit" component={EditClient} />
       <Route path="/clients/:id" component={ClientProfile} />
       <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
-      <Route path="/reports" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Reports</h1><p className="text-muted-foreground mt-2">Reporting features coming soon</p></div>} />
-      <Route path="/settings" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Settings</h1><p className="text-muted-foreground mt-2">Settings page coming soon</p></div>} />
+      <Route path="/reports" component={Reports} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -41,7 +43,7 @@ export default function App() {
           <div className="flex h-screen w-full">
             <AppSidebar />
             <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between px-6 py-3 border-b sticky top-0 bg-background z-10">
+              <header className="flex items-center justify-between px-6 py-3 border-b sticky top-0 bg-background z-50">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <ThemeToggle />
               </header>

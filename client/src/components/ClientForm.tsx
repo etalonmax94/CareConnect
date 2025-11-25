@@ -235,6 +235,30 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="scheduleArrivalNotification"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Schedule & Arrival Notifications</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-notification">
+                            <SelectValue placeholder="How does client prefer to receive schedule notifications?" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="SMS">SMS</SelectItem>
+                          <SelectItem value="Call">Phone Call</SelectItem>
+                          <SelectItem value="Email">Email</SelectItem>
+                          <SelectItem value="N/A">N/A (No notifications)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
             </Card>
           </TabsContent>
