@@ -28,6 +28,68 @@ function NotificationBadge({ type }: { type: string }) {
   );
 }
 
+interface NotificationPreferencesType {
+  smsArrival?: boolean;
+  smsSchedule?: boolean;
+  callArrival?: boolean;
+  callSchedule?: boolean;
+  none?: boolean;
+}
+
+function NotificationPreferencesBadges({ preferences }: { preferences?: NotificationPreferencesType }) {
+  if (!preferences || Object.keys(preferences).length === 0) {
+    return <Badge variant="outline" className="gap-1 text-muted-foreground"><Bell className="w-3 h-3 opacity-50" />Not set</Badge>;
+  }
+  
+  if (preferences.none) {
+    return <Badge variant="outline" className="gap-1 text-muted-foreground"><Bell className="w-3 h-3 opacity-50" />N/A</Badge>;
+  }
+  
+  const badges = [];
+  
+  if (preferences.smsSchedule) {
+    badges.push(
+      <Badge key="sms-schedule" variant="outline" className="gap-1">
+        <MessageSquare className="w-3 h-3" />
+        SMS Schedule
+      </Badge>
+    );
+  }
+  
+  if (preferences.smsArrival) {
+    badges.push(
+      <Badge key="sms-arrival" variant="outline" className="gap-1">
+        <MessageSquare className="w-3 h-3" />
+        SMS Arrival
+      </Badge>
+    );
+  }
+  
+  if (preferences.callSchedule) {
+    badges.push(
+      <Badge key="call-schedule" variant="outline" className="gap-1">
+        <PhoneCall className="w-3 h-3" />
+        Call Schedule
+      </Badge>
+    );
+  }
+  
+  if (preferences.callArrival) {
+    badges.push(
+      <Badge key="call-arrival" variant="outline" className="gap-1">
+        <PhoneCall className="w-3 h-3" />
+        Call Arrival
+      </Badge>
+    );
+  }
+  
+  if (badges.length === 0) {
+    return <Badge variant="outline" className="gap-1 text-muted-foreground"><Bell className="w-3 h-3 opacity-50" />Not set</Badge>;
+  }
+  
+  return <div className="flex flex-wrap gap-1">{badges}</div>;
+}
+
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
   
@@ -246,13 +308,13 @@ export default function ClientProfile() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg flex-shrink-0">
                 <Bell className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Notification Preference</p>
-                <div className="mt-1">
-                  <NotificationBadge type={client.scheduleArrivalNotification || "N/A"} />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Notification Preferences</p>
+                <div className="mt-1" data-testid="notification-preferences">
+                  <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
                 </div>
               </div>
             </div>
@@ -333,9 +395,9 @@ export default function ClientProfile() {
                   <p className="text-sm mt-1">{client.frequencyOfServices || "Not specified"}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Schedule & Arrival Notifications</p>
+                  <p className="text-sm font-medium text-muted-foreground">Notification Preferences</p>
                   <div className="mt-1">
-                    <NotificationBadge type={client.scheduleArrivalNotification || "N/A"} />
+                    <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
                   </div>
                 </div>
                 <div>

@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
 interface ClientFormProps {
@@ -29,6 +31,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
       careTeam: {},
       clinicalDocuments: {},
       highIntensitySupports: [],
+      notificationPreferences: {},
     } as any,
   });
 
@@ -236,29 +239,92 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="scheduleArrivalNotification"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Schedule & Arrival Notifications</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-notification">
-                            <SelectValue placeholder="How does client prefer to receive schedule notifications?" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="SMS">SMS</SelectItem>
-                          <SelectItem value="Call">Phone Call</SelectItem>
-                          <SelectItem value="Email">Email</SelectItem>
-                          <SelectItem value="N/A">N/A (No notifications)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="md:col-span-2 space-y-4">
+                  <Label>Notification Preferences</Label>
+                  <p className="text-sm text-muted-foreground">How would the client like to be notified?</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="notificationPreferences.smsSchedule"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-sms-schedule"
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer">SMS Schedule</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="notificationPreferences.smsArrival"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-sms-arrival"
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer">SMS Arrival</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="notificationPreferences.callSchedule"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-call-schedule"
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer">Call Schedule</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="notificationPreferences.callArrival"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-call-arrival"
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer">Call Arrival</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="notificationPreferences.none"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-no-notifications"
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer">N/A (No notifications)</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

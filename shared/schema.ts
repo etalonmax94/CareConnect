@@ -104,7 +104,7 @@ export const clients = pgTable("clients", {
 });
 
 export const insertClientSchema = createInsertSchema(clients, {
-  email: z.string().email().optional().or(z.literal("")),
+  email: z.string().email().optional().nullable().or(z.literal("")),
   category: z.enum(["NDIS", "Support at Home", "Private"]),
   dateOfBirth: z.string().optional().or(z.literal("")),
   careTeam: z.any().optional(),

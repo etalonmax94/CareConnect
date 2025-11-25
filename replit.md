@@ -11,9 +11,16 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - Full CRUD operations with real backend API integration
    - Client profiles with care team, clinical notes, and document tracking
    - Conditional fields for each category type
-   - Notification preferences (SMS/Call/Email/N/A) for schedule and arrival notifications
+   - Multi-select notification preferences with checkboxes (SMS Schedule, SMS Arrival, Call Schedule, Call Arrival, N/A)
+   - Profile displays multiple notification preference badges with icons
 
-2. **Interactive Dashboard**
+2. **Staff & Team Management**
+   - Staff management with roles (support_worker, nurse, care_manager, admin)
+   - Support Coordinators management with organization tracking
+   - Plan Managers management with organization tracking
+   - Full CRUD operations for all management pages
+
+3. **Interactive Dashboard**
    - Gradient-coded urgency tiles (blue/green/amber/red)
    - Clickable stat cards with drill-down modals showing filtered client data
    - New Clients (30 days) with detailed list modal
@@ -21,19 +28,19 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - Due This Month and Overdue Items with client lists
    - Recent Activity feed with client events
 
-3. **Reports System**
+4. **Reports System**
    - Age Demographics chart using Recharts
    - Incident Reports graph with monthly visualization
    - Budget Reports by category and client
    - Missing Documents report for compliance tracking
    - Distance From Office report (from Caboolture: 9/73-75 King Street)
 
-4. **Settings Management**
+5. **Settings Management**
    - Office location configuration (default: 9/73-75 King Street, Caboolture QLD 4510)
    - Report preferences and display settings
    - Company information management
 
-5. **Database Schema**
+6. **Database Schema**
    - PostgreSQL with complete table structure
    - Clients table with JSON fields for flexible data storage
    - Progress Notes table for activity tracking
@@ -45,13 +52,13 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - ActivityLog table for audit trails
    - IncidentReports table for incident tracking
 
-6. **Australian Privacy Compliance**
+7. **Australian Privacy Compliance**
    - Privacy consent tracking with collection dates
    - Activity logging for audit trails
    - Consent tracking with collection dates
    - Audit fields for data changes
 
-7. **API Integration**
+8. **API Integration**
    - Backend: Express.js with Drizzle ORM
    - Frontend: React Query for data fetching and caching
    - Proper validation using Zod schemas
@@ -199,3 +206,8 @@ A comprehensive CRM system for managing three categories of healthcare clients (
 - Dashboard tiles are interactive - click to see filtered client data
 - Distance calculations use Haversine formula from Caboolture office coordinates
 - Privacy compliance meets Australian Privacy Act requirements
+- Notification preferences use JSON field `notificationPreferences` with boolean flags:
+  - `smsSchedule`, `smsArrival`, `callSchedule`, `callArrival`, `none`
+  - Legacy `scheduleArrivalNotification` field is deprecated (kept for backward compatibility)
+- Staff roles are enum: support_worker, nurse, care_manager, admin
+- API request signature: apiRequest(method, url, data) - order matters
