@@ -1,14 +1,15 @@
 import { db } from "./db";
 import { 
   clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
-  staff, supportCoordinators, planManagers, ndisServices, users,
+  staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
   type InsertIncidentReport, type IncidentReport, type InsertPrivacyConsent, type PrivacyConsent,
   type InsertStaff, type Staff, type InsertSupportCoordinator, type SupportCoordinator,
   type InsertPlanManager, type PlanManager, type InsertNdisService, type NdisService,
-  type InsertUser, type User, type UserRole
+  type InsertUser, type User, type UserRole,
+  type InsertGP, type GP, type InsertPharmacy, type Pharmacy
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -100,6 +101,20 @@ export interface IStorage {
   updateUserRoles(id: string, roles: UserRole[]): Promise<User | undefined>;
   updateUserTokens(id: string, accessToken: string, refreshToken: string, expiresAt: Date): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
+  
+  // General Practitioners (GP)
+  getAllGPs(): Promise<GP[]>;
+  getGPById(id: string): Promise<GP | undefined>;
+  createGP(gp: InsertGP): Promise<GP>;
+  updateGP(id: string, gp: Partial<InsertGP>): Promise<GP | undefined>;
+  deleteGP(id: string): Promise<boolean>;
+  
+  // Pharmacies
+  getAllPharmacies(): Promise<Pharmacy[]>;
+  getPharmacyById(id: string): Promise<Pharmacy | undefined>;
+  createPharmacy(pharmacy: InsertPharmacy): Promise<Pharmacy>;
+  updatePharmacy(id: string, pharmacy: Partial<InsertPharmacy>): Promise<Pharmacy | undefined>;
+  deletePharmacy(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -580,6 +595,62 @@ export class DbStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.displayName);
+  }
+
+  // General Practitioners (GP)
+  async getAllGPs(): Promise<GP[]> {
+    return await db.select().from(generalPractitioners).orderBy(generalPractitioners.name);
+  }
+
+  async getGPById(id: string): Promise<GP | undefined> {
+    const result = await db.select().from(generalPractitioners).where(eq(generalPractitioners.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createGP(gp: InsertGP): Promise<GP> {
+    const result = await db.insert(generalPractitioners).values(gp).returning();
+    return result[0];
+  }
+
+  async updateGP(id: string, gpUpdate: Partial<InsertGP>): Promise<GP | undefined> {
+    const result = await db.update(generalPractitioners)
+      .set({ ...gpUpdate as any, updatedAt: new Date() })
+      .where(eq(generalPractitioners.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteGP(id: string): Promise<boolean> {
+    const result = await db.delete(generalPractitioners).where(eq(generalPractitioners.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Pharmacies
+  async getAllPharmacies(): Promise<Pharmacy[]> {
+    return await db.select().from(pharmacies).orderBy(pharmacies.name);
+  }
+
+  async getPharmacyById(id: string): Promise<Pharmacy | undefined> {
+    const result = await db.select().from(pharmacies).where(eq(pharmacies.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createPharmacy(pharmacy: InsertPharmacy): Promise<Pharmacy> {
+    const result = await db.insert(pharmacies).values(pharmacy).returning();
+    return result[0];
+  }
+
+  async updatePharmacy(id: string, pharmacyUpdate: Partial<InsertPharmacy>): Promise<Pharmacy | undefined> {
+    const result = await db.update(pharmacies)
+      .set({ ...pharmacyUpdate as any, updatedAt: new Date() })
+      .where(eq(pharmacies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePharmacy(id: string): Promise<boolean> {
+    const result = await db.delete(pharmacies).where(eq(pharmacies.id, id)).returning();
+    return result.length > 0;
   }
 }
 

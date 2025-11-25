@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -240,8 +240,8 @@ export default function LeadershipMeeting() {
                   </TableRow>
                 ) : (
                   filteredClients.map((client) => (
-                    <>
-                      <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
+                    <Fragment key={client.id}>
+                      <TableRow data-testid={`row-client-${client.id}`}>
                         <TableCell>
                           <Link href={`/clients/${client.id}`}>
                             <span className="font-medium hover:underline cursor-pointer">
@@ -292,7 +292,7 @@ export default function LeadershipMeeting() {
                         </TableCell>
                       </TableRow>
                       {expandedClients.has(client.id) && client.latestNotes.length > 0 && (
-                        <TableRow key={`${client.id}-notes`}>
+                        <TableRow>
                           <TableCell colSpan={4} className="bg-muted/50 p-0">
                             <ScrollArea className="max-h-[300px]">
                               <div className="p-4 space-y-3">
@@ -332,7 +332,7 @@ export default function LeadershipMeeting() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   ))
                 )}
               </TableBody>

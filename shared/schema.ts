@@ -97,6 +97,8 @@ export const clients = pgTable("clients", {
   frequencyOfServices: text("frequency_of_services"),
   mainDiagnosis: text("main_diagnosis"),
   allergies: text("allergies"),
+  advancedCareDirective: text("advanced_care_directive").$type<"NFR" | "For Resus" | "None" | null>(),
+  advancedCareDirectiveDocumentId: varchar("acd_document_id"),
   summaryOfServices: text("summary_of_services"),
   communicationNeeds: text("communication_needs"),
   highIntensitySupports: text("high_intensity_supports").array(),
@@ -178,6 +180,8 @@ export const insertClientSchema = createInsertSchema(clients, {
   email: z.string().email().optional().nullable().or(z.literal("")),
   category: z.enum(["NDIS", "Support at Home", "Private"]),
   dateOfBirth: z.string().optional().or(z.literal("")),
+  advancedCareDirective: z.enum(["NFR", "For Resus", "None"]).optional().nullable(),
+  advancedCareDirectiveDocumentId: z.string().optional().nullable(),
   careTeam: z.any().optional(),
   ndisDetails: z.any().optional(),
   supportAtHomeDetails: z.any().optional(),
@@ -482,6 +486,54 @@ export const insertNdisServiceSchema = createInsertSchema(ndisServices).omit({
 
 export type InsertNdisService = z.infer<typeof insertNdisServiceSchema>;
 export type NdisService = typeof ndisServices.$inferSelect;
+
+// General Practitioners (GP) Database
+export const generalPractitioners = pgTable("general_practitioners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  practiceName: text("practice_name"),
+  phoneNumber: text("phone_number"),
+  faxNumber: text("fax_number"),
+  email: text("email"),
+  address: text("address"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGPSchema = createInsertSchema(generalPractitioners).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertGP = z.infer<typeof insertGPSchema>;
+export type GP = typeof generalPractitioners.$inferSelect;
+
+// Pharmacy Database
+export const pharmacies = pgTable("pharmacies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  phoneNumber: text("phone_number"),
+  faxNumber: text("fax_number"),
+  email: text("email"),
+  address: text("address"),
+  deliveryAvailable: text("delivery_available").default("no").$type<"yes" | "no">(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPharmacySchema = createInsertSchema(pharmacies, {
+  deliveryAvailable: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPharmacy = z.infer<typeof insertPharmacySchema>;
+export type Pharmacy = typeof pharmacies.$inferSelect;
 
 // Notification preference type
 export type NotificationPreference = {

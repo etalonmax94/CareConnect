@@ -1,270 +1,46 @@
 # EmpowerLink CRM System
 
-## Project Overview
-A comprehensive CRM system for managing three categories of healthcare clients (NDIS, Support at Home, and Private) with extensive data tracking including personal details, NDIS/HCP plan information, care team management, clinical documentation, service delivery records, financial management, and Australian privacy compliance.
+## Overview
+EmpowerLink is a comprehensive CRM system designed for healthcare providers to manage NDIS, Support at Home, and Private clients. It centralizes client data, including personal details, NDIS/HCP plan information, care team management, clinical documentation, service delivery records, and financial management. The system ensures compliance with Australian privacy regulations and aims to streamline operations, improve client care coordination, and enhance data management efficiency. Key capabilities include robust client and staff management, an interactive dashboard for quick insights, detailed reporting, and an Australian Privacy Act-compliant archiving system.
 
-## Current Status
-### ✅ Completed Modules
+## User Preferences
+I prefer detailed explanations.
+Do not make changes to the folder `Z`.
+Do not make changes to the file `Y`.
 
-1. **Zoho OAuth2 Authentication**
-   - Zoho OAuth2 login flow with accounts.zoho.com.au
-   - Session-based authentication with express-session (24-hour expiry)
-   - Multi-role selection on first login
-   - Personalized sidebar greeting "Hi @[displayName]"
-   - Secure session configuration with sameSite cookie flag
-   - Role-based access control foundation
-   - Available roles: Support Worker, Enrolled Nurse, Registered Nurse, Admin, Operations Manager, Care Manager, Clinical Manager, Director
+## System Architecture
 
-2. **Client Management**
-   - Three client categories: NDIS, Support at Home (with HCP fields), Private
-   - Full CRUD operations with real backend API integration
-   - Client profiles with care team, clinical notes, and document tracking
-   - Conditional fields for each category type
-   - Multi-select notification preferences with checkboxes (SMS Schedule, SMS Arrival, Call Schedule, Call Arrival, N/A)
-   - Profile displays multiple notification preference badges with icons
+### UI/UX Decisions
+The system features a professional navy blue theme, reflecting healthcare industry standards. It utilizes Shadcn UI components with Tailwind CSS for a consistent and responsive design. Interactive elements, such as gradient-coded urgency tiles and clickable stat cards on the dashboard, provide an intuitive user experience. Typography prioritizes clear information hierarchy, and icons (Lucide React) are used for visual cues.
 
-3. **Staff & Team Management**
-   - Staff management with roles (support_worker, nurse, care_manager, admin)
-   - Support Coordinators management with organization tracking
-   - Plan Managers management with organization tracking
-   - Full CRUD operations for all management pages
+### Technical Implementations
+- **Frontend**: React with TypeScript, Wouter for routing, React Query (TanStack Query) for server state management, and Recharts for data visualization.
+- **Backend**: Express.js, PostgreSQL with Neon, and Drizzle ORM for type-safe database operations. Zod is used for schema validation.
+- **Authentication**: Zoho OAuth2 for secure login with session-based authentication and multi-role selection for access control.
+- **Client Management**: Full CRUD operations with conditional fields for different client categories (NDIS, Support at Home, Private). Includes prominent display of critical medical information like allergies and Advanced Care Directives.
+- **Data Management**: Dropdown selections for GPs, Pharmacies, Support Coordinators, and Plan Managers to reduce manual entry errors.
+- **Archiving**: Australian Privacy Act compliant 7-year retention policy with server-side retention calculation, activity logging, and read-only enforcement for archived clients.
+- **Global Search**: Fuzzy matching search functionality for clients via a global search bar.
+- **Reports**: Interactive age demographics chart with drill-down capabilities, incident reports, budget reports, and missing documents reports.
 
-4. **Interactive Dashboard**
-   - Gradient-coded urgency tiles (blue/green/amber/red)
-   - Clickable stat cards with drill-down modals showing filtered client data
-   - New Clients (30 days) with detailed list modal
-   - Compliance Rate with overdue clients modal
-   - Due This Month and Overdue Items with client lists
-   - Recent Activity feed with client events
-   - Birthday Reminders tile (replaced Budget Overview): displays upcoming birthdays with clickable modal, normalized date calculations to include same-day birthdays, sorted chronologically with badges showing days until birthday
-   - Leadership Meeting button: Opens dedicated page with three-column table (Client, Latest Progress Note, Last Updated)
+### Feature Specifications
+- **Client Module**: Manages basic information, communication preferences (SMS, Call, Email), clinical data, and care team details. Supports category-specific fields for NDIS, Support at Home (HCP), and Private clients. Tracks 9 key compliance dates for documents.
+- **Dashboard Module**: Provides an overview of client statistics, compliance rates, upcoming renewals, overdue items, recent activity, and birthday reminders. All tiles are interactive, allowing drill-down into filtered client lists.
+- **Staff & Team Management**: Manages staff with defined roles (support_worker, nurse, care_manager, admin), Support Coordinators, and Plan Managers.
+- **GP & Pharmacy Database**: Manages GP and Pharmacy details, integrated into client forms for easy selection.
+- **Settings Module**: Configures office location, report preferences, and company information.
+- **Privacy & Compliance Module**: Tracks privacy consent with collection dates, maintains activity audit logs for all data changes, and enforces data retention policies.
 
-11. **Global Search & Navigation**
-   - Global search bar in header with Command+K/Ctrl+K keyboard shortcut
-   - Searches clients by name, phone, NDIS number, HCP number
-   - Fuzzy matching with real-time results
-   - Click or Enter navigates to client profile
-   - Connecteam quick-access button in header for staff scheduling portal
+### System Design Choices
+- **Database Schema**: PostgreSQL with Drizzle ORM. Key tables include `clients`, `progress_notes`, `budgets`, `documents`, `invoices`, `users`, `settings`, `privacy_consent`, `activity_log`, `incident_reports`, `staff`, `support_coordinators`, `plan_managers`, `general_practitioners`, `pharmacies`, and `ndis_services`.
+- **API Integration**: Express.js backend with React Query on the frontend for efficient data fetching and caching. Zod schemas for robust validation across API endpoints.
+- **Date Handling**: All dates are properly formatted and validated, with schema support for 40+ compliance form dates.
+- **Distance Calculation**: Uses the Haversine formula for distance calculations from the Caboolture office.
 
-12. **Leadership Meeting Page**
-   - Dedicated page at /leadership-meeting
-   - Three-column table: Client Name, Latest Progress Note, Last Updated
-   - Shows all active clients with their most recent progress notes
-   - Searchable by client name
-   - Sortable by date for prioritizing recent activity
-   - Direct link to client profiles
-
-13. **Reports Drill-Down**
-   - Age Demographics chart is interactive/clickable
-   - Click any age group to see modal with filtered client list
-   - Shows client names, ages, categories, and care managers
-   - Click through to individual client profiles
-
-14. **Clinical Safety Features**
-   - Allergies field displayed prominently in red/bold with warning icon on client profiles
-   - Allergies input field in client form with red styling for visual prominence
-   - Critical medical information stands out for healthcare worker safety
-
-5. **Reports System**
-   - Age Demographics chart using Recharts
-   - Incident Reports graph with monthly visualization
-   - Budget Reports by category and client
-   - Missing Documents report for compliance tracking
-   - Distance From Office report (from Caboolture: 9/73-75 King Street)
-
-6. **Settings Management**
-   - Office location configuration (default: 9/73-75 King Street, Caboolture QLD 4510)
-   - Report preferences and display settings
-   - Company information management
-
-7. **Database Schema**
-   - PostgreSQL with complete table structure
-   - Clients table with JSON fields for flexible data storage
-   - Progress Notes table for activity tracking
-   - Budgets table for fund allocation and tracking
-   - Documents table for document management
-   - Invoices table for billing and payment tracking
-   - Settings table for application configuration
-   - PrivacyConsent table for Australian privacy compliance
-   - ActivityLog table for audit trails
-   - IncidentReports table for incident tracking
-
-8. **Australian Privacy Compliance**
-   - Privacy consent tracking with collection dates
-   - Activity logging for audit trails
-   - Consent tracking with collection dates
-   - Audit fields for data changes
-
-9. **Client Archive System**
-   - Australian Privacy Act compliant 7-year retention
-   - Archive fields: isArchived, archivedAt, archivedByUserId, archiveReason, retentionUntil
-   - Server-side retention calculation (archivedAt + 7 years)
-   - Activity logging for all archive/restore actions
-   - Tabbed view: Active Clients vs Archived clients
-   - Archive modal captures reason for archiving
-   - Read-only enforcement at route and storage levels
-   - Restore capability with activity logging
-   - Archived clients blocked from editing (403 error)
-
-10. **API Integration**
-   - Backend: Express.js with Drizzle ORM
-   - Frontend: React Query for data fetching and caching
-   - Proper validation using Zod schemas
-   - Date handling and parsing
-   - Search and filter functionality
-
-## Architecture
-
-### Frontend Stack
-- React with TypeScript
-- Wouter for routing
-- React Query (TanStack Query) for server state
-- Shadcn UI components with Tailwind CSS
-- Recharts for data visualization
-- Navy blue professional healthcare theme
-
-### Backend Stack
-- Express.js
-- PostgreSQL with Neon
-- Drizzle ORM for type-safe database operations
-- Zod for schema validation
-
-### Key Files
-- `shared/schema.ts` - Database schema and Zod validations (includes Users, Settings, PrivacyConsent, ActivityLog, IncidentReports)
-- `server/storage.ts` - Database operations interface (includes user management methods)
-- `server/routes.ts` - API endpoints with proper validation (includes auth routes)
-- `server/app.ts` - Express app setup with session middleware
-- `client/src/App.tsx` - Main app with auth state management and routing
-- `client/src/pages/Login.tsx` - Zoho OAuth login page
-- `client/src/pages/SelectRole.tsx` - First-login role selection
-- `client/src/components/AppSidebar.tsx` - Sidebar with user greeting and logout
-- `client/src/pages/Dashboard.tsx` - Interactive dashboard with clickable tiles
-- `client/src/pages/Reports.tsx` - Reports page with charts
-- `client/src/pages/Settings.tsx` - Settings management
-- `client/src/pages/Clients.tsx` - Client list with filtering
-- `client/src/pages/ClientProfile.tsx` - Client profile view
-- `client/src/pages/AddClient.tsx` - Add new client
-- `client/src/pages/EditClient.tsx` - Edit existing client
-- `client/src/components/ClientForm.tsx` - Tabbed form for client creation/editing
-
-## Features Overview
-
-### Client Module
-- **Basic Information**: Name, DOB (auto-calculates age), phone, email, Medicare number, address, NOK/EPOA
-- **Communication**: Notification preferences (SMS/Call/Email/N/A) for schedules and arrivals
-- **Clinical**: Main diagnosis, communication needs, high-intensity supports, clinical notes
-- **Care Team**: Care Manager, Leadership, GP, Support Coordinator, Plan Manager
-- **Category-Specific Fields**:
-  - **NDIS**: NDIS number, funding type, plan dates, consent form date
-  - **Support at Home**: HCP number, HCP funding level, schedule of supports
-  - **Private**: Payment method, service rates, billing preferences
-- **Document Tracking**: 9 compliance dates (service agreement, consent, risk assessment, medication, etc.)
-
-### Dashboard Module
-- Interactive stat cards with hover effects
-- Click to drill-down into filtered client lists via modals
-- Total Clients showing new clients in last 30 days
-- Compliance Rate with overdue/due status
-- Due This Month for upcoming document renewals
-- Overdue Items for urgent attention
-- Recent Activity feed with meaningful events
-
-### Reports Module
-- **Age Demographics**: Pie chart showing client age distribution (0-17, 18-34, 35-54, 55-74, 75+)
-- **Incident Reports**: Bar chart of incidents by month
-- **Budget Reports**: Spending by category (ADLs, Community Access, Nursing, Travel)
-- **Missing Documents**: List of clients with incomplete compliance documents
-- **Distance From Office**: Client locations with distance calculation from Caboolture office
-
-### Settings Module
-- Office Location: Configure office address (default: Caboolture)
-- Report Preferences: Default date ranges and formats
-- Company Information: Organization details
-
-### Financial Module
-- Budgets: Track allocation by category, start/end dates, usage calculation
-- Invoices: Invoice number, date, amount, status (pending/paid/overdue)
-- Budget categories: ADLs, Community Access, Nursing, Travel/Transport
-
-### Documents Module
-- Central repository for client documents
-- Document types: Consent forms, Care Plans, Reports, Risk Assessments, etc.
-- Upload tracking with dates
-
-### Privacy & Compliance Module
-- Australian Privacy Act compliance tracking
-- Consent collection dates and renewal reminders
-- Activity audit logs for all data changes
-- Data retention policies
-
-## API Endpoints
-
-### Clients
-- `GET /api/clients` - List all clients (supports search and category filter)
-- `GET /api/clients/active` - List active (non-archived) clients
-- `GET /api/clients/archived` - List archived clients
-- `GET /api/clients/:id` - Get specific client
-- `POST /api/clients` - Create new client
-- `PATCH /api/clients/:id` - Update client (blocked for archived clients, returns 403)
-- `DELETE /api/clients/:id` - Delete client
-- `GET /api/clients/new/30` - Get clients created in last 30 days
-- `POST /api/clients/:id/archive` - Archive a client (requires reason)
-- `POST /api/clients/:id/restore` - Restore an archived client
-
-### Reports
-- `GET /api/reports/dashboard` - Dashboard statistics
-- `GET /api/reports/age-demographics` - Age distribution data
-- `GET /api/reports/incidents` - Incident statistics
-- `GET /api/reports/budgets` - Budget allocation data
-- `GET /api/reports/missing-documents` - Clients with missing docs
-- `GET /api/reports/distance` - Distance calculations from office
-
-### Settings
-- `GET /api/settings` - Get all settings
-- `GET /api/settings/:key` - Get specific setting
-- `PUT /api/settings` - Update settings
-
-### Activity
-- `GET /api/activity` - Get activity log
-- `POST /api/activity` - Log new activity
-
-### Privacy
-- `GET /api/privacy-consent/:clientId` - Get client consent records
-- `POST /api/privacy-consent` - Record new consent
-
-## Design System
-- **Colors**: Navy blue primary theme (#001F3F), gradient urgency indicators
-- **Components**: Shadcn UI with Tailwind CSS
-- **Typography**: Bold, clear information hierarchy
-- **Spacing**: Consistent medium spacing between elements
-- **Icons**: Lucide React for actions and visual cues
-- **Charts**: Recharts for data visualization
-
-## Database Schema Summary
-
-### Tables
-- `clients` - Core client data with JSON fields for nested data
-- `progress_notes` - Activity logging and clinical notes
-- `budgets` - Budget allocation and tracking
-- `documents` - Document management
-- `invoices` - Billing and payment tracking
-- `users` - User authentication (prepared for future)
-- `settings` - Application configuration key-value store
-- `privacy_consent` - Consent tracking for privacy compliance
-- `activity_log` - Audit trail of all system activities
-- `incident_reports` - Incident tracking and reporting
-
-## Notes
-- Support at Home category includes HCP-specific fields (Health Care Packages)
-- All dates are properly formatted and validated
-- Schema supports 40+ compliance form dates through clinical documents JSON
-- Real-time reactivity with React Query cache invalidation
-- Professional navy blue theme reflects healthcare industry standards
-- Dashboard tiles are interactive - click to see filtered client data
-- Distance calculations use Haversine formula from Caboolture office coordinates
-- Privacy compliance meets Australian Privacy Act requirements
-- Notification preferences use JSON field `notificationPreferences` with boolean flags:
-  - `smsSchedule`, `smsArrival`, `callSchedule`, `callArrival`, `none`
-  - Legacy `scheduleArrivalNotification` field is deprecated (kept for backward compatibility)
-- Staff roles are enum: support_worker, nurse, care_manager, admin
-- API request signature: apiRequest(method, url, data) - order matters
+## External Dependencies
+- **Zoho OAuth2**: For user authentication and authorization.
+- **PostgreSQL (Neon)**: Relational database management system.
+- **Connecteam**: Integrated for quick access to staff scheduling (via a button in the header).
+- **Recharts**: JavaScript charting library for data visualization.
+- **Shadcn UI & Tailwind CSS**: UI component library and utility-first CSS framework.
+- **Lucide React**: Icon library for visual cues.

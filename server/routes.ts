@@ -6,6 +6,7 @@ import {
   insertInvoiceSchema, calculateAge, insertBudgetSchema,
   insertIncidentReportSchema, insertPrivacyConsentSchema, insertActivityLogSchema,
   insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema,
+  insertGPSchema, insertPharmacySchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -476,6 +477,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get active clients (non-archived) - MUST be before :id route
+  app.get("/api/clients/active", async (req, res) => {
+    try {
+      const activeClients = await storage.getActiveClients();
+      const clientsWithAge = activeClients.map(client => ({
+        ...client,
+        age: calculateAge(client.dateOfBirth)
+      }));
+      res.json(clientsWithAge);
+    } catch (error) {
+      console.error("Error fetching active clients:", error);
+      res.status(500).json({ error: "Failed to fetch active clients" });
+    }
+  });
+
+  // Get archived clients - MUST be before :id route
+  app.get("/api/clients/archived", async (req, res) => {
+    try {
+      const archivedClients = await storage.getArchivedClients();
+      const clientsWithAge = archivedClients.map(client => ({
+        ...client,
+        age: calculateAge(client.dateOfBirth)
+      }));
+      res.json(clientsWithAge);
+    } catch (error) {
+      console.error("Error fetching archived clients:", error);
+      res.status(500).json({ error: "Failed to fetch archived clients" });
+    }
+  });
+
   // Get client by ID
   app.get("/api/clients/:id", async (req, res) => {
     try {
@@ -587,28 +618,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting client:", error);
       res.status(500).json({ error: "Failed to delete client" });
-    }
-  });
-
-  // Get active clients (non-archived)
-  app.get("/api/clients/active", async (req, res) => {
-    try {
-      const activeClients = await storage.getActiveClients();
-      res.json(activeClients);
-    } catch (error) {
-      console.error("Error fetching active clients:", error);
-      res.status(500).json({ error: "Failed to fetch active clients" });
-    }
-  });
-
-  // Get archived clients
-  app.get("/api/clients/archived", async (req, res) => {
-    try {
-      const archivedClients = await storage.getArchivedClients();
-      res.json(archivedClients);
-    } catch (error) {
-      console.error("Error fetching archived clients:", error);
-      res.status(500).json({ error: "Failed to fetch archived clients" });
     }
   });
 
@@ -1509,6 +1518,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting plan manager:", error);
       res.status(500).json({ error: "Failed to delete plan manager" });
+    }
+  });
+
+  // ==================== GP (GENERAL PRACTITIONERS) ROUTES ====================
+  
+  // Get all GPs
+  app.get("/api/gps", async (req, res) => {
+    try {
+      const gps = await storage.getAllGPs();
+      res.json(gps);
+    } catch (error) {
+      console.error("Error fetching GPs:", error);
+      res.status(500).json({ error: "Failed to fetch GPs" });
+    }
+  });
+
+  // Get GP by ID
+  app.get("/api/gps/:id", async (req, res) => {
+    try {
+      const gp = await storage.getGPById(req.params.id);
+      if (!gp) {
+        return res.status(404).json({ error: "GP not found" });
+      }
+      res.json(gp);
+    } catch (error) {
+      console.error("Error fetching GP:", error);
+      res.status(500).json({ error: "Failed to fetch GP" });
+    }
+  });
+
+  // Create GP
+  app.post("/api/gps", async (req, res) => {
+    try {
+      const validationResult = insertGPSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const gp = await storage.createGP(validationResult.data);
+      res.status(201).json(gp);
+    } catch (error) {
+      console.error("Error creating GP:", error);
+      res.status(500).json({ error: "Failed to create GP" });
+    }
+  });
+
+  // Update GP
+  app.patch("/api/gps/:id", async (req, res) => {
+    try {
+      const gp = await storage.updateGP(req.params.id, req.body);
+      if (!gp) {
+        return res.status(404).json({ error: "GP not found" });
+      }
+      res.json(gp);
+    } catch (error) {
+      console.error("Error updating GP:", error);
+      res.status(500).json({ error: "Failed to update GP" });
+    }
+  });
+
+  // Delete GP
+  app.delete("/api/gps/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteGP(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "GP not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting GP:", error);
+      res.status(500).json({ error: "Failed to delete GP" });
+    }
+  });
+
+  // ==================== PHARMACIES ROUTES ====================
+  
+  // Get all pharmacies
+  app.get("/api/pharmacies", async (req, res) => {
+    try {
+      const pharmacies = await storage.getAllPharmacies();
+      res.json(pharmacies);
+    } catch (error) {
+      console.error("Error fetching pharmacies:", error);
+      res.status(500).json({ error: "Failed to fetch pharmacies" });
+    }
+  });
+
+  // Get pharmacy by ID
+  app.get("/api/pharmacies/:id", async (req, res) => {
+    try {
+      const pharmacy = await storage.getPharmacyById(req.params.id);
+      if (!pharmacy) {
+        return res.status(404).json({ error: "Pharmacy not found" });
+      }
+      res.json(pharmacy);
+    } catch (error) {
+      console.error("Error fetching pharmacy:", error);
+      res.status(500).json({ error: "Failed to fetch pharmacy" });
+    }
+  });
+
+  // Create pharmacy
+  app.post("/api/pharmacies", async (req, res) => {
+    try {
+      const validationResult = insertPharmacySchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const pharmacy = await storage.createPharmacy(validationResult.data);
+      res.status(201).json(pharmacy);
+    } catch (error) {
+      console.error("Error creating pharmacy:", error);
+      res.status(500).json({ error: "Failed to create pharmacy" });
+    }
+  });
+
+  // Update pharmacy
+  app.patch("/api/pharmacies/:id", async (req, res) => {
+    try {
+      const pharmacy = await storage.updatePharmacy(req.params.id, req.body);
+      if (!pharmacy) {
+        return res.status(404).json({ error: "Pharmacy not found" });
+      }
+      res.json(pharmacy);
+    } catch (error) {
+      console.error("Error updating pharmacy:", error);
+      res.status(500).json({ error: "Failed to update pharmacy" });
+    }
+  });
+
+  // Delete pharmacy
+  app.delete("/api/pharmacies/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePharmacy(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Pharmacy not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting pharmacy:", error);
+      res.status(500).json({ error: "Failed to delete pharmacy" });
     }
   });
 

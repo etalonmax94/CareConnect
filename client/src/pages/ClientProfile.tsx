@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -526,6 +526,45 @@ export default function ClientProfile() {
                     </p>
                   </div>
                 )}
+
+                {/* Advanced Care Directive - Critical Clinical Safety */}
+                <div className={`p-3 rounded-lg border ${
+                  client.advancedCareDirective === "NFR" 
+                    ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+                    : client.advancedCareDirective === "For Resus"
+                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                    : "bg-muted/50 border-border"
+                }`}>
+                  <p className={`text-sm font-bold flex items-center gap-2 ${
+                    client.advancedCareDirective === "NFR"
+                      ? "text-purple-700 dark:text-purple-400"
+                      : client.advancedCareDirective === "For Resus"
+                      ? "text-green-700 dark:text-green-400"
+                      : "text-muted-foreground"
+                  }`}>
+                    {client.advancedCareDirective === "NFR" ? (
+                      <HeartOff className="w-4 h-4" />
+                    ) : client.advancedCareDirective === "For Resus" ? (
+                      <Heart className="w-4 h-4" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
+                    ADVANCED CARE DIRECTIVE
+                  </p>
+                  <p className={`text-sm mt-1 font-bold ${
+                    client.advancedCareDirective === "NFR"
+                      ? "text-purple-600 dark:text-purple-300"
+                      : client.advancedCareDirective === "For Resus"
+                      ? "text-green-600 dark:text-green-300"
+                      : "text-muted-foreground"
+                  }`} data-testid="text-acd">
+                    {client.advancedCareDirective === "NFR" 
+                      ? "NFR - Not For Resuscitation"
+                      : client.advancedCareDirective === "For Resus"
+                      ? "For Resus - For Resuscitation"
+                      : "Not Specified"}
+                  </p>
+                </div>
               </CardContent>
             </Card>
 

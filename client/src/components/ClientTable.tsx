@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import CategoryBadge from "./CategoryBadge";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
-import { Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff } from "lucide-react";
+import { Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff, Heart, HeartOff } from "lucide-react";
 
 interface ClientTableProps {
   clients: Client[];
@@ -272,7 +272,29 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                         <AvatarFallback>{getInitials(client.participantName)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{client.participantName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{client.participantName}</p>
+                          {client.advancedCareDirective === "NFR" && (
+                            <Badge 
+                              variant="outline" 
+                              className="gap-1 bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-xs"
+                              data-testid={`badge-nfr-${client.id}`}
+                            >
+                              <HeartOff className="w-3 h-3" />
+                              NFR
+                            </Badge>
+                          )}
+                          {client.advancedCareDirective === "For Resus" && (
+                            <Badge 
+                              variant="outline" 
+                              className="gap-1 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 text-xs"
+                              data-testid={`badge-resus-${client.id}`}
+                            >
+                              <Heart className="w-3 h-3" />
+                              Resus
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {clientAge ? `${clientAge} years` : "Age N/A"}
                         </p>

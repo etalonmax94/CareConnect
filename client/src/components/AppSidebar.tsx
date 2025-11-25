@@ -1,4 +1,4 @@
-import { Home, Users, FileText, BarChart3, Settings, UserCog, Building2, Briefcase, LogOut, User } from "lucide-react";
+import { Home, Users, FileText, BarChart3, Settings, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -56,6 +56,16 @@ const menuItems = [
     icon: Briefcase,
   },
   {
+    title: "GPs",
+    url: "/gps",
+    icon: Stethoscope,
+  },
+  {
+    title: "Pharmacies",
+    url: "/pharmacies",
+    icon: Pill,
+  },
+  {
     title: "Documents",
     url: "/documents",
     icon: FileText,
@@ -101,7 +111,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             <div className="flex items-center gap-2 text-sidebar-foreground">
               <User className="w-4 h-4" />
               <span className="text-sm font-medium" data-testid="text-user-greeting">
-                Hi @{displayName}
+                Hi {displayName}
               </span>
             </div>
           </div>
