@@ -241,24 +241,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const zohoUser = await userResponse.json();
       console.log("Zoho user response:", JSON.stringify(zohoUser));
       
-      if (!zohoUser.Email) {
+      // Handle both OIDC format (lowercase) and Zoho API format (capitalized)
+      const userEmail = zohoUser.email || zohoUser.Email;
+      const userId = zohoUser.sub || zohoUser.ZUID;
+      const firstName = zohoUser.given_name || zohoUser.First_Name;
+      const lastName = zohoUser.family_name || zohoUser.Last_Name;
+      const displayName = zohoUser.name || zohoUser.Display_Name || firstName || userEmail;
+      
+      if (!userEmail) {
         console.error("Failed to get Zoho user info:", zohoUser);
         return res.redirect("/login?error=user_info_error");
       }
       
-      console.log("Zoho user email:", zohoUser.Email);
+      console.log("Zoho user email:", userEmail);
       
       // Check if user exists in our database
-      let user = await storage.getUserByEmail(zohoUser.Email);
+      let user = await storage.getUserByEmail(userEmail);
       
       if (!user) {
         // Create new user
         user = await storage.createUser({
-          zohoUserId: zohoUser.ZUID,
-          email: zohoUser.Email,
-          displayName: zohoUser.Display_Name || zohoUser.First_Name || zohoUser.Email,
-          firstName: zohoUser.First_Name,
-          lastName: zohoUser.Last_Name,
+          zohoUserId: userId,
+          email: userEmail,
+          displayName: displayName,
+          firstName: firstName,
+          lastName: lastName,
           roles: [],
           isFirstLogin: "yes",
           isActive: "yes",
