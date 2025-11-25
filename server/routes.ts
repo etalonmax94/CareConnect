@@ -353,6 +353,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(USER_ROLES);
   });
 
+  // Development bypass login (only works in development mode)
+  app.post("/api/auth/dev-login", (req, res) => {
+    if (process.env.NODE_ENV === "production") {
+      return res.status(403).json({ error: "Dev login not available in production" });
+    }
+    
+    const { name, role } = req.body;
+    
+    // Create a test user session
+    req.session.user = {
+      id: "dev-user-001",
+      email: "test@empowerlink.local",
+      displayName: name || "Test User",
+      firstName: name?.split(" ")[0] || "Test",
+      lastName: name?.split(" ")[1] || "User",
+      roles: [role || "Admin"],
+      isFirstLogin: "no",
+      zohoId: "dev-zoho-id"
+    };
+    
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res.status(500).json({ error: "Failed to create session" });
+      }
+      res.json({ 
+        success: true, 
+        user: req.session.user,
+        message: "Development login successful"
+      });
+    });
+  });
+
   // ==================== CLIENT ROUTES ====================
 
   // Get all clients
