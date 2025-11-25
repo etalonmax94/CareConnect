@@ -1,14 +1,48 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertClientSchema, updateClientSchema, insertProgressNoteSchema, 
   insertInvoiceSchema, calculateAge, insertBudgetSchema,
   insertIncidentReportSchema, insertPrivacyConsentSchema, insertActivityLogSchema,
-  insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema
+  insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema,
+  USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
+
+// Zoho OAuth Configuration
+const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID;
+const ZOHO_CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET;
+const ZOHO_AUTH_URL = "https://accounts.zoho.com.au/oauth/v2/auth";
+const ZOHO_TOKEN_URL = "https://accounts.zoho.com.au/oauth/v2/token";
+const ZOHO_USER_URL = "https://accounts.zoho.com.au/oauth/user/info";
+
+// Get base URL for redirects
+function getBaseUrl(req: Request): string {
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${protocol}://${host}`;
+}
+
+// Auth middleware - check if user is authenticated
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+}
+
+// Auth middleware - check if user has completed role selection
+function requireRoles(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  if (req.session.user.isFirstLogin === "yes" || req.session.user.roles.length === 0) {
+    return res.status(403).json({ error: "Role selection required", needsRoleSelection: true });
+  }
+  next();
+}
 
 // Helper to convert date strings to Date objects
 function parseDates(data: any): any {
@@ -109,6 +143,218 @@ function getDistanceFromOffice(address: string | null | undefined): number | nul
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ==================== AUTH ROUTES ====================
+  
+  // Get current user session
+  app.get("/api/auth/me", (req, res) => {
+    if (req.session?.user) {
+      res.json({ 
+        authenticated: true, 
+        user: req.session.user,
+        needsRoleSelection: req.session.user.isFirstLogin === "yes" || req.session.user.roles.length === 0
+      });
+    } else {
+      res.json({ authenticated: false, user: null });
+    }
+  });
+
+  // Initiate Zoho OAuth login
+  app.get("/api/auth/zoho", (req, res) => {
+    // Validate Zoho credentials are configured
+    if (!ZOHO_CLIENT_ID || !ZOHO_CLIENT_SECRET) {
+      console.error("Zoho OAuth credentials not configured");
+      return res.redirect("/login?error=oauth_not_configured");
+    }
+    
+    const baseUrl = getBaseUrl(req);
+    const redirectUri = `${baseUrl}/api/auth/zoho/callback`;
+    
+    const authUrl = new URL(ZOHO_AUTH_URL);
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("client_id", ZOHO_CLIENT_ID);
+    authUrl.searchParams.set("scope", "profile,email");
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("access_type", "offline");
+    authUrl.searchParams.set("prompt", "consent");
+    
+    res.redirect(authUrl.toString());
+  });
+
+  // Zoho OAuth callback
+  app.get("/api/auth/zoho/callback", async (req, res) => {
+    const { code, error } = req.query;
+    const baseUrl = getBaseUrl(req);
+    
+    // Validate Zoho credentials are configured
+    if (!ZOHO_CLIENT_ID || !ZOHO_CLIENT_SECRET) {
+      console.error("Zoho OAuth credentials not configured in callback");
+      return res.redirect("/login?error=oauth_not_configured");
+    }
+    
+    if (error) {
+      console.error("Zoho OAuth error:", error);
+      return res.redirect("/login?error=oauth_error");
+    }
+    
+    if (!code) {
+      return res.redirect("/login?error=no_code");
+    }
+    
+    try {
+      const redirectUri = `${baseUrl}/api/auth/zoho/callback`;
+      
+      // Exchange code for tokens
+      const tokenResponse = await fetch(ZOHO_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code: code as string,
+          grant_type: "authorization_code",
+          client_id: ZOHO_CLIENT_ID,
+          client_secret: ZOHO_CLIENT_SECRET,
+          redirect_uri: redirectUri
+        })
+      });
+      
+      const tokens = await tokenResponse.json();
+      
+      if (tokens.error) {
+        console.error("Zoho token error:", tokens);
+        return res.redirect("/?error=token_error");
+      }
+      
+      const { access_token, refresh_token, expires_in } = tokens;
+      const expiresAt = new Date(Date.now() + (expires_in * 1000));
+      
+      // Get user info from Zoho
+      const userResponse = await fetch(ZOHO_USER_URL, {
+        headers: { "Authorization": `Zoho-oauthtoken ${access_token}` }
+      });
+      
+      const zohoUser = await userResponse.json();
+      
+      if (!zohoUser.Email) {
+        console.error("Failed to get Zoho user info:", zohoUser);
+        return res.redirect("/?error=user_info_error");
+      }
+      
+      // Check if user exists in our database
+      let user = await storage.getUserByEmail(zohoUser.Email);
+      
+      if (!user) {
+        // Create new user
+        user = await storage.createUser({
+          zohoUserId: zohoUser.ZUID,
+          email: zohoUser.Email,
+          displayName: zohoUser.Display_Name || zohoUser.First_Name || zohoUser.Email,
+          firstName: zohoUser.First_Name,
+          lastName: zohoUser.Last_Name,
+          roles: [],
+          isFirstLogin: "yes",
+          isActive: "yes",
+          zohoAccessToken: access_token,
+          zohoRefreshToken: refresh_token,
+          zohoTokenExpiresAt: expiresAt
+        });
+      } else {
+        // Update existing user tokens
+        await storage.updateUserTokens(user.id, access_token, refresh_token, expiresAt);
+        user = await storage.getUserById(user.id);
+      }
+      
+      if (!user) {
+        return res.redirect("/?error=user_create_error");
+      }
+      
+      // Set session
+      req.session.userId = user.id;
+      req.session.user = {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roles: user.roles as string[],
+        isFirstLogin: user.isFirstLogin || "no"
+      };
+      
+      // Redirect based on whether roles are set
+      if (user.isFirstLogin === "yes" || !user.roles || user.roles.length === 0) {
+        res.redirect("/select-role");
+      } else {
+        res.redirect("/");
+      }
+    } catch (error) {
+      console.error("Zoho OAuth callback error:", error);
+      res.redirect("/?error=callback_error");
+    }
+  });
+
+  // Update user roles (for first login)
+  app.post("/api/auth/roles", requireAuth, async (req, res) => {
+    try {
+      const { roles } = req.body;
+      
+      if (!Array.isArray(roles) || roles.length === 0) {
+        return res.status(400).json({ error: "At least one role must be selected" });
+      }
+      
+      // Validate roles
+      const validRoles = USER_ROLES.map(r => r.value);
+      const invalidRoles = roles.filter((r: string) => !validRoles.includes(r as UserRole));
+      if (invalidRoles.length > 0) {
+        return res.status(400).json({ error: `Invalid roles: ${invalidRoles.join(", ")}` });
+      }
+      
+      const userId = req.session.userId!;
+      const updatedUser = await storage.updateUserRoles(userId, roles as UserRole[]);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Re-fetch user from database to ensure session is fully in sync
+      const freshUser = await storage.getUserById(userId);
+      if (!freshUser) {
+        return res.status(404).json({ error: "User not found after update" });
+      }
+      
+      // Update session with fresh data from database
+      req.session.user = {
+        id: freshUser.id,
+        email: freshUser.email,
+        displayName: freshUser.displayName,
+        firstName: freshUser.firstName,
+        lastName: freshUser.lastName,
+        roles: freshUser.roles as string[],
+        isFirstLogin: freshUser.isFirstLogin || "no"
+      };
+      
+      res.json({ success: true, user: req.session.user });
+    } catch (error) {
+      console.error("Error updating roles:", error);
+      res.status(500).json({ error: "Failed to update roles" });
+    }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ error: "Failed to logout" });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  // Get available roles
+  app.get("/api/auth/roles", (req, res) => {
+    res.json(USER_ROLES);
+  });
+
+  // ==================== CLIENT ROUTES ====================
+
   // Get all clients
   app.get("/api/clients", async (req, res) => {
     try {

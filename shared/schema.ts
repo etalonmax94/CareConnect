@@ -3,19 +3,82 @@ import { pgTable, text, varchar, timestamp, json, date } from "drizzle-orm/pg-co
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// User roles for role-based access control
+export type UserRole = 
+  | "support_worker" 
+  | "enrolled_nurse" 
+  | "registered_nurse" 
+  | "admin" 
+  | "operations_manager" 
+  | "care_manager" 
+  | "clinical_manager" 
+  | "director";
+
+export const USER_ROLES: { value: UserRole; label: string }[] = [
+  { value: "support_worker", label: "Support Worker" },
+  { value: "enrolled_nurse", label: "Enrolled Nurse" },
+  { value: "registered_nurse", label: "Registered Nurse" },
+  { value: "admin", label: "Admin" },
+  { value: "operations_manager", label: "Operations Manager" },
+  { value: "care_manager", label: "Care Manager" },
+  { value: "clinical_manager", label: "Clinical Manager" },
+  { value: "director", label: "Director" },
+];
+
+// Role-based permissions
+export const ROLE_PERMISSIONS: Record<UserRole, {
+  canAccessFunding: boolean;
+  canAccessBudgets: boolean;
+  canAccessReports: boolean;
+  canManageStaff: boolean;
+  canManageClients: boolean;
+  isFullAccess: boolean;
+}> = {
+  director: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
+  clinical_manager: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
+  operations_manager: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
+  admin: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
+  care_manager: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: true, canManageStaff: false, canManageClients: true, isFullAccess: false },
+  registered_nurse: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: true, canManageStaff: false, canManageClients: true, isFullAccess: false },
+  enrolled_nurse: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: true, canManageStaff: false, canManageClients: true, isFullAccess: false },
+  support_worker: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: false, canManageStaff: false, canManageClients: true, isFullAccess: false },
+};
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  zohoUserId: text("zoho_user_id").unique(),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  roles: json("roles").$type<UserRole[]>().notNull().default([]),
+  isFirstLogin: text("is_first_login").default("yes").$type<"yes" | "no">(),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  lastLoginAt: timestamp("last_login_at"),
+  zohoAccessToken: text("zoho_access_token"),
+  zohoRefreshToken: text("zoho_refresh_token"),
+  zohoTokenExpiresAt: timestamp("zoho_token_expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertUserSchema = createInsertSchema(users, {
+  roles: z.array(z.enum(["support_worker", "enrolled_nurse", "registered_nurse", "admin", "operations_manager", "care_manager", "clinical_manager", "director"])).optional(),
+  isFirstLogin: z.enum(["yes", "no"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Helper function to check if user has permission
+export function hasPermission(userRoles: UserRole[], permission: keyof typeof ROLE_PERMISSIONS[UserRole]): boolean {
+  return userRoles.some(role => ROLE_PERMISSIONS[role]?.[permission]);
+}
 
 // Client types
 export type ClientCategory = "NDIS" | "Support at Home" | "Private";

@@ -6,8 +6,26 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import session from "express-session";
+import MemoryStore from "memorystore";
 
 import { registerRoutes } from "./routes";
+
+// Extend express-session types
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+    user?: {
+      id: string;
+      email: string;
+      displayName: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      roles: string[];
+      isFirstLogin: string;
+    };
+  }
+}
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -21,6 +39,30 @@ export function log(message: string, source = "express") {
 }
 
 export const app = express();
+
+// Session store setup
+const SessionStore = MemoryStore(session);
+
+// Session middleware - require SESSION_SECRET in environment
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  console.warn("WARNING: SESSION_SECRET not set. Using fallback for development only.");
+}
+
+app.use(session({
+  secret: sessionSecret || 'empowerlink-dev-only-secret-do-not-use-in-production',
+  resave: false,
+  saveUninitialized: false,
+  store: new SessionStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 declare module 'http' {
   interface IncomingMessage {

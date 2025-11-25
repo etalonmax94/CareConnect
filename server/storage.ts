@@ -1,13 +1,14 @@
 import { db } from "./db";
 import { 
   clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
-  staff, supportCoordinators, planManagers, ndisServices,
+  staff, supportCoordinators, planManagers, ndisServices, users,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
   type InsertIncidentReport, type IncidentReport, type InsertPrivacyConsent, type PrivacyConsent,
   type InsertStaff, type Staff, type InsertSupportCoordinator, type SupportCoordinator,
-  type InsertPlanManager, type PlanManager, type InsertNdisService, type NdisService
+  type InsertPlanManager, type PlanManager, type InsertNdisService, type NdisService,
+  type InsertUser, type User, type UserRole
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -83,6 +84,16 @@ export interface IStorage {
   createNdisService(service: InsertNdisService): Promise<NdisService>;
   updateNdisService(id: string, service: Partial<InsertNdisService>): Promise<NdisService | undefined>;
   deleteNdisService(id: string): Promise<boolean>;
+  
+  // Users (Zoho Auth)
+  getUserByZohoId(zohoUserId: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
+  updateUserRoles(id: string, roles: UserRole[]): Promise<User | undefined>;
+  updateUserTokens(id: string, accessToken: string, refreshToken: string, expiresAt: Date): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -405,6 +416,61 @@ export class DbStorage implements IStorage {
   async deleteNdisService(id: string): Promise<boolean> {
     const result = await db.delete(ndisServices).where(eq(ndisServices.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Users (Zoho Auth)
+  async getUserByZohoId(zohoUserId: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.zohoUserId, zohoUserId)).limit(1);
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(user).returning();
+    return result[0];
+  }
+
+  async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ ...userUpdate as any, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateUserRoles(id: string, roles: UserRole[]): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ roles, isFirstLogin: "no", updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateUserTokens(id: string, accessToken: string, refreshToken: string, expiresAt: Date): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ 
+        zohoAccessToken: accessToken, 
+        zohoRefreshToken: refreshToken, 
+        zohoTokenExpiresAt: expiresAt,
+        lastLoginAt: new Date(),
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.displayName);
   }
 }
 

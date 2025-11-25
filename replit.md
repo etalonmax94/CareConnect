@@ -6,7 +6,16 @@ A comprehensive CRM system for managing three categories of healthcare clients (
 ## Current Status
 ### ✅ Completed Modules
 
-1. **Client Management**
+1. **Zoho OAuth2 Authentication**
+   - Zoho OAuth2 login flow with accounts.zoho.com.au
+   - Session-based authentication with express-session (24-hour expiry)
+   - Multi-role selection on first login
+   - Personalized sidebar greeting "Hi @[displayName]"
+   - Secure session configuration with sameSite cookie flag
+   - Role-based access control foundation
+   - Available roles: Support Worker, Enrolled Nurse, Registered Nurse, Admin, Operations Manager, Care Manager, Clinical Manager, Director
+
+2. **Client Management**
    - Three client categories: NDIS, Support at Home (with HCP fields), Private
    - Full CRUD operations with real backend API integration
    - Client profiles with care team, clinical notes, and document tracking
@@ -14,13 +23,13 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - Multi-select notification preferences with checkboxes (SMS Schedule, SMS Arrival, Call Schedule, Call Arrival, N/A)
    - Profile displays multiple notification preference badges with icons
 
-2. **Staff & Team Management**
+3. **Staff & Team Management**
    - Staff management with roles (support_worker, nurse, care_manager, admin)
    - Support Coordinators management with organization tracking
    - Plan Managers management with organization tracking
    - Full CRUD operations for all management pages
 
-3. **Interactive Dashboard**
+4. **Interactive Dashboard**
    - Gradient-coded urgency tiles (blue/green/amber/red)
    - Clickable stat cards with drill-down modals showing filtered client data
    - New Clients (30 days) with detailed list modal
@@ -28,19 +37,19 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - Due This Month and Overdue Items with client lists
    - Recent Activity feed with client events
 
-4. **Reports System**
+5. **Reports System**
    - Age Demographics chart using Recharts
    - Incident Reports graph with monthly visualization
    - Budget Reports by category and client
    - Missing Documents report for compliance tracking
    - Distance From Office report (from Caboolture: 9/73-75 King Street)
 
-5. **Settings Management**
+6. **Settings Management**
    - Office location configuration (default: 9/73-75 King Street, Caboolture QLD 4510)
    - Report preferences and display settings
    - Company information management
 
-6. **Database Schema**
+7. **Database Schema**
    - PostgreSQL with complete table structure
    - Clients table with JSON fields for flexible data storage
    - Progress Notes table for activity tracking
@@ -52,13 +61,13 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - ActivityLog table for audit trails
    - IncidentReports table for incident tracking
 
-7. **Australian Privacy Compliance**
+8. **Australian Privacy Compliance**
    - Privacy consent tracking with collection dates
    - Activity logging for audit trails
    - Consent tracking with collection dates
    - Audit fields for data changes
 
-8. **API Integration**
+9. **API Integration**
    - Backend: Express.js with Drizzle ORM
    - Frontend: React Query for data fetching and caching
    - Proper validation using Zod schemas
@@ -82,9 +91,14 @@ A comprehensive CRM system for managing three categories of healthcare clients (
 - Zod for schema validation
 
 ### Key Files
-- `shared/schema.ts` - Database schema and Zod validations (includes Settings, PrivacyConsent, ActivityLog, IncidentReports)
-- `server/storage.ts` - Database operations interface
-- `server/routes.ts` - API endpoints with proper validation
+- `shared/schema.ts` - Database schema and Zod validations (includes Users, Settings, PrivacyConsent, ActivityLog, IncidentReports)
+- `server/storage.ts` - Database operations interface (includes user management methods)
+- `server/routes.ts` - API endpoints with proper validation (includes auth routes)
+- `server/app.ts` - Express app setup with session middleware
+- `client/src/App.tsx` - Main app with auth state management and routing
+- `client/src/pages/Login.tsx` - Zoho OAuth login page
+- `client/src/pages/SelectRole.tsx` - First-login role selection
+- `client/src/components/AppSidebar.tsx` - Sidebar with user greeting and logout
 - `client/src/pages/Dashboard.tsx` - Interactive dashboard with clickable tiles
 - `client/src/pages/Reports.tsx` - Reports page with charts
 - `client/src/pages/Settings.tsx` - Settings management
