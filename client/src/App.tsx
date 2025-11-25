@@ -22,6 +22,8 @@ import Pharmacies from "@/pages/Pharmacies";
 import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
 import LeadershipMeeting from "@/pages/LeadershipMeeting";
+import Quotes from "@/pages/Quotes";
+import QuoteEditor from "@/pages/QuoteEditor";
 import Login from "@/pages/Login";
 import SelectRole from "@/pages/SelectRole";
 import NotFound from "@/pages/not-found";
@@ -55,6 +57,8 @@ function ProtectedRouter() {
       <Route path="/gps" component={GPs} />
       <Route path="/pharmacies" component={Pharmacies} />
       <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
+      <Route path="/quotes" component={Quotes} />
+      <Route path="/quotes/:id" component={QuoteEditor} />
       <Route path="/reports" component={Reports} />
       <Route path="/leadership-meeting" component={LeadershipMeeting} />
       <Route path="/settings" component={Settings} />

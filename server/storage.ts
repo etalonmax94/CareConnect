@@ -3,6 +3,7 @@ import {
   clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
+  ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
@@ -14,7 +15,10 @@ import {
   type InsertDocument, type Document, 
   type InsertClientStaffAssignment, type ClientStaffAssignment,
   type InsertServiceDelivery, type ServiceDelivery,
-  type InsertClientGoal, type ClientGoal
+  type InsertClientGoal, type ClientGoal,
+  type InsertNdisPriceGuideItem, type NdisPriceGuideItem,
+  type InsertQuote, type Quote, type InsertQuoteLineItem, type QuoteLineItem,
+  type InsertQuoteStatusHistory, type QuoteStatusHistory
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -150,6 +154,36 @@ export interface IStorage {
   
   // Budget Management
   deleteBudget(id: string): Promise<boolean>;
+  
+  // NDIS Price Guide
+  getAllPriceGuideItems(): Promise<NdisPriceGuideItem[]>;
+  getActivePriceGuideItems(): Promise<NdisPriceGuideItem[]>;
+  getPriceGuideItemById(id: string): Promise<NdisPriceGuideItem | undefined>;
+  searchPriceGuideItems(searchTerm: string): Promise<NdisPriceGuideItem[]>;
+  createPriceGuideItem(item: InsertNdisPriceGuideItem): Promise<NdisPriceGuideItem>;
+  updatePriceGuideItem(id: string, item: Partial<InsertNdisPriceGuideItem>): Promise<NdisPriceGuideItem | undefined>;
+  deletePriceGuideItem(id: string): Promise<boolean>;
+  
+  // Quotes
+  getAllQuotes(): Promise<Quote[]>;
+  getQuotesByClient(clientId: string): Promise<Quote[]>;
+  getQuoteById(id: string): Promise<Quote | undefined>;
+  getQuoteByNumber(quoteNumber: string): Promise<Quote | undefined>;
+  createQuote(quote: InsertQuote): Promise<Quote>;
+  updateQuote(id: string, quote: Partial<InsertQuote>): Promise<Quote | undefined>;
+  deleteQuote(id: string): Promise<boolean>;
+  getNextQuoteNumber(): Promise<string>;
+  
+  // Quote Line Items
+  getLineItemsByQuote(quoteId: string): Promise<QuoteLineItem[]>;
+  createLineItem(item: InsertQuoteLineItem): Promise<QuoteLineItem>;
+  updateLineItem(id: string, item: Partial<InsertQuoteLineItem>): Promise<QuoteLineItem | undefined>;
+  deleteLineItem(id: string): Promise<boolean>;
+  deleteLineItemsByQuote(quoteId: string): Promise<boolean>;
+  
+  // Quote Status History
+  getStatusHistoryByQuote(quoteId: string): Promise<QuoteStatusHistory[]>;
+  createStatusHistory(history: InsertQuoteStatusHistory): Promise<QuoteStatusHistory>;
 }
 
 export class DbStorage implements IStorage {
@@ -806,6 +840,145 @@ export class DbStorage implements IStorage {
   async deleteBudget(id: string): Promise<boolean> {
     const result = await db.delete(budgets).where(eq(budgets.id, id)).returning();
     return result.length > 0;
+  }
+
+  // NDIS Price Guide
+  async getAllPriceGuideItems(): Promise<NdisPriceGuideItem[]> {
+    return await db.select().from(ndisPriceGuideItems).orderBy(ndisPriceGuideItems.supportItemNumber);
+  }
+
+  async getActivePriceGuideItems(): Promise<NdisPriceGuideItem[]> {
+    return await db.select().from(ndisPriceGuideItems)
+      .where(eq(ndisPriceGuideItems.isActive, "yes"))
+      .orderBy(ndisPriceGuideItems.supportItemNumber);
+  }
+
+  async getPriceGuideItemById(id: string): Promise<NdisPriceGuideItem | undefined> {
+    const result = await db.select().from(ndisPriceGuideItems).where(eq(ndisPriceGuideItems.id, id)).limit(1);
+    return result[0];
+  }
+
+  async searchPriceGuideItems(searchTerm: string): Promise<NdisPriceGuideItem[]> {
+    return await db.select().from(ndisPriceGuideItems)
+      .where(
+        and(
+          eq(ndisPriceGuideItems.isActive, "yes"),
+          or(
+            ilike(ndisPriceGuideItems.supportItemNumber, `%${searchTerm}%`),
+            ilike(ndisPriceGuideItems.supportItemName, `%${searchTerm}%`),
+            ilike(ndisPriceGuideItems.supportCategory, `%${searchTerm}%`)
+          )
+        )
+      )
+      .orderBy(ndisPriceGuideItems.supportItemNumber)
+      .limit(50);
+  }
+
+  async createPriceGuideItem(item: InsertNdisPriceGuideItem): Promise<NdisPriceGuideItem> {
+    const result = await db.insert(ndisPriceGuideItems).values(item).returning();
+    return result[0];
+  }
+
+  async updatePriceGuideItem(id: string, item: Partial<InsertNdisPriceGuideItem>): Promise<NdisPriceGuideItem | undefined> {
+    const result = await db.update(ndisPriceGuideItems)
+      .set({ ...item as any, updatedAt: new Date() })
+      .where(eq(ndisPriceGuideItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePriceGuideItem(id: string): Promise<boolean> {
+    const result = await db.delete(ndisPriceGuideItems).where(eq(ndisPriceGuideItems.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Quotes
+  async getAllQuotes(): Promise<Quote[]> {
+    return await db.select().from(quotes).orderBy(desc(quotes.createdAt));
+  }
+
+  async getQuotesByClient(clientId: string): Promise<Quote[]> {
+    return await db.select().from(quotes)
+      .where(eq(quotes.clientId, clientId))
+      .orderBy(desc(quotes.createdAt));
+  }
+
+  async getQuoteById(id: string): Promise<Quote | undefined> {
+    const result = await db.select().from(quotes).where(eq(quotes.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getQuoteByNumber(quoteNumber: string): Promise<Quote | undefined> {
+    const result = await db.select().from(quotes).where(eq(quotes.quoteNumber, quoteNumber)).limit(1);
+    return result[0];
+  }
+
+  async createQuote(quote: InsertQuote): Promise<Quote> {
+    const result = await db.insert(quotes).values(quote).returning();
+    return result[0];
+  }
+
+  async updateQuote(id: string, quoteUpdate: Partial<InsertQuote>): Promise<Quote | undefined> {
+    const result = await db.update(quotes)
+      .set({ ...quoteUpdate as any, updatedAt: new Date() })
+      .where(eq(quotes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteQuote(id: string): Promise<boolean> {
+    const result = await db.delete(quotes).where(eq(quotes.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getNextQuoteNumber(): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(quotes);
+    const count = result[0]?.count || 0;
+    const year = new Date().getFullYear();
+    const nextNum = Number(count) + 1;
+    return `Q${year}-${String(nextNum).padStart(4, '0')}`;
+  }
+
+  // Quote Line Items
+  async getLineItemsByQuote(quoteId: string): Promise<QuoteLineItem[]> {
+    return await db.select().from(quoteLineItems)
+      .where(eq(quoteLineItems.quoteId, quoteId))
+      .orderBy(quoteLineItems.sortOrder);
+  }
+
+  async createLineItem(item: InsertQuoteLineItem): Promise<QuoteLineItem> {
+    const result = await db.insert(quoteLineItems).values(item).returning();
+    return result[0];
+  }
+
+  async updateLineItem(id: string, item: Partial<InsertQuoteLineItem>): Promise<QuoteLineItem | undefined> {
+    const result = await db.update(quoteLineItems)
+      .set(item as any)
+      .where(eq(quoteLineItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLineItem(id: string): Promise<boolean> {
+    const result = await db.delete(quoteLineItems).where(eq(quoteLineItems.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deleteLineItemsByQuote(quoteId: string): Promise<boolean> {
+    const result = await db.delete(quoteLineItems).where(eq(quoteLineItems.quoteId, quoteId)).returning();
+    return result.length >= 0;
+  }
+
+  // Quote Status History
+  async getStatusHistoryByQuote(quoteId: string): Promise<QuoteStatusHistory[]> {
+    return await db.select().from(quoteStatusHistory)
+      .where(eq(quoteStatusHistory.quoteId, quoteId))
+      .orderBy(desc(quoteStatusHistory.createdAt));
+  }
+
+  async createStatusHistory(history: InsertQuoteStatusHistory): Promise<QuoteStatusHistory> {
+    const result = await db.insert(quoteStatusHistory).values(history).returning();
+    return result[0];
   }
 }
 

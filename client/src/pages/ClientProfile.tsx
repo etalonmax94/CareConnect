@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -241,11 +241,33 @@ export default function ClientProfile() {
 
   // Budget management state
   const [addBudgetOpen, setAddBudgetOpen] = useState(false);
+  const [editBudgetOpen, setEditBudgetOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [budgetCategory, setBudgetCategory] = useState("");
   const [budgetAllocated, setBudgetAllocated] = useState("");
   const [budgetUsed, setBudgetUsed] = useState("0");
   const [budgetStartDate, setBudgetStartDate] = useState("");
   const [budgetEndDate, setBudgetEndDate] = useState("");
+
+  const openEditBudget = (budget: Budget) => {
+    setEditingBudget(budget);
+    setBudgetCategory(budget.category);
+    setBudgetAllocated(budget.totalAllocated);
+    setBudgetUsed(budget.used || "0");
+    setBudgetStartDate(budget.startDate || "");
+    setBudgetEndDate(budget.endDate || "");
+    setEditBudgetOpen(true);
+  };
+
+  const closeEditBudget = () => {
+    setEditBudgetOpen(false);
+    setEditingBudget(null);
+    setBudgetCategory("");
+    setBudgetAllocated("");
+    setBudgetUsed("0");
+    setBudgetStartDate("");
+    setBudgetEndDate("");
+  };
 
   const addBudgetMutation = useMutation({
     mutationFn: async (data: { clientId: string; category: string; totalAllocated: string; used: string; startDate?: string; endDate?: string }) => {
@@ -272,6 +294,11 @@ export default function ClientProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets", params?.id] });
+      closeEditBudget();
+      toast({ title: "Budget updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update budget", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1335,7 +1362,7 @@ export default function ClientProfile() {
                             <div className="flex items-center gap-1">
                               <Select 
                                 value={goal.status} 
-                                onValueChange={(v) => updateGoalMutation.mutate({ id: goal.id, data: { status: v } })}
+                                onValueChange={(v) => updateGoalMutation.mutate({ id: goal.id, data: { status: v as "not_started" | "in_progress" | "achieved" | "on_hold" } })}
                               >
                                 <SelectTrigger className="w-[120px] h-8 text-xs" data-testid={`select-goal-status-${goal.id}`}>
                                   <SelectValue />
@@ -1794,6 +1821,95 @@ export default function ClientProfile() {
                     </DialogContent>
                   </Dialog>
                 )}
+
+                {/* Edit Budget Dialog */}
+                <Dialog open={editBudgetOpen} onOpenChange={(open) => !open && closeEditBudget()}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Budget Allocation</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={budgetCategory} onValueChange={setBudgetCategory}>
+                          <SelectTrigger data-testid="select-edit-budget-category">
+                            <SelectValue placeholder="Select category..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Core Supports">Core Supports</SelectItem>
+                            <SelectItem value="Capacity Building">Capacity Building</SelectItem>
+                            <SelectItem value="Capital Supports">Capital Supports</SelectItem>
+                            <SelectItem value="Support Coordination">Support Coordination</SelectItem>
+                            <SelectItem value="Assistance with Daily Life">Assistance with Daily Life</SelectItem>
+                            <SelectItem value="Transport">Transport</SelectItem>
+                            <SelectItem value="Consumables">Consumables</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Allocated Amount ($) *</Label>
+                          <Input 
+                            type="number" 
+                            placeholder="0.00"
+                            value={budgetAllocated}
+                            onChange={(e) => setBudgetAllocated(e.target.value)}
+                            data-testid="input-edit-budget-allocated"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Used Amount ($)</Label>
+                          <Input 
+                            type="number" 
+                            placeholder="0.00"
+                            value={budgetUsed}
+                            onChange={(e) => setBudgetUsed(e.target.value)}
+                            data-testid="input-edit-budget-used"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Start Date</Label>
+                          <Input 
+                            type="date" 
+                            value={budgetStartDate}
+                            onChange={(e) => setBudgetStartDate(e.target.value)}
+                            data-testid="input-edit-budget-start"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>End Date</Label>
+                          <Input 
+                            type="date" 
+                            value={budgetEndDate}
+                            onChange={(e) => setBudgetEndDate(e.target.value)}
+                            data-testid="input-edit-budget-end"
+                          />
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={() => editingBudget && updateBudgetMutation.mutate({ 
+                          id: editingBudget.id,
+                          data: {
+                            category: budgetCategory, 
+                            totalAllocated: budgetAllocated,
+                            used: budgetUsed || "0",
+                            startDate: budgetStartDate || undefined,
+                            endDate: budgetEndDate || undefined
+                          }
+                        })}
+                        disabled={!budgetCategory || !budgetAllocated || updateBudgetMutation.isPending}
+                        className="w-full"
+                        data-testid="button-update-budget"
+                      >
+                        {updateBudgetMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Update Budget
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardHeader>
             <CardContent>
@@ -1811,10 +1927,24 @@ export default function ClientProfile() {
                         data-testid={`budget-${budget.id}`}
                       >
                         <div className="flex items-start justify-between gap-4 mb-3">
-                          <div>
-                            <h4 className="font-medium text-sm">{budget.category}</h4>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium text-sm">{budget.category}</h4>
+                              <Badge 
+                                variant="secondary"
+                                className={`text-xs ${
+                                  percent > 100 
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
+                                    : percent >= 80 
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
+                                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                }`}
+                              >
+                                {percent > 100 ? 'Over Budget' : percent >= 80 ? 'Low' : 'Healthy'}
+                              </Badge>
+                            </div>
                             {(budget.startDate || budget.endDate) && (
-                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
                                 {budget.startDate ? new Date(budget.startDate).toLocaleDateString('en-AU') : "N/A"} - {budget.endDate ? new Date(budget.endDate).toLocaleDateString('en-AU') : "Ongoing"}
                               </p>
@@ -1828,28 +1958,36 @@ export default function ClientProfile() {
                               </p>
                             </div>
                             {!isArchived && (
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => deleteBudgetMutation.mutate(budget.id)}
-                                data-testid={`button-delete-budget-${budget.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              <>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-8 w-8"
+                                  onClick={() => openEditBudget(budget)}
+                                  data-testid={`button-edit-budget-${budget.id}`}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={() => deleteBudgetMutation.mutate(budget.id)}
+                                  data-testid={`button-delete-budget-${budget.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>{percent}% used</span>
-                            <span className={`font-medium ${percent > 80 ? 'text-red-500' : percent > 60 ? 'text-amber-500' : 'text-green-500'}`}>
-                              {percent > 100 ? 'Over budget!' : percent > 80 ? 'Low' : percent > 60 ? 'Moderate' : 'Healthy'}
-                            </span>
                           </div>
                           <Progress 
                             value={Math.min(percent, 100)} 
-                            className={`h-2 ${percent > 80 ? '[&>div]:bg-red-500' : percent > 60 ? '[&>div]:bg-amber-500' : '[&>div]:bg-green-500'}`}
+                            className={`h-2 ${percent > 100 ? '[&>div]:bg-red-500' : percent >= 80 ? '[&>div]:bg-amber-500' : '[&>div]:bg-green-500'}`}
                           />
                         </div>
                       </div>

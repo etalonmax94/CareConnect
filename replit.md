@@ -34,6 +34,14 @@ The system features a professional navy blue theme, reflecting healthcare indust
 - **Staff Assignments**: Tracks historical and current staff-client relationships with assignment types (primary support, secondary support, care manager, clinical nurse).
 - **Settings Module**: Configures office location, report preferences, and company information.
 - **Privacy & Compliance Module**: Tracks privacy consent with collection dates, maintains activity audit logs for all data changes, and enforces data retention policies.
+- **Quotes Module**: NDIS service quotation system to replace Excel-based estimates. Features include:
+  - Quote creation with client selection and validity dates
+  - NDIS Price Guide integration for service item lookup
+  - Line items with support item numbers, rate types (weekday, Saturday, Sunday, public holiday, evening, night)
+  - Automatic total calculation with GST exemption for NDIS
+  - Status workflow: draft → sent → accepted/declined/expired
+  - Status history tracking with timestamps
+  - Professional quote numbering (Q{YEAR}-{NUMBER})
 
 ### Data Interconnection
 The system implements comprehensive data interconnection to eliminate manual retyping:
@@ -57,6 +65,10 @@ The system implements comprehensive data interconnection to eliminate manual ret
   - `staff`, `support_coordinators`, `plan_managers`
   - `general_practitioners`, `pharmacies`
   - `ndis_services`
+  - `ndis_price_guide_items` - NDIS Price Guide with support items, rates for different time periods
+  - `quotes` - Service quotations with status tracking (draft, sent, accepted, declined, expired)
+  - `quote_line_items` - Individual line items with NDIS support references, quantities, rates
+  - `quote_status_history` - Audit trail for quote status changes
 - **API Integration**: Express.js backend with React Query on the frontend for efficient data fetching and caching. Zod schemas for robust validation across API endpoints.
 - **Date Handling**: All dates are properly formatted and validated, with schema support for 40+ compliance form dates.
 - **Distance Calculation**: Uses the Haversine formula for distance calculations from the Caboolture office.

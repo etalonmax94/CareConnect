@@ -2114,6 +2114,291 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== NDIS PRICE GUIDE ROUTES ====================
+  
+  // Get all price guide items
+  app.get("/api/price-guide", async (req, res) => {
+    try {
+      const activeOnly = req.query.active === "true";
+      const items = activeOnly 
+        ? await storage.getActivePriceGuideItems()
+        : await storage.getAllPriceGuideItems();
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching price guide items:", error);
+      res.status(500).json({ error: "Failed to fetch price guide items" });
+    }
+  });
+
+  // Search price guide items
+  app.get("/api/price-guide/search", async (req, res) => {
+    try {
+      const searchTerm = (req.query.q as string) || "";
+      const items = await storage.searchPriceGuideItems(searchTerm);
+      res.json(items);
+    } catch (error) {
+      console.error("Error searching price guide items:", error);
+      res.status(500).json({ error: "Failed to search price guide items" });
+    }
+  });
+
+  // Get single price guide item
+  app.get("/api/price-guide/:id", async (req, res) => {
+    try {
+      const item = await storage.getPriceGuideItemById(req.params.id);
+      if (!item) {
+        return res.status(404).json({ error: "Price guide item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Error fetching price guide item:", error);
+      res.status(500).json({ error: "Failed to fetch price guide item" });
+    }
+  });
+
+  // Create price guide item
+  app.post("/api/price-guide", async (req, res) => {
+    try {
+      const item = await storage.createPriceGuideItem(req.body);
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating price guide item:", error);
+      res.status(500).json({ error: "Failed to create price guide item" });
+    }
+  });
+
+  // Update price guide item
+  app.patch("/api/price-guide/:id", async (req, res) => {
+    try {
+      const item = await storage.updatePriceGuideItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ error: "Price guide item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating price guide item:", error);
+      res.status(500).json({ error: "Failed to update price guide item" });
+    }
+  });
+
+  // Delete price guide item
+  app.delete("/api/price-guide/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePriceGuideItem(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Price guide item not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting price guide item:", error);
+      res.status(500).json({ error: "Failed to delete price guide item" });
+    }
+  });
+
+  // ==================== QUOTES ROUTES ====================
+  
+  // Get all quotes
+  app.get("/api/quotes", async (req, res) => {
+    try {
+      const clientId = req.query.clientId as string;
+      if (clientId) {
+        const quotes = await storage.getQuotesByClient(clientId);
+        res.json(quotes);
+      } else {
+        const quotes = await storage.getAllQuotes();
+        res.json(quotes);
+      }
+    } catch (error) {
+      console.error("Error fetching quotes:", error);
+      res.status(500).json({ error: "Failed to fetch quotes" });
+    }
+  });
+
+  // Get next quote number
+  app.get("/api/quotes/next-number", async (req, res) => {
+    try {
+      const quoteNumber = await storage.getNextQuoteNumber();
+      res.json({ quoteNumber });
+    } catch (error) {
+      console.error("Error getting next quote number:", error);
+      res.status(500).json({ error: "Failed to get next quote number" });
+    }
+  });
+
+  // Get single quote with line items
+  app.get("/api/quotes/:id", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteById(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      const lineItems = await storage.getLineItemsByQuote(req.params.id);
+      const statusHistory = await storage.getStatusHistoryByQuote(req.params.id);
+      res.json({ ...quote, lineItems, statusHistory });
+    } catch (error) {
+      console.error("Error fetching quote:", error);
+      res.status(500).json({ error: "Failed to fetch quote" });
+    }
+  });
+
+  // Create quote
+  app.post("/api/quotes", async (req, res) => {
+    try {
+      const quoteNumber = await storage.getNextQuoteNumber();
+      const quote = await storage.createQuote({
+        ...req.body,
+        quoteNumber,
+        createdById: req.session?.user?.id
+      });
+      
+      // Log initial status
+      await storage.createStatusHistory({
+        quoteId: quote.id,
+        newStatus: "draft",
+        changedById: req.session?.user?.id,
+        changedByName: req.session?.user?.displayName || "System"
+      });
+      
+      res.status(201).json(quote);
+    } catch (error) {
+      console.error("Error creating quote:", error);
+      res.status(500).json({ error: "Failed to create quote" });
+    }
+  });
+
+  // Update quote
+  app.patch("/api/quotes/:id", async (req, res) => {
+    try {
+      const existingQuote = await storage.getQuoteById(req.params.id);
+      if (!existingQuote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      
+      const quote = await storage.updateQuote(req.params.id, req.body);
+      
+      // Log status change if status changed
+      if (req.body.status && req.body.status !== existingQuote.status) {
+        await storage.createStatusHistory({
+          quoteId: req.params.id,
+          previousStatus: existingQuote.status,
+          newStatus: req.body.status,
+          changedById: req.session?.user?.id,
+          changedByName: req.session?.user?.displayName || "System",
+          notes: req.body.statusNote
+        });
+      }
+      
+      res.json(quote);
+    } catch (error) {
+      console.error("Error updating quote:", error);
+      res.status(500).json({ error: "Failed to update quote" });
+    }
+  });
+
+  // Delete quote
+  app.delete("/api/quotes/:id", async (req, res) => {
+    try {
+      // Delete line items first
+      await storage.deleteLineItemsByQuote(req.params.id);
+      const deleted = await storage.deleteQuote(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting quote:", error);
+      res.status(500).json({ error: "Failed to delete quote" });
+    }
+  });
+
+  // ==================== QUOTE LINE ITEMS ROUTES ====================
+  
+  // Get line items for a quote
+  app.get("/api/quotes/:quoteId/items", async (req, res) => {
+    try {
+      const items = await storage.getLineItemsByQuote(req.params.quoteId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching quote line items:", error);
+      res.status(500).json({ error: "Failed to fetch quote line items" });
+    }
+  });
+
+  // Add line item to quote
+  app.post("/api/quotes/:quoteId/items", async (req, res) => {
+    try {
+      const item = await storage.createLineItem({
+        ...req.body,
+        quoteId: req.params.quoteId
+      });
+      
+      // Recalculate quote totals
+      const allItems = await storage.getLineItemsByQuote(req.params.quoteId);
+      const subtotal = allItems.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0);
+      await storage.updateQuote(req.params.quoteId, {
+        subtotal: subtotal.toFixed(2),
+        totalAmount: subtotal.toFixed(2) // GST exempt for NDIS
+      });
+      
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating quote line item:", error);
+      res.status(500).json({ error: "Failed to create quote line item" });
+    }
+  });
+
+  // Update line item
+  app.patch("/api/quote-items/:id", async (req, res) => {
+    try {
+      const item = await storage.updateLineItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ error: "Quote line item not found" });
+      }
+      
+      // Recalculate quote totals
+      const allItems = await storage.getLineItemsByQuote(item.quoteId);
+      const subtotal = allItems.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0);
+      await storage.updateQuote(item.quoteId, {
+        subtotal: subtotal.toFixed(2),
+        totalAmount: subtotal.toFixed(2)
+      });
+      
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating quote line item:", error);
+      res.status(500).json({ error: "Failed to update quote line item" });
+    }
+  });
+
+  // Delete line item
+  app.delete("/api/quote-items/:id", async (req, res) => {
+    try {
+      // Get the item first to know which quote to update
+      const items = await storage.getLineItemsByQuote(req.params.id);
+      const item = items.find(i => i.id === req.params.id);
+      
+      const deleted = await storage.deleteLineItem(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Quote line item not found" });
+      }
+      
+      // Recalculate quote totals if we found the quote
+      if (item) {
+        const remainingItems = await storage.getLineItemsByQuote(item.quoteId);
+        const subtotal = remainingItems.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0);
+        await storage.updateQuote(item.quoteId, {
+          subtotal: subtotal.toFixed(2),
+          totalAmount: subtotal.toFixed(2)
+        });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting quote line item:", error);
+      res.status(500).json({ error: "Failed to delete quote line item" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
