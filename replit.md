@@ -36,6 +36,7 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - Compliance Rate with overdue clients modal
    - Due This Month and Overdue Items with client lists
    - Recent Activity feed with client events
+   - Birthday Reminders tile (replaced Budget Overview): displays upcoming birthdays with clickable modal, normalized date calculations to include same-day birthdays, sorted chronologically with badges showing days until birthday
 
 5. **Reports System**
    - Age Demographics chart using Recharts
