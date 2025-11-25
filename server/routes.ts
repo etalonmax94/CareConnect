@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const authUrl = new URL(ZOHO_AUTH_URL);
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("client_id", ZOHO_CLIENT_ID);
-    authUrl.searchParams.set("scope", "AaaServer.profile.READ");
+    authUrl.searchParams.set("scope", "openid,profile,email");
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("access_type", "offline");
     authUrl.searchParams.set("prompt", "consent");
