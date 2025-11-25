@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User } from "lucide-react";
+import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,7 +28,7 @@ interface DashboardData {
   totalBudgetUsed: number;
 }
 
-type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | null;
+type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | "birthdays" | null;
 
 export default function Dashboard() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -48,6 +48,17 @@ export default function Dashboard() {
 
   const { data: activity = [] } = useQuery<ActivityLog[]>({
     queryKey: ["/api/activity"],
+  });
+
+  interface BirthdayClient extends Client {
+    age?: number;
+    daysUntilBirthday: number;
+    turningAge: number;
+    birthdayDate: string;
+  }
+
+  const { data: upcomingBirthdays = [] } = useQuery<BirthdayClient[]>({
+    queryKey: ["/api/clients/birthdays/30"],
   });
 
   const ndisClients = clients.filter(c => c.category === "NDIS").length;
@@ -254,38 +265,60 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Budget Overview</CardTitle>
+        <Card 
+          className="hover-elevate cursor-pointer"
+          onClick={() => setActiveModal("birthdays")}
+          data-testid="card-birthdays"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Cake className="w-5 h-5 text-pink-500" />
+              Birthday Reminders
+            </CardTitle>
+            <Badge variant="secondary" className="bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400">
+              {upcomingBirthdays.length} upcoming
+            </Badge>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Allocated</span>
-              <span className="text-xl font-semibold text-primary">
-                ${(dashboardData?.totalBudgetAllocated || 0).toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Used</span>
-              <span className="text-xl font-semibold">
-                ${(dashboardData?.totalBudgetUsed || 0).toLocaleString()}
-              </span>
-            </div>
-            <div className="h-3 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-primary rounded-full"
-                style={{ 
-                  width: `${dashboardData?.totalBudgetAllocated ? 
-                    Math.min((dashboardData.totalBudgetUsed / dashboardData.totalBudgetAllocated) * 100, 100) : 0}%` 
-                }}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Remaining</span>
-              <span className="text-xl font-semibold text-green-600">
-                ${((dashboardData?.totalBudgetAllocated || 0) - (dashboardData?.totalBudgetUsed || 0)).toLocaleString()}
-              </span>
-            </div>
+          <CardContent className="space-y-3">
+            {upcomingBirthdays.length > 0 ? (
+              upcomingBirthdays.slice(0, 3).map((client) => (
+                <div key={client.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      client.daysUntilBirthday === 0 ? 'bg-pink-500 text-white' : 
+                      client.daysUntilBirthday <= 7 ? 'bg-pink-100 dark:bg-pink-900/30' : 
+                      'bg-muted'
+                    }`}>
+                      {client.daysUntilBirthday === 0 ? (
+                        <Gift className="w-4 h-4" />
+                      ) : (
+                        <span className="text-xs font-bold">{client.daysUntilBirthday}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{client.participantName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {client.daysUntilBirthday === 0 
+                          ? `Turning ${client.turningAge} today!` 
+                          : `Turning ${client.turningAge} in ${client.daysUntilBirthday} days`}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                No birthdays in the next 30 days
+              </div>
+            )}
+            {upcomingBirthdays.length > 3 && (
+              <div className="text-center pt-2">
+                <span className="text-sm text-muted-foreground">
+                  +{upcomingBirthdays.length - 3} more birthdays
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -522,6 +555,93 @@ export default function Dashboard() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   No overdue documents
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Birthday Reminders Modal */}
+      <Dialog open={activeModal === "birthdays"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Cake className="w-5 h-5 text-pink-500" />
+              Upcoming Birthdays (Next 30 Days)
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3">
+              {upcomingBirthdays.length > 0 ? (
+                upcomingBirthdays.map((client) => (
+                  <Link key={client.id} href={`/clients/${client.id}`}>
+                    <Card className={`hover-elevate cursor-pointer ${
+                      client.daysUntilBirthday === 0 
+                        ? 'border-pink-400 bg-pink-50 dark:bg-pink-900/20' 
+                        : client.daysUntilBirthday <= 7 
+                          ? 'border-pink-200 dark:border-pink-800' 
+                          : ''
+                    }`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                              client.daysUntilBirthday === 0 
+                                ? 'bg-pink-500 text-white' 
+                                : client.daysUntilBirthday <= 7 
+                                  ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600' 
+                                  : 'bg-muted'
+                            }`}>
+                              {client.daysUntilBirthday === 0 ? (
+                                <Gift className="w-6 h-6" />
+                              ) : (
+                                <span className="text-lg font-bold">{client.daysUntilBirthday}</span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium">{client.participantName}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <CategoryBadge category={client.category} />
+                                <span className="text-sm text-muted-foreground">
+                                  {new Date(client.birthdayDate).toLocaleDateString('en-AU', { 
+                                    weekday: 'short',
+                                    day: 'numeric', 
+                                    month: 'short'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {client.daysUntilBirthday === 0 ? (
+                              <Badge className="bg-pink-500 hover:bg-pink-600 text-white">
+                                <Gift className="w-3 h-3 mr-1" />
+                                Birthday Today!
+                              </Badge>
+                            ) : client.daysUntilBirthday <= 7 ? (
+                              <Badge variant="outline" className="border-pink-300 text-pink-600 dark:border-pink-700 dark:text-pink-400">
+                                <Cake className="w-3 h-3 mr-1" />
+                                In {client.daysUntilBirthday} days
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">
+                                In {client.daysUntilBirthday} days
+                              </Badge>
+                            )}
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Turning {client.turningAge}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Cake className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>No birthdays in the next 30 days</p>
                 </div>
               )}
             </div>

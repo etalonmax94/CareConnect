@@ -26,6 +26,7 @@ export interface IStorage {
   getNewClients(days: number): Promise<Client[]>;
   archiveClient(id: string, userId: string, reason: string): Promise<Client | undefined>;
   restoreClient(id: string): Promise<Client | undefined>;
+  getUpcomingBirthdays(days: number): Promise<Client[]>;
   
   // Progress Notes
   getProgressNotesByClientId(clientId: string): Promise<ProgressNote[]>;
@@ -233,6 +234,47 @@ export class DbStorage implements IStorage {
       .where(eq(clients.id, id))
       .returning();
     return result[0];
+  }
+
+  async getUpcomingBirthdays(days: number): Promise<Client[]> {
+    // Get all active clients with a date of birth
+    const allClients = await this.getActiveClients();
+    
+    // Normalize to start of day (midnight) for accurate date-only comparisons
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentYear = today.getFullYear();
+    
+    return allClients.filter(client => {
+      if (!client.dateOfBirth) return false;
+      
+      const dob = new Date(client.dateOfBirth);
+      // Create birthday this year at midnight
+      const birthdayThisYear = new Date(currentYear, dob.getMonth(), dob.getDate());
+      birthdayThisYear.setHours(0, 0, 0, 0);
+      
+      // If birthday has already passed this year (strictly before today), check next year
+      if (birthdayThisYear.getTime() < today.getTime()) {
+        birthdayThisYear.setFullYear(currentYear + 1);
+      }
+      
+      // Calculate days until birthday
+      const diffTime = birthdayThisYear.getTime() - today.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays >= 0 && diffDays <= days;
+    }).sort((a, b) => {
+      // Sort by upcoming birthday
+      const dobA = new Date(a.dateOfBirth!);
+      const dobB = new Date(b.dateOfBirth!);
+      const bdayA = new Date(currentYear, dobA.getMonth(), dobA.getDate());
+      const bdayB = new Date(currentYear, dobB.getMonth(), dobB.getDate());
+      bdayA.setHours(0, 0, 0, 0);
+      bdayB.setHours(0, 0, 0, 0);
+      if (bdayA.getTime() < today.getTime()) bdayA.setFullYear(currentYear + 1);
+      if (bdayB.getTime() < today.getTime()) bdayB.setFullYear(currentYear + 1);
+      return bdayA.getTime() - bdayB.getTime();
+    });
   }
 
   // Progress Notes

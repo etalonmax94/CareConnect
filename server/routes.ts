@@ -613,6 +613,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get upcoming birthdays
+  app.get("/api/clients/birthdays/:days", async (req, res) => {
+    try {
+      const days = parseInt(req.params.days) || 30;
+      const clients = await storage.getUpcomingBirthdays(days);
+      
+      // Calculate days until birthday and age for each client
+      // Normalize to start of day for accurate date-only comparisons
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const currentYear = today.getFullYear();
+      
+      const clientsWithBirthdayInfo = clients.map(client => {
+        const dob = new Date(client.dateOfBirth!);
+        const birthdayThisYear = new Date(currentYear, dob.getMonth(), dob.getDate());
+        birthdayThisYear.setHours(0, 0, 0, 0);
+        
+        // If birthday has already passed this year (strictly before today), check next year
+        if (birthdayThisYear.getTime() < today.getTime()) {
+          birthdayThisYear.setFullYear(currentYear + 1);
+        }
+        
+        const diffTime = birthdayThisYear.getTime() - today.getTime();
+        const daysUntilBirthday = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Calculate turning age
+        const turningAge = birthdayThisYear.getFullYear() - dob.getFullYear();
+        
+        return {
+          ...client,
+          age: calculateAge(client.dateOfBirth),
+          daysUntilBirthday,
+          turningAge,
+          birthdayDate: birthdayThisYear.toISOString(),
+        };
+      });
+      
+      res.json(clientsWithBirthdayInfo);
+    } catch (error) {
+      console.error("Error fetching upcoming birthdays:", error);
+      res.status(500).json({ error: "Failed to fetch upcoming birthdays" });
+    }
+  });
+
   // Get progress notes for a client
   app.get("/api/clients/:id/notes", async (req, res) => {
     try {
