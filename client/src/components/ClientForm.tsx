@@ -73,7 +73,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="NDIS">NDIS</SelectItem>
-                          <SelectItem value="Aged Care">Aged Care</SelectItem>
+                          <SelectItem value="Support at Home">Support at Home</SelectItem>
                           <SelectItem value="Private">Private</SelectItem>
                         </SelectContent>
                       </Select>
@@ -305,15 +305,15 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
               </Card>
             )}
 
-            {selectedCategory === "Aged Care" && (
+            {selectedCategory === "Support at Home" && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Aged Care (HCP) Details</CardTitle>
+                  <CardTitle className="text-base">Support at Home Details</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="agedCareDetails.hcpNumber"
+                    name="supportAtHomeDetails.hcpNumber"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>HCP Number</FormLabel>
@@ -327,7 +327,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                   <FormField
                     control={form.control}
-                    name="agedCareDetails.hcpFundingLevel"
+                    name="supportAtHomeDetails.hcpFundingLevel"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>HCP Funding Level</FormLabel>
@@ -341,7 +341,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                   <FormField
                     control={form.control}
-                    name="agedCareDetails.scheduleOfSupports"
+                    name="supportAtHomeDetails.scheduleOfSupports"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
                         <FormLabel>Schedule of Supports</FormLabel>

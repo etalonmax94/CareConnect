@@ -18,7 +18,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Client types
-export type ClientCategory = "NDIS" | "Aged Care" | "Private";
+export type ClientCategory = "NDIS" | "Support at Home" | "Private";
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -59,8 +59,8 @@ export const clients = pgTable("clients", {
     ndisConsentFormDate?: string;
   }>(),
   
-  // Aged Care (HCP) Details - stored as JSON
-  agedCareDetails: json("aged_care_details").$type<{
+  // Support at Home Details - stored as JSON
+  supportAtHomeDetails: json("support_at_home_details").$type<{
     hcpNumber?: string;
     hcpFundingLevel?: string;
     scheduleOfSupports?: string;
@@ -92,11 +92,11 @@ export const clients = pgTable("clients", {
 
 export const insertClientSchema = createInsertSchema(clients, {
   email: z.string().email().optional().or(z.literal("")),
-  category: z.enum(["NDIS", "Aged Care", "Private"]),
+  category: z.enum(["NDIS", "Support at Home", "Private"]),
   dateOfBirth: z.string().optional().or(z.literal("")),
   careTeam: z.any().optional(),
   ndisDetails: z.any().optional(),
-  agedCareDetails: z.any().optional(),
+  supportAtHomeDetails: z.any().optional(),
   privateClientDetails: z.any().optional(),
   clinicalDocuments: z.any().optional(),
 }).omit({
