@@ -229,6 +229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log("Tokens received successfully");
+      console.log("Token keys received:", Object.keys(tokens));
+      console.log("id_token present:", !!tokens.id_token);
       
       const { access_token, refresh_token, expires_in, id_token } = tokens;
       const expiresAt = new Date(Date.now() + (expires_in * 1000));
@@ -236,6 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Decode the id_token JWT to get user info (no need for separate API call)
       let zohoUser: any = {};
       if (id_token) {
+        console.log("id_token length:", id_token.length);
         try {
           // JWT has 3 parts: header.payload.signature - we need the payload (middle part)
           const payloadBase64 = id_token.split('.')[1];
