@@ -29,6 +29,7 @@ export interface IStorage {
   getUpcomingBirthdays(days: number): Promise<Client[]>;
   
   // Progress Notes
+  getAllProgressNotes(): Promise<ProgressNote[]>;
   getProgressNotesByClientId(clientId: string): Promise<ProgressNote[]>;
   createProgressNote(note: InsertProgressNote): Promise<ProgressNote>;
   
@@ -278,6 +279,11 @@ export class DbStorage implements IStorage {
   }
 
   // Progress Notes
+  async getAllProgressNotes(): Promise<ProgressNote[]> {
+    return await db.select().from(progressNotes)
+      .orderBy(desc(progressNotes.date));
+  }
+
   async getProgressNotesByClientId(clientId: string): Promise<ProgressNote[]> {
     return await db.select().from(progressNotes)
       .where(eq(progressNotes.clientId, clientId))

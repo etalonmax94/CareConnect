@@ -5,9 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { FileText, Users, AlertTriangle, DollarSign, MapPin, FileX, Loader2, ChevronRight } from "lucide-react";
+import { FileText, Users, AlertTriangle, DollarSign, MapPin, FileX, Loader2, ChevronRight, User } from "lucide-react";
 import { Link } from "wouter";
+import type { Client } from "@shared/schema";
 
 interface AgeDemographics {
   [key: string]: number;
@@ -60,9 +62,35 @@ interface DistanceReport {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+const AGE_RANGES: Record<string, [number, number]> = {
+  '0-17': [0, 17],
+  '18-34': [18, 34],
+  '35-54': [35, 54],
+  '55-74': [55, 74],
+  '75+': [75, 150],
+};
+
+function calculateAge(dateOfBirth: string | null): number | null {
+  if (!dateOfBirth) return null;
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 export default function Reports() {
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<string | null>(null);
+
   const { data: ageDemographics, isLoading: ageLoading } = useQuery<AgeDemographics>({
     queryKey: ["/api/reports/age-demographics"],
+  });
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients/active"],
   });
 
   const { data: incidentData, isLoading: incidentLoading } = useQuery<IncidentData[]>({
@@ -95,6 +123,35 @@ export default function Reports() {
 
   const totalBudgetAllocated = budgetData?.reduce((sum, b) => sum + b.allocated, 0) || 0;
   const totalBudgetUsed = budgetData?.reduce((sum, b) => sum + b.used, 0) || 0;
+
+  // Get clients filtered by age group
+  const getClientsByAgeGroup = (ageGroup: string) => {
+    const range = AGE_RANGES[ageGroup];
+    if (!range) return [];
+    return clients.filter(client => {
+      const age = calculateAge(client.dateOfBirth);
+      if (age === null) return false;
+      return age >= range[0] && age <= range[1];
+    }).map(client => ({
+      ...client,
+      age: calculateAge(client.dateOfBirth),
+    }));
+  };
+
+  const selectedClients = selectedAgeGroup ? getClientsByAgeGroup(selectedAgeGroup) : [];
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case "NDIS":
+        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      case "Support at Home":
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      case "Private":
+        return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
+      default:
+        return "";
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -196,15 +253,22 @@ export default function Reports() {
           <Card>
             <CardHeader>
               <CardTitle>Age Group Details</CardTitle>
+              <CardDescription>Click on an age group to view clients</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {ageChartData.map((item, index) => (
-                  <div key={item.range} className="text-center p-4 bg-muted/50 rounded-lg">
+                  <div
+                    key={item.range}
+                    className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover-elevate transition-all"
+                    onClick={() => setSelectedAgeGroup(item.range)}
+                    data-testid={`card-age-group-${item.range}`}
+                  >
                     <p className="text-2xl font-bold" style={{ color: COLORS[index % COLORS.length] }}>
                       {item.count}
                     </p>
                     <p className="text-sm text-muted-foreground">{item.range} years</p>
+                    <ChevronRight className="w-4 h-4 mx-auto mt-2 text-muted-foreground" />
                   </div>
                 ))}
               </div>
@@ -508,6 +572,58 @@ export default function Reports() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Age Group Details Modal */}
+      <Dialog open={selectedAgeGroup !== null} onOpenChange={() => setSelectedAgeGroup(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Clients Aged {selectedAgeGroup} Years
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3">
+              {selectedClients.length > 0 ? (
+                selectedClients.map((client) => (
+                  <Link key={client.id} href={`/clients/${client.id}`}>
+                    <Card className="hover-elevate cursor-pointer">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{client.participantName}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge className={getCategoryColor(client.category)}>
+                                  {client.category}
+                                </Badge>
+                                {client.age !== null && (
+                                  <span className="text-sm text-muted-foreground">
+                                    {client.age} years old
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>No clients in this age group</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

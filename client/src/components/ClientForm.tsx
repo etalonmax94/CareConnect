@@ -199,6 +199,26 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                 <FormField
                   control={form.control}
+                  name="allergies"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel className="text-red-600 dark:text-red-400 font-bold">Allergies</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          placeholder="List any known allergies..."
+                          className="border-red-200 dark:border-red-800 focus:border-red-400"
+                          data-testid="input-allergies"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="frequencyOfServices"
                   render={({ field }) => (
                     <FormItem>

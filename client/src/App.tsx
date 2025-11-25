@@ -3,9 +3,12 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
+import GlobalSearch from "@/components/GlobalSearch";
+import { Button } from "@/components/ui/button";
 import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
 import ClientProfile from "@/pages/ClientProfile";
@@ -16,10 +19,11 @@ import SupportCoordinators from "@/pages/SupportCoordinators";
 import PlanManagers from "@/pages/PlanManagers";
 import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
+import LeadershipMeeting from "@/pages/LeadershipMeeting";
 import Login from "@/pages/Login";
 import SelectRole from "@/pages/SelectRole";
 import NotFound from "@/pages/not-found";
-import { Loader2 } from "lucide-react";
+import { Loader2, ExternalLink, Calendar } from "lucide-react";
 
 interface AuthResponse {
   authenticated: boolean;
@@ -48,6 +52,7 @@ function ProtectedRouter() {
       <Route path="/plan-managers" component={PlanManagers} />
       <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
       <Route path="/reports" component={Reports} />
+      <Route path="/leadership-meeting" component={LeadershipMeeting} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
@@ -66,7 +71,25 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between px-6 py-3 border-b sticky top-0 bg-background z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <ThemeToggle />
+            <div className="flex items-center gap-3">
+              <GlobalSearch />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => window.open("https://app.connecteam.com", "_blank")}
+                    data-testid="button-connecteam"
+                  >
+                    <Calendar className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Open Connecteam</p>
+                </TooltipContent>
+              </Tooltip>
+              <ThemeToggle />
+            </div>
           </header>
           <main className="flex-1 overflow-y-auto p-6">
             <ProtectedRouter />

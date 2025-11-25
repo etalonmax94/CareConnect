@@ -96,6 +96,7 @@ export const clients = pgTable("clients", {
   nokEpoa: text("nok_epoa"),
   frequencyOfServices: text("frequency_of_services"),
   mainDiagnosis: text("main_diagnosis"),
+  allergies: text("allergies"),
   summaryOfServices: text("summary_of_services"),
   communicationNeeds: text("communication_needs"),
   highIntensitySupports: text("high_intensity_supports").array(),

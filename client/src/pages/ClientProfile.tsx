@@ -515,6 +515,17 @@ export default function ClientProfile() {
                   <p className="text-sm font-medium text-muted-foreground">Main Diagnosis</p>
                   <p className="text-sm mt-1">{client.mainDiagnosis || "Not provided"}</p>
                 </div>
+                {client.allergies && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <p className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      ALLERGIES
+                    </p>
+                    <p className="text-sm mt-1 font-bold text-red-600 dark:text-red-300" data-testid="text-allergies">
+                      {client.allergies}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

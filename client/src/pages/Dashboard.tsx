@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift } from "lucide-react";
+import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -113,12 +113,20 @@ export default function Dashboard() {
             Overview of client management and compliance status
           </p>
         </div>
-        <Link href="/clients/new">
-          <Button data-testid="button-add-client">
-            <Plus className="w-4 h-4 mr-2" />
-            Add New Client
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/leadership-meeting">
+            <Button variant="outline" data-testid="button-leadership-meeting">
+              <UsersRound className="w-4 h-4 mr-2" />
+              Leadership Meeting
+            </Button>
+          </Link>
+          <Link href="/clients/new">
+            <Button data-testid="button-add-client">
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Client
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

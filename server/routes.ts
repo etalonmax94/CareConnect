@@ -658,6 +658,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get progress notes for a client
+  // Get all progress notes
+  app.get("/api/progress-notes", async (req, res) => {
+    try {
+      const notes = await storage.getAllProgressNotes();
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching all progress notes:", error);
+      res.status(500).json({ error: "Failed to fetch progress notes" });
+    }
+  });
+
   app.get("/api/clients/:id/notes", async (req, res) => {
     try {
       const notes = await storage.getProgressNotesByClientId(req.params.id);
