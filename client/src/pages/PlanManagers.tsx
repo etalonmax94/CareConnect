@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Eye } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,11 @@ import type { PlanManager, Client } from "@shared/schema";
 
 export default function PlanManagersPage() {
   const { toast } = useToast();
+  const searchString = useSearch();
+  const highlightId = new URLSearchParams(searchString).get("highlight");
+  const [highlightedId, setHighlightedId] = useState<string | null>(highlightId);
+  const highlightRef = useRef<HTMLTableRowElement>(null);
+  
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<PlanManager | null>(null);
   const [deleteManager, setDeleteManager] = useState<PlanManager | null>(null);
@@ -50,6 +55,14 @@ export default function PlanManagersPage() {
   const { data: managers = [], isLoading } = useQuery<PlanManager[]>({
     queryKey: ["/api/plan-managers"],
   });
+
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      const timer = setTimeout(() => setHighlightedId(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightId, managers]);
 
   const { data: managerClients = [], isLoading: isLoadingClients } = useQuery<Client[]>({
     queryKey: ["/api/plan-managers", viewingClients?.id, "clients"],
@@ -248,7 +261,12 @@ export default function PlanManagersPage() {
               </TableHeader>
               <TableBody>
                 {managers.map((manager) => (
-                  <TableRow key={manager.id} data-testid={`row-manager-${manager.id}`}>
+                  <TableRow 
+                    key={manager.id} 
+                    ref={manager.id === highlightId ? highlightRef : undefined}
+                    className={highlightedId === manager.id ? "bg-primary/10 animate-pulse" : ""}
+                    data-testid={`row-manager-${manager.id}`}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-8 h-8">

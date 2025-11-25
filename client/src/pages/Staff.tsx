@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Phone, User, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,11 @@ import type { Staff } from "@shared/schema";
 
 export default function StaffPage() {
   const { toast } = useToast();
+  const searchString = useSearch();
+  const highlightId = new URLSearchParams(searchString).get("highlight");
+  const [highlightedId, setHighlightedId] = useState<string | null>(highlightId);
+  const highlightRef = useRef<HTMLTableRowElement>(null);
+  
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [deleteStaff, setDeleteStaff] = useState<Staff | null>(null);
@@ -55,6 +60,14 @@ export default function StaffPage() {
   const { data: staffList = [], isLoading } = useQuery<Staff[]>({
     queryKey: ["/api/staff"],
   });
+
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      const timer = setTimeout(() => setHighlightedId(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightId, staffList]);
 
   const createMutation = useMutation({
     mutationFn: (data: typeof formData) => apiRequest("POST", "/api/staff", data),
@@ -259,7 +272,12 @@ export default function StaffPage() {
               </TableHeader>
               <TableBody>
                 {staffList.map((staff) => (
-                  <TableRow key={staff.id} data-testid={`row-staff-${staff.id}`}>
+                  <TableRow 
+                    key={staff.id} 
+                    ref={staff.id === highlightId ? highlightRef : undefined}
+                    className={highlightedId === staff.id ? "bg-primary/10 animate-pulse" : ""}
+                    data-testid={`row-staff-${staff.id}`}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-8 h-8">
