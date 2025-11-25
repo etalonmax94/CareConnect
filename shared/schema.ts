@@ -162,6 +162,13 @@ export const clients = pgTable("clients", {
     woundCarePlanDate?: string;
   }>().notNull().default({}),
   
+  // Archive fields for Australian Privacy Act compliance (7-year retention)
+  isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
+  archivedAt: timestamp("archived_at"),
+  archivedByUserId: varchar("archived_by_user_id"),
+  archiveReason: text("archive_reason"),
+  retentionUntil: date("retention_until"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -177,10 +184,15 @@ export const insertClientSchema = createInsertSchema(clients, {
   clinicalDocuments: z.any().optional(),
   notificationPreferences: z.any().optional(),
   isPinned: z.enum(["yes", "no"]).optional(),
+  isArchived: z.enum(["yes", "no"]).optional(),
+  archiveReason: z.string().optional(),
+  retentionUntil: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  archivedAt: true,
+  archivedByUserId: true,
 });
 
 export const updateClientSchema = insertClientSchema.partial();

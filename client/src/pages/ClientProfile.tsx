@@ -1,14 +1,19 @@
-import { useRoute } from "wouter";
+import { useState } from "react";
+import { useRoute, useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall } from "lucide-react";
+import { ArchiveClientModal } from "@/components/ArchiveClientModal";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Client, Budget } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 
@@ -99,6 +104,9 @@ interface DistanceData {
 
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
+  const [, setLocation] = useLocation();
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const { toast } = useToast();
   
   const { data: client, isLoading } = useQuery<Client>({
     queryKey: ["/api/clients", params?.id],
@@ -114,6 +122,31 @@ export default function ClientProfile() {
     queryKey: [`/api/clients/${params?.id}/distance`],
     enabled: !!params?.id,
   });
+
+  const restoreMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/clients/${params?.id}/restore`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients/archived"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id] });
+      toast({
+        title: "Client restored",
+        description: "Client has been restored from archive successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore client",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isArchived = client?.isArchived === "yes";
 
   if (isLoading) {
     return (

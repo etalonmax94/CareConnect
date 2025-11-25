@@ -14,12 +14,13 @@ import { Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff } fr
 interface ClientTableProps {
   clients: Client[];
   onViewClient: (client: Client) => void;
+  isArchiveView?: boolean;
 }
 
 type SortField = "name" | "category" | "careManager" | "phone" | "compliance";
 type SortDirection = "asc" | "desc";
 
-export default function ClientTable({ clients, onViewClient }: ClientTableProps) {
+export default function ClientTable({ clients, onViewClient, isArchiveView = false }: ClientTableProps) {
   const [selectedCategory, setSelectedCategory] = useState<ClientCategory | "All">("All");
   const [selectedCareManager, setSelectedCareManager] = useState<string>("All");
   const [selectedCompliance, setSelectedCompliance] = useState<string>("All");

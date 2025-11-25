@@ -15,6 +15,8 @@ import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 export interface IStorage {
   // Clients
   getAllClients(): Promise<Client[]>;
+  getActiveClients(): Promise<Client[]>;
+  getArchivedClients(): Promise<Client[]>;
   getClientById(id: string): Promise<Client | undefined>;
   searchClients(searchTerm: string, category?: string): Promise<Client[]>;
   createClient(client: InsertClient): Promise<Client>;
@@ -22,6 +24,8 @@ export interface IStorage {
   deleteClient(id: string): Promise<boolean>;
   getNewClientsCount(days: number): Promise<number>;
   getNewClients(days: number): Promise<Client[]>;
+  archiveClient(id: string, userId: string, reason: string): Promise<Client | undefined>;
+  restoreClient(id: string): Promise<Client | undefined>;
   
   // Progress Notes
   getProgressNotesByClientId(clientId: string): Promise<ProgressNote[]>;
@@ -172,6 +176,54 @@ export class DbStorage implements IStorage {
       .from(clients)
       .where(gte(clients.createdAt, cutoffDate))
       .orderBy(desc(clients.createdAt));
+  }
+
+  async getActiveClients(): Promise<Client[]> {
+    return await db.select()
+      .from(clients)
+      .where(or(eq(clients.isArchived, "no"), sql`${clients.isArchived} IS NULL`))
+      .orderBy(desc(clients.createdAt));
+  }
+
+  async getArchivedClients(): Promise<Client[]> {
+    return await db.select()
+      .from(clients)
+      .where(eq(clients.isArchived, "yes"))
+      .orderBy(desc(clients.archivedAt));
+  }
+
+  async archiveClient(id: string, userId: string, reason: string): Promise<Client | undefined> {
+    const now = new Date();
+    const retentionDate = new Date();
+    retentionDate.setFullYear(retentionDate.getFullYear() + 7); // 7 years retention per Australian Privacy Act
+    
+    const result = await db.update(clients)
+      .set({
+        isArchived: "yes",
+        archivedAt: now,
+        archivedByUserId: userId,
+        archiveReason: reason,
+        retentionUntil: retentionDate.toISOString().split('T')[0],
+        updatedAt: now,
+      })
+      .where(eq(clients.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async restoreClient(id: string): Promise<Client | undefined> {
+    const result = await db.update(clients)
+      .set({
+        isArchived: "no",
+        archivedAt: null,
+        archivedByUserId: null,
+        archiveReason: null,
+        retentionUntil: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(clients.id, id))
+      .returning();
+    return result[0];
   }
 
   // Progress Notes

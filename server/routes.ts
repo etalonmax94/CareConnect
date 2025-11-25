@@ -488,6 +488,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get active clients (non-archived)
+  app.get("/api/clients/active", async (req, res) => {
+    try {
+      const activeClients = await storage.getActiveClients();
+      res.json(activeClients);
+    } catch (error) {
+      console.error("Error fetching active clients:", error);
+      res.status(500).json({ error: "Failed to fetch active clients" });
+    }
+  });
+
+  // Get archived clients
+  app.get("/api/clients/archived", async (req, res) => {
+    try {
+      const archivedClients = await storage.getArchivedClients();
+      res.json(archivedClients);
+    } catch (error) {
+      console.error("Error fetching archived clients:", error);
+      res.status(500).json({ error: "Failed to fetch archived clients" });
+    }
+  });
+
+  // Archive a client (Australian Privacy Act - 7 year retention)
+  app.post("/api/clients/:id/archive", requireAuth, async (req, res) => {
+    try {
+      const { reason } = req.body;
+      
+      if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+        return res.status(400).json({ error: "Archive reason is required" });
+      }
+      
+      const userId = req.session.userId || 'system';
+      const client = await storage.archiveClient(req.params.id, userId, reason.trim());
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      // Log the archive action
+      await storage.logActivity({
+        clientId: client.id,
+        action: "client_archived",
+        description: `Client archived. Reason: ${reason.trim()}. Retention until: ${client.retentionUntil}`,
+        performedBy: userId,
+      });
+      
+      res.json(client);
+    } catch (error) {
+      console.error("Error archiving client:", error);
+      res.status(500).json({ error: "Failed to archive client" });
+    }
+  });
+
+  // Restore an archived client
+  app.post("/api/clients/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const client = await storage.restoreClient(req.params.id);
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const userId = req.session.userId || 'system';
+      
+      // Log the restore action
+      await storage.logActivity({
+        clientId: client.id,
+        action: "client_restored",
+        description: "Client restored from archive",
+        performedBy: userId,
+      });
+      
+      res.json(client);
+    } catch (error) {
+      console.error("Error restoring client:", error);
+      res.status(500).json({ error: "Failed to restore client" });
+    }
+  });
+
   // Get distance from office for a client
   app.get("/api/clients/:id/distance", async (req, res) => {
     try {
