@@ -182,8 +182,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Zoho OAuth callback
   app.get("/api/auth/zoho/callback", async (req, res) => {
+    console.log("=== ZOHO CALLBACK START ===");
     const { code, error } = req.query;
     const baseUrl = getBaseUrl(req);
+    console.log("Base URL:", baseUrl);
+    console.log("Code received:", code ? "yes" : "no");
     
     // Validate Zoho credentials are configured
     if (!ZOHO_CLIENT_ID || !ZOHO_CLIENT_SECRET) {
@@ -197,6 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     if (!code) {
+      console.error("No code received");
       return res.redirect("/login?error=no_code");
     }
     
@@ -217,11 +221,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const tokens = await tokenResponse.json();
+      console.log("Token response status:", tokenResponse.status);
       
       if (tokens.error) {
         console.error("Zoho token error:", tokens);
-        return res.redirect("/?error=token_error");
+        return res.redirect("/login?error=token_error");
       }
+      
+      console.log("Tokens received successfully");
       
       const { access_token, refresh_token, expires_in } = tokens;
       const expiresAt = new Date(Date.now() + (expires_in * 1000));
@@ -232,11 +239,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const zohoUser = await userResponse.json();
+      console.log("Zoho user response:", JSON.stringify(zohoUser));
       
       if (!zohoUser.Email) {
         console.error("Failed to get Zoho user info:", zohoUser);
-        return res.redirect("/?error=user_info_error");
+        return res.redirect("/login?error=user_info_error");
       }
+      
+      console.log("Zoho user email:", zohoUser.Email);
       
       // Check if user exists in our database
       let user = await storage.getUserByEmail(zohoUser.Email);
