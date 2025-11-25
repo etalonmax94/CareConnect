@@ -134,13 +134,18 @@ export default function ClientProfile() {
                     </div>
                   )}
                   {client.email && (
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-full">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-primary/10 rounded-full flex-shrink-0">
                         <Mail className="w-4 h-4 text-primary" />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs text-muted-foreground">Email</p>
-                        <a href={`mailto:${client.email}`} className="text-sm font-medium hover:text-primary truncate block max-w-[200px]">
+                        <a 
+                          href={`mailto:${client.email}`} 
+                          className="text-sm font-medium hover:text-primary block truncate"
+                          title={client.email}
+                          data-testid="text-client-email"
+                        >
                           {client.email}
                         </a>
                       </div>
