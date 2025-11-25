@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2 } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Client } from "@shared/schema";
@@ -88,7 +88,7 @@ export default function ClientProfile() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
                   {client.phoneNumber && (
                     <div className="flex items-center gap-2 text-sm">
                       <Phone className="w-4 h-4 text-muted-foreground" />
@@ -105,6 +105,17 @@ export default function ClientProfile() {
                     <div className="flex items-center gap-2 text-sm">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
                       <span>{client.homeAddress}</span>
+                    </div>
+                  )}
+                  {client.zohoWorkdriveLink && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:text-blue-800" data-testid="link-zoho-workdrive">
+                        <FileText className="w-4 h-4" />
+                        <span className="flex items-center gap-1">
+                          Workdrive
+                          <ExternalLink className="w-3 h-3" />
+                        </span>
+                      </a>
                     </div>
                   )}
                 </div>

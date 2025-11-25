@@ -38,6 +38,7 @@ export const clients = pgTable("clients", {
   highIntensitySupports: text("high_intensity_supports").array(),
   clinicalNotes: text("clinical_notes"),
   scheduleArrivalNotification: text("schedule_arrival_notification"),
+  zohoWorkdriveLink: text("zoho_workdrive_link"),
   
   // Care Team - stored as JSON
   careTeam: json("care_team").$type<{

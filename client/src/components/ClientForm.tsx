@@ -221,6 +221,20 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="zohoWorkdriveLink"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Zoho Workdrive Link</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="https://workdrive.zoho.com/..." type="url" data-testid="input-zoho-link" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
             </Card>
           </TabsContent>
