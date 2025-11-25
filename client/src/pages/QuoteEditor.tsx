@@ -16,6 +16,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Plus, Trash2, Send, Check, X, FileText, Search, DollarSign, Clock, Loader2, Save, Download, Calendar, Calculator, Info, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { BlobProvider } from '@react-pdf/renderer';
+import { QuotePDF } from "@/components/QuotePDF";
 import type { Quote, QuoteLineItem, NdisPriceGuideItem, Client } from "@shared/schema";
 
 type QuoteStatus = "draft" | "sent" | "accepted" | "declined" | "expired";
@@ -310,13 +312,14 @@ export default function QuoteEditor() {
   };
 
   const handleStatusChange = (newStatus: QuoteStatus) => {
-    const statusUpdates: Partial<Quote> = { status: newStatus };
+    const statusUpdates: Record<string, any> = { status: newStatus };
+    const now = new Date().toISOString();
     if (newStatus === "sent") {
-      statusUpdates.sentAt = new Date();
+      statusUpdates.sentAt = now;
     } else if (newStatus === "accepted") {
-      statusUpdates.acceptedAt = new Date();
+      statusUpdates.acceptedAt = now;
     } else if (newStatus === "declined") {
-      statusUpdates.declinedAt = new Date();
+      statusUpdates.declinedAt = now;
     }
     updateQuoteMutation.mutate(statusUpdates);
   };
@@ -330,6 +333,74 @@ export default function QuoteEditor() {
     
     return { weekly, annual };
   }, [quote?.lineItems]);
+
+  const handleTriggerPdfDownload = (blob: Blob | null, filename: string) => {
+    if (!blob) return;
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: "PDF downloaded successfully" });
+  };
+
+  const convertToBudgetMutation = useMutation({
+    mutationFn: async () => {
+      if (!quote?.lineItems?.length || !quote.clientId) {
+        throw new Error("No line items to convert");
+      }
+      
+      const budgetItems = quote.lineItems.map(item => {
+        const annualAmount = parseFloat(item.annualTotal || item.lineTotal || "0");
+        if (isNaN(annualAmount) || annualAmount <= 0) {
+          throw new Error(`Invalid amount for "${item.supportItemName || item.description}"`);
+        }
+        
+        return {
+          clientId: quote.clientId,
+          category: item.category || item.supportItemName || item.description || "Core Supports",
+          totalAllocated: annualAmount.toFixed(2),
+          used: "0",
+          startDate: quote.validUntil ? undefined : new Date().toISOString().split('T')[0],
+          endDate: quote.validUntil || undefined,
+        };
+      });
+      
+      const results = await Promise.all(
+        budgetItems.map(budget => 
+          apiRequest("POST", "/api/budgets", budget)
+        )
+      );
+      
+      await apiRequest("PATCH", `/api/quotes/${quote.id}`, {
+        convertedToBudgetAt: new Date().toISOString()
+      });
+      
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets", quote?.clientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      toast({ title: "Quote converted to budget allocations successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to convert quote to budgets", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const canConvertToBudget = quote?.status === "accepted" && 
+    !quote?.convertedToBudgetAt && 
+    quote?.lineItems?.length > 0;
 
   if (isLoading) {
     return (
@@ -375,6 +446,34 @@ export default function QuoteEditor() {
           <p className="text-muted-foreground">{quote.title}</p>
         </div>
         <div className="flex items-center gap-2">
+          {quote.lineItems?.length ? (
+            <BlobProvider document={<QuotePDF quote={quote} client={client || null} />}>
+              {({ blob, loading, error }) => (
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleTriggerPdfDownload(blob, `${quote.quoteNumber}-${client?.participantName?.replace(/\s+/g, '-') || 'quote'}.pdf`)}
+                  disabled={loading || !!error}
+                  data-testid="button-download-pdf"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Download PDF
+                </Button>
+              )}
+            </BlobProvider>
+          ) : (
+            <Button 
+              variant="outline" 
+              disabled
+              data-testid="button-download-pdf"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
+          )}
           {quote.status === "draft" && (
             <Button onClick={() => handleStatusChange("sent")} data-testid="button-send-quote">
               <Send className="w-4 h-4 mr-2" />
@@ -392,6 +491,27 @@ export default function QuoteEditor() {
                 Accepted
               </Button>
             </>
+          )}
+          {canConvertToBudget && (
+            <Button 
+              onClick={() => convertToBudgetMutation.mutate()}
+              disabled={convertToBudgetMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700"
+              data-testid="button-convert-to-budget"
+            >
+              {convertToBudgetMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <DollarSign className="w-4 h-4 mr-2" />
+              )}
+              Convert to Budget
+            </Button>
+          )}
+          {quote.convertedToBudgetAt && (
+            <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800">
+              <Check className="w-3 h-3" />
+              Converted to Budget
+            </Badge>
           )}
         </div>
       </div>
@@ -1075,18 +1195,10 @@ export default function QuoteEditor() {
                   <span className="font-medium">Quote Accepted</span>
                 </div>
                 <p className="text-sm text-green-600 dark:text-green-500 mt-1">
-                  This quote can be converted to budget allocations
+                  {quote.convertedToBudgetAt 
+                    ? "This quote has been converted to budget allocations" 
+                    : "This quote can be converted to budget allocations using the button above"}
                 </p>
-                <Button 
-                  className="w-full mt-3" 
-                  variant="outline"
-                  onClick={() => {
-                    toast({ title: "Feature coming soon", description: "Quote to budget conversion will be available soon" });
-                  }}
-                  data-testid="button-convert-to-budget"
-                >
-                  Convert to Budget
-                </Button>
               </CardContent>
             </Card>
           )}

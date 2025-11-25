@@ -919,8 +919,17 @@ export class DbStorage implements IStorage {
   }
 
   async updateQuote(id: string, quoteUpdate: Partial<InsertQuote>): Promise<Quote | undefined> {
+    // Parse date strings to Date objects for timestamp fields
+    const processedUpdate: any = { ...quoteUpdate };
+    const dateFields = ['sentAt', 'acceptedAt', 'declinedAt', 'convertedToBudgetAt'];
+    for (const field of dateFields) {
+      if (processedUpdate[field] && typeof processedUpdate[field] === 'string') {
+        processedUpdate[field] = new Date(processedUpdate[field]);
+      }
+    }
+    
     const result = await db.update(quotes)
-      .set({ ...quoteUpdate as any, updatedAt: new Date() })
+      .set({ ...processedUpdate, updatedAt: new Date() })
       .where(eq(quotes.id, id))
       .returning();
     return result[0];
