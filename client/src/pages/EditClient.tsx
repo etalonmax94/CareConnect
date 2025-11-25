@@ -21,11 +21,7 @@ export default function EditClient() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest(`/api/clients/${params?.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await apiRequest("PATCH", `/api/clients/${params?.id}`, data);
       return response;
     },
     onSuccess: () => {
@@ -85,7 +81,7 @@ export default function EditClient() {
 
       <ClientForm
         client={client}
-        onSubmit={(data) => updateMutation.mutateAsync(data)}
+        onSubmit={async (data) => { await updateMutation.mutateAsync(data); }}
         onCancel={() => setLocation(`/clients/${params?.id}`)}
       />
     </div>

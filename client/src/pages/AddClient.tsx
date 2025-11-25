@@ -15,11 +15,7 @@ export default function AddClient() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("/api/clients", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await apiRequest("POST", "/api/clients", data);
       return response;
     },
     onSuccess: () => {
@@ -56,7 +52,7 @@ export default function AddClient() {
       </div>
 
       <ClientForm
-        onSubmit={(data) => createMutation.mutateAsync(data)}
+        onSubmit={async (data) => { await createMutation.mutateAsync(data); }}
         onCancel={() => setLocation("/clients")}
       />
     </div>
