@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, FileText, Send, Check, X, Clock, Trash2, Eye, DollarSign, Users, TrendingUp, AlertCircle } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Search, FileText, Send, Check, X, Clock, Trash2, Eye, DollarSign, Users, TrendingUp, AlertCircle, ChevronsUpDown, User } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Quote, Client } from "@shared/schema";
@@ -51,6 +53,8 @@ export default function Quotes() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
   const [validUntil, setValidUntil] = useState("");
@@ -107,6 +111,18 @@ export default function Quotes() {
     return client?.participantName || "Unknown Client";
   };
 
+  const selectedClient = clients.find(c => c.id === selectedClientId);
+
+  const filteredClients = useMemo(() => {
+    return clients
+      .filter(c => !c.isArchived)
+      .filter(c => 
+        clientSearchTerm === "" ||
+        c.participantName.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+        (c.ndisDetails as any)?.ndisNumber?.toLowerCase().includes(clientSearchTerm.toLowerCase())
+      );
+  }, [clients, clientSearchTerm]);
+
   const stats = {
     total: quotes.length,
     draft: quotes.filter(q => q.status === "draft").length,
@@ -131,25 +147,106 @@ export default function Quotes() {
               New Quote
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Create New Quote</DialogTitle>
+              <DialogDescription>
+                Create an NDIS service quotation for a client
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Client *</Label>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger data-testid="select-quote-client">
-                    <SelectValue placeholder="Select a client..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.filter(c => !c.isArchived).map(client => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.participantName} - {client.category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={clientSearchOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="select-quote-client"
+                    >
+                      {selectedClient ? (
+                        <div className="flex items-center gap-2 truncate">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="truncate">{selectedClient.participantName}</span>
+                          <Badge variant="secondary" className="ml-auto text-xs">{selectedClient.category}</Badge>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Type client name to search...</span>
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Search by name or NDIS number..." 
+                        value={clientSearchTerm}
+                        onValueChange={setClientSearchTerm}
+                        data-testid="input-client-search"
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {clientSearchTerm.length > 0 
+                            ? "No clients found." 
+                            : "Type to search clients..."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {filteredClients.slice(0, 10).map((client) => (
+                            <CommandItem
+                              key={client.id}
+                              value={client.id}
+                              onSelect={() => {
+                                setSelectedClientId(client.id);
+                                setClientSearchOpen(false);
+                                setClientSearchTerm("");
+                              }}
+                              className="cursor-pointer"
+                              data-testid={`client-option-${client.id}`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center gap-2">
+                                  <User className="w-4 h-4 text-muted-foreground" />
+                                  <div>
+                                    <p className="font-medium">{client.participantName}</p>
+                                    {(client.ndisDetails as any)?.ndisNumber && (
+                                      <p className="text-xs text-muted-foreground">
+                                        NDIS: {(client.ndisDetails as any).ndisNumber}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className="text-xs">{client.category}</Badge>
+                              </div>
+                              {selectedClientId === client.id && (
+                                <Check className="ml-2 h-4 w-4" />
+                              )}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {selectedClient && (
+                  <div className="p-3 border rounded-lg bg-muted/30 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{selectedClient.participantName}</span>
+                      <Badge variant="secondary">{selectedClient.category}</Badge>
+                    </div>
+                    {(selectedClient.ndisDetails as any)?.ndisNumber && (
+                      <p className="text-xs text-muted-foreground">
+                        NDIS Number: {(selectedClient.ndisDetails as any).ndisNumber}
+                      </p>
+                    )}
+                    {selectedClient.phoneNumber && (
+                      <p className="text-xs text-muted-foreground">
+                        Phone: {selectedClient.phoneNumber}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Quote Title *</Label>

@@ -739,19 +739,46 @@ export const insertQuoteSchema = createInsertSchema(quotes, {
 export type InsertQuote = z.infer<typeof insertQuoteSchema>;
 export type Quote = typeof quotes.$inferSelect;
 
-// Quote Line Items - Individual service items in a quote
+// Quote Line Items - Individual service items in a quote with comprehensive NDIS pricing
 export const quoteLineItems = pgTable("quote_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
   priceGuideItemId: varchar("price_guide_item_id").references(() => ndisPriceGuideItems.id, { onDelete: "set null" }),
   supportItemNumber: text("support_item_number"),
+  supportItemName: text("support_item_name"),
   description: text("description").notNull(),
   category: text("category"),
+  unit: text("unit").default("Hour"),
+  
+  // Detailed rate breakdown - hours per week for each rate type
+  weekdayHours: text("weekday_hours").default("0"),
+  weekdayRate: text("weekday_rate").default("0"),
+  saturdayHours: text("saturday_hours").default("0"),
+  saturdayRate: text("saturday_rate").default("0"),
+  sundayHours: text("sunday_hours").default("0"),
+  sundayRate: text("sunday_rate").default("0"),
+  publicHolidayHours: text("public_holiday_hours").default("0"),
+  publicHolidayRate: text("public_holiday_rate").default("0"),
+  eveningHours: text("evening_hours").default("0"),
+  eveningRate: text("evening_rate").default("0"),
+  nightHours: text("night_hours").default("0"),
+  nightRate: text("night_rate").default("0"),
+  
+  // Annual calculation fields
+  weeksPerYear: text("weeks_per_year").default("52"),
+  includesQldHolidays: text("includes_qld_holidays").default("yes").$type<"yes" | "no">(),
+  qldHolidayDays: text("qld_holiday_days").default("12"),
+  
+  // Weekly and annual totals
+  weeklyTotal: text("weekly_total").default("0"),
+  annualTotal: text("annual_total").default("0"),
+  
+  // Legacy fields for backward compatibility
   rateType: text("rate_type").$type<NdisPriceGuideRateType>().default("weekday"),
   quantity: text("quantity").default("1"),
-  unit: text("unit").default("Hour"),
   unitPrice: text("unit_price").default("0"),
   lineTotal: text("line_total").default("0"),
+  
   notes: text("notes"),
   sortOrder: text("sort_order").default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -759,6 +786,7 @@ export const quoteLineItems = pgTable("quote_line_items", {
 
 export const insertQuoteLineItemSchema = createInsertSchema(quoteLineItems, {
   rateType: z.enum(["weekday", "saturday", "sunday", "public_holiday", "evening", "night"]).optional(),
+  includesQldHolidays: z.enum(["yes", "no"]).optional(),
 }).omit({
   id: true,
   createdAt: true,

@@ -2332,12 +2332,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quoteId: req.params.quoteId
       });
       
-      // Recalculate quote totals
+      // Recalculate quote totals using annual totals
       const allItems = await storage.getLineItemsByQuote(req.params.quoteId);
-      const subtotal = allItems.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0);
+      const annualTotal = allItems.reduce((sum, i) => sum + parseFloat(i.annualTotal || i.lineTotal || "0"), 0);
+      const weeklyTotal = allItems.reduce((sum, i) => sum + parseFloat(i.weeklyTotal || "0"), 0);
+      
       await storage.updateQuote(req.params.quoteId, {
-        subtotal: subtotal.toFixed(2),
-        totalAmount: subtotal.toFixed(2) // GST exempt for NDIS
+        subtotal: annualTotal.toFixed(2),
+        totalAmount: annualTotal.toFixed(2) // GST exempt for NDIS
       });
       
       res.status(201).json(item);
@@ -2355,12 +2357,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Quote line item not found" });
       }
       
-      // Recalculate quote totals
+      // Recalculate quote totals using annual totals
       const allItems = await storage.getLineItemsByQuote(item.quoteId);
-      const subtotal = allItems.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0);
+      const annualTotal = allItems.reduce((sum, i) => sum + parseFloat(i.annualTotal || i.lineTotal || "0"), 0);
       await storage.updateQuote(item.quoteId, {
-        subtotal: subtotal.toFixed(2),
-        totalAmount: subtotal.toFixed(2)
+        subtotal: annualTotal.toFixed(2),
+        totalAmount: annualTotal.toFixed(2)
       });
       
       res.json(item);
@@ -2385,10 +2387,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recalculate quote totals if we found the quote
       if (item) {
         const remainingItems = await storage.getLineItemsByQuote(item.quoteId);
-        const subtotal = remainingItems.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0);
+        const annualTotal = remainingItems.reduce((sum, i) => sum + parseFloat(i.annualTotal || i.lineTotal || "0"), 0);
         await storage.updateQuote(item.quoteId, {
-          subtotal: subtotal.toFixed(2),
-          totalAmount: subtotal.toFixed(2)
+          subtotal: annualTotal.toFixed(2),
+          totalAmount: annualTotal.toFixed(2)
         });
       }
       
