@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const authUrl = new URL(ZOHO_AUTH_URL);
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("client_id", ZOHO_CLIENT_ID);
-    authUrl.searchParams.set("scope", "aaaserver.profile.Read");
+    authUrl.searchParams.set("scope", "openid,email,profile");
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("access_type", "offline");
     authUrl.searchParams.set("prompt", "consent");
@@ -230,22 +230,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Tokens received successfully");
       
-      const { access_token, refresh_token, expires_in } = tokens;
+      const { access_token, refresh_token, expires_in, id_token } = tokens;
       const expiresAt = new Date(Date.now() + (expires_in * 1000));
       
-      // Get user info from Zoho
-      const userResponse = await fetch(ZOHO_USER_URL, {
-        headers: { "Authorization": `Zoho-oauthtoken ${access_token}` }
-      });
+      // Decode the id_token JWT to get user info (no need for separate API call)
+      let zohoUser: any = {};
+      if (id_token) {
+        try {
+          // JWT has 3 parts: header.payload.signature - we need the payload (middle part)
+          const payloadBase64 = id_token.split('.')[1];
+          const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
+          zohoUser = JSON.parse(payloadJson);
+          console.log("Decoded id_token payload:", JSON.stringify(zohoUser));
+        } catch (decodeError) {
+          console.error("Failed to decode id_token:", decodeError);
+        }
+      }
       
-      const zohoUser = await userResponse.json();
-      console.log("Zoho user response:", JSON.stringify(zohoUser));
+      // If no id_token or decode failed, try the userinfo endpoint as fallback
+      if (!zohoUser.email && !zohoUser.sub) {
+        console.log("Trying userinfo endpoint as fallback...");
+        const userResponse = await fetch(ZOHO_USER_URL, {
+          headers: { "Authorization": `Zoho-oauthtoken ${access_token}` }
+        });
+        zohoUser = await userResponse.json();
+        console.log("Zoho userinfo response:", JSON.stringify(zohoUser));
+      }
       
       // Handle both OIDC format (lowercase) and Zoho API format (capitalized)
       const userEmail = zohoUser.email || zohoUser.Email;
       const userId = zohoUser.sub || zohoUser.ZUID;
-      const firstName = zohoUser.given_name || zohoUser.First_Name;
-      const lastName = zohoUser.family_name || zohoUser.Last_Name;
+      const firstName = zohoUser.first_name || zohoUser.given_name || zohoUser.First_Name;
+      const lastName = zohoUser.last_name || zohoUser.family_name || zohoUser.Last_Name;
       const displayName = zohoUser.name || zohoUser.Display_Name || firstName || userEmail;
       
       if (!userEmail) {
