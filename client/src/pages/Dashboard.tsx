@@ -35,16 +35,17 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-blue-100 mb-2">Total Clients</p>
-                <p className="text-3xl font-semibold" data-testid="text-stat-total-clients">
+                <p className="text-base font-semibold text-blue-50 mb-3">Total Clients</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-total-clients">
                   {totalClients}
                 </p>
-                <p className="text-xs mt-2 text-blue-100">
-                  ↑ 12% from last month
-                </p>
+                <div className="flex items-center gap-1 text-blue-50">
+                  <span className="text-xl font-bold">↑</span>
+                  <span className="text-sm font-semibold">12% from last month</span>
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-white/20">
-                <Users className="w-6 h-6" />
+                <Users className="w-7 h-7" />
               </div>
             </div>
           </CardContent>
@@ -54,16 +55,17 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-emerald-100 mb-2">Compliance Rate</p>
-                <p className="text-3xl font-semibold" data-testid="text-stat-compliance-rate">
+                <p className="text-base font-semibold text-emerald-50 mb-3">Compliance Rate</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-compliance-rate">
                   94%
                 </p>
-                <p className="text-xs mt-2 text-emerald-100">
-                  ↑ 2% from last month
-                </p>
+                <div className="flex items-center gap-1 text-emerald-50">
+                  <span className="text-xl font-bold">↑</span>
+                  <span className="text-sm font-semibold">2% from last month</span>
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-white/20">
-                <FileCheck className="w-6 h-6" />
+                <FileCheck className="w-7 h-7" />
               </div>
             </div>
           </CardContent>
@@ -73,16 +75,16 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-amber-100 mb-2">Due This Month</p>
-                <p className="text-3xl font-semibold" data-testid="text-stat-due-this-month">
+                <p className="text-base font-semibold text-amber-50 mb-3">Due This Month</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-due-this-month">
                   23
                 </p>
-                <p className="text-xs mt-2 text-amber-100">
+                <p className="text-sm font-semibold text-amber-50">
                   Requires attention
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-white/20">
-                <Clock className="w-6 h-6" />
+                <Clock className="w-7 h-7" />
               </div>
             </div>
           </CardContent>
@@ -92,16 +94,17 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-100 mb-2">Overdue Items</p>
-                <p className="text-3xl font-semibold" data-testid="text-stat-overdue-items">
+                <p className="text-base font-semibold text-red-50 mb-3">Overdue Items</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-overdue-items">
                   8
                 </p>
-                <p className="text-xs mt-2 text-red-100">
-                  ⚠ Urgent action required
-                </p>
+                <div className="flex items-center gap-1 text-red-50">
+                  <span className="text-xl font-bold">⚠</span>
+                  <span className="text-sm font-semibold">Urgent action required</span>
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-white/20">
-                <AlertTriangle className="w-6 h-6" />
+                <AlertTriangle className="w-7 h-7" />
               </div>
             </div>
           </CardContent>
