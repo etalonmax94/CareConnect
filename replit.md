@@ -67,7 +67,18 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - Consent tracking with collection dates
    - Audit fields for data changes
 
-9. **API Integration**
+9. **Client Archive System**
+   - Australian Privacy Act compliant 7-year retention
+   - Archive fields: isArchived, archivedAt, archivedByUserId, archiveReason, retentionUntil
+   - Server-side retention calculation (archivedAt + 7 years)
+   - Activity logging for all archive/restore actions
+   - Tabbed view: Active Clients vs Archived clients
+   - Archive modal captures reason for archiving
+   - Read-only enforcement at route and storage levels
+   - Restore capability with activity logging
+   - Archived clients blocked from editing (403 error)
+
+10. **API Integration**
    - Backend: Express.js with Drizzle ORM
    - Frontend: React Query for data fetching and caching
    - Proper validation using Zod schemas
@@ -162,11 +173,15 @@ A comprehensive CRM system for managing three categories of healthcare clients (
 
 ### Clients
 - `GET /api/clients` - List all clients (supports search and category filter)
+- `GET /api/clients/active` - List active (non-archived) clients
+- `GET /api/clients/archived` - List archived clients
 - `GET /api/clients/:id` - Get specific client
 - `POST /api/clients` - Create new client
-- `PATCH /api/clients/:id` - Update client
+- `PATCH /api/clients/:id` - Update client (blocked for archived clients, returns 403)
 - `DELETE /api/clients/:id` - Delete client
 - `GET /api/clients/new/30` - Get clients created in last 30 days
+- `POST /api/clients/:id/archive` - Archive a client (requires reason)
+- `POST /api/clients/:id/restore` - Restore an archived client
 
 ### Reports
 - `GET /api/reports/dashboard` - Dashboard statistics
