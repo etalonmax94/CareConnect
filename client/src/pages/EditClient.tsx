@@ -63,6 +63,23 @@ export default function EditClient() {
     );
   }
 
+  // Redirect if client is archived - archived clients are read-only
+  if (client.isArchived === "yes") {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-lg font-medium">Client is Archived</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Archived clients cannot be edited. Restore the client first if changes are needed.
+          </p>
+          <Link href={`/clients/${params?.id}`}>
+            <Button variant="outline" className="mt-4">View Client Profile</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">

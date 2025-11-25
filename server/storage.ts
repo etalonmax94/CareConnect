@@ -145,6 +145,15 @@ export class DbStorage implements IStorage {
   }
 
   async updateClient(id: string, clientUpdate: Partial<InsertClient>): Promise<Client | undefined> {
+    // First check if the client exists and is not archived
+    const existingClient = await this.getClientById(id);
+    if (!existingClient) {
+      return undefined;
+    }
+    if (existingClient.isArchived === "yes") {
+      throw new Error("Cannot update archived client");
+    }
+    
     const result = await db.update(clients)
       .set({ ...clientUpdate as any, updatedAt: new Date() })
       .where(eq(clients.id, id))

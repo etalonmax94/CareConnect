@@ -440,6 +440,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update client
   app.patch("/api/clients/:id", async (req, res) => {
     try {
+      // Check if client is archived - archived clients are read-only
+      const existingClient = await storage.getClientById(req.params.id);
+      if (!existingClient) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      if (existingClient.isArchived === "yes") {
+        return res.status(403).json({ error: "Cannot edit archived client. Restore the client first." });
+      }
+      
       const parsedData = parseDates(req.body);
       const validationResult = updateClientSchema.safeParse(parsedData);
       

@@ -190,14 +190,56 @@ export default function ClientProfile() {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-semibold">Client Profile</h1>
+          {isArchived && (
+            <Badge variant="secondary" className="mt-1 gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              <Archive className="w-3 h-3" />
+              Archived
+            </Badge>
+          )}
         </div>
-        <Link href={`/clients/${params?.id}/edit`}>
-          <Button data-testid="button-edit-client">
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Profile
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {isArchived ? (
+            <Button 
+              onClick={() => restoreMutation.mutate()}
+              disabled={restoreMutation.isPending}
+              data-testid="button-restore-client"
+              className="gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              {restoreMutation.isPending ? "Restoring..." : "Restore Client"}
+            </Button>
+          ) : (
+            <>
+              <Button 
+                variant="outline"
+                onClick={() => setArchiveModalOpen(true)}
+                data-testid="button-archive-client"
+                className="gap-2"
+              >
+                <Archive className="w-4 h-4" />
+                Archive
+              </Button>
+              <Link href={`/clients/${params?.id}/edit`}>
+                <Button data-testid="button-edit-client">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Profile
+                </Button>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
+
+      {isArchived && (
+        <Alert variant="default" className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            This client record is archived and read-only. Archived on: {client.archivedAt ? new Date(client.archivedAt).toLocaleDateString() : 'Unknown'}. 
+            Reason: {client.archiveReason || 'Not specified'}. 
+            Records retained until: {client.retentionUntil || 'N/A'}.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
@@ -795,6 +837,15 @@ export default function ClientProfile() {
           )}
         </TabsContent>
       </Tabs>
+
+      {client && (
+        <ArchiveClientModal
+          client={client}
+          open={archiveModalOpen}
+          onOpenChange={setArchiveModalOpen}
+          onSuccess={() => setLocation("/clients")}
+        />
+      )}
     </div>
   );
 }
