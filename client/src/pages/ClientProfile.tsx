@@ -6,15 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Client, Budget } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 
 function NotificationBadge({ type }: { type: string }) {
@@ -122,6 +126,126 @@ export default function ClientProfile() {
     queryKey: [`/api/clients/${params?.id}/distance`],
     enabled: !!params?.id,
   });
+
+  const { data: progressNotes = [] } = useQuery<ProgressNote[]>({
+    queryKey: ["/api/clients", params?.id, "notes"],
+    enabled: !!params?.id,
+  });
+
+  const { data: staffList = [] } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
+  });
+
+  const { data: staffAssignments = [] } = useQuery<ClientStaffAssignment[]>({
+    queryKey: ["/api/clients", params?.id, "assignments"],
+    enabled: !!params?.id,
+  });
+
+  const [addAssignmentOpen, setAddAssignmentOpen] = useState(false);
+  const [assignmentStaffId, setAssignmentStaffId] = useState("");
+  const [assignmentType, setAssignmentType] = useState<"primary_support" | "secondary_support" | "care_manager" | "clinical_nurse">("primary_support");
+
+  const addAssignmentMutation = useMutation({
+    mutationFn: async (data: { staffId: string; assignmentType: string }) => {
+      return apiRequest("POST", `/api/clients/${params?.id}/assignments`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "assignments"] });
+      setAddAssignmentOpen(false);
+      setAssignmentStaffId("");
+      setAssignmentType("primary_support");
+    },
+  });
+
+  const removeAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return apiRequest("DELETE", `/api/assignments/${assignmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "assignments"] });
+    },
+  });
+
+  const { data: incidentReports = [] } = useQuery<IncidentReport[]>({
+    queryKey: [`/api/incidents/client/${params?.id}`],
+    enabled: !!params?.id,
+  });
+
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
+  const [noteContent, setNoteContent] = useState("");
+  const [noteType, setNoteType] = useState<"progress" | "clinical" | "incident" | "complaint" | "feedback">("progress");
+  const [noteAuthorId, setNoteAuthorId] = useState("");
+
+  const [addIncidentOpen, setAddIncidentOpen] = useState(false);
+  const [incidentType, setIncidentType] = useState<"fall" | "medication" | "behavioral" | "injury" | "other">("fall");
+  const [incidentSeverity, setIncidentSeverity] = useState<"low" | "medium" | "high" | "critical">("low");
+  const [incidentDescription, setIncidentDescription] = useState("");
+  const [incidentActionTaken, setIncidentActionTaken] = useState("");
+  const [incidentReporterId, setIncidentReporterId] = useState("");
+
+  const addIncidentMutation = useMutation({
+    mutationFn: async (data: { 
+      clientId: string;
+      incidentDate: string; 
+      incidentType: string; 
+      severity: string;
+      description: string;
+      actionTaken?: string;
+      reportedBy: string;
+      reportedById?: string;
+    }) => {
+      return apiRequest("POST", "/api/incidents", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/incidents/client/${params?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/incident-reports"] });
+      setAddIncidentOpen(false);
+      setIncidentType("fall");
+      setIncidentSeverity("low");
+      setIncidentDescription("");
+      setIncidentActionTaken("");
+      setIncidentReporterId("");
+    },
+  });
+
+  const handleAddIncident = () => {
+    if (!incidentDescription.trim() || !incidentReporterId) return;
+    const reporter = staffList.find(s => s.id === incidentReporterId);
+    addIncidentMutation.mutate({
+      clientId: params?.id || "",
+      incidentDate: new Date().toISOString(),
+      incidentType,
+      severity: incidentSeverity,
+      description: incidentDescription,
+      actionTaken: incidentActionTaken || undefined,
+      reportedBy: reporter ? reporter.name : "Unknown",
+      reportedById: incidentReporterId,
+    });
+  };
+
+  const addNoteMutation = useMutation({
+    mutationFn: async (data: { note: string; type: string; author: string; authorId?: string }) => {
+      return apiRequest("POST", `/api/clients/${params?.id}/notes`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "notes"] });
+      setAddNoteOpen(false);
+      setNoteContent("");
+      setNoteType("progress");
+      setNoteAuthorId("");
+    },
+  });
+
+  const handleAddNote = () => {
+    if (!noteContent.trim()) return;
+    const author = staffList.find(s => s.id === noteAuthorId);
+    addNoteMutation.mutate({
+      note: noteContent,
+      type: noteType,
+      author: author ? author.name : "Unknown Staff",
+      authorId: noteAuthorId || undefined,
+    });
+  };
 
   const restoreMutation = useMutation({
     mutationFn: async () => {
@@ -779,11 +903,125 @@ export default function ClientProfile() {
                 </CardContent>
               </Card>
             )}
+
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Staff Assignments
+                  </CardTitle>
+                  {!isArchived && (
+                    <Dialog open={addAssignmentOpen} onOpenChange={setAddAssignmentOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" data-testid="button-add-assignment">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Assign Staff
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Assign Staff Member</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Staff Member</Label>
+                            <Select value={assignmentStaffId} onValueChange={setAssignmentStaffId}>
+                              <SelectTrigger data-testid="select-assignment-staff">
+                                <SelectValue placeholder="Select staff member..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {staffList.filter(s => !staffAssignments.some(a => a.staffId === s.id && !a.endDate)).map(staff => (
+                                  <SelectItem key={staff.id} value={staff.id}>
+                                    {staff.name} ({staff.role.replace("_", " ")})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Assignment Type</Label>
+                            <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as typeof assignmentType)}>
+                              <SelectTrigger data-testid="select-assignment-type">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="primary_support">Primary Support Worker</SelectItem>
+                                <SelectItem value="secondary_support">Secondary Support Worker</SelectItem>
+                                <SelectItem value="care_manager">Care Manager</SelectItem>
+                                <SelectItem value="clinical_nurse">Clinical Nurse</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button 
+                            onClick={() => addAssignmentMutation.mutate({ staffId: assignmentStaffId, assignmentType })}
+                            disabled={!assignmentStaffId || addAssignmentMutation.isPending}
+                            className="w-full"
+                            data-testid="button-submit-assignment"
+                          >
+                            {addAssignmentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Assign Staff
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {staffAssignments.filter(a => !a.endDate).length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No staff currently assigned</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {staffAssignments.filter(a => !a.endDate).map(assignment => {
+                      const staff = staffList.find(s => s.id === assignment.staffId);
+                      const typeLabels: Record<string, string> = {
+                        primary_support: "Primary Support Worker",
+                        secondary_support: "Secondary Support Worker",
+                        care_manager: "Care Manager",
+                        clinical_nurse: "Clinical Nurse",
+                      };
+                      return (
+                        <div key={assignment.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg" data-testid={`assignment-${assignment.id}`}>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback>{staff?.name?.charAt(0) || "?"}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <Link href={`/staff/${assignment.staffId}`}>
+                                <p className="text-sm font-medium hover:underline cursor-pointer">{staff?.name || "Unknown"}</p>
+                              </Link>
+                              <p className="text-xs text-muted-foreground">{typeLabels[assignment.assignmentType] || assignment.assignmentType}</p>
+                              <p className="text-xs text-muted-foreground">Since {new Date(assignment.startDate).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          {!isArchived && (
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => removeAssignmentMutation.mutate(assignment.id)}
+                              data-testid={`button-remove-assignment-${assignment.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="documents">
-          <DocumentTracker documents={client.clinicalDocuments} />
+          <DocumentTracker 
+            documents={client.clinicalDocuments} 
+            clientId={client.id}
+            zohoWorkdriveLink={client.zohoWorkdriveLink}
+          />
         </TabsContent>
 
         <TabsContent value="clinical" className="space-y-6">
@@ -798,26 +1036,283 @@ export default function ClientProfile() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Progress Notes</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Progress Notes</CardTitle>
+                {!isArchived && (
+                  <Dialog open={addNoteOpen} onOpenChange={setAddNoteOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" data-testid="button-add-progress-note">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Note
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Progress Note</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Note Type</Label>
+                          <Select value={noteType} onValueChange={(v) => setNoteType(v as typeof noteType)}>
+                            <SelectTrigger data-testid="select-note-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="progress">Progress</SelectItem>
+                              <SelectItem value="clinical">Clinical</SelectItem>
+                              <SelectItem value="incident">Incident</SelectItem>
+                              <SelectItem value="complaint">Complaint</SelectItem>
+                              <SelectItem value="feedback">Feedback</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Author (Staff Member)</Label>
+                          <Select value={noteAuthorId} onValueChange={setNoteAuthorId}>
+                            <SelectTrigger data-testid="select-note-author">
+                              <SelectValue placeholder="Select staff member..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {staffList.map(staff => (
+                                <SelectItem key={staff.id} value={staff.id}>
+                                  {staff.name} ({staff.role.replace("_", " ")})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Note Content</Label>
+                          <Textarea
+                            value={noteContent}
+                            onChange={(e) => setNoteContent(e.target.value)}
+                            placeholder="Enter note content..."
+                            rows={4}
+                            data-testid="textarea-note-content"
+                          />
+                        </div>
+                        <Button 
+                          onClick={handleAddNote}
+                          disabled={!noteContent.trim() || !noteAuthorId || addNoteMutation.isPending}
+                          className="w-full"
+                          data-testid="button-submit-note"
+                        >
+                          {addNoteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          Save Note
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border-l-2 border-primary pl-4 py-2">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-sm font-medium">Regular monitoring session completed</p>
-                    <p className="text-xs text-muted-foreground">2 days ago</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Client responding well to current care plan. No changes required at this time.</p>
-                  <p className="text-xs text-muted-foreground mt-2">By: {client.careTeam?.careManager || "Care Team"}</p>
-                </div>
-                <div className="border-l-2 border-muted pl-4 py-2">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-sm font-medium">Medication review completed</p>
-                    <p className="text-xs text-muted-foreground">1 week ago</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground">All medications reviewed with GP. Dosages confirmed as appropriate.</p>
-                  <p className="text-xs text-muted-foreground mt-2">By: {client.careTeam?.generalPractitioner || "GP"}</p>
-                </div>
+                {progressNotes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No progress notes recorded yet</p>
+                ) : (
+                  progressNotes.map((note) => {
+                    const noteAuthor = note.authorId ? staffList.find(s => s.id === note.authorId) : null;
+                    const typeColors: Record<string, string> = {
+                      progress: "border-primary",
+                      clinical: "border-blue-500",
+                      incident: "border-red-500",
+                      complaint: "border-amber-500",
+                      feedback: "border-green-500",
+                    };
+                    return (
+                      <div 
+                        key={note.id} 
+                        className={`border-l-2 ${typeColors[note.type] || "border-muted"} pl-4 py-2`}
+                        data-testid={`progress-note-${note.id}`}
+                      >
+                        <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs capitalize">{note.type}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(note.date).toLocaleDateString()} at {new Date(note.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </p>
+                        </div>
+                        <p className="text-sm">{note.note}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <UserCircle className="w-3 h-3 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">
+                            By: {noteAuthor ? (
+                              <Link href={`/staff/${noteAuthor.id}`} className="hover:underline text-primary">
+                                {noteAuthor.name}
+                              </Link>
+                            ) : note.author}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  Incident Reports
+                </CardTitle>
+                {!isArchived && (
+                  <Dialog open={addIncidentOpen} onOpenChange={setAddIncidentOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="destructive" data-testid="button-add-incident">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Report Incident
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Report Incident</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Incident Type</Label>
+                            <Select value={incidentType} onValueChange={(v) => setIncidentType(v as typeof incidentType)}>
+                              <SelectTrigger data-testid="select-incident-type">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="fall">Fall</SelectItem>
+                                <SelectItem value="medication">Medication</SelectItem>
+                                <SelectItem value="behavioral">Behavioral</SelectItem>
+                                <SelectItem value="injury">Injury</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Severity</Label>
+                            <Select value={incidentSeverity} onValueChange={(v) => setIncidentSeverity(v as typeof incidentSeverity)}>
+                              <SelectTrigger data-testid="select-incident-severity">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Low</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="high">High</SelectItem>
+                                <SelectItem value="critical">Critical</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Reported By (Staff Member)</Label>
+                          <Select value={incidentReporterId} onValueChange={setIncidentReporterId}>
+                            <SelectTrigger data-testid="select-incident-reporter">
+                              <SelectValue placeholder="Select staff member..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {staffList.map(staff => (
+                                <SelectItem key={staff.id} value={staff.id}>
+                                  {staff.name} ({staff.role.replace("_", " ")})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <Textarea
+                            value={incidentDescription}
+                            onChange={(e) => setIncidentDescription(e.target.value)}
+                            placeholder="Describe the incident..."
+                            rows={3}
+                            data-testid="textarea-incident-description"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Action Taken (Optional)</Label>
+                          <Textarea
+                            value={incidentActionTaken}
+                            onChange={(e) => setIncidentActionTaken(e.target.value)}
+                            placeholder="What action was taken?"
+                            rows={2}
+                            data-testid="textarea-incident-action"
+                          />
+                        </div>
+                        <Button 
+                          onClick={handleAddIncident}
+                          disabled={!incidentDescription.trim() || !incidentReporterId || addIncidentMutation.isPending}
+                          variant="destructive"
+                          className="w-full"
+                          data-testid="button-submit-incident"
+                        >
+                          {addIncidentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          Submit Report
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {incidentReports.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No incidents reported for this client</p>
+                ) : (
+                  incidentReports.map((incident) => {
+                    const reporter = incident.reportedById ? staffList.find(s => s.id === incident.reportedById) : null;
+                    const severityColors: Record<string, string> = {
+                      low: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200",
+                      medium: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+                      high: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200",
+                      critical: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200",
+                    };
+                    const statusColors: Record<string, string> = {
+                      open: "bg-red-100 text-red-800",
+                      investigating: "bg-amber-100 text-amber-800",
+                      resolved: "bg-blue-100 text-blue-800",
+                      closed: "bg-gray-100 text-gray-800",
+                    };
+                    return (
+                      <div 
+                        key={incident.id} 
+                        className="p-4 border rounded-lg space-y-2"
+                        data-testid={`incident-${incident.id}`}
+                      >
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className={severityColors[incident.severity] || ""}>
+                              {incident.severity.toUpperCase()}
+                            </Badge>
+                            <Badge variant="outline" className="capitalize">{incident.incidentType}</Badge>
+                            <Badge className={statusColors[incident.status] || ""}>{incident.status}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(incident.incidentDate).toLocaleDateString()} at {new Date(incident.incidentDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </p>
+                        </div>
+                        <p className="text-sm">{incident.description}</p>
+                        {incident.actionTaken && (
+                          <div className="bg-muted p-2 rounded text-xs">
+                            <span className="font-medium">Action Taken: </span>
+                            {incident.actionTaken}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <UserCircle className="w-3 h-3 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">
+                            Reported by: {reporter ? (
+                              <Link href={`/staff/${reporter.id}`} className="hover:underline text-primary">
+                                {reporter.name}
+                              </Link>
+                            ) : incident.reportedBy}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>

@@ -2,6 +2,7 @@ import { db } from "./db";
 import { 
   clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
+  documents, clientStaffAssignments, serviceDeliveries,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
@@ -9,7 +10,10 @@ import {
   type InsertStaff, type Staff, type InsertSupportCoordinator, type SupportCoordinator,
   type InsertPlanManager, type PlanManager, type InsertNdisService, type NdisService,
   type InsertUser, type User, type UserRole,
-  type InsertGP, type GP, type InsertPharmacy, type Pharmacy
+  type InsertGP, type GP, type InsertPharmacy, type Pharmacy,
+  type InsertDocument, type Document, 
+  type InsertClientStaffAssignment, type ClientStaffAssignment,
+  type InsertServiceDelivery, type ServiceDelivery
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -115,6 +119,26 @@ export interface IStorage {
   createPharmacy(pharmacy: InsertPharmacy): Promise<Pharmacy>;
   updatePharmacy(id: string, pharmacy: Partial<InsertPharmacy>): Promise<Pharmacy | undefined>;
   deletePharmacy(id: string): Promise<boolean>;
+  
+  // Documents
+  getDocumentsByClient(clientId: string): Promise<Document[]>;
+  getDocumentById(id: string): Promise<Document | undefined>;
+  createDocument(document: InsertDocument): Promise<Document>;
+  deleteDocument(id: string): Promise<boolean>;
+  
+  // Client-Staff Assignments
+  getAssignmentsByClient(clientId: string): Promise<ClientStaffAssignment[]>;
+  getAssignmentsByStaff(staffId: string): Promise<ClientStaffAssignment[]>;
+  createAssignment(assignment: InsertClientStaffAssignment): Promise<ClientStaffAssignment>;
+  updateAssignment(id: string, assignment: Partial<InsertClientStaffAssignment>): Promise<ClientStaffAssignment | undefined>;
+  deleteAssignment(id: string): Promise<boolean>;
+  
+  // Service Deliveries
+  getServiceDeliveriesByClient(clientId: string): Promise<ServiceDelivery[]>;
+  getServiceDeliveriesByStaff(staffId: string): Promise<ServiceDelivery[]>;
+  createServiceDelivery(delivery: InsertServiceDelivery): Promise<ServiceDelivery>;
+  updateServiceDelivery(id: string, delivery: Partial<InsertServiceDelivery>): Promise<ServiceDelivery | undefined>;
+  deleteServiceDelivery(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -650,6 +674,90 @@ export class DbStorage implements IStorage {
 
   async deletePharmacy(id: string): Promise<boolean> {
     const result = await db.delete(pharmacies).where(eq(pharmacies.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Documents
+  async getDocumentsByClient(clientId: string): Promise<Document[]> {
+    return await db.select().from(documents)
+      .where(eq(documents.clientId, clientId))
+      .orderBy(desc(documents.uploadDate));
+  }
+
+  async getDocumentById(id: string): Promise<Document | undefined> {
+    const result = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createDocument(document: InsertDocument): Promise<Document> {
+    const result = await db.insert(documents).values(document).returning();
+    return result[0];
+  }
+
+  async deleteDocument(id: string): Promise<boolean> {
+    const result = await db.delete(documents).where(eq(documents.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Client-Staff Assignments
+  async getAssignmentsByClient(clientId: string): Promise<ClientStaffAssignment[]> {
+    return await db.select().from(clientStaffAssignments)
+      .where(eq(clientStaffAssignments.clientId, clientId))
+      .orderBy(desc(clientStaffAssignments.createdAt));
+  }
+
+  async getAssignmentsByStaff(staffId: string): Promise<ClientStaffAssignment[]> {
+    return await db.select().from(clientStaffAssignments)
+      .where(eq(clientStaffAssignments.staffId, staffId))
+      .orderBy(desc(clientStaffAssignments.createdAt));
+  }
+
+  async createAssignment(assignment: InsertClientStaffAssignment): Promise<ClientStaffAssignment> {
+    const result = await db.insert(clientStaffAssignments).values(assignment).returning();
+    return result[0];
+  }
+
+  async updateAssignment(id: string, assignmentUpdate: Partial<InsertClientStaffAssignment>): Promise<ClientStaffAssignment | undefined> {
+    const result = await db.update(clientStaffAssignments)
+      .set({ ...assignmentUpdate as any, updatedAt: new Date() })
+      .where(eq(clientStaffAssignments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAssignment(id: string): Promise<boolean> {
+    const result = await db.delete(clientStaffAssignments).where(eq(clientStaffAssignments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Service Deliveries
+  async getServiceDeliveriesByClient(clientId: string): Promise<ServiceDelivery[]> {
+    return await db.select().from(serviceDeliveries)
+      .where(eq(serviceDeliveries.clientId, clientId))
+      .orderBy(desc(serviceDeliveries.deliveredAt));
+  }
+
+  async getServiceDeliveriesByStaff(staffId: string): Promise<ServiceDelivery[]> {
+    return await db.select().from(serviceDeliveries)
+      .where(eq(serviceDeliveries.staffId, staffId))
+      .orderBy(desc(serviceDeliveries.deliveredAt));
+  }
+
+  async createServiceDelivery(delivery: InsertServiceDelivery): Promise<ServiceDelivery> {
+    const result = await db.insert(serviceDeliveries).values(delivery).returning();
+    return result[0];
+  }
+
+  async updateServiceDelivery(id: string, deliveryUpdate: Partial<InsertServiceDelivery>): Promise<ServiceDelivery | undefined> {
+    const result = await db.update(serviceDeliveries)
+      .set({ ...deliveryUpdate as any })
+      .where(eq(serviceDeliveries.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteServiceDelivery(id: string): Promise<boolean> {
+    const result = await db.delete(serviceDeliveries).where(eq(serviceDeliveries.id, id)).returning();
     return result.length > 0;
   }
 }

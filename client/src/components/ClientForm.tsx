@@ -714,7 +714,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   control={form.control}
                   name="careTeam.planManagerId"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
+                    <FormItem>
                       <FormLabel>Plan Manager</FormLabel>
                       <Select 
                         onValueChange={(value) => {
@@ -743,6 +743,109 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="pharmacyId"
+                  render={({ field }) => {
+                    const selectedPharmacy = pharmacies.find(p => p.id === field.value);
+                    return (
+                      <FormItem>
+                        <FormLabel>Pharmacy</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            if (value === "none") {
+                              field.onChange(null);
+                              form.setValue("careTeam.pharmacy", "");
+                            } else {
+                              field.onChange(value);
+                              const pharmacy = pharmacies.find(p => p.id === value);
+                              if (pharmacy) {
+                                form.setValue("careTeam.pharmacy", pharmacy.name);
+                              }
+                            }
+                          }}
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-pharmacy">
+                              <SelectValue placeholder="Select pharmacy...">
+                                {selectedPharmacy?.name || "Select pharmacy..."}
+                              </SelectValue>
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {pharmacies.map((pharmacy) => (
+                              <SelectItem key={pharmacy.id} value={pharmacy.id}>
+                                {pharmacy.name}{pharmacy.deliveryAvailable === "yes" ? " (Delivers)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedPharmacy && (
+                          <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1">
+                            {selectedPharmacy.phoneNumber && <p>Phone: {selectedPharmacy.phoneNumber}</p>}
+                            {selectedPharmacy.faxNumber && <p>Fax: {selectedPharmacy.faxNumber}</p>}
+                            {selectedPharmacy.address && <p>Address: {selectedPharmacy.address}</p>}
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">GP Contact Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const gpValue = form.watch("careTeam.generalPractitioner");
+                  const selectedGP = gps.find(g => gpValue?.includes(g.name));
+                  if (!selectedGP) return <p className="text-sm text-muted-foreground">Select a GP above to see contact details</p>;
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs">Name</p>
+                        <p className="font-medium">{selectedGP.name}</p>
+                      </div>
+                      {selectedGP.practiceName && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">Practice</p>
+                          <p>{selectedGP.practiceName}</p>
+                        </div>
+                      )}
+                      {selectedGP.phoneNumber && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">Phone</p>
+                          <p>{selectedGP.phoneNumber}</p>
+                        </div>
+                      )}
+                      {selectedGP.faxNumber && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">Fax</p>
+                          <p>{selectedGP.faxNumber}</p>
+                        </div>
+                      )}
+                      {selectedGP.email && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">Email</p>
+                          <p>{selectedGP.email}</p>
+                        </div>
+                      )}
+                      {selectedGP.address && (
+                        <div className="md:col-span-2">
+                          <p className="text-muted-foreground text-xs">Address</p>
+                          <p>{selectedGP.address}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>

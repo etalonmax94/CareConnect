@@ -6,7 +6,8 @@ import {
   insertInvoiceSchema, calculateAge, insertBudgetSchema,
   insertIncidentReportSchema, insertPrivacyConsentSchema, insertActivityLogSchema,
   insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema,
-  insertGPSchema, insertPharmacySchema,
+  insertGPSchema, insertPharmacySchema, insertDocumentSchema, insertClientStaffAssignmentSchema,
+  insertServiceDeliverySchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -1747,6 +1748,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching plan manager clients:", error);
       res.status(500).json({ error: "Failed to fetch plan manager clients" });
+    }
+  });
+
+  // ==================== DOCUMENT ROUTES ====================
+  
+  // Get documents by client
+  app.get("/api/clients/:clientId/documents", async (req, res) => {
+    try {
+      const docs = await storage.getDocumentsByClient(req.params.clientId);
+      res.json(docs);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  // Create document (metadata only - file URL from external storage)
+  app.post("/api/clients/:clientId/documents", async (req, res) => {
+    try {
+      const validationResult = insertDocumentSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const document = await storage.createDocument(validationResult.data);
+      
+      // Log activity
+      await storage.logActivity({
+        clientId: req.params.clientId,
+        action: "document_uploaded",
+        description: `Document ${document.fileName} was uploaded`,
+        performedBy: "System"
+      });
+      
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error creating document:", error);
+      res.status(500).json({ error: "Failed to create document" });
+    }
+  });
+
+  // Delete document (requires authentication)
+  app.delete("/api/documents/:id", async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const deleted = await storage.deleteDocument(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Log the deletion
+      await storage.logActivity({
+        clientId: null,
+        action: "document_deleted",
+        description: `Document was deleted`,
+        performedBy: req.session.user.email || "Unknown"
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+
+  // ==================== CLIENT-STAFF ASSIGNMENT ROUTES ====================
+  
+  // Get assignments by client
+  app.get("/api/clients/:clientId/assignments", async (req, res) => {
+    try {
+      const assignments = await storage.getAssignmentsByClient(req.params.clientId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  // Get assignments by staff
+  app.get("/api/staff/:staffId/assignments", async (req, res) => {
+    try {
+      const assignments = await storage.getAssignmentsByStaff(req.params.staffId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching staff assignments:", error);
+      res.status(500).json({ error: "Failed to fetch staff assignments" });
+    }
+  });
+
+  // Create assignment
+  app.post("/api/clients/:clientId/assignments", async (req, res) => {
+    try {
+      const validationResult = insertClientStaffAssignmentSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const assignment = await storage.createAssignment(validationResult.data);
+      
+      // Log activity
+      await storage.logActivity({
+        clientId: req.params.clientId,
+        action: "staff_assigned",
+        description: `Staff member assigned as ${assignment.assignmentType.replace("_", " ")}`,
+        performedBy: "System"
+      });
+      
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating assignment:", error);
+      res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  // Update assignment
+  app.patch("/api/assignments/:id", async (req, res) => {
+    try {
+      const assignment = await storage.updateAssignment(req.params.id, req.body);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error updating assignment:", error);
+      res.status(500).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  // Delete assignment
+  app.delete("/api/assignments/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAssignment(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      res.status(500).json({ error: "Failed to delete assignment" });
+    }
+  });
+
+  // ==================== SERVICE DELIVERY ROUTES ====================
+  
+  // Get service deliveries by client
+  app.get("/api/clients/:clientId/service-deliveries", async (req, res) => {
+    try {
+      const deliveries = await storage.getServiceDeliveriesByClient(req.params.clientId);
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching service deliveries:", error);
+      res.status(500).json({ error: "Failed to fetch service deliveries" });
+    }
+  });
+
+  // Get service deliveries by staff
+  app.get("/api/staff/:staffId/service-deliveries", async (req, res) => {
+    try {
+      const deliveries = await storage.getServiceDeliveriesByStaff(req.params.staffId);
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching staff service deliveries:", error);
+      res.status(500).json({ error: "Failed to fetch staff service deliveries" });
+    }
+  });
+
+  // Create service delivery
+  app.post("/api/clients/:clientId/service-deliveries", async (req, res) => {
+    try {
+      const validationResult = insertServiceDeliverySchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const delivery = await storage.createServiceDelivery(validationResult.data);
+      
+      // Log activity
+      await storage.logActivity({
+        clientId: req.params.clientId,
+        action: "service_delivered",
+        description: `Service "${delivery.serviceName}" was delivered`,
+        performedBy: "System"
+      });
+      
+      res.status(201).json(delivery);
+    } catch (error) {
+      console.error("Error creating service delivery:", error);
+      res.status(500).json({ error: "Failed to create service delivery" });
+    }
+  });
+
+  // Update service delivery
+  app.patch("/api/service-deliveries/:id", async (req, res) => {
+    try {
+      const delivery = await storage.updateServiceDelivery(req.params.id, req.body);
+      if (!delivery) {
+        return res.status(404).json({ error: "Service delivery not found" });
+      }
+      res.json(delivery);
+    } catch (error) {
+      console.error("Error updating service delivery:", error);
+      res.status(500).json({ error: "Failed to update service delivery" });
+    }
+  });
+
+  // Delete service delivery
+  app.delete("/api/service-deliveries/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteServiceDelivery(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Service delivery not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting service delivery:", error);
+      res.status(500).json({ error: "Failed to delete service delivery" });
     }
   });
 

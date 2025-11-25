@@ -114,17 +114,25 @@ export const clients = pgTable("clients", {
   zohoWorkdriveLink: text("zoho_workdrive_link"),
   isPinned: text("is_pinned").default("no").$type<"yes" | "no">(),
   
-  // Care Team - stored as JSON
+  // Care Team - foreign keys for linked entities
+  generalPractitionerId: varchar("general_practitioner_id"),
+  pharmacyId: varchar("pharmacy_id"),
+  
+  // Care Team - stored as JSON (includes legacy string references)
   careTeam: json("care_team").$type<{
     careManager?: string;
+    careManagerId?: string;
     leadership?: string;
     generalPractitioner?: string;
+    pharmacy?: string;
     supportCoordinator?: string;
     planManager?: string;
     supportCoordinatorId?: string;
     planManagerId?: string;
     preferredWorkers?: string[];
+    preferredWorkerIds?: string[];
     unsuitableWorkers?: string[];
+    unsuitableWorkerIds?: string[];
     otherHealthProfessionals?: string[];
   }>().notNull().default({}),
   
@@ -182,6 +190,8 @@ export const insertClientSchema = createInsertSchema(clients, {
   dateOfBirth: z.string().optional().or(z.literal("")),
   advancedCareDirective: z.enum(["NFR", "For Resus", "None"]).optional().nullable(),
   advancedCareDirectiveDocumentId: z.string().optional().nullable(),
+  generalPractitionerId: z.string().optional().nullable(),
+  pharmacyId: z.string().optional().nullable(),
   careTeam: z.any().optional(),
   ndisDetails: z.any().optional(),
   supportAtHomeDetails: z.any().optional(),
@@ -227,12 +237,14 @@ export const progressNotes = pgTable("progress_notes", {
   date: timestamp("date").notNull().defaultNow(),
   note: text("note").notNull(),
   author: text("author").notNull(),
+  authorId: varchar("author_id"),
   type: text("type").notNull().$type<"progress" | "clinical" | "incident" | "complaint" | "feedback">(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertProgressNoteSchema = createInsertSchema(progressNotes, {
   type: z.enum(["progress", "clinical", "incident", "complaint", "feedback"]),
+  authorId: z.string().optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
@@ -350,6 +362,7 @@ export const incidentReports = pgTable("incident_reports", {
   description: text("description").notNull(),
   actionTaken: text("action_taken"),
   reportedBy: text("reported_by").notNull(),
+  reportedById: varchar("reported_by_id"),
   status: text("status").notNull().$type<"open" | "investigating" | "resolved" | "closed">().default("open"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -359,6 +372,7 @@ export const insertIncidentReportSchema = createInsertSchema(incidentReports, {
   incidentType: z.enum(["fall", "medication", "behavioral", "injury", "other"]),
   severity: z.enum(["low", "medium", "high", "critical"]),
   status: z.enum(["open", "investigating", "resolved", "closed"]),
+  reportedById: z.string().optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
@@ -543,3 +557,60 @@ export type NotificationPreference = {
   callSchedule?: boolean;
   none?: boolean;
 };
+
+// Assignment types for client-staff relationships
+export type StaffAssignmentType = "primary_support" | "secondary_support" | "care_manager" | "clinical_nurse" | "primary_worker" | "preferred_worker" | "backup_worker" | "unsuitable";
+
+// Client-Staff Assignments - Track which staff are assigned to which clients
+export const clientStaffAssignments = pgTable("client_staff_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  assignmentType: text("assignment_type").notNull().$type<StaffAssignmentType>(),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientStaffAssignmentSchema = createInsertSchema(clientStaffAssignments, {
+  assignmentType: z.enum(["primary_support", "secondary_support", "care_manager", "clinical_nurse", "primary_worker", "preferred_worker", "backup_worker", "unsuitable"]),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientStaffAssignment = z.infer<typeof insertClientStaffAssignmentSchema>;
+export type ClientStaffAssignment = typeof clientStaffAssignments.$inferSelect;
+
+// Service Delivery Records - Track services delivered to clients
+export const serviceDeliveries = pgTable("service_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").references(() => staff.id, { onDelete: "set null" }),
+  serviceCode: text("service_code"),
+  serviceName: text("service_name").notNull(),
+  serviceCategory: text("service_category"),
+  deliveredAt: timestamp("delivered_at").notNull(),
+  durationMinutes: text("duration_minutes"),
+  quantity: text("quantity"),
+  distanceKm: text("distance_km"),
+  notes: text("notes"),
+  status: text("status").$type<"scheduled" | "completed" | "cancelled" | "no_show">().default("completed"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertServiceDeliverySchema = createInsertSchema(serviceDeliveries, {
+  status: z.enum(["scheduled", "completed", "cancelled", "no_show"]).optional(),
+  staffId: z.string().optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertServiceDelivery = z.infer<typeof insertServiceDeliverySchema>;
+export type ServiceDelivery = typeof serviceDeliveries.$inferSelect;
