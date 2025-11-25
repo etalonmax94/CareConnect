@@ -4,21 +4,30 @@ import type { ClientCategory } from "@shared/schema";
 interface CategoryBadgeProps {
   category: ClientCategory;
   className?: string;
+  abbreviated?: boolean;
 }
 
 const categoryStyles = {
-  "NDIS": "bg-blue-600 text-white hover:bg-blue-700",
-  "Support at Home": "bg-emerald-600 text-white hover:bg-emerald-700",
-  "Private": "bg-purple-600 text-white hover:bg-purple-700"
+  "NDIS": "bg-purple-600 text-white hover:bg-purple-700",
+  "Support at Home": "bg-teal-600 text-white hover:bg-teal-700",
+  "Private": "bg-blue-600 text-white hover:bg-blue-700"
 };
 
-export default function CategoryBadge({ category, className = "" }: CategoryBadgeProps) {
+const categoryAbbreviations: Record<ClientCategory, string> = {
+  "NDIS": "NDIS",
+  "Support at Home": "SaH",
+  "Private": "Private"
+};
+
+export default function CategoryBadge({ category, className = "", abbreviated = false }: CategoryBadgeProps) {
+  const displayText = abbreviated ? categoryAbbreviations[category] : category;
+  
   return (
     <Badge 
       className={`${categoryStyles[category]} ${className}`}
       data-testid={`badge-category-${category.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      {category}
+      {displayText}
     </Badge>
   );
 }

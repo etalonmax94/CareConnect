@@ -11,6 +11,9 @@ import Clients from "@/pages/Clients";
 import ClientProfile from "@/pages/ClientProfile";
 import AddClient from "@/pages/AddClient";
 import EditClient from "@/pages/EditClient";
+import Staff from "@/pages/Staff";
+import SupportCoordinators from "@/pages/SupportCoordinators";
+import PlanManagers from "@/pages/PlanManagers";
 import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
 import NotFound from "@/pages/not-found";
@@ -23,6 +26,9 @@ function Router() {
       <Route path="/clients/new" component={AddClient} />
       <Route path="/clients/:id/edit" component={EditClient} />
       <Route path="/clients/:id" component={ClientProfile} />
+      <Route path="/staff" component={Staff} />
+      <Route path="/support-coordinators" component={SupportCoordinators} />
+      <Route path="/plan-managers" component={PlanManagers} />
       <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
       <Route path="/reports" component={Reports} />
       <Route path="/settings" component={Settings} />

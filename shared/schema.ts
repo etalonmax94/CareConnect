@@ -38,7 +38,15 @@ export const clients = pgTable("clients", {
   highIntensitySupports: text("high_intensity_supports").array(),
   clinicalNotes: text("clinical_notes"),
   scheduleArrivalNotification: text("schedule_arrival_notification"),
+  notificationPreferences: json("notification_preferences").$type<{
+    smsArrival?: boolean;
+    smsSchedule?: boolean;
+    callArrival?: boolean;
+    callSchedule?: boolean;
+    none?: boolean;
+  }>(),
   zohoWorkdriveLink: text("zoho_workdrive_link"),
+  isPinned: text("is_pinned").default("no").$type<"yes" | "no">(),
   
   // Care Team - stored as JSON
   careTeam: json("care_team").$type<{
@@ -47,6 +55,10 @@ export const clients = pgTable("clients", {
     generalPractitioner?: string;
     supportCoordinator?: string;
     planManager?: string;
+    supportCoordinatorId?: string;
+    planManagerId?: string;
+    preferredWorkers?: string[];
+    unsuitableWorkers?: string[];
     otherHealthProfessionals?: string[];
   }>().notNull().default({}),
   
@@ -100,6 +112,8 @@ export const insertClientSchema = createInsertSchema(clients, {
   supportAtHomeDetails: z.any().optional(),
   privateClientDetails: z.any().optional(),
   clinicalDocuments: z.any().optional(),
+  notificationPreferences: z.any().optional(),
+  isPinned: z.enum(["yes", "no"]).optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -299,3 +313,105 @@ export const insertPrivacyConsentSchema = createInsertSchema(privacyConsents, {
 
 export type InsertPrivacyConsent = z.infer<typeof insertPrivacyConsentSchema>;
 export type PrivacyConsent = typeof privacyConsents.$inferSelect;
+
+// Staff Members
+export const staff = pgTable("staff", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  phoneNumber: text("phone_number"),
+  email: text("email"),
+  role: text("role").$type<"support_worker" | "nurse" | "care_manager" | "admin">().default("support_worker"),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffSchema = createInsertSchema(staff, {
+  role: z.enum(["support_worker", "nurse", "care_manager", "admin"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaff = z.infer<typeof insertStaffSchema>;
+export type Staff = typeof staff.$inferSelect;
+
+// Support Coordinators (External)
+export const supportCoordinators = pgTable("support_coordinators", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phoneNumber: text("phone_number"),
+  organisation: text("organisation"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSupportCoordinatorSchema = createInsertSchema(supportCoordinators).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSupportCoordinator = z.infer<typeof insertSupportCoordinatorSchema>;
+export type SupportCoordinator = typeof supportCoordinators.$inferSelect;
+
+// Plan Managers (External)
+export const planManagers = pgTable("plan_managers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phoneNumber: text("phone_number"),
+  organisation: text("organisation"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPlanManagerSchema = createInsertSchema(planManagers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPlanManager = z.infer<typeof insertPlanManagerSchema>;
+export type PlanManager = typeof planManagers.$inferSelect;
+
+// NDIS Services for service tracking
+export const ndisServices = pgTable("ndis_services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  ndisCode: text("ndis_code").notNull(),
+  serviceName: text("service_name").notNull(),
+  hoursAllocated: text("hours_allocated"),
+  budgetAllocated: text("budget_allocated"),
+  hoursUsed: text("hours_used").default("0"),
+  budgetUsed: text("budget_used").default("0"),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertNdisServiceSchema = createInsertSchema(ndisServices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertNdisService = z.infer<typeof insertNdisServiceSchema>;
+export type NdisService = typeof ndisServices.$inferSelect;
+
+// Notification preference type
+export type NotificationPreference = {
+  smsArrival?: boolean;
+  smsSchedule?: boolean;
+  callArrival?: boolean;
+  callSchedule?: boolean;
+  none?: boolean;
+};

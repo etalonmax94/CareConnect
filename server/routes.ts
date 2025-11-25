@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { 
   insertClientSchema, updateClientSchema, insertProgressNoteSchema, 
   insertInvoiceSchema, calculateAge, insertBudgetSchema,
-  insertIncidentReportSchema, insertPrivacyConsentSchema, insertActivityLogSchema
+  insertIncidentReportSchema, insertPrivacyConsentSchema, insertActivityLogSchema,
+  insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -757,6 +758,305 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching distance report:", error);
       res.status(500).json({ error: "Failed to fetch distance report" });
+    }
+  });
+
+  // ==================== STAFF ROUTES ====================
+  
+  // Get all staff
+  app.get("/api/staff", async (req, res) => {
+    try {
+      const staffList = await storage.getAllStaff();
+      res.json(staffList);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      res.status(500).json({ error: "Failed to fetch staff" });
+    }
+  });
+
+  // Get staff by ID
+  app.get("/api/staff/:id", async (req, res) => {
+    try {
+      const staffMember = await storage.getStaffById(req.params.id);
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+      res.json(staffMember);
+    } catch (error) {
+      console.error("Error fetching staff member:", error);
+      res.status(500).json({ error: "Failed to fetch staff member" });
+    }
+  });
+
+  // Create staff
+  app.post("/api/staff", async (req, res) => {
+    try {
+      const validationResult = insertStaffSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const staffMember = await storage.createStaff(validationResult.data);
+      res.status(201).json(staffMember);
+    } catch (error) {
+      console.error("Error creating staff:", error);
+      res.status(500).json({ error: "Failed to create staff member" });
+    }
+  });
+
+  // Update staff
+  app.patch("/api/staff/:id", async (req, res) => {
+    try {
+      const staffMember = await storage.updateStaff(req.params.id, req.body);
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+      res.json(staffMember);
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      res.status(500).json({ error: "Failed to update staff member" });
+    }
+  });
+
+  // Delete staff
+  app.delete("/api/staff/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteStaff(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      res.status(500).json({ error: "Failed to delete staff member" });
+    }
+  });
+
+  // ==================== SUPPORT COORDINATORS ROUTES ====================
+  
+  // Get all support coordinators
+  app.get("/api/support-coordinators", async (req, res) => {
+    try {
+      const coordinators = await storage.getAllSupportCoordinators();
+      res.json(coordinators);
+    } catch (error) {
+      console.error("Error fetching support coordinators:", error);
+      res.status(500).json({ error: "Failed to fetch support coordinators" });
+    }
+  });
+
+  // Get support coordinator by ID
+  app.get("/api/support-coordinators/:id", async (req, res) => {
+    try {
+      const coordinator = await storage.getSupportCoordinatorById(req.params.id);
+      if (!coordinator) {
+        return res.status(404).json({ error: "Support coordinator not found" });
+      }
+      res.json(coordinator);
+    } catch (error) {
+      console.error("Error fetching support coordinator:", error);
+      res.status(500).json({ error: "Failed to fetch support coordinator" });
+    }
+  });
+
+  // Create support coordinator
+  app.post("/api/support-coordinators", async (req, res) => {
+    try {
+      const validationResult = insertSupportCoordinatorSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const coordinator = await storage.createSupportCoordinator(validationResult.data);
+      res.status(201).json(coordinator);
+    } catch (error) {
+      console.error("Error creating support coordinator:", error);
+      res.status(500).json({ error: "Failed to create support coordinator" });
+    }
+  });
+
+  // Update support coordinator
+  app.patch("/api/support-coordinators/:id", async (req, res) => {
+    try {
+      const coordinator = await storage.updateSupportCoordinator(req.params.id, req.body);
+      if (!coordinator) {
+        return res.status(404).json({ error: "Support coordinator not found" });
+      }
+      res.json(coordinator);
+    } catch (error) {
+      console.error("Error updating support coordinator:", error);
+      res.status(500).json({ error: "Failed to update support coordinator" });
+    }
+  });
+
+  // Delete support coordinator
+  app.delete("/api/support-coordinators/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSupportCoordinator(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Support coordinator not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting support coordinator:", error);
+      res.status(500).json({ error: "Failed to delete support coordinator" });
+    }
+  });
+
+  // ==================== PLAN MANAGERS ROUTES ====================
+  
+  // Get all plan managers
+  app.get("/api/plan-managers", async (req, res) => {
+    try {
+      const managers = await storage.getAllPlanManagers();
+      res.json(managers);
+    } catch (error) {
+      console.error("Error fetching plan managers:", error);
+      res.status(500).json({ error: "Failed to fetch plan managers" });
+    }
+  });
+
+  // Get plan manager by ID
+  app.get("/api/plan-managers/:id", async (req, res) => {
+    try {
+      const manager = await storage.getPlanManagerById(req.params.id);
+      if (!manager) {
+        return res.status(404).json({ error: "Plan manager not found" });
+      }
+      res.json(manager);
+    } catch (error) {
+      console.error("Error fetching plan manager:", error);
+      res.status(500).json({ error: "Failed to fetch plan manager" });
+    }
+  });
+
+  // Create plan manager
+  app.post("/api/plan-managers", async (req, res) => {
+    try {
+      const validationResult = insertPlanManagerSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const manager = await storage.createPlanManager(validationResult.data);
+      res.status(201).json(manager);
+    } catch (error) {
+      console.error("Error creating plan manager:", error);
+      res.status(500).json({ error: "Failed to create plan manager" });
+    }
+  });
+
+  // Update plan manager
+  app.patch("/api/plan-managers/:id", async (req, res) => {
+    try {
+      const manager = await storage.updatePlanManager(req.params.id, req.body);
+      if (!manager) {
+        return res.status(404).json({ error: "Plan manager not found" });
+      }
+      res.json(manager);
+    } catch (error) {
+      console.error("Error updating plan manager:", error);
+      res.status(500).json({ error: "Failed to update plan manager" });
+    }
+  });
+
+  // Delete plan manager
+  app.delete("/api/plan-managers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePlanManager(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Plan manager not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting plan manager:", error);
+      res.status(500).json({ error: "Failed to delete plan manager" });
+    }
+  });
+
+  // ==================== NDIS SERVICES ROUTES ====================
+  
+  // Get NDIS services by client
+  app.get("/api/clients/:clientId/ndis-services", async (req, res) => {
+    try {
+      const services = await storage.getNdisServicesByClient(req.params.clientId);
+      res.json(services);
+    } catch (error) {
+      console.error("Error fetching NDIS services:", error);
+      res.status(500).json({ error: "Failed to fetch NDIS services" });
+    }
+  });
+
+  // Create NDIS service
+  app.post("/api/clients/:clientId/ndis-services", async (req, res) => {
+    try {
+      const validationResult = insertNdisServiceSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const service = await storage.createNdisService(validationResult.data);
+      res.status(201).json(service);
+    } catch (error) {
+      console.error("Error creating NDIS service:", error);
+      res.status(500).json({ error: "Failed to create NDIS service" });
+    }
+  });
+
+  // Update NDIS service
+  app.patch("/api/ndis-services/:id", async (req, res) => {
+    try {
+      const service = await storage.updateNdisService(req.params.id, req.body);
+      if (!service) {
+        return res.status(404).json({ error: "NDIS service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      console.error("Error updating NDIS service:", error);
+      res.status(500).json({ error: "Failed to update NDIS service" });
+    }
+  });
+
+  // Delete NDIS service
+  app.delete("/api/ndis-services/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteNdisService(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "NDIS service not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting NDIS service:", error);
+      res.status(500).json({ error: "Failed to delete NDIS service" });
+    }
+  });
+
+  // Get clients by support coordinator ID
+  app.get("/api/support-coordinators/:id/clients", async (req, res) => {
+    try {
+      const allClients = await storage.getAllClients();
+      const clients = allClients.filter(c => c.careTeam?.supportCoordinatorId === req.params.id);
+      res.json(clients.map(client => ({
+        ...client,
+        age: calculateAge(client.dateOfBirth)
+      })));
+    } catch (error) {
+      console.error("Error fetching coordinator clients:", error);
+      res.status(500).json({ error: "Failed to fetch coordinator clients" });
+    }
+  });
+
+  // Get clients by plan manager ID
+  app.get("/api/plan-managers/:id/clients", async (req, res) => {
+    try {
+      const allClients = await storage.getAllClients();
+      const clients = allClients.filter(c => c.careTeam?.planManagerId === req.params.id);
+      res.json(clients.map(client => ({
+        ...client,
+        age: calculateAge(client.dateOfBirth)
+      })));
+    } catch (error) {
+      console.error("Error fetching plan manager clients:", error);
+      res.status(500).json({ error: "Failed to fetch plan manager clients" });
     }
   });
 

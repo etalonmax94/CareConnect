@@ -1,10 +1,13 @@
 import { db } from "./db";
 import { 
   clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
+  staff, supportCoordinators, planManagers, ndisServices,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
-  type InsertIncidentReport, type IncidentReport, type InsertPrivacyConsent, type PrivacyConsent
+  type InsertIncidentReport, type IncidentReport, type InsertPrivacyConsent, type PrivacyConsent,
+  type InsertStaff, type Staff, type InsertSupportCoordinator, type SupportCoordinator,
+  type InsertPlanManager, type PlanManager, type InsertNdisService, type NdisService
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -53,6 +56,33 @@ export interface IStorage {
   getConsentsByClient(clientId: string): Promise<PrivacyConsent[]>;
   createPrivacyConsent(consent: InsertPrivacyConsent): Promise<PrivacyConsent>;
   updatePrivacyConsent(id: string, consent: Partial<InsertPrivacyConsent>): Promise<PrivacyConsent | undefined>;
+  
+  // Staff
+  getAllStaff(): Promise<Staff[]>;
+  getStaffById(id: string): Promise<Staff | undefined>;
+  createStaff(staffMember: InsertStaff): Promise<Staff>;
+  updateStaff(id: string, staffMember: Partial<InsertStaff>): Promise<Staff | undefined>;
+  deleteStaff(id: string): Promise<boolean>;
+  
+  // Support Coordinators
+  getAllSupportCoordinators(): Promise<SupportCoordinator[]>;
+  getSupportCoordinatorById(id: string): Promise<SupportCoordinator | undefined>;
+  createSupportCoordinator(coordinator: InsertSupportCoordinator): Promise<SupportCoordinator>;
+  updateSupportCoordinator(id: string, coordinator: Partial<InsertSupportCoordinator>): Promise<SupportCoordinator | undefined>;
+  deleteSupportCoordinator(id: string): Promise<boolean>;
+  
+  // Plan Managers
+  getAllPlanManagers(): Promise<PlanManager[]>;
+  getPlanManagerById(id: string): Promise<PlanManager | undefined>;
+  createPlanManager(manager: InsertPlanManager): Promise<PlanManager>;
+  updatePlanManager(id: string, manager: Partial<InsertPlanManager>): Promise<PlanManager | undefined>;
+  deletePlanManager(id: string): Promise<boolean>;
+  
+  // NDIS Services
+  getNdisServicesByClient(clientId: string): Promise<NdisService[]>;
+  createNdisService(service: InsertNdisService): Promise<NdisService>;
+  updateNdisService(id: string, service: Partial<InsertNdisService>): Promise<NdisService | undefined>;
+  deleteNdisService(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -266,6 +296,115 @@ export class DbStorage implements IStorage {
       .where(eq(privacyConsents.id, id))
       .returning();
     return result[0];
+  }
+
+  // Staff
+  async getAllStaff(): Promise<Staff[]> {
+    return await db.select().from(staff).orderBy(staff.name);
+  }
+
+  async getStaffById(id: string): Promise<Staff | undefined> {
+    const result = await db.select().from(staff).where(eq(staff.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createStaff(staffMember: InsertStaff): Promise<Staff> {
+    const result = await db.insert(staff).values(staffMember).returning();
+    return result[0];
+  }
+
+  async updateStaff(id: string, staffUpdate: Partial<InsertStaff>): Promise<Staff | undefined> {
+    const result = await db.update(staff)
+      .set({ ...staffUpdate as any, updatedAt: new Date() })
+      .where(eq(staff.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaff(id: string): Promise<boolean> {
+    const result = await db.delete(staff).where(eq(staff.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Support Coordinators
+  async getAllSupportCoordinators(): Promise<SupportCoordinator[]> {
+    return await db.select().from(supportCoordinators).orderBy(supportCoordinators.name);
+  }
+
+  async getSupportCoordinatorById(id: string): Promise<SupportCoordinator | undefined> {
+    const result = await db.select().from(supportCoordinators).where(eq(supportCoordinators.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createSupportCoordinator(coordinator: InsertSupportCoordinator): Promise<SupportCoordinator> {
+    const result = await db.insert(supportCoordinators).values(coordinator).returning();
+    return result[0];
+  }
+
+  async updateSupportCoordinator(id: string, coordinatorUpdate: Partial<InsertSupportCoordinator>): Promise<SupportCoordinator | undefined> {
+    const result = await db.update(supportCoordinators)
+      .set({ ...coordinatorUpdate as any, updatedAt: new Date() })
+      .where(eq(supportCoordinators.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSupportCoordinator(id: string): Promise<boolean> {
+    const result = await db.delete(supportCoordinators).where(eq(supportCoordinators.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Plan Managers
+  async getAllPlanManagers(): Promise<PlanManager[]> {
+    return await db.select().from(planManagers).orderBy(planManagers.name);
+  }
+
+  async getPlanManagerById(id: string): Promise<PlanManager | undefined> {
+    const result = await db.select().from(planManagers).where(eq(planManagers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createPlanManager(manager: InsertPlanManager): Promise<PlanManager> {
+    const result = await db.insert(planManagers).values(manager).returning();
+    return result[0];
+  }
+
+  async updatePlanManager(id: string, managerUpdate: Partial<InsertPlanManager>): Promise<PlanManager | undefined> {
+    const result = await db.update(planManagers)
+      .set({ ...managerUpdate as any, updatedAt: new Date() })
+      .where(eq(planManagers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePlanManager(id: string): Promise<boolean> {
+    const result = await db.delete(planManagers).where(eq(planManagers.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // NDIS Services
+  async getNdisServicesByClient(clientId: string): Promise<NdisService[]> {
+    return await db.select().from(ndisServices)
+      .where(eq(ndisServices.clientId, clientId))
+      .orderBy(ndisServices.serviceName);
+  }
+
+  async createNdisService(service: InsertNdisService): Promise<NdisService> {
+    const result = await db.insert(ndisServices).values(service).returning();
+    return result[0];
+  }
+
+  async updateNdisService(id: string, serviceUpdate: Partial<InsertNdisService>): Promise<NdisService | undefined> {
+    const result = await db.update(ndisServices)
+      .set({ ...serviceUpdate as any, updatedAt: new Date() })
+      .where(eq(ndisServices.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteNdisService(id: string): Promise<boolean> {
+    const result = await db.delete(ndisServices).where(eq(ndisServices.id, id)).returning();
+    return result.length > 0;
   }
 }
 
