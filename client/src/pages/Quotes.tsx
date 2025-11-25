@@ -115,7 +115,7 @@ export default function Quotes() {
 
   const filteredClients = useMemo(() => {
     return clients
-      .filter(c => !c.isArchived)
+      .filter(c => c.isArchived !== "yes")
       .filter(c => 
         clientSearchTerm === "" ||
         c.participantName.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
@@ -187,12 +187,15 @@ export default function Quotes() {
                         data-testid="input-client-search"
                       />
                       <CommandList>
-                        <CommandEmpty>
-                          {clientSearchTerm.length > 0 
-                            ? "No clients found." 
-                            : "Type to search clients..."}
-                        </CommandEmpty>
-                        <CommandGroup>
+                        {filteredClients.length === 0 && (
+                          <div className="py-6 text-center text-sm text-muted-foreground">
+                            {clientSearchTerm.length > 0 
+                              ? "No clients found." 
+                              : "Type to search clients..."}
+                          </div>
+                        )}
+                        {filteredClients.length > 0 && (
+                          <CommandGroup heading="Clients">
                           {filteredClients.slice(0, 10).map((client) => (
                             <CommandItem
                               key={client.id}
@@ -224,7 +227,8 @@ export default function Quotes() {
                               )}
                             </CommandItem>
                           ))}
-                        </CommandGroup>
+                          </CommandGroup>
+                        )}
                       </CommandList>
                     </Command>
                   </PopoverContent>

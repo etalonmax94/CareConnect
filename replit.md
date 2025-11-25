@@ -34,11 +34,21 @@ The system features a professional navy blue theme, reflecting healthcare indust
 - **Staff Assignments**: Tracks historical and current staff-client relationships with assignment types (primary support, secondary support, care manager, clinical nurse).
 - **Settings Module**: Configures office location, report preferences, and company information.
 - **Privacy & Compliance Module**: Tracks privacy consent with collection dates, maintains activity audit logs for all data changes, and enforces data retention policies.
-- **Quotes Module**: NDIS service quotation system to replace Excel-based estimates. Features include:
-  - Quote creation with client selection and validity dates
-  - NDIS Price Guide integration for service item lookup
-  - Line items with support item numbers, rate types (weekday, Saturday, Sunday, public holiday, evening, night)
-  - Automatic total calculation with GST exemption for NDIS
+- **Quotes Module**: Comprehensive NDIS service quotation system to replace Excel-based estimates. Features include:
+  - Quote creation with searchable client picker (typeahead dropdown)
+  - NDIS Price Guide integration for service item lookup (optional)
+  - Detailed rate breakdown per line item:
+    - Weekday hours and rates
+    - Saturday hours and rates  
+    - Sunday hours and rates
+    - Public Holiday hours and rates
+    - Evening hours and rates
+    - Night hours and rates
+  - Annual calculation settings:
+    - Configurable weeks per year (48, 50, or 52)
+    - QLD Public Holiday uplift toggle (adds rate difference for 12 public holidays)
+  - Weekly and annual totals calculated automatically
+  - GST exemption for NDIS services
   - Status workflow: draft → sent → accepted/declined/expired
   - Status history tracking with timestamps
   - Professional quote numbering (Q{YEAR}-{NUMBER})
@@ -116,3 +126,11 @@ The system implements comprehensive data interconnection to eliminate manual ret
 - **New Client Onboarding**: Blue banner for new clients with "Mark as Onboarded" button, "New" badge in client list
 - **Budget Allocation UI**: Enhanced add/delete functionality with visual progress bars and NDIS-aligned categories
 - **Client Table Improvements**: Care Manager displayed as "First Name + Initial" format, phone numbers with no-wrap styling
+- **NDIS Quote System Completed**:
+  - Searchable client picker with typeahead dropdown
+  - Comprehensive rate breakdown per line item (weekday, Saturday, Sunday, public holiday, evening, night)
+  - Configurable annual calculations (48/50/52 weeks)
+  - QLD Public Holiday uplift toggle with rate difference calculation
+  - Fixed annual calculation to avoid double-counting public holidays
+  - Professional quote numbering (Q{YEAR}-{NUMBER})
+  - Quote status workflow with history tracking
