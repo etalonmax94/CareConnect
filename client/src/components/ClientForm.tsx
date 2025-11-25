@@ -29,7 +29,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
       careTeam: {},
       clinicalDocuments: {},
       highIntensitySupports: [],
-    },
+    } as any,
   });
 
   const handleSubmit = async (data: InsertClient) => {
@@ -73,7 +73,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="NDIS">NDIS</SelectItem>
-                          <SelectItem value="Support at Home">Support at Home</SelectItem>
+                          <SelectItem value="Aged Care">Aged Care</SelectItem>
                           <SelectItem value="Private">Private</SelectItem>
                         </SelectContent>
                       </Select>
@@ -305,20 +305,20 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
               </Card>
             )}
 
-            {selectedCategory === "Support at Home" && (
+            {selectedCategory === "Aged Care" && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Support at Home Details</CardTitle>
+                  <CardTitle className="text-base">Aged Care (HCP) Details</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="supportAtHomeDetails.programDetails"
+                    name="agedCareDetails.hcpNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Program Details</FormLabel>
+                        <FormLabel>HCP Number</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} data-testid="input-program" />
+                          <Input {...field} value={field.value || ""} data-testid="input-hcp-number" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -327,12 +327,12 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                   <FormField
                     control={form.control}
-                    name="supportAtHomeDetails.fundingSource"
+                    name="agedCareDetails.hcpFundingLevel"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Funding Source</FormLabel>
+                        <FormLabel>HCP Funding Level</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} data-testid="input-funding-source" />
+                          <Input {...field} value={field.value || ""} placeholder="Level 1-4" data-testid="input-hcp-level" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -341,12 +341,12 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                   <FormField
                     control={form.control}
-                    name="supportAtHomeDetails.serviceEntitlements"
+                    name="agedCareDetails.scheduleOfSupports"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel>Service Entitlements</FormLabel>
+                        <FormLabel>Schedule of Supports</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} data-testid="input-entitlements" />
+                          <Input {...field} value={field.value || ""} data-testid="input-hcp-supports" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

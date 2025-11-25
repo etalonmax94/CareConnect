@@ -18,7 +18,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Client types
-export type ClientCategory = "NDIS" | "Support at Home" | "Private";
+export type ClientCategory = "NDIS" | "Aged Care" | "Private";
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -59,11 +59,11 @@ export const clients = pgTable("clients", {
     ndisConsentFormDate?: string;
   }>(),
   
-  // Support at Home Details - stored as JSON
-  supportAtHomeDetails: json("support_at_home_details").$type<{
-    programDetails?: string;
-    fundingSource?: string;
-    serviceEntitlements?: string;
+  // Aged Care (HCP) Details - stored as JSON
+  agedCareDetails: json("aged_care_details").$type<{
+    hcpNumber?: string;
+    hcpFundingLevel?: string;
+    scheduleOfSupports?: string;
   }>(),
   
   // Private Client Details - stored as JSON
@@ -92,11 +92,11 @@ export const clients = pgTable("clients", {
 
 export const insertClientSchema = createInsertSchema(clients, {
   email: z.string().email().optional().or(z.literal("")),
-  category: z.enum(["NDIS", "Support at Home", "Private"]),
+  category: z.enum(["NDIS", "Aged Care", "Private"]),
   dateOfBirth: z.string().optional().or(z.literal("")),
   careTeam: z.any().optional(),
   ndisDetails: z.any().optional(),
-  supportAtHomeDetails: z.any().optional(),
+  agedCareDetails: z.any().optional(),
   privateClientDetails: z.any().optional(),
   clinicalDocuments: z.any().optional(),
 }).omit({
@@ -145,6 +145,48 @@ export const insertProgressNoteSchema = createInsertSchema(progressNotes, {
 
 export type InsertProgressNote = z.infer<typeof insertProgressNoteSchema>;
 export type ProgressNote = typeof progressNotes.$inferSelect;
+
+// Budgets
+export const budgets = pgTable("budgets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  category: text("category").notNull(),
+  totalAllocated: text("total_allocated").notNull(),
+  used: text("used").default("0").notNull(),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBudgetSchema = createInsertSchema(budgets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertBudget = z.infer<typeof insertBudgetSchema>;
+export type Budget = typeof budgets.$inferSelect;
+
+// Documents
+export const documents = pgTable("documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  uploadDate: timestamp("upload_date").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDocumentSchema = createInsertSchema(documents).omit({
+  id: true,
+  uploadDate: true,
+  createdAt: true,
+});
+
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documents.$inferSelect;
 
 // Invoices
 export const invoices = pgTable("invoices", {

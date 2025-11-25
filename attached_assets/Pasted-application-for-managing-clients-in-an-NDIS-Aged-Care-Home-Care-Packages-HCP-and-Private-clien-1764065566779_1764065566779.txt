@@ -1,0 +1,109 @@
+application for managing clients in an NDIS, Aged Care (Home Care Packages - HCP), and Private clients business. The app should serve as a CRM system with client profiles, document management, budgeting, and funds tracking features. Use the following structure based on my existing Excel data structure (with sheets for NDIS, SaH/Aged Care, Private, and Archive):
+Main Modules:
+
+Clients Module (Central form for all clients, with a 'Client Type' field to categorize as NDIS, Aged Care, Private, or Archive. This allows unified management with type-specific fields shown conditionally.)
+Key Fields:
+Client Name (Text, Required)
+Care Manager (Lookup to a separate Care Managers module or Text)
+Leadership/Clinical Notes (Multi-line Text)
+Photo (Image Upload)
+DOB (Date)
+Age (Formula: Calculate automatically from DOB)
+Home Address (Address Field)
+Phone Number (Phone)
+Schedule & Arrival Notification (Multi-line Text, e.g., SMS/Call preferences)
+NOK/EPOA (Multi-line Text, e.g., Next of Kin details)
+Email (Email)
+Medicare Number (Text)
+Frequency of Services (Multi-line Text)
+Main Diagnosis (Multi-line Text)
+Summary of Services Received (Multi-line Text)
+Communication Needs (Text)
+Funding Details (Subform or Section):
+For NDIS: NDIS Number (Text), Funding Type (Picklist: Plan, Agency), Plan Start Date (Date), Plan End Date (Date)
+For Aged Care: HCP Number (Text), HCP Funding Level (Picklist: Level 1, Level 2, Level 3, Level 4)
+For Private: Funding Source (Text, e.g., QLD Health, Self-Funded)
+
+Service Agreement Date (Date, Annual Renewal)
+Schedule of Supports/Budget (Currency or Subform for budget breakdown)
+Consent Form Date (Date, Annual)
+NDIS Consent Form Date (Date, Conditional for NDIS)
+Risk Assessment Date (Date, Annual)
+Self Assessment of Medication Tool (Date)
+Medication Consent Date (Date, Annual)
+Personal Emergency Management (Date)
+Care Plan Date (Date, 6-monthly)
+Health Summary Date (Date, 6-monthly)
+Wound Care Plan (Multi-line Text)
+General Practitioner (Subform: Name, Clinic, Phone, Email)
+Support Coordinator (Text, for NDIS/Aged Care)
+Plan Manager (Text)
+Other Health Professionals (Multi-line Text)
+Allied Health Reports (File Upload)
+High Intensity Supports Provided (Multi-line Text, e.g., IDC/SPC/PEG)
+Intake Form/Initial Assessment (File Upload)
+Service Delivery Record (Subform or Lookup to Records module)
+Progress Notes (Subform: Date, Note, Author)
+Money and Property Form (File Upload)
+Referrals Made (Multi-line Text)
+Plan Reviews (Subform: Date, Notes)
+Incidents (Subform: Date, Description, Resolution)
+Complaints/Feedback (Subform: Date, Details)
+Invoices (Lookup to Invoices module or Subform)
+
+
+Budgeting and Funds Tracking Module (Linked to Clients via Client ID):
+Track funding allocation, usage, and remaining balance.
+Fields:
+Client Lookup (Required)
+Budget Category (Picklist: e.g., ADLs, Community Access, Nursing, Travel/Transport)
+Total Allocated Budget (Currency)
+Start Date (Date)
+End Date (Date)
+Used Amount (Currency, Calculated from linked services/invoices)
+Remaining Balance (Formula: Total Allocated - Used Amount)
+Funding Alerts (Workflow: Email reminders 30 days before plan end or when balance <20%)
+
+Subform for Transactions: Date, Service Type, Amount, Invoice Reference.
+
+Invoices Module (For tracking billing and payments, linked to Clients and Budgets):
+Fields:
+Client Lookup
+Invoice Date (Date)
+Service Provided (Multi-line Text)
+Amount (Currency)
+Payment Status (Picklist: Pending, Paid, Overdue)
+Linked Budget (Lookup)
+Invoice Upload (File)
+
+Workflow: Auto-update client's budget usage on invoice approval.
+
+Care Managers/Support Coordinators Module (Simple directory for lookups):
+Fields: Name, Email, Phone, Organization.
+
+Documents/Attachments Module (Central repository linked to Clients):
+Fields: Client Lookup, Document Type (Picklist: Consent, Care Plan, Reports, etc.), Upload Date, File.
+
+
+Additional Features:
+
+Workflows and Automations:
+Send email/SMS reminders for expiring dates (e.g., Plan End, Risk Assessment, Care Plan - 30/7 days prior).
+Auto-calculate age and budget balances.
+Approval workflows for new clients or budget changes.
+Archive workflow: Move inactive clients to 'Archive' status.
+
+Reports and Dashboards:
+Client Overview Dashboard: Charts for active clients by type, upcoming renewals, low budgets.
+Funds Usage Report: By client, category, or period.
+Compliance Report: Overdue assessments/consents.
+Custom Views: Filtered by Client Type (NDIS, Aged Care, Private).
+
+Security and Access:
+Role-based: Admin (full access), Care Managers (view/edit own clients), Nurses (add notes/records).
+Data Import: Allow importing from Excel (match fields to my provided sheet structure).
+
+Integrations:
+Integrate with Zoho CRM for leads/prospects.
+Email/SMS for notifications.
+Calendar for scheduling visits.
