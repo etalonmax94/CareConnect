@@ -2401,6 +2401,260 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ZAPIER INTEGRATION WEBHOOKS ====================
+  
+  // API Key middleware for webhook authentication
+  const ZAPIER_API_KEY = process.env.ZAPIER_API_KEY;
+  
+  function requireApiKey(req: Request, res: Response, next: NextFunction) {
+    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    
+    if (!ZAPIER_API_KEY) {
+      console.error("ZAPIER_API_KEY not configured");
+      return res.status(500).json({ error: "Webhook not configured" });
+    }
+    
+    if (!apiKey || apiKey !== ZAPIER_API_KEY) {
+      console.warn("Invalid API key attempt from:", req.ip);
+      return res.status(401).json({ error: "Invalid or missing API key" });
+    }
+    
+    next();
+  }
+  
+  // Referral webhook schema - maps Zoho form fields to client data
+  const referralWebhookSchema = z.object({
+    // Required fields
+    participantName: z.string().min(1, "Participant name is required"),
+    category: z.enum(["NDIS", "Support at Home", "Private"]).default("NDIS"),
+    
+    // Optional contact fields
+    phoneNumber: z.string().optional(),
+    email: z.string().email().optional().or(z.literal("")),
+    homeAddress: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    
+    // Medical information
+    mainDiagnosis: z.string().optional(),
+    allergies: z.string().optional(),
+    medicareNumber: z.string().optional(),
+    
+    // NDIS specific
+    ndisNumber: z.string().optional(),
+    ndisPlanStartDate: z.string().optional(),
+    ndisPlanEndDate: z.string().optional(),
+    
+    // Support at Home specific
+    hcpLevel: z.string().optional(),
+    hcpStartDate: z.string().optional(),
+    hcpEndDate: z.string().optional(),
+    
+    // Related entities (can be IDs or names for upsert)
+    gpName: z.string().optional(),
+    gpAddress: z.string().optional(),
+    gpPhone: z.string().optional(),
+    gpFax: z.string().optional(),
+    
+    supportCoordinatorName: z.string().optional(),
+    supportCoordinatorEmail: z.string().optional(),
+    supportCoordinatorPhone: z.string().optional(),
+    supportCoordinatorOrganisation: z.string().optional(),
+    
+    planManagerName: z.string().optional(),
+    planManagerEmail: z.string().optional(),
+    planManagerPhone: z.string().optional(),
+    planManagerOrganisation: z.string().optional(),
+    
+    pharmacyName: z.string().optional(),
+    pharmacyAddress: z.string().optional(),
+    pharmacyPhone: z.string().optional(),
+    
+    // Next of kin / Emergency contact
+    nokEpoa: z.string().optional(),
+    
+    // Notes
+    summaryOfServices: z.string().optional(),
+    clinicalNotes: z.string().optional(),
+    communicationNeeds: z.string().optional(),
+    
+    // Source tracking
+    referralSource: z.string().optional(),
+    referralDate: z.string().optional(),
+  });
+
+  // POST /api/referrals - Zapier webhook to create new clients from Zoho referrals
+  app.post("/api/referrals", requireApiKey, async (req, res) => {
+    try {
+      console.log("Received referral webhook:", JSON.stringify(req.body, null, 2));
+      
+      const validation = referralWebhookSchema.safeParse(req.body);
+      if (!validation.success) {
+        const error = fromZodError(validation.error);
+        console.error("Referral validation failed:", error.message);
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: error.message 
+        });
+      }
+      
+      const data = validation.data;
+      
+      // Handle GP upsert if provided
+      let generalPractitionerId: string | undefined;
+      if (data.gpName) {
+        const existingGPs = await storage.getAllGPs();
+        let gp = existingGPs.find((g: any) => 
+          g.name.toLowerCase() === data.gpName!.toLowerCase()
+        );
+        
+        if (!gp) {
+          gp = await storage.createGP({
+            name: data.gpName,
+            address: data.gpAddress,
+            phoneNumber: data.gpPhone,
+            faxNumber: data.gpFax,
+          });
+          console.log("Created new GP:", gp.id, gp.name);
+        }
+        generalPractitionerId = gp.id;
+      }
+      
+      // Handle Support Coordinator upsert if provided
+      let supportCoordinatorId: string | undefined;
+      if (data.supportCoordinatorName) {
+        const existingSCs = await storage.getAllSupportCoordinators();
+        let sc = existingSCs.find((s: any) => 
+          s.name.toLowerCase() === data.supportCoordinatorName!.toLowerCase()
+        );
+        
+        if (!sc) {
+          sc = await storage.createSupportCoordinator({
+            name: data.supportCoordinatorName,
+            email: data.supportCoordinatorEmail,
+            phoneNumber: data.supportCoordinatorPhone,
+            organisation: data.supportCoordinatorOrganisation,
+          });
+          console.log("Created new Support Coordinator:", sc.id, sc.name);
+        }
+        supportCoordinatorId = sc.id;
+      }
+      
+      // Handle Plan Manager upsert if provided
+      let planManagerId: string | undefined;
+      if (data.planManagerName) {
+        const existingPMs = await storage.getAllPlanManagers();
+        let pm = existingPMs.find((p: any) => 
+          p.name.toLowerCase() === data.planManagerName!.toLowerCase()
+        );
+        
+        if (!pm) {
+          pm = await storage.createPlanManager({
+            name: data.planManagerName,
+            email: data.planManagerEmail,
+            phoneNumber: data.planManagerPhone,
+            organisation: data.planManagerOrganisation,
+          });
+          console.log("Created new Plan Manager:", pm.id, pm.name);
+        }
+        planManagerId = pm.id;
+      }
+      
+      // Handle Pharmacy upsert if provided
+      let pharmacyId: string | undefined;
+      if (data.pharmacyName) {
+        const existingPharmacies = await storage.getAllPharmacies();
+        let pharmacy = existingPharmacies.find((p: any) => 
+          p.name.toLowerCase() === data.pharmacyName!.toLowerCase()
+        );
+        
+        if (!pharmacy) {
+          pharmacy = await storage.createPharmacy({
+            name: data.pharmacyName,
+            address: data.pharmacyAddress,
+            phoneNumber: data.pharmacyPhone,
+          });
+          console.log("Created new Pharmacy:", pharmacy.id, pharmacy.name);
+        }
+        pharmacyId = pharmacy.id;
+      }
+      
+      // Build NDIS details if applicable
+      const ndisDetails = data.category === "NDIS" ? {
+        ndisNumber: data.ndisNumber,
+        ndisPlanStartDate: data.ndisPlanStartDate,
+        ndisPlanEndDate: data.ndisPlanEndDate,
+        supportCoordinatorId,
+        planManagerId,
+      } : undefined;
+      
+      // Build Support at Home details if applicable  
+      const supportAtHomeDetails = data.category === "Support at Home" ? {
+        hcpLevel: data.hcpLevel,
+        hcpStartDate: data.hcpStartDate,
+        hcpEndDate: data.hcpEndDate,
+      } : undefined;
+      
+      // Create the new client
+      const newClient = await storage.createClient({
+        category: data.category,
+        participantName: data.participantName,
+        phoneNumber: data.phoneNumber,
+        email: data.email || undefined,
+        homeAddress: data.homeAddress,
+        dateOfBirth: data.dateOfBirth,
+        mainDiagnosis: data.mainDiagnosis,
+        allergies: data.allergies,
+        medicareNumber: data.medicareNumber,
+        nokEpoa: data.nokEpoa,
+        summaryOfServices: data.summaryOfServices,
+        clinicalNotes: data.clinicalNotes,
+        communicationNeeds: data.communicationNeeds,
+        generalPractitionerId,
+        pharmacyId,
+        ndisDetails: ndisDetails as any,
+        supportAtHomeDetails: supportAtHomeDetails as any,
+        isOnboarded: "no",
+      });
+      
+      console.log("Created new client from referral:", newClient.id, newClient.participantName);
+      
+      // Log the activity
+      await storage.logActivity({
+        clientId: newClient.id,
+        action: "created",
+        description: `Client created from Zoho referral form${data.referralSource ? ` (${data.referralSource})` : ""}`,
+        performedBy: "Zapier Integration",
+        metadata: {
+          source: "zapier_webhook",
+          referralSource: data.referralSource,
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+        },
+      });
+      
+      res.status(201).json({
+        success: true,
+        message: "Referral processed successfully",
+        clientId: newClient.id,
+        clientName: newClient.participantName,
+        category: newClient.category,
+      });
+      
+    } catch (error) {
+      console.error("Error processing referral webhook:", error);
+      res.status(500).json({ error: "Failed to process referral" });
+    }
+  });
+  
+  // GET /api/referrals/test - Test endpoint to verify webhook configuration
+  app.get("/api/referrals/test", requireApiKey, (req, res) => {
+    res.json({
+      success: true,
+      message: "Webhook endpoint is configured correctly",
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
