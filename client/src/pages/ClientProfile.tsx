@@ -13,12 +13,14 @@ import { Label } from "@/components/ui/label";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 
 function NotificationBadge({ type }: { type: string }) {
@@ -169,6 +171,130 @@ export default function ClientProfile() {
   const { data: incidentReports = [] } = useQuery<IncidentReport[]>({
     queryKey: [`/api/incidents/client/${params?.id}`],
     enabled: !!params?.id,
+  });
+
+  const { data: goals = [] } = useQuery<ClientGoal[]>({
+    queryKey: ["/api/clients", params?.id, "goals"],
+    enabled: !!params?.id,
+  });
+
+  // Goal management state
+  const [addGoalOpen, setAddGoalOpen] = useState(false);
+  const [goalTitle, setGoalTitle] = useState("");
+  const [goalDescription, setGoalDescription] = useState("");
+  const [goalTargetDate, setGoalTargetDate] = useState("");
+  const [goalStatus, setGoalStatus] = useState<"not_started" | "in_progress" | "achieved" | "on_hold">("not_started");
+  const [pendingGoalSubmission, setPendingGoalSubmission] = useState(false);
+
+  const addGoalMutation = useMutation({
+    mutationFn: async (data: { title: string; description?: string; targetDate?: string; status: string }) => {
+      // Check current goal count from cache before submitting
+      const cachedGoals = queryClient.getQueryData<ClientGoal[]>(["/api/clients", params?.id, "goals"]) || [];
+      if (cachedGoals.length >= 5) {
+        throw new Error("Maximum of 5 goals per client allowed");
+      }
+      return apiRequest("POST", `/api/clients/${params?.id}/goals`, data);
+    },
+    onMutate: () => {
+      setPendingGoalSubmission(true);
+    },
+    onSettled: () => {
+      setPendingGoalSubmission(false);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "goals"] });
+      setAddGoalOpen(false);
+      setGoalTitle("");
+      setGoalDescription("");
+      setGoalTargetDate("");
+      setGoalStatus("not_started");
+      toast({ title: "Goal added successfully" });
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Failed to add goal";
+      if (message.includes("Maximum")) {
+        toast({ title: "Maximum goals reached", description: "You can only have up to 5 goals per client. Delete an existing goal to add a new one.", variant: "destructive" });
+      } else {
+        toast({ title: "Failed to add goal", description: message, variant: "destructive" });
+      }
+    }
+  });
+
+  const updateGoalMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ClientGoal> }) => {
+      return apiRequest("PATCH", `/api/goals/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "goals"] });
+    },
+  });
+
+  const deleteGoalMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/goals/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "goals"] });
+      toast({ title: "Goal deleted" });
+    },
+  });
+
+  // Budget management state
+  const [addBudgetOpen, setAddBudgetOpen] = useState(false);
+  const [budgetCategory, setBudgetCategory] = useState("");
+  const [budgetAllocated, setBudgetAllocated] = useState("");
+  const [budgetUsed, setBudgetUsed] = useState("0");
+  const [budgetStartDate, setBudgetStartDate] = useState("");
+  const [budgetEndDate, setBudgetEndDate] = useState("");
+
+  const addBudgetMutation = useMutation({
+    mutationFn: async (data: { clientId: string; category: string; totalAllocated: string; used: string; startDate?: string; endDate?: string }) => {
+      return apiRequest("POST", "/api/budgets", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets", params?.id] });
+      setAddBudgetOpen(false);
+      setBudgetCategory("");
+      setBudgetAllocated("");
+      setBudgetUsed("0");
+      setBudgetStartDate("");
+      setBudgetEndDate("");
+      toast({ title: "Budget added successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to add budget", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const updateBudgetMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Budget> }) => {
+      return apiRequest("PATCH", `/api/budgets/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets", params?.id] });
+    },
+  });
+
+  const deleteBudgetMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/budgets/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets", params?.id] });
+      toast({ title: "Budget removed" });
+    },
+  });
+
+  // Onboarding mutation
+  const onboardMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/clients/${params?.id}/onboard`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({ title: "Client marked as onboarded" });
+    },
   });
 
   const [addNoteOpen, setAddNoteOpen] = useState(false);
@@ -365,6 +491,26 @@ export default function ClientProfile() {
         </Alert>
       )}
 
+      {client.isOnboarded !== "yes" && !isArchived && (
+        <Alert variant="default" className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+          <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200 flex items-center justify-between">
+            <span><strong>New Client</strong> - This client has not been onboarded yet. Complete the onboarding process to remove this notification.</span>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="ml-4 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              onClick={() => onboardMutation.mutate()}
+              disabled={onboardMutation.isPending}
+              data-testid="button-onboard-client"
+            >
+              {onboardMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+              Mark as Onboarded
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardContent className="p-6">
@@ -377,12 +523,28 @@ export default function ClientProfile() {
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                   <div>
                     <h2 className="text-2xl font-bold mb-2">{client.participantName}</h2>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <CategoryBadge category={client.category} />
                       {clientAge && (
                         <Badge variant="secondary" className="gap-1">
                           <Calendar className="w-3 h-3" />
                           {clientAge} years old
+                        </Badge>
+                      )}
+                      {client.riskAssessmentScore && (
+                        <Badge 
+                          variant="outline" 
+                          className={`gap-1 ${
+                            parseInt(client.riskAssessmentScore) >= 7 
+                              ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400" 
+                              : parseInt(client.riskAssessmentScore) >= 4 
+                                ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" 
+                                : "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                          }`}
+                          data-testid="badge-risk-score"
+                        >
+                          <Shield className="w-3 h-3" />
+                          Risk: {client.riskAssessmentScore}/10
                         </Badge>
                       )}
                     </div>
@@ -575,6 +737,7 @@ export default function ClientProfile() {
           <TabsTrigger value="details" data-testid="tab-details">Personal Details</TabsTrigger>
           <TabsTrigger value="program" data-testid="tab-program">Program Info</TabsTrigger>
           <TabsTrigger value="team" data-testid="tab-team">Care Team</TabsTrigger>
+          <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
           <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
           <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
           <TabsTrigger value="budget" data-testid="tab-budget">Budget Details</TabsTrigger>
@@ -933,7 +1096,7 @@ export default function ClientProfile() {
                               <SelectContent>
                                 {staffList.filter(s => !staffAssignments.some(a => a.staffId === s.id && !a.endDate)).map(staff => (
                                   <SelectItem key={staff.id} value={staff.id}>
-                                    {staff.name} ({staff.role.replace("_", " ")})
+                                    {staff.name} ({(staff.role || "staff").replace("_", " ")})
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -992,7 +1155,7 @@ export default function ClientProfile() {
                                 <p className="text-sm font-medium hover:underline cursor-pointer">{staff?.name || "Unknown"}</p>
                               </Link>
                               <p className="text-xs text-muted-foreground">{typeLabels[assignment.assignmentType] || assignment.assignmentType}</p>
-                              <p className="text-xs text-muted-foreground">Since {new Date(assignment.startDate).toLocaleDateString()}</p>
+                              <p className="text-xs text-muted-foreground">Since {assignment.startDate ? new Date(assignment.startDate).toLocaleDateString() : "N/A"}</p>
                             </div>
                           </div>
                           {!isArchived && (
@@ -1014,6 +1177,195 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="goals">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  Client Goals ({goals.length}/5)
+                </CardTitle>
+                {!isArchived && goals.length < 5 ? (
+                  <Dialog open={addGoalOpen} onOpenChange={setAddGoalOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" data-testid="button-add-goal">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Goal
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Goal</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Goal Title *</Label>
+                          <Input 
+                            placeholder="Enter goal title..." 
+                            value={goalTitle}
+                            onChange={(e) => setGoalTitle(e.target.value)}
+                            data-testid="input-goal-title"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <Textarea 
+                            placeholder="Describe the goal in detail..." 
+                            value={goalDescription}
+                            onChange={(e) => setGoalDescription(e.target.value)}
+                            rows={3}
+                            data-testid="input-goal-description"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Target Date</Label>
+                            <Input 
+                              type="date" 
+                              value={goalTargetDate}
+                              onChange={(e) => setGoalTargetDate(e.target.value)}
+                              data-testid="input-goal-target-date"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Status</Label>
+                            <Select value={goalStatus} onValueChange={(v) => setGoalStatus(v as typeof goalStatus)}>
+                              <SelectTrigger data-testid="select-goal-status">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="not_started">Not Started</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="achieved">Achieved</SelectItem>
+                                <SelectItem value="on_hold">On Hold</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        {goals.length >= 5 || pendingGoalSubmission ? (
+                          <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                              {pendingGoalSubmission ? "Processing..." : "Maximum of 5 goals reached. Delete an existing goal to add a new one."}
+                            </p>
+                          </div>
+                        ) : (
+                          <Button 
+                            onClick={() => {
+                              // Double-check cache before submitting
+                              const cachedGoals = queryClient.getQueryData<ClientGoal[]>(["/api/clients", params?.id, "goals"]) || [];
+                              if (cachedGoals.length >= 5) {
+                                toast({ title: "Maximum goals reached", description: "You can only have up to 5 goals per client.", variant: "destructive" });
+                                setAddGoalOpen(false);
+                                return;
+                              }
+                              addGoalMutation.mutate({ 
+                                title: goalTitle, 
+                                description: goalDescription || undefined,
+                                targetDate: goalTargetDate || undefined,
+                                status: goalStatus 
+                              });
+                            }}
+                            disabled={!goalTitle.trim() || addGoalMutation.isPending}
+                            className="w-full"
+                            data-testid="button-submit-goal"
+                          >
+                            {addGoalMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Add Goal
+                          </Button>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                ) : !isArchived && goals.length >= 5 ? (
+                  <Badge variant="secondary" className="gap-1 text-muted-foreground">
+                    <CheckCircle className="w-3 h-3" />
+                    Maximum goals reached
+                  </Badge>
+                ) : null}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {goals.length === 0 ? (
+                <div className="text-center py-8">
+                  <Target className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No goals set for this client</p>
+                  {!isArchived && (
+                    <p className="text-xs text-muted-foreground mt-1">Click "Add Goal" to set client objectives</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {goals.map((goal) => {
+                    const statusConfig: Record<string, { label: string; className: string; icon: JSX.Element }> = {
+                      not_started: { label: "Not Started", className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300", icon: <Clock className="w-3 h-3" /> },
+                      in_progress: { label: "In Progress", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300", icon: <TrendingUp className="w-3 h-3" /> },
+                      achieved: { label: "Achieved", className: "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300", icon: <CheckCircle className="w-3 h-3" /> },
+                      on_hold: { label: "On Hold", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300", icon: <AlertTriangle className="w-3 h-3" /> },
+                    };
+                    const status = statusConfig[goal.status] || statusConfig.not_started;
+                    
+                    return (
+                      <div 
+                        key={goal.id} 
+                        className="p-4 border rounded-lg bg-card"
+                        data-testid={`goal-${goal.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium text-sm">{goal.title}</h4>
+                              <Badge className={`${status.className} gap-1`} variant="secondary">
+                                {status.icon}
+                                {status.label}
+                              </Badge>
+                            </div>
+                            {goal.description && (
+                              <p className="text-sm text-muted-foreground mt-1">{goal.description}</p>
+                            )}
+                            {goal.targetDate && (
+                              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Target: {new Date(goal.targetDate).toLocaleDateString('en-AU')}
+                              </p>
+                            )}
+                          </div>
+                          {!isArchived && (
+                            <div className="flex items-center gap-1">
+                              <Select 
+                                value={goal.status} 
+                                onValueChange={(v) => updateGoalMutation.mutate({ id: goal.id, data: { status: v } })}
+                              >
+                                <SelectTrigger className="w-[120px] h-8 text-xs" data-testid={`select-goal-status-${goal.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="not_started">Not Started</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="achieved">Achieved</SelectItem>
+                                  <SelectItem value="on_hold">On Hold</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => deleteGoalMutation.mutate(goal.id)}
+                                data-testid={`button-delete-goal-${goal.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="documents">
@@ -1075,7 +1427,7 @@ export default function ClientProfile() {
                             <SelectContent>
                               {staffList.map(staff => (
                                 <SelectItem key={staff.id} value={staff.id}>
-                                  {staff.name} ({staff.role.replace("_", " ")})
+                                  {staff.name} ({(staff.role || "staff").replace("_", " ")})
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1213,7 +1565,7 @@ export default function ClientProfile() {
                             <SelectContent>
                               {staffList.map(staff => (
                                 <SelectItem key={staff.id} value={staff.id}>
-                                  {staff.name} ({staff.role.replace("_", " ")})
+                                  {staff.name} ({(staff.role || "staff").replace("_", " ")})
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1342,44 +1694,179 @@ export default function ClientProfile() {
             </Card>
           </div>
 
-          {budgets && budgets.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Budget Categories</CardTitle>
-              </CardHeader>
-              <CardContent>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Budget Allocations
+                </CardTitle>
+                {!isArchived && (
+                  <Dialog open={addBudgetOpen} onOpenChange={setAddBudgetOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" data-testid="button-add-budget">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Budget
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Budget Allocation</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Category *</Label>
+                          <Select value={budgetCategory} onValueChange={setBudgetCategory}>
+                            <SelectTrigger data-testid="select-budget-category">
+                              <SelectValue placeholder="Select category..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Core Supports">Core Supports</SelectItem>
+                              <SelectItem value="Capacity Building">Capacity Building</SelectItem>
+                              <SelectItem value="Capital Supports">Capital Supports</SelectItem>
+                              <SelectItem value="Support Coordination">Support Coordination</SelectItem>
+                              <SelectItem value="Assistance with Daily Life">Assistance with Daily Life</SelectItem>
+                              <SelectItem value="Transport">Transport</SelectItem>
+                              <SelectItem value="Consumables">Consumables</SelectItem>
+                              <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Allocated Amount *</Label>
+                            <Input 
+                              type="number"
+                              placeholder="0.00" 
+                              value={budgetAllocated}
+                              onChange={(e) => setBudgetAllocated(e.target.value)}
+                              data-testid="input-budget-allocated"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Used Amount</Label>
+                            <Input 
+                              type="number"
+                              placeholder="0.00" 
+                              value={budgetUsed}
+                              onChange={(e) => setBudgetUsed(e.target.value)}
+                              data-testid="input-budget-used"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Start Date</Label>
+                            <Input 
+                              type="date" 
+                              value={budgetStartDate}
+                              onChange={(e) => setBudgetStartDate(e.target.value)}
+                              data-testid="input-budget-start"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>End Date</Label>
+                            <Input 
+                              type="date" 
+                              value={budgetEndDate}
+                              onChange={(e) => setBudgetEndDate(e.target.value)}
+                              data-testid="input-budget-end"
+                            />
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={() => addBudgetMutation.mutate({ 
+                            clientId: params?.id || "",
+                            category: budgetCategory, 
+                            totalAllocated: budgetAllocated,
+                            used: budgetUsed || "0",
+                            startDate: budgetStartDate || undefined,
+                            endDate: budgetEndDate || undefined
+                          })}
+                          disabled={!budgetCategory || !budgetAllocated || addBudgetMutation.isPending}
+                          className="w-full"
+                          data-testid="button-submit-budget"
+                        >
+                          {addBudgetMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          Add Budget
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {budgets && budgets.length > 0 ? (
                 <div className="space-y-4">
                   {budgets.map((budget) => {
                     const allocated = parseFloat(budget.totalAllocated || "0");
                     const used = parseFloat(budget.used || "0");
                     const percent = allocated > 0 ? Math.round((used / allocated) * 100) : 0;
+                    const remaining = allocated - used;
                     return (
-                      <div key={budget.id} className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">{budget.category}</span>
-                          <span className="text-sm text-muted-foreground">
-                            ${used.toLocaleString()} / ${allocated.toLocaleString()}
-                          </span>
+                      <div 
+                        key={budget.id} 
+                        className="p-4 border rounded-lg bg-card"
+                        data-testid={`budget-${budget.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div>
+                            <h4 className="font-medium text-sm">{budget.category}</h4>
+                            {(budget.startDate || budget.endDate) && (
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {budget.startDate ? new Date(budget.startDate).toLocaleDateString('en-AU') : "N/A"} - {budget.endDate ? new Date(budget.endDate).toLocaleDateString('en-AU') : "Ongoing"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              <p className="text-sm font-medium">${used.toLocaleString()} / ${allocated.toLocaleString()}</p>
+                              <p className={`text-xs ${remaining < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                                ${remaining.toLocaleString()} remaining
+                              </p>
+                            </div>
+                            {!isArchived && (
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => deleteBudgetMutation.mutate(budget.id)}
+                                data-testid={`button-delete-budget-${budget.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${percent > 80 ? 'bg-red-500' : percent > 60 ? 'bg-amber-500' : 'bg-green-500'}`}
-                            style={{ width: `${Math.min(percent, 100)}%` }}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{percent}% used</span>
+                            <span className={`font-medium ${percent > 80 ? 'text-red-500' : percent > 60 ? 'text-amber-500' : 'text-green-500'}`}>
+                              {percent > 100 ? 'Over budget!' : percent > 80 ? 'Low' : percent > 60 ? 'Moderate' : 'Healthy'}
+                            </span>
+                          </div>
+                          <Progress 
+                            value={Math.min(percent, 100)} 
+                            className={`h-2 ${percent > 80 ? '[&>div]:bg-red-500' : percent > 60 ? '[&>div]:bg-amber-500' : '[&>div]:bg-green-500'}`}
                           />
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                No budget allocations recorded for this client.
-              </CardContent>
-            </Card>
-          )}
+              ) : (
+                <div className="text-center py-8">
+                  <DollarSign className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No budget allocations recorded</p>
+                  {!isArchived && (
+                    <p className="text-xs text-muted-foreground mt-1">Click "Add Budget" to create budget categories</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

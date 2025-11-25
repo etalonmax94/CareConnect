@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import CategoryBadge from "./CategoryBadge";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
-import { Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff, Heart, HeartOff } from "lucide-react";
+import { Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff, Heart, HeartOff, Sparkles } from "lucide-react";
 
 interface ClientTableProps {
   clients: Client[];
@@ -133,6 +133,15 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  const formatCareManagerName = (name: string | null | undefined) => {
+    if (!name) return "Not assigned";
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0];
+    const firstName = parts[0];
+    const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
+    return `${firstName} ${lastInitial}.`;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4">
@@ -246,10 +255,12 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
               const isPinned = pinnedClients.has(client.id);
               const clientAge = calculateAge(client.dateOfBirth);
               
+              const isNewClient = client.isOnboarded !== "yes";
+              
               return (
                 <TableRow 
                   key={client.id} 
-                  className={`hover-elevate ${isPinned ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`} 
+                  className={`hover-elevate ${isPinned ? 'bg-amber-50 dark:bg-amber-900/10' : ''} ${isNewClient ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`} 
                   data-testid={`row-client-${client.id}`}
                 >
                   <TableCell className="w-8 px-2">
@@ -272,8 +283,18 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                         <AvatarFallback>{getInitials(client.participantName)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium">{client.participantName}</p>
+                          {isNewClient && (
+                            <Badge 
+                              variant="outline" 
+                              className="gap-1 bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs"
+                              data-testid={`badge-new-${client.id}`}
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              New
+                            </Badge>
+                          )}
                           {client.advancedCareDirective === "NFR" && (
                             <Badge 
                               variant="outline" 
@@ -313,17 +334,17 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                     {client.phoneNumber ? (
                       <a 
                         href={`tel:${client.phoneNumber}`}
-                        className="flex items-center gap-1 text-sm hover:text-primary"
+                        className="flex items-center gap-1 text-sm hover:text-primary whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Phone className="w-3 h-3" />
-                        {client.phoneNumber}
+                        <Phone className="w-3 h-3 flex-shrink-0" />
+                        <span className="whitespace-nowrap">{client.phoneNumber}</span>
                       </a>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell>{client.careTeam?.careManager || "Not assigned"}</TableCell>
+                  <TableCell>{formatCareManagerName(client.careTeam?.careManager)}</TableCell>
                   <TableCell>
                     <ComplianceIndicator status={complianceStatus} />
                   </TableCell>

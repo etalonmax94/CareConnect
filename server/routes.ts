@@ -7,7 +7,7 @@ import {
   insertIncidentReportSchema, insertPrivacyConsentSchema, insertActivityLogSchema,
   insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema,
   insertGPSchema, insertPharmacySchema, insertDocumentSchema, insertClientStaffAssignmentSchema,
-  insertServiceDeliverySchema,
+  insertServiceDeliverySchema, insertClientGoalSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -1974,6 +1974,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting service delivery:", error);
       res.status(500).json({ error: "Failed to delete service delivery" });
+    }
+  });
+
+  // ==================== CLIENT GOALS ROUTES ====================
+  
+  // Get goals by client
+  app.get("/api/clients/:clientId/goals", async (req, res) => {
+    try {
+      const goals = await storage.getGoalsByClient(req.params.clientId);
+      res.json(goals);
+    } catch (error) {
+      console.error("Error fetching goals:", error);
+      res.status(500).json({ error: "Failed to fetch goals" });
+    }
+  });
+
+  // Create goal (max 5 per client)
+  app.post("/api/clients/:clientId/goals", async (req, res) => {
+    try {
+      // Check if client already has 5 goals
+      const existingGoals = await storage.getGoalsByClient(req.params.clientId);
+      if (existingGoals.length >= 5) {
+        return res.status(400).json({ error: "Maximum of 5 goals per client allowed" });
+      }
+      
+      const validationResult = insertClientGoalSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId,
+        order: String(existingGoals.length + 1)
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const goal = await storage.createGoal(validationResult.data);
+      
+      // Log activity
+      await storage.logActivity({
+        clientId: req.params.clientId,
+        action: "goal_added",
+        description: `Goal "${goal.title}" was added`,
+        performedBy: "System"
+      });
+      
+      res.status(201).json(goal);
+    } catch (error) {
+      console.error("Error creating goal:", error);
+      res.status(500).json({ error: "Failed to create goal" });
+    }
+  });
+
+  // Update goal
+  app.patch("/api/goals/:id", async (req, res) => {
+    try {
+      const goal = await storage.updateGoal(req.params.id, req.body);
+      if (!goal) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      res.json(goal);
+    } catch (error) {
+      console.error("Error updating goal:", error);
+      res.status(500).json({ error: "Failed to update goal" });
+    }
+  });
+
+  // Delete goal
+  app.delete("/api/goals/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteGoal(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting goal:", error);
+      res.status(500).json({ error: "Failed to delete goal" });
+    }
+  });
+
+  // ==================== BUDGET MANAGEMENT ROUTES ====================
+  
+  // Delete budget
+  app.delete("/api/budgets/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBudget(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Budget not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting budget:", error);
+      res.status(500).json({ error: "Failed to delete budget" });
+    }
+  });
+
+  // Update budget
+  app.patch("/api/budgets/:id", async (req, res) => {
+    try {
+      const budget = await storage.updateBudget(req.params.id, req.body);
+      if (!budget) {
+        return res.status(404).json({ error: "Budget not found" });
+      }
+      res.json(budget);
+    } catch (error) {
+      console.error("Error updating budget:", error);
+      res.status(500).json({ error: "Failed to update budget" });
+    }
+  });
+
+  // ==================== ONBOARDING ROUTES ====================
+  
+  // Mark client as onboarded
+  app.post("/api/clients/:id/onboard", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const client = await storage.updateClient(req.params.id, {
+        isOnboarded: "yes"
+      });
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      // Log activity
+      await storage.logActivity({
+        clientId: req.params.id,
+        action: "client_onboarded",
+        description: `Client was marked as onboarded`,
+        performedBy: req.session.user.email || "System"
+      });
+      
+      res.json(client);
+    } catch (error) {
+      console.error("Error onboarding client:", error);
+      res.status(500).json({ error: "Failed to onboard client" });
     }
   });
 

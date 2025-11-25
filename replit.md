@@ -45,10 +45,11 @@ The system implements comprehensive data interconnection to eliminate manual ret
 
 ### System Design Choices
 - **Database Schema**: PostgreSQL with Drizzle ORM. Key tables include:
-  - `clients` - Core client information with foreign keys to GPs, pharmacies
+  - `clients` - Core client information with foreign keys to GPs, pharmacies, isOnboarded and riskAssessmentScore fields
+  - `client_goals` - Up to 5 goals per client with title, description, targetDate, status, priority
   - `progress_notes` - Clinical notes with authorId linking to staff
   - `incident_reports` - Safety incidents with reportedById linking to staff
-  - `documents` - File metadata linked to clients
+  - `documents` - File metadata linked to clients with expiryDate field
   - `client_staff_assignments` - Historical staff-client relationships
   - `service_deliveries` - NDIS-aligned visit records
   - `budgets`, `invoices` - Financial tracking
@@ -65,9 +66,13 @@ The system implements comprehensive data interconnection to eliminate manual ret
 ### Core Resources
 - `GET/POST /api/clients` - List/create clients
 - `GET/PATCH/DELETE /api/clients/:id` - Individual client operations
+- `POST /api/clients/:id/onboard` - Mark client as onboarded
 - `GET/POST /api/clients/:id/notes` - Progress notes with author tracking
+- `GET/POST /api/clients/:clientId/goals` - Client goals (max 5 per client)
+- `PATCH/DELETE /api/goals/:id` - Update/delete individual goals
 - `GET/POST/DELETE /api/clients/:clientId/documents` - Document management
 - `GET/POST/DELETE /api/clients/:clientId/assignments` - Staff assignments
+- `DELETE /api/budgets/:id` - Delete budget allocation
 - `GET /api/incidents/client/:clientId` - Client incidents
 - `POST /api/incidents` - Create incident report with reportedById
 
@@ -94,3 +99,8 @@ The system implements comprehensive data interconnection to eliminate manual ret
 - Added incident reports with staff reporting linkage
 - Implemented staff assignment tracking for clients
 - Added comprehensive data interconnection across all entities
+- **Client Goals Tab**: Up to 5 goals per client with status tracking (not_started, in_progress, achieved, on_hold) with UI and backend enforcement
+- **Risk Assessment Badge**: Color-coded risk score badge next to client age (green 1-3, amber 4-6, red 7-10)
+- **New Client Onboarding**: Blue banner for new clients with "Mark as Onboarded" button, "New" badge in client list
+- **Budget Allocation UI**: Enhanced add/delete functionality with visual progress bars and NDIS-aligned categories
+- **Client Table Improvements**: Care Manager displayed as "First Name + Initial" format, phone numbers with no-wrap styling

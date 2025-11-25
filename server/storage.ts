@@ -2,7 +2,7 @@ import { db } from "./db";
 import { 
   clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
-  documents, clientStaffAssignments, serviceDeliveries,
+  documents, clientStaffAssignments, serviceDeliveries, clientGoals,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
@@ -13,7 +13,8 @@ import {
   type InsertGP, type GP, type InsertPharmacy, type Pharmacy,
   type InsertDocument, type Document, 
   type InsertClientStaffAssignment, type ClientStaffAssignment,
-  type InsertServiceDelivery, type ServiceDelivery
+  type InsertServiceDelivery, type ServiceDelivery,
+  type InsertClientGoal, type ClientGoal
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -139,6 +140,16 @@ export interface IStorage {
   createServiceDelivery(delivery: InsertServiceDelivery): Promise<ServiceDelivery>;
   updateServiceDelivery(id: string, delivery: Partial<InsertServiceDelivery>): Promise<ServiceDelivery | undefined>;
   deleteServiceDelivery(id: string): Promise<boolean>;
+  
+  // Client Goals
+  getGoalsByClient(clientId: string): Promise<ClientGoal[]>;
+  getGoalById(id: string): Promise<ClientGoal | undefined>;
+  createGoal(goal: InsertClientGoal): Promise<ClientGoal>;
+  updateGoal(id: string, goal: Partial<InsertClientGoal>): Promise<ClientGoal | undefined>;
+  deleteGoal(id: string): Promise<boolean>;
+  
+  // Budget Management
+  deleteBudget(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -758,6 +769,42 @@ export class DbStorage implements IStorage {
 
   async deleteServiceDelivery(id: string): Promise<boolean> {
     const result = await db.delete(serviceDeliveries).where(eq(serviceDeliveries.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Client Goals
+  async getGoalsByClient(clientId: string): Promise<ClientGoal[]> {
+    return await db.select().from(clientGoals)
+      .where(eq(clientGoals.clientId, clientId))
+      .orderBy(clientGoals.order);
+  }
+
+  async getGoalById(id: string): Promise<ClientGoal | undefined> {
+    const result = await db.select().from(clientGoals).where(eq(clientGoals.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createGoal(goal: InsertClientGoal): Promise<ClientGoal> {
+    const result = await db.insert(clientGoals).values(goal).returning();
+    return result[0];
+  }
+
+  async updateGoal(id: string, goalUpdate: Partial<InsertClientGoal>): Promise<ClientGoal | undefined> {
+    const result = await db.update(clientGoals)
+      .set({ ...goalUpdate as any, updatedAt: new Date() })
+      .where(eq(clientGoals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteGoal(id: string): Promise<boolean> {
+    const result = await db.delete(clientGoals).where(eq(clientGoals.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Budget Management
+  async deleteBudget(id: string): Promise<boolean> {
+    const result = await db.delete(budgets).where(eq(budgets.id, id)).returning();
     return result.length > 0;
   }
 }

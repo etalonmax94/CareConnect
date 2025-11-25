@@ -114,6 +114,16 @@ export const clients = pgTable("clients", {
   zohoWorkdriveLink: text("zoho_workdrive_link"),
   isPinned: text("is_pinned").default("no").$type<"yes" | "no">(),
   
+  // Onboarding status - new clients are highlighted until marked as onboarded
+  isOnboarded: text("is_onboarded").default("no").$type<"yes" | "no">(),
+  onboardedAt: timestamp("onboarded_at"),
+  onboardedBy: varchar("onboarded_by"),
+  
+  // Risk assessment score (1-10) for clinical priority
+  riskAssessmentScore: text("risk_assessment_score").$type<"1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10">(),
+  riskAssessmentDate: date("risk_assessment_date"),
+  riskAssessmentNotes: text("risk_assessment_notes"),
+  
   // Care Team - foreign keys for linked entities
   generalPractitionerId: varchar("general_practitioner_id"),
   pharmacyId: varchar("pharmacy_id"),
@@ -199,6 +209,10 @@ export const insertClientSchema = createInsertSchema(clients, {
   clinicalDocuments: z.any().optional(),
   notificationPreferences: z.any().optional(),
   isPinned: z.enum(["yes", "no"]).optional(),
+  isOnboarded: z.enum(["yes", "no"]).optional(),
+  riskAssessmentScore: z.enum(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]).optional().nullable(),
+  riskAssessmentDate: z.string().optional().nullable(),
+  riskAssessmentNotes: z.string().optional().nullable(),
   isArchived: z.enum(["yes", "no"]).optional(),
   archiveReason: z.string().optional(),
   retentionUntil: z.string().optional(),
@@ -208,6 +222,8 @@ export const insertClientSchema = createInsertSchema(clients, {
   updatedAt: true,
   archivedAt: true,
   archivedByUserId: true,
+  onboardedAt: true,
+  onboardedBy: true,
 });
 
 export const updateClientSchema = insertClientSchema.partial();
@@ -282,11 +298,14 @@ export const documents = pgTable("documents", {
   documentType: text("document_type").notNull(),
   fileName: text("file_name").notNull(),
   fileUrl: text("file_url").notNull(),
+  expiryDate: date("expiry_date"),
   uploadDate: timestamp("upload_date").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertDocumentSchema = createInsertSchema(documents).omit({
+export const insertDocumentSchema = createInsertSchema(documents, {
+  expiryDate: z.string().optional().nullable(),
+}).omit({
   id: true,
   uploadDate: true,
   createdAt: true,
@@ -294,6 +313,34 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+// Client Goals - Up to 5 goals per client
+export type GoalStatus = "not_started" | "in_progress" | "achieved" | "on_hold";
+
+export const clientGoals = pgTable("client_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  targetDate: date("target_date"),
+  status: text("status").notNull().$type<GoalStatus>().default("not_started"),
+  progress: text("progress"),
+  order: text("order").default("1"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientGoalSchema = createInsertSchema(clientGoals, {
+  status: z.enum(["not_started", "in_progress", "achieved", "on_hold"]).optional(),
+  targetDate: z.string().optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientGoal = z.infer<typeof insertClientGoalSchema>;
+export type ClientGoal = typeof clientGoals.$inferSelect;
 
 // Invoices
 export const invoices = pgTable("invoices", {
