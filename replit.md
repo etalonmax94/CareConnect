@@ -37,6 +37,33 @@ A comprehensive CRM system for managing three categories of healthcare clients (
    - Due This Month and Overdue Items with client lists
    - Recent Activity feed with client events
    - Birthday Reminders tile (replaced Budget Overview): displays upcoming birthdays with clickable modal, normalized date calculations to include same-day birthdays, sorted chronologically with badges showing days until birthday
+   - Leadership Meeting button: Opens dedicated page with three-column table (Client, Latest Progress Note, Last Updated)
+
+11. **Global Search & Navigation**
+   - Global search bar in header with Command+K/Ctrl+K keyboard shortcut
+   - Searches clients by name, phone, NDIS number, HCP number
+   - Fuzzy matching with real-time results
+   - Click or Enter navigates to client profile
+   - Connecteam quick-access button in header for staff scheduling portal
+
+12. **Leadership Meeting Page**
+   - Dedicated page at /leadership-meeting
+   - Three-column table: Client Name, Latest Progress Note, Last Updated
+   - Shows all active clients with their most recent progress notes
+   - Searchable by client name
+   - Sortable by date for prioritizing recent activity
+   - Direct link to client profiles
+
+13. **Reports Drill-Down**
+   - Age Demographics chart is interactive/clickable
+   - Click any age group to see modal with filtered client list
+   - Shows client names, ages, categories, and care managers
+   - Click through to individual client profiles
+
+14. **Clinical Safety Features**
+   - Allergies field displayed prominently in red/bold with warning icon on client profiles
+   - Allergies input field in client form with red styling for visual prominence
+   - Critical medical information stands out for healthcare worker safety
 
 5. **Reports System**
    - Age Demographics chart using Recharts
