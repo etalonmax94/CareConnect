@@ -90,6 +90,13 @@ function NotificationPreferencesBadges({ preferences }: { preferences?: Notifica
   return <div className="flex flex-wrap gap-1">{badges}</div>;
 }
 
+interface DistanceData {
+  clientId: string;
+  address: string | null;
+  distanceKm: number | null;
+  officeAddress: string;
+}
+
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
   
@@ -100,6 +107,11 @@ export default function ClientProfile() {
 
   const { data: budgets } = useQuery<Budget[]>({
     queryKey: ["/api/budgets", params?.id],
+    enabled: !!params?.id,
+  });
+
+  const { data: distanceData } = useQuery<DistanceData>({
+    queryKey: [`/api/clients/${params?.id}/distance`],
     enabled: !!params?.id,
   });
 
@@ -342,7 +354,19 @@ export default function ClientProfile() {
                 allowFullScreen
               />
             </div>
-            <p className="text-sm text-muted-foreground mt-2">{client.homeAddress}</p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-sm text-muted-foreground">{client.homeAddress}</p>
+              {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
+                <Badge 
+                  variant="secondary" 
+                  className="ml-2 flex-shrink-0"
+                  data-testid="badge-distance"
+                >
+                  <MapPin className="w-3 h-3 mr-1" />
+                  {distanceData.distanceKm} km from office
+                </Badge>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

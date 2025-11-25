@@ -70,6 +70,44 @@ const OFFICE_LOCATION = {
   lon: 152.9511
 };
 
+// Suburb coordinates mapping for distance calculation
+const SUBURB_COORDS: Record<string, { lat: number; lon: number }> = {
+  "caboolture": { lat: -27.0847, lon: 152.9511 },
+  "morayfield": { lat: -27.1053, lon: 152.9469 },
+  "burpengary": { lat: -27.1564, lon: 152.9583 },
+  "narangba": { lat: -27.2039, lon: 152.9639 },
+  "deception bay": { lat: -27.1944, lon: 153.0247 },
+  "redcliffe": { lat: -27.2297, lon: 153.1089 },
+  "bribie island": { lat: -27.0667, lon: 153.1333 },
+  "bellmere": { lat: -27.0694, lon: 152.9125 },
+  "beachmere": { lat: -27.1208, lon: 153.0461 },
+  "brisbane": { lat: -27.4698, lon: 153.0251 },
+  "sunshine coast": { lat: -26.6500, lon: 153.0667 },
+  "north lakes": { lat: -27.2194, lon: 153.0089 },
+  "kallangur": { lat: -27.2469, lon: 152.9853 },
+  "petrie": { lat: -27.2756, lon: 152.9783 },
+  "strathpine": { lat: -27.3050, lon: 152.9889 },
+  "warner": { lat: -27.3111, lon: 152.9469 },
+  "albany creek": { lat: -27.3508, lon: 152.9686 },
+  "aspley": { lat: -27.3658, lon: 153.0183 },
+  "chermside": { lat: -27.3833, lon: 153.0333 },
+  "nundah": { lat: -27.4000, lon: 153.0500 }
+};
+
+// Calculate distance for a client's address
+function getDistanceFromOffice(address: string | null | undefined): number | null {
+  if (!address) return null;
+  
+  const addressLower = address.toLowerCase();
+  for (const [suburb, coords] of Object.entries(SUBURB_COORDS)) {
+    if (addressLower.includes(suburb)) {
+      const distance = calculateDistance(OFFICE_LOCATION.lat, OFFICE_LOCATION.lon, coords.lat, coords.lon);
+      return Math.round(distance * 10) / 10;
+    }
+  }
+  return null;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all clients
   app.get("/api/clients", async (req, res) => {
@@ -201,6 +239,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting client:", error);
       res.status(500).json({ error: "Failed to delete client" });
+    }
+  });
+
+  // Get distance from office for a client
+  app.get("/api/clients/:id/distance", async (req, res) => {
+    try {
+      const client = await storage.getClientById(req.params.id);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const distanceKm = getDistanceFromOffice(client.homeAddress);
+      res.json({
+        clientId: client.id,
+        address: client.homeAddress,
+        distanceKm,
+        officeAddress: OFFICE_LOCATION.address
+      });
+    } catch (error) {
+      console.error("Error fetching client distance:", error);
+      res.status(500).json({ error: "Failed to fetch client distance" });
     }
   });
 
