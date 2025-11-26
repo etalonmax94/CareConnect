@@ -900,6 +900,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate VCF (vCard) file for client - iPhone contact export (requires authentication and role)
+  app.get("/api/clients/:id/vcf", requireAuth, requireRoles, async (req, res) => {
+    try {
+      const client = await storage.getClientById(req.params.id);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      // Get client contacts for NOK info
+      const contacts = await storage.getContactsByClient(req.params.id);
+      const nokContacts = contacts.filter(c => c.isNok === "yes" || c.isEmergencyContact === "yes");
+      
+      // Parse name into components
+      const nameParts = client.participantName.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      // Format DOB for vCard (YYYYMMDD format)
+      let dobFormatted = '';
+      if (client.dateOfBirth) {
+        const dob = new Date(client.dateOfBirth);
+        if (!isNaN(dob.getTime())) {
+          dobFormatted = dob.toISOString().slice(0, 10).replace(/-/g, '');
+        }
+      }
+      
+      // Build NOK notes section
+      const nokNotes: string[] = [];
+      
+      // Add contacts marked as NOK or emergency contact
+      nokContacts.forEach((contact, index) => {
+        const prefix = index === 0 ? 'Next of Kin' : `NOK ${index + 1}`;
+        nokNotes.push(`${prefix}: ${contact.name}`);
+        if (contact.phoneNumber) nokNotes.push(`${prefix} Phone: ${contact.phoneNumber}`);
+        if (contact.relationship) nokNotes.push(`Relationship: ${contact.relationship}`);
+      });
+      
+      // Also include nokEpoa field if set
+      if (client.nokEpoa) {
+        nokNotes.push(`NOK/EPOA: ${client.nokEpoa}`);
+      }
+      
+      // Add client category and any critical notes
+      nokNotes.push(`Category: ${client.category}`);
+      if (client.attentionNotes) nokNotes.push(`Attention Notes: ${client.attentionNotes}`);
+      
+      const notesText = nokNotes.join('\\n');
+      
+      // Build vCard content
+      let vcfContent = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        `N:${lastName};${firstName};;;`,
+        `FN:${client.participantName}`,
+      ];
+      
+      // Add phone number
+      if (client.phoneNumber) {
+        vcfContent.push(`TEL;TYPE=CELL:${client.phoneNumber}`);
+      }
+      
+      // Add email
+      if (client.email) {
+        vcfContent.push(`EMAIL:${client.email}`);
+      }
+      
+      // Add address (homeAddress is a single field)
+      if (client.homeAddress) {
+        vcfContent.push(`ADR;TYPE=HOME:;;${client.homeAddress};;;;Australia`);
+        vcfContent.push(`LABEL;TYPE=HOME:${client.homeAddress}`);
+      }
+      
+      // Add birthday
+      if (dobFormatted) {
+        vcfContent.push(`BDAY:${dobFormatted}`);
+      }
+      
+      // Add notes (NOK info)
+      if (notesText) {
+        vcfContent.push(`NOTE:${notesText}`);
+      }
+      
+      // Add organization
+      vcfContent.push('ORG:EmpowerLink Client');
+      
+      // Add photo if exists
+      if (client.photo) {
+        try {
+          const photoPath = path.join(process.cwd(), client.photo);
+          if (fs.existsSync(photoPath)) {
+            const photoData = fs.readFileSync(photoPath);
+            const base64Photo = photoData.toString('base64');
+            const extension = path.extname(client.photo).toLowerCase();
+            const photoType = extension === '.png' ? 'PNG' : 'JPEG';
+            vcfContent.push(`PHOTO;ENCODING=b;TYPE=${photoType}:${base64Photo}`);
+          }
+        } catch (photoError) {
+          console.error("Error reading photo for VCF:", photoError);
+        }
+      }
+      
+      vcfContent.push('END:VCARD');
+      
+      // Generate filename
+      const safeFileName = client.participantName.replace(/[^a-zA-Z0-9]/g, '_');
+      
+      // Send as VCF file
+      res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.vcf"`);
+      res.send(vcfContent.join('\r\n'));
+      
+    } catch (error) {
+      console.error("Error generating VCF:", error);
+      res.status(500).json({ error: "Failed to generate contact file" });
+    }
+  });
+
   // Create client
   app.post("/api/clients", async (req, res) => {
     try {
