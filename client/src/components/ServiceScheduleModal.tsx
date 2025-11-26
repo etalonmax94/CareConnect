@@ -160,12 +160,45 @@ export function ServiceScheduleModal({
     return Object.values(week).reduce((total, slots) => total + slots.length, 0);
   };
 
+  const getTotalHours = (week: WeekSchedule) => {
+    let totalMinutes = 0;
+    Object.values(week).forEach(slots => {
+      slots.forEach(slot => {
+        const [startHours, startMinutes] = slot.startTime.split(":").map(Number);
+        const [endHours, endMinutes] = slot.endTime.split(":").map(Number);
+        let mins = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+        if (mins < 0) mins += 24 * 60;
+        totalMinutes += mins;
+      });
+    });
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours === 0 && minutes === 0) return "0h";
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}min`;
+  };
+
   const formatTimeDisplay = (time: string) => {
     const [hours, minutes] = time.split(":");
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? "PM" : "AM";
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const calculateDuration = (startTime: string, endTime: string) => {
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    const [endHours, endMinutes] = endTime.split(":").map(Number);
+    
+    let totalMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+    if (totalMinutes < 0) totalMinutes += 24 * 60; // Handle overnight
+    
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    if (hours === 0) return `${minutes}min`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}min`;
   };
 
   return (
@@ -189,13 +222,13 @@ export function ServiceScheduleModal({
               <TabsTrigger value="week1" className="gap-2" data-testid="tab-week1">
                 Week 1
                 <Badge variant="secondary" className="text-xs">
-                  {getTotalSlots(schedule.week1)} slots
+                  {getTotalSlots(schedule.week1)} sessions • {getTotalHours(schedule.week1)}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="week2" className="gap-2" data-testid="tab-week2">
                 Week 2
                 <Badge variant="secondary" className="text-xs">
-                  {getTotalSlots(schedule.week2)} slots
+                  {getTotalSlots(schedule.week2)} sessions • {getTotalHours(schedule.week2)}
                 </Badge>
               </TabsTrigger>
             </TabsList>
@@ -228,6 +261,7 @@ export function ServiceScheduleModal({
               onRemoveSlot={removeTimeSlot}
               onUpdateSlot={updateTimeSlot}
               formatTimeDisplay={formatTimeDisplay}
+              calculateDuration={calculateDuration}
             />
           </TabsContent>
           <TabsContent value="week2" className="mt-0">
@@ -238,9 +272,59 @@ export function ServiceScheduleModal({
               onRemoveSlot={removeTimeSlot}
               onUpdateSlot={updateTimeSlot}
               formatTimeDisplay={formatTimeDisplay}
+              calculateDuration={calculateDuration}
             />
           </TabsContent>
         </Tabs>
+
+        {/* Fortnight Summary */}
+        <Card className="mt-4 bg-muted/30">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Fortnight Summary</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Week 1</p>
+                  <p className="text-sm font-semibold">{getTotalHours(schedule.week1)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Week 2</p>
+                  <p className="text-sm font-semibold">{getTotalHours(schedule.week2)}</p>
+                </div>
+                <div className="text-right border-l pl-4">
+                  <p className="text-xs text-muted-foreground">Total (Fortnight)</p>
+                  <p className="text-sm font-bold text-primary">
+                    {(() => {
+                      const week1Mins = Object.values(schedule.week1).flat().reduce((acc, slot) => {
+                        const [sh, sm] = slot.startTime.split(":").map(Number);
+                        const [eh, em] = slot.endTime.split(":").map(Number);
+                        let m = (eh * 60 + em) - (sh * 60 + sm);
+                        if (m < 0) m += 24 * 60;
+                        return acc + m;
+                      }, 0);
+                      const week2Mins = Object.values(schedule.week2).flat().reduce((acc, slot) => {
+                        const [sh, sm] = slot.startTime.split(":").map(Number);
+                        const [eh, em] = slot.endTime.split(":").map(Number);
+                        let m = (eh * 60 + em) - (sh * 60 + sm);
+                        if (m < 0) m += 24 * 60;
+                        return acc + m;
+                      }, 0);
+                      const total = week1Mins + week2Mins;
+                      const h = Math.floor(total / 60);
+                      const m = total % 60;
+                      if (h === 0 && m === 0) return "0h";
+                      if (m === 0) return `${h}h`;
+                      return `${h}h ${m}min`;
+                    })()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="mt-4">
           <Label htmlFor="schedule-notes">Additional Notes</Label>
@@ -286,6 +370,7 @@ interface WeekViewProps {
     value: string
   ) => void;
   formatTimeDisplay: (time: string) => string;
+  calculateDuration: (startTime: string, endTime: string) => string;
 }
 
 function WeekView({
@@ -295,6 +380,7 @@ function WeekView({
   onRemoveSlot,
   onUpdateSlot,
   formatTimeDisplay,
+  calculateDuration,
 }: WeekViewProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-2">
@@ -308,6 +394,7 @@ function WeekView({
                 size="icon"
                 className="h-6 w-6"
                 onClick={() => onAddSlot(week, day)}
+                title="Add another session"
                 data-testid={`button-add-slot-${week}-${day}`}
               >
                 <Plus className="w-3 h-3" />
@@ -323,7 +410,9 @@ function WeekView({
                     className="bg-muted/50 rounded-md p-2 space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <Clock className="w-3 h-3 text-muted-foreground" />
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        Session {index + 1}
+                      </Badge>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -335,24 +424,38 @@ function WeekView({
                       </Button>
                     </div>
                     <div className="space-y-1">
-                      <Input
-                        type="time"
-                        value={slot.startTime}
-                        onChange={(e) => onUpdateSlot(week, day, index, "startTime", e.target.value)}
-                        className="h-7 text-xs"
-                        data-testid={`input-start-time-${week}-${day}-${index}`}
-                      />
-                      <Input
-                        type="time"
-                        value={slot.endTime}
-                        onChange={(e) => onUpdateSlot(week, day, index, "endTime", e.target.value)}
-                        className="h-7 text-xs"
-                        data-testid={`input-end-time-${week}-${day}-${index}`}
-                      />
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground">Start</Label>
+                        <Input
+                          type="time"
+                          value={slot.startTime}
+                          onChange={(e) => onUpdateSlot(week, day, index, "startTime", e.target.value)}
+                          className="h-7 text-xs"
+                          data-testid={`input-start-time-${week}-${day}-${index}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground">End</Label>
+                        <Input
+                          type="time"
+                          value={slot.endTime}
+                          onChange={(e) => onUpdateSlot(week, day, index, "endTime", e.target.value)}
+                          className="h-7 text-xs"
+                          data-testid={`input-end-time-${week}-${day}-${index}`}
+                        />
+                      </div>
                     </div>
-                    <p className="text-[10px] text-center text-muted-foreground">
-                      {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
-                    </p>
+                    <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
+                        </span>
+                      </div>
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {calculateDuration(slot.startTime, slot.endTime)}
+                      </Badge>
+                    </div>
                   </div>
                 ))
               )}
