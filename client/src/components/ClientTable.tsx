@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { Client, ClientCategory } from "@shared/schema";
+import type { Client } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -7,20 +7,49 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import CategoryBadge from "./CategoryBadge";
+import FundingTypeBadge from "./FundingTypeBadge";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
 import { ArrowUpDown, ArrowUp, ArrowDown, Phone, Mail, CalendarPlus, Star, StarOff, Heart, HeartOff, Sparkles, MoreHorizontal, Eye, Edit, UserPlus, Archive } from "lucide-react";
 import { useLocation } from "wouter";
+
+type DensityMode = "compact" | "standard" | "expanded";
+
+interface ColumnVisibility {
+  client: boolean;
+  category: boolean;
+  phone: boolean;
+  careManager: boolean;
+  compliance: boolean;
+  fundingType: boolean;
+}
 
 interface ClientTableProps {
   clients: Client[];
   onViewClient: (client: Client) => void;
   isArchiveView?: boolean;
+  density?: DensityMode;
+  columnVisibility?: ColumnVisibility;
 }
 
 type SortField = "name" | "category" | "careManager" | "phone" | "compliance";
 type SortDirection = "asc" | "desc";
 
-export default function ClientTable({ clients, onViewClient, isArchiveView = false }: ClientTableProps) {
+const defaultColumnVisibility: ColumnVisibility = {
+  client: true,
+  category: true,
+  phone: true,
+  careManager: true,
+  compliance: true,
+  fundingType: true,
+};
+
+export default function ClientTable({ 
+  clients, 
+  onViewClient, 
+  isArchiveView = false,
+  density = "standard",
+  columnVisibility = defaultColumnVisibility
+}: ClientTableProps) {
   const [, setLocation] = useLocation();
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -149,59 +178,88 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
     setLocation(`/clients/${clientId}?action=archive`);
   };
 
+  const getRowPadding = () => {
+    switch (density) {
+      case "compact": return "py-1";
+      case "expanded": return "py-4";
+      default: return "py-2";
+    }
+  };
+
+  const getAvatarSize = () => {
+    switch (density) {
+      case "compact": return "h-8 w-8";
+      case "expanded": return "h-12 w-12";
+      default: return "h-10 w-10";
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="border rounded-md">
+      <div className="border rounded-md bg-white dark:bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-8"></TableHead>
-              <TableHead>
-                <button 
-                  className="flex items-center font-medium hover:text-primary transition-colors"
-                  onClick={() => handleSort("name")}
-                  data-testid="sort-name"
-                >
-                  Client <SortIcon field="name" />
-                </button>
-              </TableHead>
-              <TableHead>
-                <button 
-                  className="flex items-center font-medium hover:text-primary transition-colors"
-                  onClick={() => handleSort("category")}
-                  data-testid="sort-category"
-                >
-                  Category <SortIcon field="category" />
-                </button>
-              </TableHead>
-              <TableHead>
-                <button 
-                  className="flex items-center font-medium hover:text-primary transition-colors"
-                  onClick={() => handleSort("phone")}
-                  data-testid="sort-phone"
-                >
-                  Phone <SortIcon field="phone" />
-                </button>
-              </TableHead>
-              <TableHead>
-                <button 
-                  className="flex items-center font-medium hover:text-primary transition-colors"
-                  onClick={() => handleSort("careManager")}
-                  data-testid="sort-care-manager"
-                >
-                  Care Manager <SortIcon field="careManager" />
-                </button>
-              </TableHead>
-              <TableHead>
-                <button 
-                  className="flex items-center font-medium hover:text-primary transition-colors"
-                  onClick={() => handleSort("compliance")}
-                  data-testid="sort-compliance"
-                >
-                  Compliance <SortIcon field="compliance" />
-                </button>
-              </TableHead>
-              <TableHead className="w-24"></TableHead>
+              {columnVisibility.client && (
+                <TableHead>
+                  <button 
+                    className="flex items-center font-medium hover:text-primary transition-colors"
+                    onClick={() => handleSort("name")}
+                    data-testid="sort-name"
+                  >
+                    Client <SortIcon field="name" />
+                  </button>
+                </TableHead>
+              )}
+              {columnVisibility.category && (
+                <TableHead>
+                  <button 
+                    className="flex items-center font-medium hover:text-primary transition-colors"
+                    onClick={() => handleSort("category")}
+                    data-testid="sort-category"
+                  >
+                    Category <SortIcon field="category" />
+                  </button>
+                </TableHead>
+              )}
+              {columnVisibility.fundingType && (
+                <TableHead>Funding Type</TableHead>
+              )}
+              {columnVisibility.phone && (
+                <TableHead>
+                  <button 
+                    className="flex items-center font-medium hover:text-primary transition-colors"
+                    onClick={() => handleSort("phone")}
+                    data-testid="sort-phone"
+                  >
+                    Phone <SortIcon field="phone" />
+                  </button>
+                </TableHead>
+              )}
+              {columnVisibility.careManager && (
+                <TableHead>
+                  <button 
+                    className="flex items-center font-medium hover:text-primary transition-colors"
+                    onClick={() => handleSort("careManager")}
+                    data-testid="sort-care-manager"
+                  >
+                    Care Manager <SortIcon field="careManager" />
+                  </button>
+                </TableHead>
+              )}
+              {columnVisibility.compliance && (
+                <TableHead>
+                  <button 
+                    className="flex items-center font-medium hover:text-primary transition-colors"
+                    onClick={() => handleSort("compliance")}
+                    data-testid="sort-compliance"
+                  >
+                    Compliance <SortIcon field="compliance" />
+                  </button>
+                </TableHead>
+              )}
+              <TableHead className="w-24 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -212,11 +270,12 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
               const clientAge = calculateAge(client.dateOfBirth);
               const isNewClient = client.isOnboarded !== "yes";
               const isHovered = hoveredClientId === client.id;
+              const fundingType = client.category === "NDIS" ? client.ndisDetails?.ndisFundingType : null;
               
               return (
                 <TableRow 
                   key={client.id} 
-                  className={`cursor-pointer transition-colors ${isPinned ? 'bg-amber-50 dark:bg-amber-900/10' : ''} ${isNewClient ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''} hover:bg-muted/50`} 
+                  className={`cursor-pointer transition-colors ${getRowPadding()} ${isPinned ? 'bg-amber-50 dark:bg-amber-900/10' : ''} ${isNewClient ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''} hover:bg-muted/50`} 
                   data-testid={`row-client-${client.id}`}
                   onClick={() => handleRowClick(client)}
                   onMouseEnter={() => setHoveredClientId(client.id)}
@@ -227,6 +286,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                       onClick={(e) => togglePin(client.id, e)}
                       className="p-1 hover:bg-muted rounded"
                       data-testid={`button-pin-${client.id}`}
+                      aria-label={isPinned ? "Unpin client" : "Pin client"}
                     >
                       {isPinned ? (
                         <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
@@ -235,71 +295,92 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                       )}
                     </button>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={client.photo || undefined} alt={client.participantName} />
-                        <AvatarFallback>{getInitials(client.participantName)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium">{client.participantName}</p>
-                          {isNewClient && (
-                            <Badge 
-                              variant="outline" 
-                              className="gap-1 bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs"
-                              data-testid={`badge-new-${client.id}`}
-                            >
-                              <Sparkles className="w-3 h-3" />
-                              New
-                            </Badge>
-                          )}
-                          {client.advancedCareDirective === "NFR" && (
-                            <Badge 
-                              variant="outline" 
-                              className="gap-1 bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-xs"
-                              data-testid={`badge-nfr-${client.id}`}
-                            >
-                              <HeartOff className="w-3 h-3" />
-                              NFR
-                            </Badge>
-                          )}
-                          {client.advancedCareDirective === "For Resus" && (
-                            <Badge 
-                              variant="outline" 
-                              className="gap-1 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 text-xs"
-                              data-testid={`badge-resus-${client.id}`}
-                            >
-                              <Heart className="w-3 h-3" />
-                              Resus
-                            </Badge>
+                  {columnVisibility.client && (
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className={getAvatarSize()}>
+                          <AvatarImage src={client.photo || undefined} alt={client.participantName} />
+                          <AvatarFallback>{getInitials(client.participantName)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium">{client.participantName}</p>
+                            {isNewClient && (
+                              <Badge 
+                                variant="outline" 
+                                className="gap-1 bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs"
+                                data-testid={`badge-new-${client.id}`}
+                              >
+                                <Sparkles className="w-3 h-3" />
+                                New
+                              </Badge>
+                            )}
+                            {client.advancedCareDirective === "NFR" && (
+                              <Badge 
+                                variant="outline" 
+                                className="gap-1 bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-xs"
+                                data-testid={`badge-nfr-${client.id}`}
+                              >
+                                <HeartOff className="w-3 h-3" />
+                                NFR
+                              </Badge>
+                            )}
+                            {client.advancedCareDirective === "For Resus" && (
+                              <Badge 
+                                variant="outline" 
+                                className="gap-1 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 text-xs"
+                                data-testid={`badge-resus-${client.id}`}
+                              >
+                                <Heart className="w-3 h-3" />
+                                Resus
+                              </Badge>
+                            )}
+                          </div>
+                          {density !== "compact" && (
+                            <p className="text-sm text-muted-foreground">
+                              {clientAge ? `${clientAge} years` : "Age N/A"}
+                            </p>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {clientAge ? `${clientAge} years` : "Age N/A"}
-                        </p>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <CategoryBadge category={client.category} abbreviated />
-                      {clientId && (
-                        <p className="text-xs text-muted-foreground font-mono">{clientId}</p>
+                    </TableCell>
+                  )}
+                  {columnVisibility.category && (
+                    <TableCell>
+                      <div className="space-y-1">
+                        <CategoryBadge category={client.category} abbreviated />
+                        {density !== "compact" && clientId && (
+                          <p className="text-xs text-muted-foreground font-mono">{clientId}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                  {columnVisibility.fundingType && (
+                    <TableCell>
+                      {fundingType ? (
+                        <FundingTypeBadge fundingType={fundingType} />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {client.phoneNumber ? (
-                      <span className="text-sm whitespace-nowrap">{client.phoneNumber}</span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatCareManagerName(client.careTeam?.careManager)}</TableCell>
-                  <TableCell>
-                    <ComplianceIndicator status={complianceStatus} />
-                  </TableCell>
+                    </TableCell>
+                  )}
+                  {columnVisibility.phone && (
+                    <TableCell>
+                      {client.phoneNumber ? (
+                        <span className="text-sm whitespace-nowrap">{client.phoneNumber}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  )}
+                  {columnVisibility.careManager && (
+                    <TableCell>{formatCareManagerName(client.careTeam?.careManager)}</TableCell>
+                  )}
+                  {columnVisibility.compliance && (
+                    <TableCell>
+                      <ComplianceIndicator status={complianceStatus} />
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <div className={`flex items-center gap-1 transition-opacity ${isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
@@ -310,7 +391,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                             className="h-8 w-8"
                             onClick={(e) => handleQuickCall(e, client.phoneNumber!)}
                             data-testid={`button-call-${client.id}`}
-                            title="Call"
+                            aria-label={`Call ${client.participantName}`}
                           >
                             <Phone className="w-4 h-4 text-green-600" />
                           </Button>
@@ -322,7 +403,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                             className="h-8 w-8"
                             onClick={(e) => handleQuickEmail(e, client.email!)}
                             data-testid={`button-email-${client.id}`}
-                            title="Email"
+                            aria-label={`Email ${client.participantName}`}
                           >
                             <Mail className="w-4 h-4 text-blue-600" />
                           </Button>
@@ -333,7 +414,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                           className="h-8 w-8"
                           onClick={(e) => handleAddAppointment(e, client.id)}
                           data-testid={`button-appointment-${client.id}`}
-                          title="Add Appointment"
+                          aria-label={`Add appointment for ${client.participantName}`}
                         >
                           <CalendarPlus className="w-4 h-4 text-purple-600" />
                         </Button>
@@ -347,6 +428,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                             className="h-8 w-8"
                             onClick={(e) => e.stopPropagation()}
                             data-testid={`button-menu-${client.id}`}
+                            aria-label={`Actions for ${client.participantName}`}
                           >
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
