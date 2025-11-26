@@ -25,23 +25,35 @@ export const USER_ROLES: { value: UserRole; label: string }[] = [
   { value: "director", label: "Director" },
 ];
 
+// Approval status for new users
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
+// Pre-approved admin emails (auto-approved on first login)
+export const PRE_APPROVED_ADMINS: { email: string; role: UserRole }[] = [
+  { email: "max.bartosh@empowerlink.au", role: "director" },
+  { email: "sarah.little@empowerlink.au", role: "operations_manager" },
+];
+
 // Role-based permissions
 export const ROLE_PERMISSIONS: Record<UserRole, {
   canAccessFunding: boolean;
   canAccessBudgets: boolean;
-  canAccessReports: boolean;
+  canAccessFinancialReports: boolean;
+  canExportFinancialData: boolean;
   canManageStaff: boolean;
   canManageClients: boolean;
+  canApproveUsers: boolean;
+  canViewAllClients: boolean;
   isFullAccess: boolean;
 }> = {
-  director: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
-  clinical_manager: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
-  operations_manager: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
-  admin: { canAccessFunding: true, canAccessBudgets: true, canAccessReports: true, canManageStaff: true, canManageClients: true, isFullAccess: true },
-  care_manager: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: true, canManageStaff: false, canManageClients: true, isFullAccess: false },
-  registered_nurse: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: true, canManageStaff: false, canManageClients: true, isFullAccess: false },
-  enrolled_nurse: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: true, canManageStaff: false, canManageClients: true, isFullAccess: false },
-  support_worker: { canAccessFunding: false, canAccessBudgets: false, canAccessReports: false, canManageStaff: false, canManageClients: true, isFullAccess: false },
+  director: { canAccessFunding: true, canAccessBudgets: true, canAccessFinancialReports: true, canExportFinancialData: true, canManageStaff: true, canManageClients: true, canApproveUsers: true, canViewAllClients: true, isFullAccess: true },
+  clinical_manager: { canAccessFunding: true, canAccessBudgets: true, canAccessFinancialReports: true, canExportFinancialData: true, canManageStaff: true, canManageClients: true, canApproveUsers: false, canViewAllClients: true, isFullAccess: true },
+  operations_manager: { canAccessFunding: true, canAccessBudgets: true, canAccessFinancialReports: true, canExportFinancialData: true, canManageStaff: true, canManageClients: true, canApproveUsers: true, canViewAllClients: true, isFullAccess: true },
+  admin: { canAccessFunding: true, canAccessBudgets: true, canAccessFinancialReports: true, canExportFinancialData: true, canManageStaff: true, canManageClients: true, canApproveUsers: false, canViewAllClients: true, isFullAccess: true },
+  care_manager: { canAccessFunding: false, canAccessBudgets: true, canAccessFinancialReports: false, canExportFinancialData: false, canManageStaff: false, canManageClients: true, canApproveUsers: false, canViewAllClients: true, isFullAccess: false },
+  registered_nurse: { canAccessFunding: false, canAccessBudgets: false, canAccessFinancialReports: false, canExportFinancialData: false, canManageStaff: false, canManageClients: false, canApproveUsers: false, canViewAllClients: false, isFullAccess: false },
+  enrolled_nurse: { canAccessFunding: false, canAccessBudgets: false, canAccessFinancialReports: false, canExportFinancialData: false, canManageStaff: false, canManageClients: false, canApproveUsers: false, canViewAllClients: false, isFullAccess: false },
+  support_worker: { canAccessFunding: false, canAccessBudgets: false, canAccessFinancialReports: false, canExportFinancialData: false, canManageStaff: false, canManageClients: false, canApproveUsers: false, canViewAllClients: false, isFullAccess: false },
 };
 
 export const users = pgTable("users", {
@@ -52,6 +64,10 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   roles: json("roles").$type<UserRole[]>().notNull().default([]),
+  approvalStatus: text("approval_status").default("pending").$type<ApprovalStatus>(),
+  approvedBy: varchar("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  staffId: varchar("staff_id"),
   isFirstLogin: text("is_first_login").default("yes").$type<"yes" | "no">(),
   isActive: text("is_active").default("yes").$type<"yes" | "no">(),
   lastLoginAt: timestamp("last_login_at"),
@@ -64,6 +80,7 @@ export const users = pgTable("users", {
 
 export const insertUserSchema = createInsertSchema(users, {
   roles: z.array(z.enum(["support_worker", "enrolled_nurse", "registered_nurse", "admin", "operations_manager", "care_manager", "clinical_manager", "director"])).optional(),
+  approvalStatus: z.enum(["pending", "approved", "rejected"]).optional(),
   isFirstLogin: z.enum(["yes", "no"]).optional(),
   isActive: z.enum(["yes", "no"]).optional(),
 }).omit({
@@ -475,6 +492,7 @@ export type PrivacyConsent = typeof privacyConsents.$inferSelect;
 // Staff Members
 export const staff = pgTable("staff", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
   name: text("name").notNull(),
   phoneNumber: text("phone_number"),
   email: text("email"),

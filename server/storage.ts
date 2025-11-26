@@ -84,6 +84,8 @@ export interface IStorage {
   // Staff
   getAllStaff(): Promise<Staff[]>;
   getStaffById(id: string): Promise<Staff | undefined>;
+  getStaffByEmail(email: string): Promise<Staff | undefined>;
+  getStaffByUserId(userId: string): Promise<Staff | undefined>;
   createStaff(staffMember: InsertStaff): Promise<Staff>;
   updateStaff(id: string, staffMember: Partial<InsertStaff>): Promise<Staff | undefined>;
   deleteStaff(id: string): Promise<boolean>;
@@ -116,6 +118,10 @@ export interface IStorage {
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   updateUserRoles(id: string, roles: UserRole[]): Promise<User | undefined>;
   updateUserTokens(id: string, accessToken: string, refreshToken: string, expiresAt: Date): Promise<User | undefined>;
+  getPendingUsers(): Promise<User[]>;
+  approveUser(id: string, approvedBy: string, roles: UserRole[]): Promise<User | undefined>;
+  rejectUser(id: string, rejectedBy: string): Promise<User | undefined>;
+  linkUserToStaff(userId: string, staffId: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   
   // General Practitioners (GP)
@@ -554,6 +560,16 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getStaffByEmail(email: string): Promise<Staff | undefined> {
+    const result = await db.select().from(staff).where(eq(staff.email, email)).limit(1);
+    return result[0];
+  }
+
+  async getStaffByUserId(userId: string): Promise<Staff | undefined> {
+    const result = await db.select().from(staff).where(eq(staff.userId, userId)).limit(1);
+    return result[0];
+  }
+
   async createStaff(staffMember: InsertStaff): Promise<Staff> {
     const result = await db.insert(staff).values(staffMember).returning();
     return result[0];
@@ -706,6 +722,52 @@ export class DbStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.displayName);
+  }
+
+  async getPendingUsers(): Promise<User[]> {
+    return await db.select().from(users)
+      .where(eq(users.approvalStatus, "pending"))
+      .orderBy(users.createdAt);
+  }
+
+  async approveUser(id: string, approvedBy: string, roles: UserRole[]): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ 
+        approvalStatus: "approved",
+        approvedBy,
+        approvedAt: new Date(),
+        roles,
+        isFirstLogin: "no",
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async rejectUser(id: string, rejectedBy: string): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ 
+        approvalStatus: "rejected",
+        approvedBy: rejectedBy,
+        approvedAt: new Date(),
+        isActive: "no",
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async linkUserToStaff(userId: string, staffId: string): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ 
+        staffId,
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
   }
 
   // General Practitioners (GP)
