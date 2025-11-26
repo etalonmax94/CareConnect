@@ -3,14 +3,13 @@
 
 import { type Server } from "node:http";
 import express, { type Express } from "express";
-import runApp from "./app";
+import runApp, { app } from "./app";
 
-// For Cloud Run backend-only deployment, we skip static file serving
-// The frontend is hosted separately (e.g., on Replit)
-export async function setupApiOnly(app: Express, _server: Server) {
-  // CORS configuration for cross-origin requests from frontend
+// CORS configuration - MUST be applied BEFORE routes are registered
+// This middleware runs early in the request pipeline
+function setupCors() {
   app.use((req, res, next) => {
-    // Allow requests from Replit frontend domain
+    // Allow requests from production frontend domains
     const allowedOrigins = [
       'https://app.empowerlink.au',
       'https://empowerlink.au',
@@ -42,10 +41,14 @@ export async function setupApiOnly(app: Express, _server: Server) {
     
     next();
   });
+}
 
+// For Cloud Run backend-only deployment, we skip static file serving
+// The frontend is hosted separately (e.g., on Replit)
+export async function setupApiOnly(_app: Express, _server: Server) {
   // For any unmatched routes in a backend-only deployment, return 404
   // This includes both non-API routes and undefined API endpoints
-  app.use("*", (_req, res) => {
+  _app.use("*", (_req, res) => {
     res.status(404).json({ 
       error: "Not Found", 
       message: "This is an API-only server. Frontend is hosted separately."
@@ -54,5 +57,7 @@ export async function setupApiOnly(app: Express, _server: Server) {
 }
 
 (async () => {
+  // Apply CORS BEFORE routes are registered
+  setupCors();
   await runApp(setupApiOnly);
 })();
