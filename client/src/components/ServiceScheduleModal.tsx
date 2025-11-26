@@ -76,10 +76,7 @@ export function ServiceScheduleModal({
 
   const saveMutation = useMutation({
     mutationFn: async (data: { serviceSchedule: ServiceSchedule }) => {
-      return apiRequest(`/api/clients/${clientId}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/clients/${clientId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId] });

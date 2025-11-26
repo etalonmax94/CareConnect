@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
+import { ServiceScheduleModal } from "@/components/ServiceScheduleModal";
 import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -127,6 +128,7 @@ export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
   const [, setLocation] = useLocation();
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<ProfileSection>("overview");
   const { toast } = useToast();
   
@@ -1341,9 +1343,33 @@ export default function ClientProfile() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frequency of Services</p>
-                        <p className="text-sm mt-1 font-medium">{client.frequencyOfServices || "Not specified"}</p>
+                      <div 
+                        className="cursor-pointer hover-elevate p-3 -m-3 rounded-lg transition-colors"
+                        onClick={() => setScheduleModalOpen(true)}
+                        data-testid="button-open-schedule-modal"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frequency of Services</p>
+                          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                        </div>
+                        {client.serviceSchedule ? (
+                          <div className="mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {(() => {
+                                const schedule = client.serviceSchedule as any;
+                                const week1Slots = schedule.week1 ? Object.values(schedule.week1).flat().length : 0;
+                                const week2Slots = schedule.week2 ? Object.values(schedule.week2).flat().length : 0;
+                                return `${week1Slots + week2Slots} time slots configured`;
+                              })()}
+                            </Badge>
+                            <p className="text-xs text-primary mt-1">Click to view/edit schedule</p>
+                          </div>
+                        ) : (
+                          <div className="mt-1">
+                            <p className="text-sm font-medium">{client.frequencyOfServices || "Not specified"}</p>
+                            <p className="text-xs text-primary mt-1">Click to set schedule</p>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Communication Needs</p>
@@ -2732,12 +2758,22 @@ export default function ClientProfile() {
       </div>
 
       {client && (
+        <>
         <ArchiveClientModal
           client={client}
           open={archiveModalOpen}
           onOpenChange={setArchiveModalOpen}
           onSuccess={() => setLocation("/clients")}
         />
+        <ServiceScheduleModal
+          open={scheduleModalOpen}
+          onOpenChange={setScheduleModalOpen}
+          clientId={client.id}
+          clientName={client.participantName}
+          currentSchedule={client.serviceSchedule as any}
+          currentFrequencyText={client.frequencyOfServices}
+        />
+        </>
       )}
     </div>
   );
