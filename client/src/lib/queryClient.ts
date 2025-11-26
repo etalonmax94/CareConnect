@@ -1,8 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAuthToken } from "./auth";
 
-// API base URL - use Cloud Run backend in production, same-origin in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://careconnect-124485508170.australia-southeast1.run.app';
+// API base URL - use Cloud Run backend only when we have a token (cross-domain auth)
+// For same-origin requests (dev server with sessions), use empty string
+function getApiBaseUrl(): string {
+  const token = getAuthToken();
+  // If we have a JWT token, we're doing cross-domain auth with Cloud Run
+  if (token) {
+    return import.meta.env.VITE_API_URL || 'https://careconnect-124485508170.australia-southeast1.run.app';
+  }
+  // No token = same-origin (dev server with sessions)
+  return '';
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -25,7 +34,8 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
+  const baseUrl = getApiBaseUrl();
+  const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
   
   const headers: Record<string, string> = {
     ...getAuthHeaders(),
@@ -53,7 +63,8 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const path = queryKey.join("/");
-    const fullUrl = path.startsWith('/') ? `${API_BASE_URL}${path}` : path;
+    const baseUrl = getApiBaseUrl();
+    const fullUrl = path.startsWith('/') ? `${baseUrl}${path}` : path;
     
     const res = await fetch(fullUrl, {
       headers: getAuthHeaders(),

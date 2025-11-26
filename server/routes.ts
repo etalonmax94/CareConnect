@@ -398,6 +398,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Get current user session
   app.get("/api/auth/me", (req, res) => {
+    // Prevent caching of auth status
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    
     if (req.session?.user) {
       res.json({ 
         authenticated: true, 

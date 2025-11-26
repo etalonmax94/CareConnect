@@ -26,6 +26,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: devName, role: devRole }),
+        credentials: "include", // Required for session cookies
       });
 
       if (response.ok) {
