@@ -784,59 +784,59 @@ export default function ClientProfile() {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Stat Cards Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900">
+          {/* Stat Cards Row - Clean, subtle design */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-teal-50/80 to-white dark:from-teal-950/30 dark:to-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-500 rounded-lg">
-                    <CalendarDays className="w-5 h-5 text-white" />
+                  <div className="p-2 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
+                    <CalendarDays className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Age</p>
-                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{clientAge || '-'}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Age</p>
+                    <p className="text-xl font-semibold">{clientAge || '-'}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-green-50 dark:bg-green-950/30 border-green-100 dark:border-green-900">
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/30 dark:to-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-500 rounded-lg">
-                    <Shield className="w-5 h-5 text-white" />
+                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
+                    <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Support Level</p>
-                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{getSupportLevel() || '-'}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Support Level</p>
+                    <p className="text-xl font-semibold">{getSupportLevel() || '-'}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900">
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-50/80 to-white dark:from-slate-950/30 dark:to-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-500 rounded-lg">
-                    <Users className="w-5 h-5 text-white" />
+                  <div className="p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+                    <Users className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Assigned Staff</p>
-                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{assignedStaffCount}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Assigned Staff</p>
+                    <p className="text-xl font-semibold">{assignedStaffCount}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-purple-50 dark:bg-purple-950/30 border-purple-100 dark:border-purple-900">
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-violet-50/80 to-white dark:from-violet-950/30 dark:to-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-500 rounded-lg">
-                    <DollarSign className="w-5 h-5 text-white" />
+                  <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
+                    <DollarSign className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Budget</p>
-                    <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">${remainingBudget.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Budget Left</p>
+                    <p className="text-xl font-semibold">${remainingBudget.toLocaleString()}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1250,142 +1250,126 @@ export default function ClientProfile() {
               </TabsList>
 
               <TabsContent value="details" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Personal Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
-                    <p className="text-sm mt-1">{client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString('en-AU') : "Not provided"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Age</p>
-                    <p className="text-sm mt-1">{clientAge ? `${clientAge} years` : "Not provided"}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Medicare Number</p>
-                  <p className="text-sm mt-1 font-mono">{client.medicareNumber || "Not provided"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Next of Kin / EPOA</p>
-                  <p className="text-sm mt-1">{client.nokEpoa || "Not provided"}</p>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Identity & Demographics */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="w-4 h-4 text-primary" />
+                      Identity & Demographics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date of Birth</p>
+                        <p className="text-sm mt-1 font-medium">{client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString('en-AU') : "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Medicare Number</p>
+                        <p className="text-sm mt-1 font-mono">{client.medicareNumber || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Next of Kin / EPOA</p>
+                        <p className="text-sm mt-1 font-medium">{client.nokEpoa || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</p>
+                        <div className="mt-1">
+                          <CategoryBadge category={client.category} />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Service Preferences</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Frequency of Services</p>
-                  <p className="text-sm mt-1">{client.frequencyOfServices || "Not specified"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Notification Preferences</p>
-                  <div className="mt-1">
-                    <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Communication Needs</p>
-                  <p className="text-sm mt-1">{client.communicationNeeds || "No special needs"}</p>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Clinical Details */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Stethoscope className="w-4 h-4 text-primary" />
+                      Clinical Details
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Critical info displayed in Overview alerts</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Main Diagnosis</p>
+                        <p className="text-sm mt-1 font-medium">{client.mainDiagnosis || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Risk Score</p>
+                        <div className="mt-1 flex items-center gap-2">
+                          {client.riskAssessmentScore ? (
+                            <Badge className={`${
+                              parseInt(client.riskAssessmentScore) <= 3 ? 'bg-emerald-500' :
+                              parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
+                              'bg-red-500'
+                            } text-white border-0`}>
+                              {client.riskAssessmentScore}/10
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not assessed</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Clinical Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Main Diagnosis</p>
-                  <p className="text-sm mt-1">{client.mainDiagnosis || "Not provided"}</p>
-                </div>
-                {client.allergies && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                    <p className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      ALLERGIES
-                    </p>
-                    <p className="text-sm mt-1 font-bold text-red-600 dark:text-red-300" data-testid="text-allergies">
-                      {client.allergies}
-                    </p>
-                  </div>
-                )}
-
-                {/* Advanced Care Directive - Critical Clinical Safety */}
-                <div className={`p-3 rounded-lg border ${
-                  client.advancedCareDirective === "NFR" 
-                    ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
-                    : client.advancedCareDirective === "For Resus"
-                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                    : "bg-muted/50 border-border"
-                }`}>
-                  <p className={`text-sm font-bold flex items-center gap-2 ${
-                    client.advancedCareDirective === "NFR"
-                      ? "text-purple-700 dark:text-purple-400"
-                      : client.advancedCareDirective === "For Resus"
-                      ? "text-green-700 dark:text-green-400"
-                      : "text-muted-foreground"
-                  }`}>
-                    {client.advancedCareDirective === "NFR" ? (
-                      <HeartOff className="w-4 h-4" />
-                    ) : client.advancedCareDirective === "For Resus" ? (
-                      <Heart className="w-4 h-4" />
-                    ) : (
-                      <FileText className="w-4 h-4" />
+                {/* Service Preferences */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Settings className="w-4 h-4 text-primary" />
+                      Service Preferences
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frequency of Services</p>
+                        <p className="text-sm mt-1 font-medium">{client.frequencyOfServices || "Not specified"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Communication Needs</p>
+                        <p className="text-sm mt-1 font-medium">{client.communicationNeeds || "No special needs"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notification Preferences</p>
+                        <div className="mt-1">
+                          <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
+                        </div>
+                      </div>
+                    </div>
+                    {client.summaryOfServices && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Summary of Services</p>
+                        <p className="text-sm">{client.summaryOfServices}</p>
+                      </div>
                     )}
-                    ADVANCED CARE DIRECTIVE
-                  </p>
-                  <p className={`text-sm mt-1 font-bold ${
-                    client.advancedCareDirective === "NFR"
-                      ? "text-purple-600 dark:text-purple-300"
-                      : client.advancedCareDirective === "For Resus"
-                      ? "text-green-600 dark:text-green-300"
-                      : "text-muted-foreground"
-                  }`} data-testid="text-acd">
-                    {client.advancedCareDirective === "NFR" 
-                      ? "NFR - Not For Resuscitation"
-                      : client.advancedCareDirective === "For Resus"
-                      ? "For Resus - For Resuscitation"
-                      : "Not Specified"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Summary of Services</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">{client.summaryOfServices || "No summary provided"}</p>
-              </CardContent>
-            </Card>
-
-            {client.highIntensitySupports && client.highIntensitySupports.length > 0 && (
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle className="text-base">High Intensity Supports</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {client.highIntensitySupports.map((support, index) => (
-                      <Badge key={index} variant="secondary">{support}</Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
+                {/* High Intensity Supports */}
+                {client.highIntensitySupports && client.highIntensitySupports.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" />
+                        High Intensity Supports
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {client.highIntensitySupports.map((support, index) => (
+                          <Badge key={index} variant="secondary">{support}</Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
 
         <TabsContent value="program" className="space-y-6">
           {client.category === "NDIS" && client.ndisDetails && (
