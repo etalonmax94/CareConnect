@@ -79,15 +79,17 @@ export default function Login() {
           <div className="text-center text-sm text-muted-foreground mb-6">
             Sign in with your Zoho account to access the CRM system
           </div>
-          <Button 
-            onClick={handleZohoLogin} 
-            className="w-full gap-2"
-            size="lg"
+          <a 
+            href={`${API_BASE_URL}/api/auth/zoho`}
+            className="inline-flex items-center justify-center gap-2 w-full h-11 px-8 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90"
             data-testid="button-zoho-login"
           >
             <LogIn className="h-5 w-5" />
             Sign in with Zoho
-          </Button>
+          </a>
+          <p className="text-xs text-muted-foreground text-center">
+            Debug: Clicking will go to {API_BASE_URL}/api/auth/zoho
+          </p>
 
           {isDevelopment && (
             <>
