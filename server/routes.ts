@@ -170,7 +170,7 @@ function getBaseUrl(req: Request): string {
 
 // JWT token payload interface
 interface JwtPayload {
-  userId: number;
+  userId: string | number;  // UUID string or legacy number ID
   email: string;
   displayName: string;
   roles: UserRole[];
@@ -188,7 +188,8 @@ function generateAuthToken(user: {
   approvalStatus: string | null;
 }): string {
   const payload: JwtPayload = {
-    userId: typeof user.id === 'string' ? parseInt(user.id, 10) : user.id,
+    // Keep userId as string (UUID) - don't try to parse as integer
+    userId: user.id,
     email: user.email,
     displayName: user.displayName || user.email,
     roles: user.roles || [],
