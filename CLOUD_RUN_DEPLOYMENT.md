@@ -1,4 +1,5 @@
 # EmpowerLink CRM - Google Cloud Run Deployment Guide
+<!-- Last updated: 2024 -->
 
 This guide explains how to deploy the EmpowerLink backend API to Google Cloud Run in the **australia-southeast1** (Sydney) region for Australian healthcare data sovereignty compliance.
 
