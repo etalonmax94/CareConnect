@@ -13,7 +13,7 @@ const isDevelopment = import.meta.env.DEV;
 
 export default function Login() {
   const [devName, setDevName] = useState("Developer");
-  const [devRole, setDevRole] = useState("Admin");
+  const [devRole, setDevRole] = useState("admin");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -115,12 +115,14 @@ export default function Login() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Manager">Manager</SelectItem>
-                        <SelectItem value="Care Coordinator">Care Coordinator</SelectItem>
-                        <SelectItem value="Support Worker">Support Worker</SelectItem>
-                        <SelectItem value="Finance">Finance</SelectItem>
-                        <SelectItem value="Viewer">Viewer</SelectItem>
+                        <SelectItem value="director">Director</SelectItem>
+                        <SelectItem value="operations_manager">Operations Manager</SelectItem>
+                        <SelectItem value="clinical_manager">Clinical Manager</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="care_manager">Care Manager</SelectItem>
+                        <SelectItem value="support_worker">Support Worker</SelectItem>
+                        <SelectItem value="enrolled_nurse">Enrolled Nurse</SelectItem>
+                        <SelectItem value="registered_nurse">Registered Nurse</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
