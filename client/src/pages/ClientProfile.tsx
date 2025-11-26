@@ -695,13 +695,18 @@ export default function ClientProfile() {
                     Edit Profile
                   </Button>
                 </Link>
-                {client.zohoWorkdriveLink && (
+                {client.zohoWorkdriveLink ? (
                   <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-service-agreement">
                     <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
                       <FileText className="w-4 h-4" />
                       Service Agreement
                     </Button>
                   </a>
+                ) : (
+                  <Button variant="outline" className="gap-2" disabled data-testid="link-service-agreement-disabled">
+                    <FileText className="w-4 h-4" />
+                    Service Agreement
+                  </Button>
                 )}
                 <Button 
                   variant="ghost"
@@ -782,9 +787,9 @@ export default function ClientProfile() {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Stat Cards Row - Clean, subtle design */}
+          {/* Stat Cards Row - Clean design with borders */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-teal-50/80 to-white dark:from-teal-950/30 dark:to-card">
+            <Card className="bg-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
@@ -798,7 +803,7 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
             
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/30 dark:to-card">
+            <Card className="bg-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
@@ -812,7 +817,7 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
             
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-50/80 to-white dark:from-slate-950/30 dark:to-card">
+            <Card className="bg-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
@@ -826,7 +831,7 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
             
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-violet-50/80 to-white dark:from-violet-950/30 dark:to-card">
+            <Card className="bg-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
@@ -879,7 +884,7 @@ export default function ClientProfile() {
 
               {/* Quick Info Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-teal-50/50 to-white dark:from-teal-950/20 dark:to-card">
+                <Card className="bg-card">
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Activity className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
@@ -888,7 +893,7 @@ export default function ClientProfile() {
                     <p className="text-sm font-semibold">{client.serviceType || 'Not specified'}</p>
                   </CardContent>
                 </Card>
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50/50 to-white dark:from-emerald-950/20 dark:to-card">
+                <Card className="bg-card">
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Navigation className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -901,7 +906,7 @@ export default function ClientProfile() {
                     </p>
                   </CardContent>
                 </Card>
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-50/50 to-white dark:from-slate-900/30 dark:to-card md:col-span-2">
+                <Card className="bg-card md:col-span-2">
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Car className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
