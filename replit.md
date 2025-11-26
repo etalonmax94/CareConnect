@@ -134,3 +134,9 @@ The system implements comprehensive data interconnection to eliminate manual ret
   - Fixed annual calculation to avoid double-counting public holidays
   - Professional quote numbering (Q{YEAR}-{NUMBER})
   - Quote status workflow with history tracking
+- **Quote PDF Generation**: Professional PDF export using @react-pdf/renderer with company branding, line item details, rate breakdowns, and annual totals
+- **Quote-to-Budget Conversion**: Converts accepted quotes to budget allocations grouped by support category with one-click conversion workflow
+- **Zapier Webhook Integration**: POST /api/referrals endpoint with API key authentication for auto-creating clients from Zoho Forms, includes GP/pharmacy/SC/PM upsert logic
+- **Service-Budget Linking**: Service deliveries now link to budget categories via budgetId field with automatic budget usage tracking
+- **Services Tab**: New tab in ClientProfile for recording service deliveries with budget linking, staff assignment, and real-time budget impact display
+- **Budget Alerts Dashboard**: Color-coded alert card (green healthy, orange low budget 80%+, rose overspent 100%+) with modal showing detailed alerts by client

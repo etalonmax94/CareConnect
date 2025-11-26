@@ -734,17 +734,17 @@ export default function Dashboard() {
             <div className="space-y-3">
               {budgetAlerts?.alerts && budgetAlerts.alerts.length > 0 ? (
                 budgetAlerts.alerts.map((alert) => (
-                  <Link key={alert.id} href={`/clients/${alert.clientId}`}>
+                  <Link key={alert.id} href={`/clients/${alert.clientId}`} data-testid={`link-budget-alert-${alert.id}`}>
                     <Card className={`hover-elevate cursor-pointer ${
                       alert.alertType === "overspent" 
                         ? 'border-red-200 dark:border-red-800' 
                         : 'border-orange-200 dark:border-orange-800'
-                    }`}>
+                    }`} data-testid={`card-budget-alert-${alert.id}`}>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium">{alert.clientName}</p>
-                            <p className="text-sm text-muted-foreground">{alert.category}</p>
+                            <p className="font-medium" data-testid={`text-alert-client-${alert.id}`}>{alert.clientName}</p>
+                            <p className="text-sm text-muted-foreground" data-testid={`text-alert-category-${alert.id}`}>{alert.category}</p>
                           </div>
                           <div className="text-right">
                             <Badge variant={alert.alertType === "overspent" ? "destructive" : "secondary"} 
