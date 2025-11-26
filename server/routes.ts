@@ -48,7 +48,7 @@ const storage_config = multer.diskStorage({
   }
 });
 
-const upload = multer({
+const uploadPdf = multer({
   storage: storage_config,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
@@ -56,6 +56,39 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(new Error('Only PDF files are allowed'));
+    }
+  }
+});
+
+// Photo upload configuration
+const photoStorageConfig = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const clientId = (req as any).params.clientId;
+    if (clientId) {
+      const photosDir = path.join(uploadsDir, 'photos', sanitizeFilename(clientId));
+      if (!fs.existsSync(photosDir)) {
+        fs.mkdirSync(photosDir, { recursive: true });
+      }
+      cb(null, photosDir);
+    } else {
+      cb(new Error('Client ID required'), '');
+    }
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `profile${ext}`);
+  }
+});
+
+const uploadPhoto = multer({
+  storage: photoStorageConfig,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for photos
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
     }
   }
 });
@@ -2450,7 +2483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload document file (PDF)
-  app.post("/api/clients/:clientId/documents/upload", upload.single("file"), async (req, res) => {
+  app.post("/api/clients/:clientId/documents/upload", uploadPdf.single("file"), async (req, res) => {
     try {
       // Check if user is authenticated
       if (!req.session?.user) {
@@ -2461,7 +2494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const { documentType, fileName } = req.body;
+      const { documentType, fileName, expiryDate } = req.body;
       if (!documentType) {
         return res.status(400).json({ error: "Document type is required" });
       }
@@ -2485,13 +2518,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         documentType,
         fileName: fileName || req.file.originalname,
         fileUrl,
+        expiryDate: expiryDate || null,
       });
 
       // Log activity
       await storage.logActivity({
         clientId: req.params.clientId,
         action: "document_uploaded",
-        description: `Document ${document.fileName} was uploaded`,
+        description: `Document ${document.fileName} was uploaded${expiryDate ? ` (expires: ${expiryDate})` : ''}`,
         performedBy: req.session.user.email || "System"
       });
 
@@ -2499,6 +2533,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error uploading document:", error);
       res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  // Upload client profile photo
+  app.post("/api/clients/:clientId/photo", uploadPhoto.single("photo"), async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No photo uploaded" });
+      }
+
+      const clientId = req.params.clientId;
+      
+      // Verify client exists
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Create photo URL
+      const safeClientId = sanitizeFilename(clientId);
+      const photoUrl = `/uploads/photos/${safeClientId}/${req.file.filename}`;
+      
+      // Update client with photo URL
+      await storage.updateClient(clientId, { photo: photoUrl });
+
+      // Log activity
+      await storage.logActivity({
+        clientId,
+        action: "photo_uploaded",
+        description: `Profile photo was uploaded for ${client.participantName}`,
+        performedBy: req.session.user.email || "System"
+      });
+
+      res.status(200).json({ success: true, photoUrl });
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
+  // Serve client profile photos
+  app.get("/uploads/photos/:clientId/:filename", async (req, res) => {
+    if (!req.session?.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const { clientId, filename } = req.params;
+    const safeClientId = sanitizeFilename(clientId);
+    const safeFilename = sanitizeFilename(filename);
+    
+    try {
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const filePath = path.join(uploadsDir, 'photos', safeClientId, safeFilename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+      
+      res.sendFile(filePath);
+    } catch (error) {
+      console.error("Error serving photo:", error);
+      res.status(500).json({ error: "Failed to serve photo" });
     }
   });
 
@@ -2522,7 +2626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       // Verify the client exists
-      const client = await storage.getClient(clientId);
+      const client = await storage.getClientById(clientId);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }

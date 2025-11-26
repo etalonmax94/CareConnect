@@ -55,6 +55,7 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [fileUrl, setFileUrl] = useState("");
   const [fileName, setFileName] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
   const [uploadMode, setUploadMode] = useState<"file" | "link">("file");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -123,6 +124,9 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
       formData.append("file", selectedFile);
       formData.append("documentType", selectedDocType);
       formData.append("fileName", fileName || selectedFile.name);
+      if (expiryDate) {
+        formData.append("expiryDate", expiryDate);
+      }
 
       const response = await fetch(`/api/clients/${clientId}/documents/upload`, {
         method: "POST",
@@ -138,6 +142,7 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
       setUploadDialogOpen(false);
       setFileUrl("");
       setFileName("");
+      setExpiryDate("");
       setSelectedDocType("");
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -232,8 +237,8 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                   </div>
                 )}
                 {uploadedDoc && (
-                  <div className="p-2 bg-muted rounded text-xs">
-                    <p className="text-muted-foreground mb-1">Uploaded File</p>
+                  <div className="p-2 bg-muted rounded text-xs space-y-1">
+                    <p className="text-muted-foreground">Uploaded File</p>
                     <div className="flex items-center justify-between">
                       <span className="truncate max-w-32">{uploadedDoc.fileName}</span>
                       <div className="flex gap-1">
@@ -252,6 +257,18 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                         </Button>
                       </div>
                     </div>
+                    {uploadedDoc.expiryDate && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <span>Expires:</span>
+                        <span className={`font-medium ${
+                          new Date(uploadedDoc.expiryDate) < new Date() ? 'text-red-600' :
+                          new Date(uploadedDoc.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' :
+                          'text-emerald-600'
+                        }`}>
+                          {new Date(uploadedDoc.expiryDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="flex gap-2 pt-2">
@@ -310,6 +327,17 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                                 </span>
                               </div>
                             )}
+                            <div className="space-y-2">
+                              <Label htmlFor="expiryDate">Expiry Date (Optional)</Label>
+                              <Input 
+                                id="expiryDate"
+                                type="date"
+                                value={expiryDate}
+                                onChange={(e) => setExpiryDate(e.target.value)}
+                                data-testid="input-doc-expiry"
+                              />
+                              <p className="text-xs text-muted-foreground">Set when this document will expire</p>
+                            </div>
                           </TabsContent>
                           <TabsContent value="link" className="space-y-4 mt-4">
                             <p className="text-sm text-muted-foreground">

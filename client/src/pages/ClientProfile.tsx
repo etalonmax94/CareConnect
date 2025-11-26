@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
 import { ServiceScheduleModal } from "@/components/ServiceScheduleModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -435,6 +435,51 @@ export default function ClientProfile() {
     },
   });
 
+  // Photo upload
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("photo", file);
+      
+      const response = await fetch(`/api/clients/${params?.id}/photo`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to upload photo");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id] });
+      toast({ title: "Photo uploaded successfully" });
+      setIsUploadingPhoto(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to upload photo", description: error.message, variant: "destructive" });
+      setIsUploadingPhoto(false);
+    },
+  });
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Photo must be under 5MB", variant: "destructive" });
+        return;
+      }
+      setIsUploadingPhoto(true);
+      uploadPhotoMutation.mutate(file);
+    }
+  };
+
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [noteType, setNoteType] = useState<"progress" | "clinical" | "incident" | "complaint" | "feedback">("progress");
@@ -622,10 +667,34 @@ export default function ClientProfile() {
             </Button>
           </Link>
           
-          <Avatar className="w-16 h-16 border-2 border-border flex-shrink-0">
-            <AvatarImage src={client.photo || undefined} alt={client.participantName} />
-            <AvatarFallback className="text-xl bg-muted text-foreground font-bold">{getInitials(client.participantName)}</AvatarFallback>
-          </Avatar>
+          <div className="relative group">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              className="hidden"
+              onChange={handlePhotoChange}
+              data-testid="input-photo-upload"
+            />
+            <Avatar 
+              className="w-16 h-16 border-2 border-border flex-shrink-0 cursor-pointer rounded-xl overflow-hidden"
+              onClick={() => photoInputRef.current?.click()}
+              data-testid="avatar-client"
+            >
+              <AvatarImage src={client.photo || undefined} alt={client.participantName} className="object-cover" />
+              <AvatarFallback className="text-xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
+            </Avatar>
+            <div 
+              className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+              onClick={() => photoInputRef.current?.click()}
+            >
+              {isUploadingPhoto ? (
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+              ) : (
+                <Camera className="w-5 h-5 text-white" />
+              )}
+            </div>
+          </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
