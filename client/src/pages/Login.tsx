@@ -20,6 +20,8 @@ export default function Login() {
 
   const handleZohoLogin = () => {
     // Use Cloud Run backend for OAuth
+    console.log("API_BASE_URL:", API_BASE_URL);
+    console.log("Redirecting to:", `${API_BASE_URL}/api/auth/zoho`);
     window.location.href = `${API_BASE_URL}/api/auth/zoho`;
   };
 
