@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Archive, Users } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Archive, Users, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,11 +9,14 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Loader2 } from "lucide-react";
+import { getComplianceStatus } from "@/components/ComplianceIndicator";
 
 export default function Clients() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
   const [selectedCategory, setSelectedCategory] = useState<ClientCategory | "All">("All");
+  const [selectedCareManager, setSelectedCareManager] = useState<string>("All");
+  const [selectedCompliance, setSelectedCompliance] = useState<string>("All");
 
   const { data: activeClients = [], isLoading: isLoadingActive } = useQuery<Client[]>({
     queryKey: ["/api/clients/active"],
@@ -30,9 +33,34 @@ export default function Clients() {
   const isLoading = activeTab === "active" ? isLoadingActive : isLoadingArchived;
   const clients = activeTab === "active" ? activeClients : archivedClients;
 
-  const filteredByCategory = selectedCategory === "All" 
-    ? clients 
-    : clients.filter(c => c.category === selectedCategory);
+  const careManagers = useMemo(() => {
+    const managers = new Set<string>();
+    clients.forEach(c => {
+      if (c.careTeam?.careManager) managers.add(c.careTeam.careManager);
+    });
+    return Array.from(managers).sort();
+  }, [clients]);
+
+  const filteredClients = useMemo(() => {
+    return clients.filter(client => {
+      const matchesCategory = selectedCategory === "All" || client.category === selectedCategory;
+      const matchesCareManager = selectedCareManager === "All" || client.careTeam?.careManager === selectedCareManager;
+      const compStatus = getComplianceStatus(client.clinicalDocuments?.carePlanDate);
+      const matchesCompliance = selectedCompliance === "All" || 
+        (selectedCompliance === "compliant" && compStatus === "compliant") ||
+        (selectedCompliance === "due-soon" && compStatus === "due-soon") ||
+        (selectedCompliance === "overdue" && compStatus === "overdue");
+      return matchesCategory && matchesCareManager && matchesCompliance;
+    });
+  }, [clients, selectedCategory, selectedCareManager, selectedCompliance]);
+
+  const hasActiveFilters = selectedCategory !== "All" || selectedCareManager !== "All" || selectedCompliance !== "All";
+
+  const clearAllFilters = () => {
+    setSelectedCategory("All");
+    setSelectedCareManager("All");
+    setSelectedCompliance("All");
+  };
 
   return (
     <div className="space-y-6">
@@ -51,71 +79,82 @@ export default function Clients() {
         </Link>
       </div>
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Button
-            variant={activeTab === "active" ? "default" : "outline"}
-            onClick={() => setActiveTab("active")}
-            className="gap-2"
-            data-testid="tab-active-clients"
-          >
-            <Users className="w-4 h-4" />
-            Active Clients
-            <Badge variant={activeTab === "active" ? "secondary" : "outline"} className="ml-1">
-              {activeClients.length}
-            </Badge>
-          </Button>
-          <Button
-            variant={activeTab === "archived" ? "default" : "outline"}
-            onClick={() => setActiveTab("archived")}
-            className="gap-2"
-            data-testid="tab-archived-clients"
-          >
-            <Archive className="w-4 h-4" />
-            Archived
-            <Badge variant={activeTab === "archived" ? "secondary" : "outline"} className="ml-1">
-              {archivedClients.length}
-            </Badge>
-          </Button>
-        </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button
+          variant={activeTab === "active" ? "default" : "outline"}
+          onClick={() => setActiveTab("active")}
+          className="gap-2"
+          data-testid="tab-active-clients"
+        >
+          <Users className="w-4 h-4" />
+          Active Clients
+          <Badge variant={activeTab === "active" ? "secondary" : "outline"} className="ml-1">
+            {activeClients.length}
+          </Badge>
+        </Button>
+        <Button
+          variant={activeTab === "archived" ? "default" : "outline"}
+          onClick={() => setActiveTab("archived")}
+          className="gap-2"
+          data-testid="tab-archived-clients"
+        >
+          <Archive className="w-4 h-4" />
+          Archived
+          <Badge variant={activeTab === "archived" ? "secondary" : "outline"} className="ml-1">
+            {archivedClients.length}
+          </Badge>
+        </Button>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant={selectedCategory === "All" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory("All")}
-            data-testid="filter-all"
+        <div className="h-6 w-px bg-border mx-1" />
+
+        <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as ClientCategory | "All")}>
+          <SelectTrigger className="w-[160px]" data-testid="filter-category">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Categories</SelectItem>
+            <SelectItem value="NDIS">NDIS</SelectItem>
+            <SelectItem value="Support at Home">Support at Home</SelectItem>
+            <SelectItem value="Private">Private</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedCareManager} onValueChange={setSelectedCareManager}>
+          <SelectTrigger className="w-[180px]" data-testid="filter-care-manager">
+            <SelectValue placeholder="All Care Managers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Care Managers</SelectItem>
+            {careManagers.map(cm => (
+              <SelectItem key={cm} value={cm}>{cm}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
+          <SelectTrigger className="w-[160px]" data-testid="filter-compliance">
+            <SelectValue placeholder="All Compliance" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Compliance</SelectItem>
+            <SelectItem value="compliant">Compliant</SelectItem>
+            <SelectItem value="due-soon">Due Soon</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={clearAllFilters}
+            className="text-muted-foreground"
+            data-testid="button-clear-filters"
           >
-            All
+            <Filter className="w-4 h-4 mr-1" />
+            Clear filters
           </Button>
-          <Button
-            variant={selectedCategory === "NDIS" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory("NDIS")}
-            className={selectedCategory === "NDIS" ? "" : "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950"}
-            data-testid="filter-ndis"
-          >
-            NDIS
-          </Button>
-          <Button
-            variant={selectedCategory === "Support at Home" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory("Support at Home")}
-            className={selectedCategory === "Support at Home" ? "" : "border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950"}
-            data-testid="filter-support"
-          >
-            Support at Home
-          </Button>
-          <Button
-            variant={selectedCategory === "Private" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory("Private")}
-            className={selectedCategory === "Private" ? "" : "border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950"}
-            data-testid="filter-private"
-          >
-            Private
-          </Button>
-        </div>
+        )}
       </div>
 
       {activeTab === "active" ? (
@@ -124,18 +163,31 @@ export default function Clients() {
             <div className="flex items-center justify-center h-96">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : filteredByCategory.length === 0 ? (
+          ) : filteredClients.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-96 text-muted-foreground">
               <Users className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-lg font-medium">No clients found</p>
               <p className="text-sm">
-                {selectedCategory === "All" 
-                  ? "Get started by adding your first client" 
-                  : `No ${selectedCategory} clients found`}
+                {hasActiveFilters 
+                  ? "Try adjusting your filters" 
+                  : "Get started by adding your first client"}
               </p>
+              {hasActiveFilters && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={clearAllFilters}
+                >
+                  Clear all filters
+                </Button>
+              )}
             </div>
           ) : (
-            <ClientTable clients={filteredByCategory} onViewClient={handleViewClient} />
+            <ClientTable 
+              clients={filteredClients} 
+              onViewClient={handleViewClient} 
+            />
           )}
         </>
       ) : (
@@ -144,7 +196,7 @@ export default function Clients() {
             <div className="flex items-center justify-center h-96">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : filteredByCategory.length === 0 ? (
+          ) : filteredClients.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-96 text-muted-foreground">
               <Archive className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-lg font-medium">No archived clients</p>
@@ -158,7 +210,7 @@ export default function Clients() {
                 </p>
               </div>
               <ClientTable 
-                clients={filteredByCategory} 
+                clients={filteredClients} 
                 onViewClient={handleViewClient}
                 isArchiveView={true}
               />

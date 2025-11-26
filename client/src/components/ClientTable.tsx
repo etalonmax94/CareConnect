@@ -3,12 +3,13 @@ import type { Client, ClientCategory } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import CategoryBadge from "./CategoryBadge";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
-import { Eye, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff, Heart, HeartOff, Sparkles } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Phone, Mail, CalendarPlus, Star, StarOff, Heart, HeartOff, Sparkles, MoreHorizontal, Eye, Edit, UserPlus, Archive } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface ClientTableProps {
   clients: Client[];
@@ -20,19 +21,11 @@ type SortField = "name" | "category" | "careManager" | "phone" | "compliance";
 type SortDirection = "asc" | "desc";
 
 export default function ClientTable({ clients, onViewClient, isArchiveView = false }: ClientTableProps) {
-  const [selectedCareManager, setSelectedCareManager] = useState<string>("All");
-  const [selectedCompliance, setSelectedCompliance] = useState<string>("All");
+  const [, setLocation] = useLocation();
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [pinnedClients, setPinnedClients] = useState<Set<string>>(new Set());
-
-  const careManagers = useMemo(() => {
-    const managers = new Set<string>();
-    clients.forEach(c => {
-      if (c.careTeam?.careManager) managers.add(c.careTeam.careManager);
-    });
-    return Array.from(managers).sort();
-  }, [clients]);
+  const [hoveredClientId, setHoveredClientId] = useState<string | null>(null);
 
   const togglePin = (clientId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -53,21 +46,9 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
     return client.medicareNumber;
   };
 
-  const filteredClients = useMemo(() => {
-    return clients.filter(client => {
-      const matchesCareManager = selectedCareManager === "All" || client.careTeam?.careManager === selectedCareManager;
-      const compStatus = getComplianceStatus(client.clinicalDocuments?.carePlanDate);
-      const matchesCompliance = selectedCompliance === "All" || 
-        (selectedCompliance === "compliant" && compStatus === "compliant") ||
-        (selectedCompliance === "due-soon" && compStatus === "due-soon") ||
-        (selectedCompliance === "overdue" && compStatus === "overdue");
-      return matchesCareManager && matchesCompliance;
-    });
-  }, [clients, selectedCareManager, selectedCompliance]);
-
   const sortedClients = useMemo(() => {
-    const pinned = filteredClients.filter(c => pinnedClients.has(c.id));
-    const unpinned = filteredClients.filter(c => !pinnedClients.has(c.id));
+    const pinned = clients.filter(c => pinnedClients.has(c.id));
+    const unpinned = clients.filter(c => !pinnedClients.has(c.id));
     
     const sortFn = (a: Client, b: Client) => {
       let aVal: string | number = "";
@@ -103,7 +84,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
     };
     
     return [...pinned.sort(sortFn), ...unpinned.sort(sortFn)];
-  }, [filteredClients, sortField, sortDirection, pinnedClients]);
+  }, [clients, sortField, sortDirection, pinnedClients]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -134,34 +115,42 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
     return `${firstName} ${lastInitial}.`;
   };
 
+  const handleRowClick = (client: Client) => {
+    onViewClient(client);
+  };
+
+  const handleQuickCall = (e: React.MouseEvent, phone: string) => {
+    e.stopPropagation();
+    window.location.href = `tel:${phone}`;
+  };
+
+  const handleQuickEmail = (e: React.MouseEvent, email: string) => {
+    e.stopPropagation();
+    window.location.href = `mailto:${email}`;
+  };
+
+  const handleAddAppointment = (e: React.MouseEvent, clientId: string) => {
+    e.stopPropagation();
+    setLocation(`/clients/${clientId}?tab=services`);
+  };
+
+  const handleEditClient = (e: React.MouseEvent, clientId: string) => {
+    e.stopPropagation();
+    setLocation(`/clients/${clientId}/edit`);
+  };
+
+  const handleAssignClient = (e: React.MouseEvent, clientId: string) => {
+    e.stopPropagation();
+    setLocation(`/clients/${clientId}?tab=team`);
+  };
+
+  const handleArchiveClient = (e: React.MouseEvent, clientId: string) => {
+    e.stopPropagation();
+    setLocation(`/clients/${clientId}?action=archive`);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
-        <Select value={selectedCareManager} onValueChange={setSelectedCareManager}>
-          <SelectTrigger className="w-[180px]" data-testid="filter-care-manager">
-            <SelectValue placeholder="All Care Managers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Care Managers</SelectItem>
-            {careManagers.map(cm => (
-              <SelectItem key={cm} value={cm}>{cm}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
-          <SelectTrigger className="w-[160px]" data-testid="filter-compliance">
-            <SelectValue placeholder="All Compliance" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Compliance</SelectItem>
-            <SelectItem value="compliant">Compliant</SelectItem>
-            <SelectItem value="due-soon">Due Soon</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       <div className="border rounded-md">
         <Table>
           <TableHeader>
@@ -212,7 +201,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                   Compliance <SortIcon field="compliance" />
                 </button>
               </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-24"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -221,14 +210,17 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
               const clientId = getClientId(client);
               const isPinned = pinnedClients.has(client.id);
               const clientAge = calculateAge(client.dateOfBirth);
-              
               const isNewClient = client.isOnboarded !== "yes";
+              const isHovered = hoveredClientId === client.id;
               
               return (
                 <TableRow 
                   key={client.id} 
-                  className={`hover-elevate ${isPinned ? 'bg-amber-50 dark:bg-amber-900/10' : ''} ${isNewClient ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`} 
+                  className={`cursor-pointer transition-colors ${isPinned ? 'bg-amber-50 dark:bg-amber-900/10' : ''} ${isNewClient ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''} hover:bg-muted/50`} 
                   data-testid={`row-client-${client.id}`}
+                  onClick={() => handleRowClick(client)}
+                  onMouseEnter={() => setHoveredClientId(client.id)}
+                  onMouseLeave={() => setHoveredClientId(null)}
                 >
                   <TableCell className="w-8 px-2">
                     <button
@@ -299,14 +291,7 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                   </TableCell>
                   <TableCell>
                     {client.phoneNumber ? (
-                      <a 
-                        href={`tel:${client.phoneNumber}`}
-                        className="flex items-center gap-1 text-sm hover:text-primary whitespace-nowrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Phone className="w-3 h-3 flex-shrink-0" />
-                        <span className="whitespace-nowrap">{client.phoneNumber}</span>
-                      </a>
+                      <span className="text-sm whitespace-nowrap">{client.phoneNumber}</span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -316,15 +301,94 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
                     <ComplianceIndicator status={complianceStatus} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onViewClient(client)}
-                      data-testid={`button-view-${client.id}`}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <div className={`flex items-center gap-1 transition-opacity ${isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                        {client.phoneNumber && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={(e) => handleQuickCall(e, client.phoneNumber!)}
+                            data-testid={`button-call-${client.id}`}
+                            title="Call"
+                          >
+                            <Phone className="w-4 h-4 text-green-600" />
+                          </Button>
+                        )}
+                        {client.email && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={(e) => handleQuickEmail(e, client.email!)}
+                            data-testid={`button-email-${client.id}`}
+                            title="Email"
+                          >
+                            <Mail className="w-4 h-4 text-blue-600" />
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={(e) => handleAddAppointment(e, client.id)}
+                          data-testid={`button-appointment-${client.id}`}
+                          title="Add Appointment"
+                        >
+                          <CalendarPlus className="w-4 h-4 text-purple-600" />
+                        </Button>
+                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`button-menu-${client.id}`}
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem 
+                            onClick={(e) => { e.stopPropagation(); onViewClient(client); }}
+                            data-testid={`menu-view-${client.id}`}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Client
+                          </DropdownMenuItem>
+                          {!isArchiveView && (
+                            <>
+                              <DropdownMenuItem 
+                                onClick={(e) => handleEditClient(e, client.id)}
+                                data-testid={`menu-edit-${client.id}`}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Client
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={(e) => handleAssignClient(e, client.id)}
+                                data-testid={`menu-assign-${client.id}`}
+                              >
+                                <UserPlus className="w-4 h-4 mr-2" />
+                                Assign Staff
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={(e) => handleArchiveClient(e, client.id)}
+                                className="text-red-600 focus:text-red-600"
+                                data-testid={`menu-archive-${client.id}`}
+                              >
+                                <Archive className="w-4 h-4 mr-2" />
+                                Archive Client
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
