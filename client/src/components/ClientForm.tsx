@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { SuburbAutocomplete } from "@/components/AddressAutocomplete";
 
 interface ClientFormProps {
   client?: Client;
@@ -205,7 +206,17 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                     <FormItem>
                       <FormLabel>Suburb/City</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="Sydney" data-testid="input-suburb" />
+                        <SuburbAutocomplete
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          onSuburbSelect={(suburb, state, postcode) => {
+                            field.onChange(suburb);
+                            form.setValue("state", state);
+                            form.setValue("postcode", postcode);
+                          }}
+                          placeholder="Start typing suburb..."
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

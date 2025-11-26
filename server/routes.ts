@@ -966,17 +966,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vcfContent.push(`EMAIL:${client.email}`);
       }
       
-      // Add address - prefer separate fields if available, otherwise use homeAddress
-      if (client.streetAddress || client.homeAddress) {
-        const street = client.streetAddress || client.homeAddress || '';
+      // Add address - prefer separate fields if available, otherwise try to parse homeAddress
+      if (client.streetAddress) {
+        // Use new separate address fields
+        const street = client.streetAddress || '';
         const city = client.suburb || '';
         const state = client.state || '';
         const postcode = client.postcode || '';
         vcfContent.push(`ADR;TYPE=HOME:;;${street};${city};${state};${postcode};Australia`);
         
         // Build label from available parts
-        const addressParts = [client.streetAddress || client.homeAddress, client.suburb, client.state, client.postcode].filter(Boolean);
+        const addressParts = [client.streetAddress, client.suburb, client.state, client.postcode].filter(Boolean);
         vcfContent.push(`LABEL;TYPE=HOME:${addressParts.join(', ')}`);
+      } else if (client.homeAddress) {
+        // Try to parse legacy homeAddress format
+        // Examples: "123 Main St, Sydney NSW 2000", "Unit 5, 12 Example St, Brisbane QLD 4000"
+        const addressStr = client.homeAddress;
+        
+        // Try to extract postcode (4 digits, usually at end)
+        const postcodeMatch = addressStr.match(/\b(\d{4})\b(?:\s*$|\s*,)/);
+        const extractedPostcode = postcodeMatch ? postcodeMatch[1] : '';
+        
+        // Try to extract state (NSW, VIC, QLD, etc.)
+        const stateMatch = addressStr.match(/\b(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b/i);
+        const extractedState = stateMatch ? stateMatch[1].toUpperCase() : '';
+        
+        // Split by comma to get address parts
+        const parts = addressStr.split(',').map(p => p.trim());
+        let extractedStreet = '';
+        let extractedCity = '';
+        
+        if (parts.length >= 3) {
+          // Multi-part address like "Unit 5, 12 Example St, Brisbane QLD 4000"
+          // Combine first two parts as street (e.g., "Unit 5, 12 Example St")
+          extractedStreet = parts.slice(0, -1).join(', ');
+          // Last part contains suburb, state, postcode
+          extractedCity = parts[parts.length - 1]
+            .replace(/\b(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b/gi, '')
+            .replace(/\b\d{4}\b/g, '')
+            .trim();
+        } else if (parts.length === 2) {
+          // Two-part address like "123 Main St, Sydney NSW 2000"
+          extractedStreet = parts[0];
+          // Remove state and postcode from the second part to get suburb
+          extractedCity = parts[1]
+            .replace(/\b(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b/gi, '')
+            .replace(/\b\d{4}\b/g, '')
+            .trim();
+        } else {
+          // Single line address, try to extract components
+          // Look for pattern: street address followed by suburb state postcode
+          const singleLineMatch = addressStr.match(/^(.+?)\s+([A-Za-z\s]+)\s+(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\s*(\d{4})?$/i);
+          if (singleLineMatch) {
+            extractedStreet = singleLineMatch[1].trim();
+            extractedCity = singleLineMatch[2].trim();
+          } else {
+            // Fallback: use entire address as street, stripped of state/postcode
+            extractedStreet = addressStr
+              .replace(/\b(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b/gi, '')
+              .replace(/\b\d{4}\b/g, '')
+              .trim();
+          }
+        }
+        
+        vcfContent.push(`ADR;TYPE=HOME:;;${extractedStreet};${extractedCity};${extractedState};${extractedPostcode};Australia`);
+        vcfContent.push(`LABEL;TYPE=HOME:${addressStr}`);
       }
       
       // Add birthday
