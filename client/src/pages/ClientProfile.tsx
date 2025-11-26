@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -108,10 +109,13 @@ interface DistanceData {
   officeAddress: string;
 }
 
+type ProfileSection = "overview" | "details" | "program" | "team" | "goals" | "documents" | "clinical" | "services" | "budget";
+
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
   const [, setLocation] = useLocation();
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<ProfileSection>("overview");
   const { toast } = useToast();
   
   const { data: client, isLoading } = useQuery<Client>({
@@ -521,58 +525,172 @@ export default function ClientProfile() {
   const remainingBudget = totalBudget - usedBudget;
   const budgetPercentage = totalBudget > 0 ? Math.round((usedBudget / totalBudget) * 100) : 0;
 
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        toast({ title: `${label} copied to clipboard` });
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        toast({ title: `${label} copied to clipboard` });
+      }
+    } catch (err) {
+      toast({ title: `Failed to copy ${label}`, variant: "destructive" });
+    }
+  };
+
+  const getNdisNumber = () => client.ndisDetails?.ndisNumber;
+  const getHcpNumber = () => client.supportAtHomeDetails?.hcpNumber;
+  const getSupportLevel = () => {
+    const level = (client.ndisDetails as any)?.supportLevel;
+    if (level) return level;
+    return null;
+  };
+
+  const assignedStaffCount = staffAssignments?.filter(a => !a.endDate || new Date(a.endDate) > new Date()).length || 0;
+
+  const sidebarItems: { id: ProfileSection; label: string; icon: any; badge?: string; badgeColor?: string }[] = [
+    { id: "overview", label: "Overview", icon: User },
+    { id: "details", label: "Personal Details", icon: UserCircle },
+    { id: "program", label: "Program Info", icon: ClipboardCheck },
+    { id: "team", label: "Care Team", icon: Users },
+    { id: "goals", label: "Goals", icon: Target },
+    { id: "documents", label: "Documents", icon: FileText },
+    { id: "clinical", label: "Clinical Notes", icon: Stethoscope },
+    { id: "services", label: "Services", icon: Clock },
+    { id: "budget", label: "Budget Details", icon: DollarSign, badge: totalBudget === 0 ? "Setup" : undefined, badgeColor: "text-amber-600" },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/clients">
-          <Button variant="ghost" size="icon" data-testid="button-back">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold">Client Profile</h1>
-          {isArchived && (
-            <Badge variant="secondary" className="mt-1 gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-              <Archive className="w-3 h-3" />
-              Archived
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {isArchived ? (
-            <Button 
-              onClick={() => restoreMutation.mutate()}
-              disabled={restoreMutation.isPending}
-              data-testid="button-restore-client"
-              className="gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              {restoreMutation.isPending ? "Restoring..." : "Restore Client"}
+    <div className="h-full -m-6 flex flex-col">
+      {/* Profile Header */}
+      <div className="bg-slate-800 dark:bg-slate-900 text-white px-6 py-4">
+        <div className="flex items-start gap-4">
+          <Link href="/clients">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" data-testid="button-back">
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-          ) : (
-            <>
+          </Link>
+          
+          <Avatar className="w-16 h-16 border-2 border-white/20 flex-shrink-0">
+            <AvatarImage src={client.photo || undefined} alt={client.participantName} />
+            <AvatarFallback className="text-xl bg-primary text-white font-bold">{getInitials(client.participantName)}</AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold truncate">{client.participantName}</h1>
+              <Badge className={`${isArchived ? 'bg-amber-500' : 'bg-green-500'} text-white border-0`}>
+                {isArchived ? 'Archived' : 'Active'}
+              </Badge>
+              {client.isOnboarded !== "yes" && !isArchived && (
+                <Badge className="bg-blue-500 text-white border-0">New</Badge>
+              )}
+            </div>
+            
+            {/* Quick Info Chips */}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              {clientAge && (
+                <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
+                  <CalendarDays className="w-4 h-4 text-slate-400" />
+                  <div>
+                    <p className="text-[10px] uppercase text-slate-400">Age</p>
+                    <p className="text-sm font-semibold">{clientAge}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
+                <User className="w-4 h-4 text-slate-400" />
+                <div>
+                  <p className="text-[10px] uppercase text-slate-400">ID</p>
+                  <p className="text-sm font-semibold font-mono truncate max-w-[100px]" title={client.id}>{client.id.substring(0, 10)}...</p>
+                </div>
+              </div>
+              
+              {client.category === "NDIS" && getNdisNumber() && (
+                <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
+                  <div className="w-2 h-2 bg-green-400 rounded-full" />
+                  <div>
+                    <p className="text-[10px] uppercase text-slate-400">NDIS</p>
+                    <p className="text-sm font-semibold font-mono">{getNdisNumber()}</p>
+                  </div>
+                </div>
+              )}
+              
+              {client.category === "Support at Home" && getHcpNumber() && (
+                <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
+                  <div className="w-2 h-2 bg-green-400 rounded-full" />
+                  <div>
+                    <p className="text-[10px] uppercase text-slate-400">HCP</p>
+                    <p className="text-sm font-semibold font-mono">{getHcpNumber()}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
+                <CreditCard className="w-4 h-4 text-slate-400" />
+                <div>
+                  <p className="text-[10px] uppercase text-slate-400">Care Category</p>
+                  <p className="text-sm font-semibold">{client.category}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isArchived ? (
               <Button 
-                variant="outline"
-                onClick={() => setArchiveModalOpen(true)}
-                data-testid="button-archive-client"
-                className="gap-2"
+                onClick={() => restoreMutation.mutate()}
+                disabled={restoreMutation.isPending}
+                data-testid="button-restore-client"
+                className="gap-2 bg-white text-slate-800 hover:bg-slate-100"
               >
-                <Archive className="w-4 h-4" />
-                Archive
+                <RotateCcw className="w-4 h-4" />
+                {restoreMutation.isPending ? "Restoring..." : "Restore"}
               </Button>
-              <Link href={`/clients/${params?.id}/edit`}>
-                <Button data-testid="button-edit-client">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Profile
+            ) : (
+              <>
+                <Link href={`/clients/${params?.id}/edit`}>
+                  <Button variant="outline" className="gap-2 border-white/30 text-white hover:bg-white/10" data-testid="button-edit-client">
+                    <Pencil className="w-4 h-4" />
+                    Edit Profile
+                  </Button>
+                </Link>
+                {client.zohoWorkdriveLink && (
+                  <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-service-agreement">
+                    <Button className="gap-2 bg-green-600 hover:bg-green-700 text-white">
+                      <FileText className="w-4 h-4" />
+                      Service Agreement
+                    </Button>
+                  </a>
+                )}
+                <Button 
+                  variant="outline"
+                  onClick={() => setArchiveModalOpen(true)}
+                  data-testid="button-archive-client"
+                  className="gap-2 border-white/30 text-white hover:bg-white/10"
+                >
+                  <Archive className="w-4 h-4" />
+                  <span className="sr-only">Archive Client</span>
                 </Button>
-              </Link>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Alerts */}
       {isArchived && (
-        <Alert variant="default" className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+        <Alert variant="default" className="mx-6 mt-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
           <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           <AlertDescription className="text-amber-800 dark:text-amber-200">
             This client record is archived and read-only. Archived on: {client.archivedAt ? new Date(client.archivedAt).toLocaleDateString() : 'Unknown'}. 
@@ -583,10 +701,10 @@ export default function ClientProfile() {
       )}
 
       {client.isOnboarded !== "yes" && !isArchived && (
-        <Alert variant="default" className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+        <Alert variant="default" className="mx-6 mt-4 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
           <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="text-blue-800 dark:text-blue-200 flex items-center justify-between">
-            <span><strong>New Client</strong> - This client has not been onboarded yet. Complete the onboarding process to remove this notification.</span>
+            <span><strong>New Client</strong> - This client has not been onboarded yet.</span>
             <Button 
               size="sm" 
               variant="outline" 
@@ -602,240 +720,326 @@ export default function ClientProfile() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <Avatar className="w-24 h-24 border-4 border-primary/20">
-                <AvatarImage src={client.photo || undefined} alt={client.participantName} />
-                <AvatarFallback className="text-2xl bg-primary/10 text-primary">{getInitials(client.participantName)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-2">{client.participantName}</h2>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CategoryBadge category={client.category} />
-                      {clientAge && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {clientAge} years old
-                        </Badge>
-                      )}
-                      {client.riskAssessmentScore && (
-                        <Badge 
-                          variant="outline" 
-                          className={`gap-1 ${
-                            parseInt(client.riskAssessmentScore) >= 7 
-                              ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400" 
-                              : parseInt(client.riskAssessmentScore) >= 4 
-                                ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" 
-                                : "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                          }`}
-                          data-testid="badge-risk-score"
-                        >
-                          <Shield className="w-3 h-3" />
-                          Risk: {client.riskAssessmentScore}/10
-                        </Badge>
-                      )}
-                    </div>
+      {/* Main Content with Sidebar */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar Navigation */}
+        <div className="w-56 border-r bg-muted/30 flex-shrink-0 hidden lg:block">
+          <div className="p-4 border-b">
+            <p className="font-semibold text-sm">Client Profile</p>
+            <p className="text-xs text-muted-foreground">Navigate sections</p>
+          </div>
+          <ScrollArea className="h-[calc(100vh-280px)]">
+            <nav className="p-2 space-y-1">
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
+                    activeSection === item.id 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'hover:bg-muted text-foreground'
+                  }`}
+                  data-testid={`sidebar-${item.id}`}
+                >
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {item.badge && (
+                    <span className={`text-xs ${item.badgeColor || 'text-muted-foreground'}`}>{item.badge}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </ScrollArea>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Stat Cards Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500 rounded-lg">
+                    <CalendarDays className="w-5 h-5 text-white" />
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <span className="font-medium">ID:</span> {client.ndisDetails?.ndisNumber || client.supportAtHomeDetails?.hcpNumber || client.medicareNumber || "N/A"}
+                  <div>
+                    <p className="text-xs text-muted-foreground">Age</p>
+                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{clientAge || '-'}</p>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 p-4 bg-muted/50 rounded-lg">
-                  {client.phoneNumber && (
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-full">
-                        <Phone className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Phone</p>
-                        <a href={`tel:${client.phoneNumber}`} className="text-sm font-medium hover:text-primary">
-                          {client.phoneNumber}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                  {client.email && (
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 bg-primary/10 rounded-full flex-shrink-0">
-                        <Mail className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-muted-foreground">Email</p>
-                        <a 
-                          href={`mailto:${client.email}`} 
-                          className="text-sm font-medium hover:text-primary block truncate"
-                          title={client.email}
-                          data-testid="text-client-email"
-                        >
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-green-50 dark:bg-green-950/30 border-green-100 dark:border-green-900">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500 rounded-lg">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Support Level</p>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{getSupportLevel() || '-'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500 rounded-lg">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Assigned Staff</p>
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{assignedStaffCount}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-purple-50 dark:bg-purple-950/30 border-purple-100 dark:border-purple-900">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500 rounded-lg">
+                    <DollarSign className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Budget</p>
+                    <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">${remainingBudget.toLocaleString()}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Overview Section */}
+          {activeSection === "overview" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Client Overview</h2>
+                  <p className="text-sm text-muted-foreground">Essential information and contact details</p>
+                </div>
+                <Badge className={`${isArchived ? 'bg-amber-500' : 'bg-green-500'} text-white border-0`}>
+                  {isArchived ? 'Archived' : 'Active Client'}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Contact Information */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Contact Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {client.email && (
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-full">
+                          <Mail className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <a href={`mailto:${client.email}`} className="text-sm hover:text-primary" data-testid="text-client-email">
                           {client.email}
                         </a>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={() => copyToClipboard(client.email!, 'Email')}>
+                          <Copy className="w-3 h-3" />
+                        </Button>
                       </div>
-                    </div>
-                  )}
-                  {client.homeAddress && (
-                    <div className="flex items-center gap-3 sm:col-span-2">
-                      <div className="p-2 bg-primary/10 rounded-full">
-                        <MapPin className="w-4 h-4 text-primary" />
+                    )}
+                    {client.phoneNumber && (
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-full">
+                          <Phone className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <a href={`tel:${client.phoneNumber}`} className="text-sm hover:text-primary">
+                          {client.phoneNumber}
+                        </a>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={() => copyToClipboard(client.phoneNumber!, 'Phone')}>
+                          <Copy className="w-3 h-3" />
+                        </Button>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Address</p>
-                        <p className="text-sm font-medium">{client.homeAddress}</p>
+                    )}
+                    {client.homeAddress && (
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-muted rounded-full">
+                          <MapPin className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm flex-1">{client.homeAddress}</p>
+                        {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
+                          <Badge variant="secondary" className="flex-shrink-0" data-testid="badge-distance">
+                            {distanceData.distanceKm} km
+                          </Badge>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-                
-                {client.zohoWorkdriveLink && (
-                  <a 
-                    href={client.zohoWorkdriveLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                    data-testid="link-zoho-workdrive"
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>Open Document Folder</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* NDIS / Program Information */}
+                {client.category === "NDIS" && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">NDIS Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-xs text-muted-foreground">NDIS Number</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-lg font-bold font-mono">{getNdisNumber() || 'Not provided'}</p>
+                          {getNdisNumber() && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(getNdisNumber()!, 'NDIS Number')}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Support Level</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="font-semibold">Level {getSupportLevel() || '-'}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {getSupportLevel() === "1" ? "Minimal" : getSupportLevel() === "2" ? "Low" : getSupportLevel() === "3" ? "Medium" : getSupportLevel() === "4" ? "High" : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="w-4 h-4" />
-              Budget Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center py-4">
-              <p className="text-3xl font-bold text-primary">${remainingBudget.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Available Balance</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Used</span>
-                <span className="font-medium">${usedBudget.toLocaleString()}</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all ${budgetPercentage > 80 ? 'bg-red-500' : budgetPercentage > 60 ? 'bg-amber-500' : 'bg-green-500'}`}
-                  style={{ width: `${budgetPercentage}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Allocated</span>
-                <span className="font-medium">${totalBudget.toLocaleString()}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                {/* Support at Home Information */}
+                {client.category === "Support at Home" && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Support at Home Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-xs text-muted-foreground">HCP Number</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-lg font-bold font-mono">{getHcpNumber() || 'Not provided'}</p>
+                          {getHcpNumber() && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(getHcpNumber()!, 'HCP Number')}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Funding Level</p>
+                        <p className="text-sm font-medium mt-1">
+                          {client.supportAtHomeDetails?.hcpFundingLevel || 'Not specified'}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Frequency of Services</p>
-                <p className="text-sm font-medium">{client.frequencyOfServices || "Not specified"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Preferred Hours</p>
-                <p className="text-sm font-medium">{client.summaryOfServices?.includes("Morning") ? "Morning" : client.summaryOfServices?.includes("Afternoon") ? "Afternoon" : "Flexible"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg flex-shrink-0">
-                <Bell className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Notification Preferences</p>
-                <div className="mt-1" data-testid="notification-preferences">
-                  <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                {/* Private Client Info */}
+                {client.category === "Private" && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Private Client Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Medicare Number</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-lg font-bold font-mono">{client.medicareNumber || 'Not provided'}</p>
+                          {client.medicareNumber && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(client.medicareNumber!, 'Medicare')}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
-      {client.homeAddress && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Location
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48 bg-muted rounded-lg overflow-hidden relative">
-              <iframe
-                title="Client Location"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(client.homeAddress)}`}
-                allowFullScreen
-              />
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-sm text-muted-foreground">{client.homeAddress}</p>
-              {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
-                <Badge 
-                  variant="secondary" 
-                  className="ml-2 flex-shrink-0"
-                  data-testid="badge-distance"
-                >
-                  <MapPin className="w-3 h-3 mr-1" />
-                  {distanceData.distanceKm} km from office
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                {/* Funding & Plan Manager */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Funding & Plan Manager</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs text-muted-foreground">Funding Management</p>
+                      <p className="text-sm font-semibold mt-1">
+                        {client.ndisDetails?.ndisFundingType || client.supportAtHomeDetails?.hcpFundingLevel || 'Self Managed'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-      <Tabs defaultValue="details" className="space-y-6">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="details" data-testid="tab-details">Personal Details</TabsTrigger>
-          <TabsTrigger value="program" data-testid="tab-program">Program Info</TabsTrigger>
-          <TabsTrigger value="team" data-testid="tab-team">Care Team</TabsTrigger>
-          <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
-          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
-          <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
-          <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
-          <TabsTrigger value="budget" data-testid="tab-budget">Budget Details</TabsTrigger>
-        </TabsList>
+                {/* Support Coordinator */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Support Coordinator</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {client.careTeamDetails?.supportCoordinatorId ? (
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm">Support coordinator assigned</p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <Users className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No support coordinator assigned</p>
+                        <Link href={`/clients/${params?.id}/edit`}>
+                          <Button variant="outline" size="sm" className="mt-3 gap-2">
+                            <Plus className="w-3 h-3" />
+                            Assign Coordinator
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-        <TabsContent value="details" className="space-y-6">
+              {/* Recent Activity / Behaviors Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Recent Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {incidentReports.length > 0 ? (
+                    <div className="space-y-2">
+                      {incidentReports.slice(0, 3).map((incident) => (
+                        <div key={incident.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
+                          <Badge variant={incident.severity === 'high' || incident.severity === 'critical' ? 'destructive' : 'secondary'}>
+                            {incident.incidentType}
+                          </Badge>
+                          <span className="text-sm flex-1 truncate">{incident.description}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(incident.incidentDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No recent activity recorded</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Other sections - using existing Tabs content */}
+          {activeSection !== "overview" && (
+            <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as ProfileSection)} className="space-y-6">
+              <TabsList className="w-full justify-start overflow-x-auto lg:hidden">
+                <TabsTrigger value="details" data-testid="tab-details">Personal Details</TabsTrigger>
+                <TabsTrigger value="program" data-testid="tab-program">Program Info</TabsTrigger>
+                <TabsTrigger value="team" data-testid="tab-team">Care Team</TabsTrigger>
+                <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
+                <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+                <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
+                <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
+                <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="details" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -2313,8 +2517,11 @@ export default function ClientProfile() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+              </TabsContent>
+            </Tabs>
+          )}
+        </div>
+      </div>
 
       {client && (
         <ArchiveClientModal
