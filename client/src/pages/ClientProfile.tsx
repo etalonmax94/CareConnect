@@ -22,7 +22,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -206,6 +206,17 @@ export default function ClientProfile() {
     queryKey: ["/api/clients", params?.id, "contacts"],
     enabled: !!params?.id,
   });
+
+  // Fetch client documents to check for Service Agreement
+  const { data: clientDocuments = [] } = useQuery<Document[]>({
+    queryKey: ["/api/clients", params?.id, "documents"],
+    enabled: !!params?.id,
+  });
+
+  // Check if Service Agreement document exists
+  const hasServiceAgreement = clientDocuments.some(
+    doc => doc.documentType === "Service Agreement"
+  );
 
   const { data: goals = [] } = useQuery<ClientGoal[]>({
     queryKey: ["/api/clients", params?.id, "goals"],
@@ -695,16 +706,23 @@ export default function ClientProfile() {
                     Edit Profile
                   </Button>
                 </Link>
-                {client.zohoWorkdriveLink ? (
-                  <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-service-agreement">
-                    <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-                      <FileText className="w-4 h-4" />
+                {hasServiceAgreement ? (
+                  client.zohoWorkdriveLink ? (
+                    <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-service-agreement">
+                      <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                        <FileCheck className="w-4 h-4" />
+                        Service Agreement
+                      </Button>
+                    </a>
+                  ) : (
+                    <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="link-service-agreement-uploaded">
+                      <FileCheck className="w-4 h-4" />
                       Service Agreement
                     </Button>
-                  </a>
+                  )
                 ) : (
-                  <Button variant="outline" className="gap-2" disabled data-testid="link-service-agreement-disabled">
-                    <FileText className="w-4 h-4" />
+                  <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white" data-testid="link-service-agreement-missing">
+                    <FileWarning className="w-4 h-4" />
                     Service Agreement
                   </Button>
                 )}
@@ -736,21 +754,19 @@ export default function ClientProfile() {
       )}
 
       {client.isOnboarded !== "yes" && !isArchived && (
-        <Alert variant="default" className="mx-6 mt-4">
-          <Sparkles className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between gap-4">
-            <span><strong>New Client</strong> - This client has not been onboarded yet.</span>
-            <Button 
-              size="sm" 
-              onClick={() => onboardMutation.mutate()}
-              disabled={onboardMutation.isPending}
-              data-testid="button-onboard-client"
-            >
-              {onboardMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle className="w-4 h-4 mr-1" />}
-              Mark as Onboarded
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <div className="mx-6 mt-4 flex items-center gap-3 p-3 rounded-lg border bg-card">
+          <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+          <span className="flex-1 text-sm"><strong>New Client</strong> - This client has not been onboarded yet.</span>
+          <Button 
+            size="sm" 
+            onClick={() => onboardMutation.mutate()}
+            disabled={onboardMutation.isPending}
+            data-testid="button-onboard-client"
+          >
+            {onboardMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+            Mark as Onboarded
+          </Button>
+        </div>
       )}
 
       {/* Main Content with Sidebar */}
@@ -896,14 +912,26 @@ export default function ClientProfile() {
                 <Card className="bg-card">
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
-                      <Navigation className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span className="text-xs text-muted-foreground font-medium">Distance</span>
+                      <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <span className="text-xs text-muted-foreground font-medium">Risk Score</span>
                     </div>
-                    <p className="text-sm font-semibold">
-                      {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined 
-                        ? `${distanceData.distanceKm} km` 
-                        : 'Not calculated'}
-                    </p>
+                    {client.riskAssessmentScore ? (
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${
+                          parseInt(client.riskAssessmentScore) <= 3 ? 'bg-emerald-500' :
+                          parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
+                          'bg-red-500'
+                        } text-white border-0 text-xs`}>
+                          {client.riskAssessmentScore}/10
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {parseInt(client.riskAssessmentScore) <= 3 ? 'Low' :
+                           parseInt(client.riskAssessmentScore) <= 6 ? 'Medium' : 'High'}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Not assessed</p>
+                    )}
                   </CardContent>
                 </Card>
                 <Card className="bg-card md:col-span-2">
@@ -966,6 +994,12 @@ export default function ClientProfile() {
                           <div className="flex-1">
                             <p className="text-xs text-muted-foreground">Address</p>
                             <p className="text-sm font-medium">{client.homeAddress}</p>
+                            {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <Navigation className="w-3 h-3 inline mr-1" />
+                                {distanceData.distanceKm} km from office
+                              </p>
+                            )}
                           </div>
                           <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(client.homeAddress!, 'Address')}>
                             <Copy className="w-3 h-3" />
@@ -1182,29 +1216,6 @@ export default function ClientProfile() {
                           <p className="text-sm font-semibold font-mono">{client.medicareNumber}</p>
                         </div>
                       )}
-
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Risk Score</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {client.riskAssessmentScore ? (
-                            <>
-                              <Badge className={`${
-                                parseInt(client.riskAssessmentScore) <= 3 ? 'bg-green-500' :
-                                parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
-                                'bg-red-500'
-                              } text-white border-0`}>
-                                {client.riskAssessmentScore}/10
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {parseInt(client.riskAssessmentScore) <= 3 ? 'Low Risk' :
-                                 parseInt(client.riskAssessmentScore) <= 6 ? 'Medium Risk' : 'High Risk'}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Not assessed</span>
-                          )}
-                        </div>
-                      </div>
                     </CardContent>
                   </Card>
 
