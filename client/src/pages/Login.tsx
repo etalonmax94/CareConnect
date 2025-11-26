@@ -10,7 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
 const isDevelopment = import.meta.env.DEV;
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// Hardcode Cloud Run URL for production OAuth flow
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://careconnect-124485508170.australia-southeast1.run.app';
 
 export default function Login() {
   const [devName, setDevName] = useState("Developer");
