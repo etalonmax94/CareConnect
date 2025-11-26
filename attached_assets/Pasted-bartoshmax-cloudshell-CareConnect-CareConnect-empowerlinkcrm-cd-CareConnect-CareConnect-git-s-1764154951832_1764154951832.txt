@@ -1,0 +1,55 @@
+bartoshmax@cloudshell:~/CareConnect/CareConnect (empowerlinkcrm)$ cd ~/CareConnect/CareConnect
+git stash
+git pull origin main
+git stash pop
+git add -A
+git commit -m "Fix Cloud SQL connection - use pg driver for Cloud Run builds"
+git push origin main
+Saved working directory and index state WIP on main: 80ca2aa Update deployment guide with last updated date
+From https://github.com/etalonmax94/CareConnect
+ * branch            main       -> FETCH_HEAD
+Updating 80ca2aa..7e4bc91
+Fast-forward
+ .replit                                                                                                                                |   4 ++
+ Dockerfile                                                                                                                             |   4 ++
+ ...-2025-11-26-20-55-53-996-DDUT-Node-js-v20-19-6-2025-11-26-20-55-54-266-DDUT-Container-called-exit-1-1764154612653_1764154612654.txt |  63 +++++++++++++++++++++
+ ...Pasted-bartoshmax-cloudshell-CareConnect-CareConnect-empowerlinkcrm-export-DATABASE-URL-postgresql--1764153819072_1764153819072.txt |  51 +++++++++++++++++
+ ...Pasted-bartoshmax-cloudshell-CareConnect-CareConnect-empowerlinkcrm-npm-run-db-push-rest-express-1--1764153713957_1764153713958.txt |  67 ++++++++++++++++++++++
+ package-lock.json                                                                                                                      | 217 +++++++++++++++++++++++++++++++++++++---------------------------------
+ package.json                                                                                                                           |   2 +
+ server/db-cloudrun.ts                                                                                                                  |  28 +++++++++
+ server/db-cloudsql.ts                                                                                                                  |  29 ++++++++++
+ server/db-neon.ts                                                                                                                      |  18 ++++++
+ server/db.ts                                                                                                                           |   1 +
+ 11 files changed, 382 insertions(+), 102 deletions(-)
+ create mode 100644 attached_assets/Pasted--2025-11-26-20-55-53-996-DDUT-Node-js-v20-19-6-2025-11-26-20-55-54-266-DDUT-Container-called-exit-1-1764154612653_1764154612654.txt
+ create mode 100644 attached_assets/Pasted-bartoshmax-cloudshell-CareConnect-CareConnect-empowerlinkcrm-export-DATABASE-URL-postgresql--1764153819072_1764153819072.txt
+ create mode 100644 attached_assets/Pasted-bartoshmax-cloudshell-CareConnect-CareConnect-empowerlinkcrm-npm-run-db-push-rest-express-1--1764153713957_1764153713958.txt
+ create mode 100644 server/db-cloudrun.ts
+ create mode 100644 server/db-cloudsql.ts
+ create mode 100644 server/db-neon.ts
+Auto-merging package-lock.json
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   package-lock.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (ccde7c581821cf02dbb6e0691e86dd1896de9a7f)
+Author identity unknown
+
+*** Please tell me who you are.
+
+Run
+
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+
+to set your account's default identity.
+Omit --global to set the identity only in this repository.
+
+fatal: unable to auto-detect email address (got 'bartoshmax@cs-541573104726-default.(none)')
+Username for 'https://github.com': 
