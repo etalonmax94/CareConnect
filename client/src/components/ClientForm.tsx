@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertClientSchema, type InsertClient, type Client, type ClientCategory, type SupportCoordinator, type PlanManager, type Staff, type GP, type Pharmacy } from "@shared/schema";
+import { insertClientSchema, type InsertClient, type Client, type ClientCategory, type SupportCoordinator, type PlanManager, type Staff, type GP, type Pharmacy, type AlliedHealthProfessional } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,6 +44,10 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
   const { data: pharmacies = [] } = useQuery<Pharmacy[]>({
     queryKey: ["/api/pharmacies"],
+  });
+
+  const { data: alliedHealthProfessionals = [] } = useQuery<AlliedHealthProfessional[]>({
+    queryKey: ["/api/allied-health-professionals"],
   });
 
   // Filter staff by role for care managers
@@ -824,6 +828,49 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="careTeam.alliedHealthProfessionalId"
+                  render={({ field }) => {
+                    const selectedAhp = alliedHealthProfessionals.find(a => a.id === field.value);
+                    return (
+                      <FormItem>
+                        <FormLabel>Allied Health Professional</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value === "none" ? undefined : value);
+                          }} 
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-allied-health">
+                              <SelectValue placeholder="Select allied health professional...">
+                                {selectedAhp ? `${selectedAhp.name} (${selectedAhp.specialty})` : "Select allied health professional..."}
+                              </SelectValue>
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {alliedHealthProfessionals.map((ahp) => (
+                              <SelectItem key={ahp.id} value={ahp.id}>
+                                {ahp.name} ({ahp.specialty})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedAhp && (
+                          <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1">
+                            {selectedAhp.practiceName && <p>Practice: {selectedAhp.practiceName}</p>}
+                            {selectedAhp.phoneNumber && <p>Phone: {selectedAhp.phoneNumber}</p>}
+                            {selectedAhp.email && <p>Email: {selectedAhp.email}</p>}
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 <FormField

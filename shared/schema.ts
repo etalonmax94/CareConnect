@@ -172,6 +172,7 @@ export const clients = pgTable("clients", {
     planManager?: string;
     supportCoordinatorId?: string;
     planManagerId?: string;
+    alliedHealthProfessionalId?: string;
     preferredWorkers?: string[];
     preferredWorkerIds?: string[];
     unsuitableWorkers?: string[];
@@ -670,6 +671,39 @@ export const insertPharmacySchema = createInsertSchema(pharmacies, {
 
 export type InsertPharmacy = z.infer<typeof insertPharmacySchema>;
 export type Pharmacy = typeof pharmacies.$inferSelect;
+
+// Allied Health Professionals Database
+export const alliedHealthProfessionals = pgTable("allied_health_professionals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  specialty: text("specialty").notNull().$type<
+    "Physiotherapist" | "Occupational Therapist" | "Speech Pathologist" | 
+    "Psychologist" | "Dietitian" | "Podiatrist" | "Exercise Physiologist" | 
+    "Social Worker" | "Counsellor" | "Behaviour Support Practitioner" | "Other"
+  >(),
+  practiceName: text("practice_name"),
+  phoneNumber: text("phone_number"),
+  email: text("email"),
+  address: text("address"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAlliedHealthProfessionalSchema = createInsertSchema(alliedHealthProfessionals, {
+  specialty: z.enum([
+    "Physiotherapist", "Occupational Therapist", "Speech Pathologist",
+    "Psychologist", "Dietitian", "Podiatrist", "Exercise Physiologist",
+    "Social Worker", "Counsellor", "Behaviour Support Practitioner", "Other"
+  ]),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAlliedHealthProfessional = z.infer<typeof insertAlliedHealthProfessionalSchema>;
+export type AlliedHealthProfessional = typeof alliedHealthProfessionals.$inferSelect;
 
 // Notification preference type
 export type NotificationPreference = {

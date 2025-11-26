@@ -19,6 +19,7 @@ import SupportCoordinators from "@/pages/SupportCoordinators";
 import PlanManagers from "@/pages/PlanManagers";
 import GPs from "@/pages/GPs";
 import Pharmacies from "@/pages/Pharmacies";
+import AlliedHealthProfessionals from "@/pages/AlliedHealthProfessionals";
 import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
 import AuditLog from "@/pages/AuditLog";
@@ -60,6 +61,7 @@ function ProtectedRouter() {
       <Route path="/plan-managers" component={PlanManagers} />
       <Route path="/gps" component={GPs} />
       <Route path="/pharmacies" component={Pharmacies} />
+      <Route path="/allied-health-professionals" component={AlliedHealthProfessionals} />
       <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
       <Route path="/quotes" component={Quotes} />
       <Route path="/quotes/:id" component={QuoteEditor} />

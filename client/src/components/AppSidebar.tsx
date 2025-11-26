@@ -1,4 +1,4 @@
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -73,6 +73,7 @@ const menuCategories: MenuCategory[] = [
     items: [
       { title: "GPs", url: "/gps", icon: Stethoscope, iconColor: "text-rose-500" },
       { title: "Pharmacies", url: "/pharmacies", icon: Pill, iconColor: "text-teal-500" },
+      { title: "Allied Health", url: "/allied-health-professionals", icon: HeartPulse, iconColor: "text-violet-500" },
     ],
   },
   {

@@ -2,6 +2,7 @@ import { db } from "./db";
 import { 
   clients, progressNotes, invoices, budgets, settings, activityLog, auditLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
+  alliedHealthProfessionals,
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
   clientContacts, clientBehaviors, leadershipMeetingNotes,
@@ -14,6 +15,7 @@ import {
   type InsertPlanManager, type PlanManager, type InsertNdisService, type NdisService,
   type InsertUser, type User, type UserRole,
   type InsertGP, type GP, type InsertPharmacy, type Pharmacy,
+  type InsertAlliedHealthProfessional, type AlliedHealthProfessional,
   type InsertDocument, type Document, 
   type InsertClientStaffAssignment, type ClientStaffAssignment,
   type InsertServiceDelivery, type ServiceDelivery,
@@ -153,6 +155,13 @@ export interface IStorage {
   createPharmacy(pharmacy: InsertPharmacy): Promise<Pharmacy>;
   updatePharmacy(id: string, pharmacy: Partial<InsertPharmacy>): Promise<Pharmacy | undefined>;
   deletePharmacy(id: string): Promise<boolean>;
+  
+  // Allied Health Professionals
+  getAllAlliedHealthProfessionals(): Promise<AlliedHealthProfessional[]>;
+  getAlliedHealthProfessionalById(id: string): Promise<AlliedHealthProfessional | undefined>;
+  createAlliedHealthProfessional(ahp: InsertAlliedHealthProfessional): Promise<AlliedHealthProfessional>;
+  updateAlliedHealthProfessional(id: string, ahp: Partial<InsertAlliedHealthProfessional>): Promise<AlliedHealthProfessional | undefined>;
+  deleteAlliedHealthProfessional(id: string): Promise<boolean>;
   
   // Documents
   getDocumentsByClient(clientId: string): Promise<Document[]>;
@@ -903,6 +912,34 @@ export class DbStorage implements IStorage {
 
   async deletePharmacy(id: string): Promise<boolean> {
     const result = await db.delete(pharmacies).where(eq(pharmacies.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Allied Health Professionals
+  async getAllAlliedHealthProfessionals(): Promise<AlliedHealthProfessional[]> {
+    return await db.select().from(alliedHealthProfessionals).orderBy(alliedHealthProfessionals.name);
+  }
+
+  async getAlliedHealthProfessionalById(id: string): Promise<AlliedHealthProfessional | undefined> {
+    const result = await db.select().from(alliedHealthProfessionals).where(eq(alliedHealthProfessionals.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createAlliedHealthProfessional(ahp: InsertAlliedHealthProfessional): Promise<AlliedHealthProfessional> {
+    const result = await db.insert(alliedHealthProfessionals).values(ahp).returning();
+    return result[0];
+  }
+
+  async updateAlliedHealthProfessional(id: string, ahpUpdate: Partial<InsertAlliedHealthProfessional>): Promise<AlliedHealthProfessional | undefined> {
+    const result = await db.update(alliedHealthProfessionals)
+      .set({ ...ahpUpdate as any, updatedAt: new Date() })
+      .where(eq(alliedHealthProfessionals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAlliedHealthProfessional(id: string): Promise<boolean> {
+    const result = await db.delete(alliedHealthProfessionals).where(eq(alliedHealthProfessionals.id, id)).returning();
     return result.length > 0;
   }
 

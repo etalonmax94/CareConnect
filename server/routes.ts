@@ -6,7 +6,7 @@ import {
   insertInvoiceSchema, calculateAge, insertBudgetSchema,
   insertIncidentReportSchema, insertPrivacyConsentSchema, insertActivityLogSchema,
   insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema,
-  insertGPSchema, insertPharmacySchema, insertDocumentSchema, insertClientStaffAssignmentSchema,
+  insertGPSchema, insertPharmacySchema, insertAlliedHealthProfessionalSchema, insertDocumentSchema, insertClientStaffAssignmentSchema,
   insertServiceDeliverySchema, insertClientGoalSchema,
   insertClientContactSchema, insertClientBehaviorSchema, insertLeadershipMeetingNoteSchema,
   USER_ROLES, type UserRole
@@ -2695,6 +2695,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting pharmacy:", error);
       res.status(500).json({ error: "Failed to delete pharmacy" });
+    }
+  });
+
+  // ==================== ALLIED HEALTH PROFESSIONALS ROUTES ====================
+  
+  // Get all allied health professionals
+  app.get("/api/allied-health-professionals", async (req, res) => {
+    try {
+      const ahps = await storage.getAllAlliedHealthProfessionals();
+      res.json(ahps);
+    } catch (error) {
+      console.error("Error fetching allied health professionals:", error);
+      res.status(500).json({ error: "Failed to fetch allied health professionals" });
+    }
+  });
+
+  // Get allied health professional by ID
+  app.get("/api/allied-health-professionals/:id", async (req, res) => {
+    try {
+      const ahp = await storage.getAlliedHealthProfessionalById(req.params.id);
+      if (!ahp) {
+        return res.status(404).json({ error: "Allied health professional not found" });
+      }
+      res.json(ahp);
+    } catch (error) {
+      console.error("Error fetching allied health professional:", error);
+      res.status(500).json({ error: "Failed to fetch allied health professional" });
+    }
+  });
+
+  // Create allied health professional
+  app.post("/api/allied-health-professionals", async (req, res) => {
+    try {
+      const validationResult = insertAlliedHealthProfessionalSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const ahp = await storage.createAlliedHealthProfessional(validationResult.data);
+      res.status(201).json(ahp);
+    } catch (error) {
+      console.error("Error creating allied health professional:", error);
+      res.status(500).json({ error: "Failed to create allied health professional" });
+    }
+  });
+
+  // Update allied health professional
+  app.patch("/api/allied-health-professionals/:id", async (req, res) => {
+    try {
+      const ahp = await storage.updateAlliedHealthProfessional(req.params.id, req.body);
+      if (!ahp) {
+        return res.status(404).json({ error: "Allied health professional not found" });
+      }
+      res.json(ahp);
+    } catch (error) {
+      console.error("Error updating allied health professional:", error);
+      res.status(500).json({ error: "Failed to update allied health professional" });
+    }
+  });
+
+  // Delete allied health professional
+  app.delete("/api/allied-health-professionals/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAlliedHealthProfessional(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Allied health professional not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting allied health professional:", error);
+      res.status(500).json({ error: "Failed to delete allied health professional" });
+    }
+  });
+
+  // Get clients by allied health professional ID
+  app.get("/api/allied-health-professionals/:id/clients", async (req, res) => {
+    try {
+      const allClients = await storage.getAllClients();
+      const clients = allClients.filter(c => c.careTeam?.alliedHealthProfessionalId === req.params.id);
+      res.json(clients.map(client => ({
+        ...client,
+        age: calculateAge(client.dateOfBirth)
+      })));
+    } catch (error) {
+      console.error("Error fetching clients for allied health professional:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
     }
   });
 

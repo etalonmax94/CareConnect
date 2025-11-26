@@ -26,17 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix Leaflet marker icon issue
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
+import ClientLocationMap from "@/components/ClientLocationMap";
 
 function NotificationBadge({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
@@ -998,7 +988,7 @@ export default function ClientProfile() {
             
             <Card 
               className="bg-card hover-elevate cursor-pointer"
-              onClick={() => setActiveSection("staff")}
+              onClick={() => setActiveSection("team")}
               data-testid="stat-assigned-staff"
             >
               <CardContent className="p-4">
@@ -1224,34 +1214,12 @@ export default function ClientProfile() {
                   </Card>
 
                   {/* Location Map */}
-                  {client.latitude && client.longitude && (
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <MapPin className="w-4 h-4" />
-                          Location
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="h-64 rounded-b-lg overflow-hidden">
-                          <MapContainer 
-                            center={[parseFloat(client.latitude), parseFloat(client.longitude)]} 
-                            zoom={14} 
-                            style={{ height: '100%', width: '100%' }}
-                            scrollWheelZoom={false}
-                          >
-                            <TileLayer
-                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />
-                            <Marker position={[parseFloat(client.latitude), parseFloat(client.longitude)]}>
-                              <Popup>{client.participantName}<br />{client.homeAddress}</Popup>
-                            </Marker>
-                          </MapContainer>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                  <ClientLocationMap
+                    latitude={client.latitude}
+                    longitude={client.longitude}
+                    address={client.streetAddress ? `${client.streetAddress}, ${[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}` : client.homeAddress}
+                    clientName={client.participantName}
+                  />
 
                   {/* GP & Pharmacy Row */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

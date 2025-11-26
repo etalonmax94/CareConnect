@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign, Shield, UserX } from "lucide-react";
+import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign, Shield, UserX, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import CategoryBadge from "@/components/CategoryBadge";
 import ComplianceIndicator from "@/components/ComplianceIndicator";
 import { useQuery } from "@tanstack/react-query";
-import type { Client, ActivityLog } from "@shared/schema";
+import type { Client, ActivityLog, Staff } from "@shared/schema";
 import { Link } from "wouter";
 
 interface OpenIncident {
@@ -104,6 +104,19 @@ export default function Dashboard() {
   const { data: budgetAlerts } = useQuery<BudgetAlertsData>({
     queryKey: ["/api/reports/budget-alerts"],
   });
+
+  const { data: staffList = [] } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
+  });
+
+  const activeStaff = staffList.filter(s => s.isActive === "yes");
+  const newStaffIn30Days = activeStaff.filter(s => {
+    if (!s.createdAt) return false;
+    const createdDate = new Date(s.createdAt);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return createdDate >= thirtyDaysAgo;
+  }).length;
 
   const ndisClients = clients.filter(c => c.category === "NDIS").length;
   const supportClients = clients.filter(c => c.category === "Support at Home").length;
@@ -396,6 +409,35 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+
+        <Link href="/staff">
+          <Card 
+            className="hover-elevate cursor-pointer border-0 bg-gradient-to-br from-teal-500 to-teal-600 text-white"
+            data-testid="card-staff-members"
+          >
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-base font-semibold text-teal-50 mb-3">Staff Members</p>
+                  <p className="text-5xl font-bold mb-3" data-testid="text-stat-staff-count">
+                    {activeStaff.length}
+                  </p>
+                  <div className="flex items-center gap-1 text-teal-50">
+                    <span className="text-xl font-bold">+{newStaffIn30Days}</span>
+                    <span className="text-sm font-semibold">new in 30 days</span>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/20">
+                  <UserPlus className="w-7 h-7" />
+                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-2 text-teal-100 text-sm">
+                <span>Click to manage staff</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -957,7 +999,7 @@ export default function Dashboard() {
                           <div>
                             <p className="font-medium" data-testid={`text-unassigned-name-${client.id}`}>{client.participantName}</p>
                             <div className="flex items-center gap-2 mt-1">
-                              <CategoryBadge category={client.category} />
+                              <CategoryBadge category={client.category as "NDIS" | "Support at Home" | "Private"} />
                               {client.phoneNumber && (
                                 <span className="text-sm text-muted-foreground">{client.phoneNumber}</span>
                               )}
