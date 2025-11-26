@@ -124,6 +124,13 @@ export const clients = pgTable("clients", {
   riskAssessmentDate: date("risk_assessment_date"),
   riskAssessmentNotes: text("risk_assessment_notes"),
   
+  // New profile fields for Overview page
+  serviceType: text("service_type").$type<"Support Work" | "Nursing" | "Both" | null>(),
+  parkingInstructions: text("parking_instructions"),
+  attentionNotes: text("attention_notes"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  
   // Care Team - foreign keys for linked entities
   generalPractitionerId: varchar("general_practitioner_id"),
   pharmacyId: varchar("pharmacy_id"),
@@ -213,6 +220,11 @@ export const insertClientSchema = createInsertSchema(clients, {
   riskAssessmentScore: z.enum(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]).optional().nullable(),
   riskAssessmentDate: z.string().optional().nullable(),
   riskAssessmentNotes: z.string().optional().nullable(),
+  serviceType: z.enum(["Support Work", "Nursing", "Both"]).optional().nullable(),
+  parkingInstructions: z.string().optional().nullable(),
+  attentionNotes: z.string().optional().nullable(),
+  latitude: z.string().optional().nullable(),
+  longitude: z.string().optional().nullable(),
   isArchived: z.enum(["yes", "no"]).optional(),
   archiveReason: z.string().optional(),
   retentionUntil: z.string().optional(),
@@ -851,3 +863,92 @@ export const insertQuoteSendHistorySchema = createInsertSchema(quoteSendHistory,
 
 export type InsertQuoteSendHistory = z.infer<typeof insertQuoteSendHistorySchema>;
 export type QuoteSendHistory = typeof quoteSendHistory.$inferSelect;
+
+// Client Contacts - NOK, Family, Advocates, etc.
+export type ContactRelationship = "spouse" | "parent" | "child" | "sibling" | "guardian" | "advocate" | "friend" | "other";
+
+export const clientContacts = pgTable("client_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  relationship: text("relationship").$type<ContactRelationship>().notNull(),
+  phoneNumber: text("phone_number"),
+  email: text("email"),
+  address: text("address"),
+  isPrimary: text("is_primary").default("no").$type<"yes" | "no">(),
+  isEmergencyContact: text("is_emergency_contact").default("no").$type<"yes" | "no">(),
+  isNok: text("is_nok").default("no").$type<"yes" | "no">(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientContactSchema = createInsertSchema(clientContacts, {
+  relationship: z.enum(["spouse", "parent", "child", "sibling", "guardian", "advocate", "friend", "other"]),
+  isPrimary: z.enum(["yes", "no"]).optional(),
+  isEmergencyContact: z.enum(["yes", "no"]).optional(),
+  isNok: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientContact = z.infer<typeof insertClientContactSchema>;
+export type ClientContact = typeof clientContacts.$inferSelect;
+
+// Client Behaviors - Triggers, Strategies, Notes
+export const clientBehaviors = pgTable("client_behaviors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  behaviorType: text("behavior_type").notNull(),
+  description: text("description").notNull(),
+  triggers: text("triggers"),
+  deescalationStrategies: text("deescalation_strategies"),
+  preventionStrategies: text("prevention_strategies"),
+  severity: text("severity").$type<"low" | "medium" | "high">().default("low"),
+  lastOccurred: timestamp("last_occurred"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientBehaviorSchema = createInsertSchema(clientBehaviors, {
+  severity: z.enum(["low", "medium", "high"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientBehavior = z.infer<typeof insertClientBehaviorSchema>;
+export type ClientBehavior = typeof clientBehaviors.$inferSelect;
+
+// Leadership Meeting Notes
+export const leadershipMeetingNotes = pgTable("leadership_meeting_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  meetingDate: timestamp("meeting_date").notNull(),
+  attendees: text("attendees").array(),
+  discussionPoints: text("discussion_points").notNull(),
+  decisions: text("decisions"),
+  actionItems: text("action_items"),
+  followUpRequired: text("follow_up_required").default("no").$type<"yes" | "no">(),
+  followUpDate: date("follow_up_date"),
+  recordedBy: text("recorded_by"),
+  recordedById: varchar("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLeadershipMeetingNoteSchema = createInsertSchema(leadershipMeetingNotes, {
+  followUpRequired: z.enum(["yes", "no"]).optional(),
+  attendees: z.array(z.string()).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLeadershipMeetingNote = z.infer<typeof insertLeadershipMeetingNoteSchema>;
+export type LeadershipMeetingNote = typeof leadershipMeetingNotes.$inferSelect;

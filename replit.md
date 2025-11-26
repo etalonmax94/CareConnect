@@ -163,3 +163,13 @@ The system implements comprehensive data interconnection to eliminate manual ret
   - Dark purple for Agency-Managed  
   - Orange for Self-Managed
   - Uses CSS variables for proper light/dark mode support
+- **Client Profile Redesign (In Progress)**:
+  - New database tables: `client_contacts` (NOK/family), `behaviors`, `leadership_meeting_notes`
+  - New client fields: `serviceType`, `parkingInstructions`, `attentionNotes`
+  - Redesigned Overview section with critical alerts banner (allergies, ACD, attention notes)
+  - Quick info cards for service type, distance, parking instructions
+  - React Leaflet map integration for client location visualization
+  - GP and Pharmacy cards with contact details auto-display
+  - Emergency contact cards with NOK/EPOA from new client_contacts table
+  - Program summary with risk score badge
+  - API routes for client contacts, behaviors, and leadership meeting notes

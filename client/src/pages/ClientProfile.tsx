@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,18 +11,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet marker icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
 function NotificationBadge({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
@@ -109,7 +121,7 @@ interface DistanceData {
   officeAddress: string;
 }
 
-type ProfileSection = "overview" | "details" | "program" | "team" | "goals" | "documents" | "clinical" | "services" | "budget";
+type ProfileSection = "overview" | "care" | "people" | "services" | "admin";
 
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
@@ -174,6 +186,24 @@ export default function ClientProfile() {
 
   const { data: incidentReports = [] } = useQuery<IncidentReport[]>({
     queryKey: [`/api/incidents/client/${params?.id}`],
+    enabled: !!params?.id,
+  });
+
+  // Fetch GP details if client has a GP assigned
+  const { data: gpDetails } = useQuery<GP>({
+    queryKey: ["/api/gps", client?.generalPractitionerId],
+    enabled: !!client?.generalPractitionerId,
+  });
+
+  // Fetch Pharmacy details if client has a pharmacy assigned
+  const { data: pharmacyDetails } = useQuery<Pharmacy>({
+    queryKey: ["/api/pharmacies", client?.pharmacyId],
+    enabled: !!client?.pharmacyId,
+  });
+
+  // Fetch client contacts (NOK, emergency contacts, etc.)
+  const { data: clientContacts = [] } = useQuery<ClientContact[]>({
+    queryKey: ["/api/clients", params?.id, "contacts"],
     enabled: !!params?.id,
   });
 
@@ -556,16 +586,12 @@ export default function ClientProfile() {
 
   const assignedStaffCount = staffAssignments?.filter(a => !a.endDate || new Date(a.endDate) > new Date()).length || 0;
 
-  const sidebarItems: { id: ProfileSection; label: string; icon: any; badge?: string; badgeColor?: string }[] = [
-    { id: "overview", label: "Overview", icon: User },
-    { id: "details", label: "Personal Details", icon: UserCircle },
-    { id: "program", label: "Program Info", icon: ClipboardCheck },
-    { id: "team", label: "Care Team", icon: Users },
-    { id: "goals", label: "Goals", icon: Target },
-    { id: "documents", label: "Documents", icon: FileText },
-    { id: "clinical", label: "Clinical Notes", icon: Stethoscope },
-    { id: "services", label: "Services", icon: Clock },
-    { id: "budget", label: "Budget Details", icon: DollarSign, badge: totalBudget === 0 ? "Setup" : undefined, badgeColor: "text-amber-600" },
+  const sidebarItems: { id: ProfileSection; label: string; icon: any; badge?: string; badgeColor?: string; description?: string }[] = [
+    { id: "overview", label: "Overview", icon: User, description: "At-a-glance information" },
+    { id: "care", label: "Care", icon: Heart, description: "Medical, Behaviors, Goals" },
+    { id: "people", label: "People", icon: Users, description: "Contacts, Staff, Team" },
+    { id: "services", label: "Services", icon: Clock, description: "Appointments, Notes" },
+    { id: "admin", label: "Admin", icon: Settings, description: "Documents, Budget, Meeting Notes" },
   ];
 
   return (
@@ -816,230 +842,582 @@ export default function ClientProfile() {
           {/* Overview Section */}
           {activeSection === "overview" && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold">Client Overview</h2>
-                  <p className="text-sm text-muted-foreground">Essential information and contact details</p>
+              {/* Critical Alerts Banner */}
+              {(client.allergies || client.advancedCareDirective || client.attentionNotes) && (
+                <div className="space-y-3">
+                  {client.allergies && (
+                    <Alert variant="destructive" className="border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="font-medium">
+                        <span className="font-bold">ALLERGIES: </span>{client.allergies}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {client.advancedCareDirective && client.advancedCareDirective !== "None" && (
+                    <Alert className={`${client.advancedCareDirective === "NFR" ? "border-purple-300 bg-purple-50 dark:border-purple-800 dark:bg-purple-950/30" : "border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"}`}>
+                      <FileText className="h-4 w-4" />
+                      <AlertDescription className="font-medium">
+                        <span className="font-bold">Advanced Care Directive: </span>
+                        <Badge className={`ml-2 ${client.advancedCareDirective === "NFR" ? "bg-purple-600" : "bg-blue-600"} text-white border-0`}>
+                          {client.advancedCareDirective === "NFR" ? "Not For Resuscitation" : "For Resuscitation"}
+                        </Badge>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {client.attentionNotes && (
+                    <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="font-medium text-amber-800 dark:text-amber-200">
+                        <span className="font-bold">ATTENTION: </span>{client.attentionNotes}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
-                <Badge className={`${isArchived ? 'bg-amber-500' : 'bg-green-500'} text-white border-0`}>
-                  {isArchived ? 'Archived' : 'Active Client'}
-                </Badge>
+              )}
+
+              {/* Quick Info Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card className="bg-slate-50 dark:bg-slate-900/50">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-slate-500" />
+                      <span className="text-xs text-muted-foreground">Service Type</span>
+                    </div>
+                    <p className="text-sm font-semibold mt-1">{client.serviceType || 'Not specified'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-slate-50 dark:bg-slate-900/50">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2">
+                      <Navigation className="w-4 h-4 text-slate-500" />
+                      <span className="text-xs text-muted-foreground">Distance</span>
+                    </div>
+                    <p className="text-sm font-semibold mt-1">
+                      {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined 
+                        ? `${distanceData.distanceKm} km from office` 
+                        : 'Not calculated'}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-slate-50 dark:bg-slate-900/50 md:col-span-2">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2">
+                      <Car className="w-4 h-4 text-slate-500" />
+                      <span className="text-xs text-muted-foreground">Parking / Access</span>
+                    </div>
+                    <p className="text-sm font-semibold mt-1">{client.parkingInstructions || 'No instructions provided'}</p>
+                  </CardContent>
+                </Card>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Contact Information */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Contact Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {client.email && (
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-muted rounded-full">
-                          <Mail className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <a href={`mailto:${client.email}`} className="text-sm hover:text-primary" data-testid="text-client-email">
-                          {client.email}
-                        </a>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={() => copyToClipboard(client.email!, 'Email')}>
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
-                    {client.phoneNumber && (
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-muted rounded-full">
-                          <Phone className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <a href={`tel:${client.phoneNumber}`} className="text-sm hover:text-primary">
-                          {client.phoneNumber}
-                        </a>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={() => copyToClipboard(client.phoneNumber!, 'Phone')}>
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
-                    {client.homeAddress && (
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-muted rounded-full">
-                          <MapPin className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm flex-1">{client.homeAddress}</p>
-                        {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
-                          <Badge variant="secondary" className="flex-shrink-0" data-testid="badge-distance">
-                            {distanceData.distanceKm} km
-                          </Badge>
+              {/* Main Content Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column - Contact & Location */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Contact Information */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        Contact Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {client.phoneNumber && (
+                          <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                            <Phone className="w-4 h-4 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-muted-foreground">Phone</p>
+                              <a href={`tel:${client.phoneNumber}`} className="text-sm font-medium hover:text-primary">
+                                {client.phoneNumber}
+                              </a>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(client.phoneNumber!, 'Phone')}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                        {client.email && (
+                          <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                            <Mail className="w-4 h-4 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-muted-foreground">Email</p>
+                              <a href={`mailto:${client.email}`} className="text-sm font-medium hover:text-primary truncate block" data-testid="text-client-email">
+                                {client.email}
+                              </a>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(client.email!, 'Email')}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
                         )}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* NDIS / Program Information */}
-                {client.category === "NDIS" && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">NDIS Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-xs text-muted-foreground">NDIS Number</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-lg font-bold font-mono">{getNdisNumber() || 'Not provided'}</p>
-                          {getNdisNumber() && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(getNdisNumber()!, 'NDIS Number')}>
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Support Level</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="font-semibold">Level {getSupportLevel() || '-'}</Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {getSupportLevel() === "1" ? "Minimal" : getSupportLevel() === "2" ? "Low" : getSupportLevel() === "3" ? "Medium" : getSupportLevel() === "4" ? "High" : ""}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Support at Home Information */}
-                {client.category === "Support at Home" && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Support at Home Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-xs text-muted-foreground">HCP Number</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-lg font-bold font-mono">{getHcpNumber() || 'Not provided'}</p>
-                          {getHcpNumber() && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(getHcpNumber()!, 'HCP Number')}>
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Funding Level</p>
-                        <p className="text-sm font-medium mt-1">
-                          {client.supportAtHomeDetails?.hcpFundingLevel || 'Not specified'}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Private Client Info */}
-                {client.category === "Private" && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Private Client Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Medicare Number</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-lg font-bold font-mono">{client.medicareNumber || 'Not provided'}</p>
-                          {client.medicareNumber && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(client.medicareNumber!, 'Medicare')}>
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Funding & Plan Manager */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Funding & Plan Manager</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">Funding Management</p>
-                      <p className="text-sm font-semibold mt-1">
-                        {client.ndisDetails?.ndisFundingType || client.supportAtHomeDetails?.hcpFundingLevel || 'Self Managed'}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Support Coordinator */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Support Coordinator</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {client.careTeamDetails?.supportCoordinatorId ? (
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-sm">Support coordinator assigned</p>
-                      </div>
-                    ) : (
-                      <div className="text-center py-6">
-                        <Users className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">No support coordinator assigned</p>
-                        <Link href={`/clients/${params?.id}/edit`}>
-                          <Button variant="outline" size="sm" className="mt-3 gap-2">
-                            <Plus className="w-3 h-3" />
-                            Assign Coordinator
+                      {client.homeAddress && (
+                        <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                          <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">Address</p>
+                            <p className="text-sm font-medium">{client.homeAddress}</p>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(client.homeAddress!, 'Address')}>
+                            <Copy className="w-3 h-3" />
                           </Button>
-                        </Link>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Recent Activity / Behaviors Section */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {incidentReports.length > 0 ? (
-                    <div className="space-y-2">
-                      {incidentReports.slice(0, 3).map((incident) => (
-                        <div key={incident.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                          <Badge variant={incident.severity === 'high' || incident.severity === 'critical' ? 'destructive' : 'secondary'}>
-                            {incident.incidentType}
-                          </Badge>
-                          <span className="text-sm flex-1 truncate">{incident.description}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(incident.incidentDate).toLocaleDateString()}
-                          </span>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No recent activity recorded</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Location Map */}
+                  {client.latitude && client.longitude && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <MapPin className="w-4 h-4" />
+                          Location
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="h-64 rounded-b-lg overflow-hidden">
+                          <MapContainer 
+                            center={[parseFloat(client.latitude), parseFloat(client.longitude)]} 
+                            zoom={14} 
+                            style={{ height: '100%', width: '100%' }}
+                            scrollWheelZoom={false}
+                          >
+                            <TileLayer
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            />
+                            <Marker position={[parseFloat(client.latitude), parseFloat(client.longitude)]}>
+                              <Popup>{client.participantName}<br />{client.homeAddress}</Popup>
+                            </Marker>
+                          </MapContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
-                </CardContent>
-              </Card>
+
+                  {/* GP & Pharmacy Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* GP Information */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Stethoscope className="w-4 h-4" />
+                          General Practitioner
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {gpDetails ? (
+                          <div className="space-y-2">
+                            <p className="font-semibold">{gpDetails.name}</p>
+                            {gpDetails.practiceName && (
+                              <p className="text-sm text-muted-foreground">{gpDetails.practiceName}</p>
+                            )}
+                            {gpDetails.phoneNumber && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="w-3 h-3 text-muted-foreground" />
+                                <a href={`tel:${gpDetails.phoneNumber}`} className="hover:text-primary">{gpDetails.phoneNumber}</a>
+                              </div>
+                            )}
+                            {gpDetails.faxNumber && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="text-xs text-muted-foreground">Fax:</span>
+                                <span>{gpDetails.faxNumber}</span>
+                              </div>
+                            )}
+                            {gpDetails.address && (
+                              <p className="text-sm text-muted-foreground">{gpDetails.address}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <Stethoscope className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                            <p className="text-sm text-muted-foreground">No GP assigned</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Pharmacy Information */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Pill className="w-4 h-4" />
+                          Pharmacy
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {pharmacyDetails ? (
+                          <div className="space-y-2">
+                            <p className="font-semibold">{pharmacyDetails.name}</p>
+                            {pharmacyDetails.phoneNumber && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="w-3 h-3 text-muted-foreground" />
+                                <a href={`tel:${pharmacyDetails.phoneNumber}`} className="hover:text-primary">{pharmacyDetails.phoneNumber}</a>
+                              </div>
+                            )}
+                            {pharmacyDetails.faxNumber && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="text-xs text-muted-foreground">Fax:</span>
+                                <span>{pharmacyDetails.faxNumber}</span>
+                              </div>
+                            )}
+                            {pharmacyDetails.address && (
+                              <p className="text-sm text-muted-foreground">{pharmacyDetails.address}</p>
+                            )}
+                            {pharmacyDetails.deliveryAvailable === "yes" && (
+                              <Badge variant="secondary" className="mt-1">Delivery Available</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <Pill className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                            <p className="text-sm text-muted-foreground">No pharmacy assigned</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Right Column - Key Contacts & Program Info */}
+                <div className="space-y-6">
+                  {/* Next of Kin / Emergency Contact */}
+                  <Card className="border-l-4 border-l-red-500">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Emergency Contact
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {clientContacts.length > 0 ? (
+                        <div className="space-y-3">
+                          {clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes").slice(0, 2).map((contact) => (
+                            <div key={contact.id} className="p-3 bg-muted/30 rounded-lg">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="font-semibold text-sm">{contact.name}</p>
+                                <div className="flex gap-1">
+                                  {contact.isNok === "yes" && <Badge variant="outline" className="text-xs">NOK</Badge>}
+                                  {contact.isEmergencyContact === "yes" && <Badge variant="destructive" className="text-xs">Emergency</Badge>}
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground capitalize mb-2">{contact.relationship}</p>
+                              {contact.phoneNumber && (
+                                <div className="flex items-center gap-2">
+                                  <a href={`tel:${contact.phoneNumber}`} className="text-sm text-primary hover:underline flex items-center gap-1">
+                                    <Phone className="w-3 h-3" />
+                                    {contact.phoneNumber}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : client.nokEpoa ? (
+                        <div className="p-3 bg-muted/30 rounded-lg">
+                          <p className="text-sm">{client.nokEpoa}</p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <Users className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                          <p className="text-sm text-muted-foreground">No emergency contact listed</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Program Info Summary */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <ClipboardCheck className="w-4 h-4" />
+                        Program Summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="p-3 bg-muted/30 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Category</p>
+                        <p className="text-sm font-semibold">{client.category}</p>
+                      </div>
+                      
+                      {client.category === "NDIS" && (
+                        <>
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <p className="text-xs text-muted-foreground">NDIS Number</p>
+                            <p className="text-sm font-semibold font-mono">{getNdisNumber() || 'Not provided'}</p>
+                          </div>
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Funding Type</p>
+                            <p className="text-sm font-semibold">{client.ndisDetails?.ndisFundingType || 'Not specified'}</p>
+                          </div>
+                        </>
+                      )}
+                      
+                      {client.category === "Support at Home" && (
+                        <>
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <p className="text-xs text-muted-foreground">HCP Number</p>
+                            <p className="text-sm font-semibold font-mono">{getHcpNumber() || 'Not provided'}</p>
+                          </div>
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Funding Level</p>
+                            <p className="text-sm font-semibold">{client.supportAtHomeDetails?.hcpFundingLevel || 'Not specified'}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {client.category === "Private" && client.medicareNumber && (
+                        <div className="p-3 bg-muted/30 rounded-lg">
+                          <p className="text-xs text-muted-foreground">Medicare Number</p>
+                          <p className="text-sm font-semibold font-mono">{client.medicareNumber}</p>
+                        </div>
+                      )}
+
+                      <div className="p-3 bg-muted/30 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Risk Score</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {client.riskAssessmentScore ? (
+                            <>
+                              <Badge className={`${
+                                parseInt(client.riskAssessmentScore) <= 3 ? 'bg-green-500' :
+                                parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
+                                'bg-red-500'
+                              } text-white border-0`}>
+                                {client.riskAssessmentScore}/10
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {parseInt(client.riskAssessmentScore) <= 3 ? 'Low Risk' :
+                                 parseInt(client.riskAssessmentScore) <= 6 ? 'Medium Risk' : 'High Risk'}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not assessed</span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Recent Incidents */}
+                  {incidentReports.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4" />
+                          Recent Incidents
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {incidentReports.slice(0, 3).map((incident) => (
+                            <div key={incident.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+                              <Badge variant={incident.severity === 'high' || incident.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
+                                {incident.incidentType}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(incident.incidentDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Other sections - using existing Tabs content */}
-          {activeSection !== "overview" && (
-            <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as ProfileSection)} className="space-y-6">
-              <TabsList className="w-full justify-start overflow-x-auto lg:hidden">
-                <TabsTrigger value="details" data-testid="tab-details">Personal Details</TabsTrigger>
-                <TabsTrigger value="program" data-testid="tab-program">Program Info</TabsTrigger>
-                <TabsTrigger value="team" data-testid="tab-team">Care Team</TabsTrigger>
-                <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
-                <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
-                <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
-                <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
-                <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
-              </TabsList>
+          {/* Care Section - Medical Info, Behaviors, Goals */}
+          {activeSection === "care" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-primary" />
+                    Care Information
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Medical details, behaviors, and care goals</p>
+                </div>
+              </div>
 
-              <TabsContent value="details" className="space-y-6">
+              {/* Sub-navigation for Care section */}
+              <Tabs defaultValue="medical" className="space-y-4">
+                <TabsList className="grid w-full max-w-lg grid-cols-3">
+                  <TabsTrigger value="medical" data-testid="tab-care-medical">Medical Info</TabsTrigger>
+                  <TabsTrigger value="behaviors" data-testid="tab-care-behaviors">Behaviors</TabsTrigger>
+                  <TabsTrigger value="goals" data-testid="tab-care-goals">Goals</TabsTrigger>
+                </TabsList>
+
+                {/* Medical Information */}
+                <TabsContent value="medical" className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Personal Information */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Personal Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
+                            <p className="text-sm mt-1">{client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString('en-AU') : "Not provided"}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Age</p>
+                            <p className="text-sm mt-1">{clientAge ? `${clientAge} years` : "Not provided"}</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Medicare Number</p>
+                          <p className="text-sm mt-1 font-mono">{client.medicareNumber || "Not provided"}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Clinical Information */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Clinical Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Main Diagnosis</p>
+                          <p className="text-sm mt-1">{client.mainDiagnosis || "Not provided"}</p>
+                        </div>
+                        {client.allergies && (
+                          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                            <p className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4" />
+                              ALLERGIES
+                            </p>
+                            <p className="text-sm mt-1 font-bold text-red-600 dark:text-red-300" data-testid="text-allergies">
+                              {client.allergies}
+                            </p>
+                          </div>
+                        )}
+                        {/* Advanced Care Directive */}
+                        <div className={`p-3 rounded-lg border ${
+                          client.advancedCareDirective === "NFR" 
+                            ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+                            : client.advancedCareDirective === "For Resus"
+                            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                            : "bg-muted/50 border-border"
+                        }`}>
+                          <p className={`text-sm font-bold flex items-center gap-2 ${
+                            client.advancedCareDirective === "NFR"
+                              ? "text-purple-700 dark:text-purple-400"
+                              : client.advancedCareDirective === "For Resus"
+                              ? "text-green-700 dark:text-green-400"
+                              : "text-muted-foreground"
+                          }`}>
+                            {client.advancedCareDirective === "NFR" ? (
+                              <HeartOff className="w-4 h-4" />
+                            ) : client.advancedCareDirective === "For Resus" ? (
+                              <Heart className="w-4 h-4" />
+                            ) : (
+                              <FileText className="w-4 h-4" />
+                            )}
+                            ADVANCED CARE DIRECTIVE
+                          </p>
+                          <p className={`text-sm mt-1 font-bold ${
+                            client.advancedCareDirective === "NFR"
+                              ? "text-purple-600 dark:text-purple-300"
+                              : client.advancedCareDirective === "For Resus"
+                              ? "text-green-600 dark:text-green-300"
+                              : "text-muted-foreground"
+                          }`} data-testid="text-acd">
+                            {client.advancedCareDirective === "NFR" 
+                              ? "NFR - Not For Resuscitation"
+                              : client.advancedCareDirective === "For Resus"
+                              ? "For Resus - For Resuscitation"
+                              : "Not Specified"}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Risk Assessment */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Risk Assessment</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <p className="text-sm font-medium text-muted-foreground">Risk Score</p>
+                          {client.riskAssessmentScore ? (
+                            <Badge className={`${
+                              parseInt(client.riskAssessmentScore) <= 3 ? 'bg-green-500' :
+                              parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
+                              'bg-red-500'
+                            } text-white border-0`}>
+                              {client.riskAssessmentScore}/10
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not assessed</span>
+                          )}
+                        </div>
+                        {client.riskAssessmentScore && parseInt(client.riskAssessmentScore) > 6 && (
+                          <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                              High risk client - ensure appropriate safety measures are in place
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Service Preferences */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Service Preferences</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Frequency of Services</p>
+                          <p className="text-sm mt-1">{client.frequencyOfServices || "Not specified"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Notification Preferences</p>
+                          <div className="mt-1">
+                            <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Communication Needs</p>
+                          <p className="text-sm mt-1">{client.communicationNeeds || "No special needs"}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                {/* Behaviors Tab */}
+                <TabsContent value="behaviors" className="space-y-6">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="text-base">Behavioral Notes</CardTitle>
+                      <Button size="sm" variant="outline" className="gap-1" disabled={isArchived}>
+                        <Plus className="w-3 h-3" />
+                        Add Behavior
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center py-8">
+                        <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
+                        <p className="text-sm text-muted-foreground">No behavioral notes recorded yet</p>
+                        <p className="text-xs text-muted-foreground mt-1">Add behavior patterns, triggers, and interventions</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Goals Tab - Reuse existing goals content */}
+                <TabsContent value="goals" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>

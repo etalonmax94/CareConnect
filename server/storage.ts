@@ -4,6 +4,7 @@ import {
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
+  clientContacts, clientBehaviors, leadershipMeetingNotes,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
@@ -19,7 +20,10 @@ import {
   type InsertNdisPriceGuideItem, type NdisPriceGuideItem,
   type InsertQuote, type Quote, type InsertQuoteLineItem, type QuoteLineItem,
   type InsertQuoteStatusHistory, type QuoteStatusHistory,
-  type InsertQuoteSendHistory, type QuoteSendHistory
+  type InsertQuoteSendHistory, type QuoteSendHistory,
+  type InsertClientContact, type ClientContact,
+  type InsertClientBehavior, type ClientBehavior,
+  type InsertLeadershipMeetingNote, type LeadershipMeetingNote
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -190,6 +194,27 @@ export interface IStorage {
   // Quote Send History
   getSendHistoryByQuote(quoteId: string): Promise<QuoteSendHistory[]>;
   createSendHistory(history: InsertQuoteSendHistory): Promise<QuoteSendHistory>;
+  
+  // Client Contacts
+  getContactsByClient(clientId: string): Promise<ClientContact[]>;
+  getContactById(id: string): Promise<ClientContact | undefined>;
+  createContact(contact: InsertClientContact): Promise<ClientContact>;
+  updateContact(id: string, contact: Partial<InsertClientContact>): Promise<ClientContact | undefined>;
+  deleteContact(id: string): Promise<boolean>;
+  
+  // Client Behaviors
+  getBehaviorsByClient(clientId: string): Promise<ClientBehavior[]>;
+  getBehaviorById(id: string): Promise<ClientBehavior | undefined>;
+  createBehavior(behavior: InsertClientBehavior): Promise<ClientBehavior>;
+  updateBehavior(id: string, behavior: Partial<InsertClientBehavior>): Promise<ClientBehavior | undefined>;
+  deleteBehavior(id: string): Promise<boolean>;
+  
+  // Leadership Meeting Notes
+  getMeetingNotesByClient(clientId: string): Promise<LeadershipMeetingNote[]>;
+  getMeetingNoteById(id: string): Promise<LeadershipMeetingNote | undefined>;
+  createMeetingNote(note: InsertLeadershipMeetingNote): Promise<LeadershipMeetingNote>;
+  updateMeetingNote(id: string, note: Partial<InsertLeadershipMeetingNote>): Promise<LeadershipMeetingNote | undefined>;
+  deleteMeetingNote(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -1071,6 +1096,96 @@ export class DbStorage implements IStorage {
   async createSendHistory(history: InsertQuoteSendHistory): Promise<QuoteSendHistory> {
     const result = await db.insert(quoteSendHistory).values(history).returning();
     return result[0];
+  }
+
+  // Client Contacts
+  async getContactsByClient(clientId: string): Promise<ClientContact[]> {
+    return await db.select().from(clientContacts)
+      .where(eq(clientContacts.clientId, clientId))
+      .orderBy(desc(clientContacts.isPrimary), clientContacts.name);
+  }
+
+  async getContactById(id: string): Promise<ClientContact | undefined> {
+    const result = await db.select().from(clientContacts).where(eq(clientContacts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createContact(contact: InsertClientContact): Promise<ClientContact> {
+    const result = await db.insert(clientContacts).values(contact).returning();
+    return result[0];
+  }
+
+  async updateContact(id: string, contact: Partial<InsertClientContact>): Promise<ClientContact | undefined> {
+    const result = await db.update(clientContacts)
+      .set({ ...contact as any, updatedAt: new Date() })
+      .where(eq(clientContacts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteContact(id: string): Promise<boolean> {
+    const result = await db.delete(clientContacts).where(eq(clientContacts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Client Behaviors
+  async getBehaviorsByClient(clientId: string): Promise<ClientBehavior[]> {
+    return await db.select().from(clientBehaviors)
+      .where(eq(clientBehaviors.clientId, clientId))
+      .orderBy(desc(clientBehaviors.createdAt));
+  }
+
+  async getBehaviorById(id: string): Promise<ClientBehavior | undefined> {
+    const result = await db.select().from(clientBehaviors).where(eq(clientBehaviors.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createBehavior(behavior: InsertClientBehavior): Promise<ClientBehavior> {
+    const result = await db.insert(clientBehaviors).values(behavior).returning();
+    return result[0];
+  }
+
+  async updateBehavior(id: string, behavior: Partial<InsertClientBehavior>): Promise<ClientBehavior | undefined> {
+    const result = await db.update(clientBehaviors)
+      .set({ ...behavior as any, updatedAt: new Date() })
+      .where(eq(clientBehaviors.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteBehavior(id: string): Promise<boolean> {
+    const result = await db.delete(clientBehaviors).where(eq(clientBehaviors.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Leadership Meeting Notes
+  async getMeetingNotesByClient(clientId: string): Promise<LeadershipMeetingNote[]> {
+    return await db.select().from(leadershipMeetingNotes)
+      .where(eq(leadershipMeetingNotes.clientId, clientId))
+      .orderBy(desc(leadershipMeetingNotes.meetingDate));
+  }
+
+  async getMeetingNoteById(id: string): Promise<LeadershipMeetingNote | undefined> {
+    const result = await db.select().from(leadershipMeetingNotes).where(eq(leadershipMeetingNotes.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createMeetingNote(note: InsertLeadershipMeetingNote): Promise<LeadershipMeetingNote> {
+    const result = await db.insert(leadershipMeetingNotes).values(note).returning();
+    return result[0];
+  }
+
+  async updateMeetingNote(id: string, note: Partial<InsertLeadershipMeetingNote>): Promise<LeadershipMeetingNote | undefined> {
+    const result = await db.update(leadershipMeetingNotes)
+      .set({ ...note as any, updatedAt: new Date() })
+      .where(eq(leadershipMeetingNotes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMeetingNote(id: string): Promise<boolean> {
+    const result = await db.delete(leadershipMeetingNotes).where(eq(leadershipMeetingNotes.id, id)).returning();
+    return result.length > 0;
   }
 }
 

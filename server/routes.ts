@@ -8,6 +8,7 @@ import {
   insertStaffSchema, insertSupportCoordinatorSchema, insertPlanManagerSchema, insertNdisServiceSchema,
   insertGPSchema, insertPharmacySchema, insertDocumentSchema, insertClientStaffAssignmentSchema,
   insertServiceDeliverySchema, insertClientGoalSchema,
+  insertClientContactSchema, insertClientBehaviorSchema, insertLeadershipMeetingNoteSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -2762,6 +2763,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
       message: "Webhook endpoint is configured correctly",
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // ==================== CLIENT CONTACTS ROUTES ====================
+  
+  // Get contacts by client
+  app.get("/api/clients/:clientId/contacts", async (req, res) => {
+    try {
+      const contacts = await storage.getContactsByClient(req.params.clientId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching client contacts:", error);
+      res.status(500).json({ error: "Failed to fetch client contacts" });
+    }
+  });
+
+  // Create client contact
+  app.post("/api/clients/:clientId/contacts", async (req, res) => {
+    try {
+      const validationResult = insertClientContactSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const contact = await storage.createContact(validationResult.data);
+      res.status(201).json(contact);
+    } catch (error) {
+      console.error("Error creating client contact:", error);
+      res.status(500).json({ error: "Failed to create client contact" });
+    }
+  });
+
+  // Update client contact
+  app.patch("/api/contacts/:id", async (req, res) => {
+    try {
+      const contact = await storage.updateContact(req.params.id, req.body);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      res.json(contact);
+    } catch (error) {
+      console.error("Error updating contact:", error);
+      res.status(500).json({ error: "Failed to update contact" });
+    }
+  });
+
+  // Delete client contact
+  app.delete("/api/contacts/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteContact(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      res.status(500).json({ error: "Failed to delete contact" });
+    }
+  });
+
+  // ==================== CLIENT BEHAVIORS ROUTES ====================
+  
+  // Get behaviors by client
+  app.get("/api/clients/:clientId/behaviors", async (req, res) => {
+    try {
+      const behaviors = await storage.getBehaviorsByClient(req.params.clientId);
+      res.json(behaviors);
+    } catch (error) {
+      console.error("Error fetching client behaviors:", error);
+      res.status(500).json({ error: "Failed to fetch client behaviors" });
+    }
+  });
+
+  // Create client behavior
+  app.post("/api/clients/:clientId/behaviors", async (req, res) => {
+    try {
+      const validationResult = insertClientBehaviorSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const behavior = await storage.createBehavior(validationResult.data);
+      res.status(201).json(behavior);
+    } catch (error) {
+      console.error("Error creating client behavior:", error);
+      res.status(500).json({ error: "Failed to create client behavior" });
+    }
+  });
+
+  // Update client behavior
+  app.patch("/api/behaviors/:id", async (req, res) => {
+    try {
+      const behavior = await storage.updateBehavior(req.params.id, req.body);
+      if (!behavior) {
+        return res.status(404).json({ error: "Behavior not found" });
+      }
+      res.json(behavior);
+    } catch (error) {
+      console.error("Error updating behavior:", error);
+      res.status(500).json({ error: "Failed to update behavior" });
+    }
+  });
+
+  // Delete client behavior
+  app.delete("/api/behaviors/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBehavior(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Behavior not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting behavior:", error);
+      res.status(500).json({ error: "Failed to delete behavior" });
+    }
+  });
+
+  // ==================== LEADERSHIP MEETING NOTES ROUTES ====================
+  
+  // Get meeting notes by client
+  app.get("/api/clients/:clientId/meeting-notes", async (req, res) => {
+    try {
+      const notes = await storage.getMeetingNotesByClient(req.params.clientId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching meeting notes:", error);
+      res.status(500).json({ error: "Failed to fetch meeting notes" });
+    }
+  });
+
+  // Create meeting note
+  app.post("/api/clients/:clientId/meeting-notes", async (req, res) => {
+    try {
+      const validationResult = insertLeadershipMeetingNoteSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const note = await storage.createMeetingNote(validationResult.data);
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating meeting note:", error);
+      res.status(500).json({ error: "Failed to create meeting note" });
+    }
+  });
+
+  // Update meeting note
+  app.patch("/api/meeting-notes/:id", async (req, res) => {
+    try {
+      const note = await storage.updateMeetingNote(req.params.id, req.body);
+      if (!note) {
+        return res.status(404).json({ error: "Meeting note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating meeting note:", error);
+      res.status(500).json({ error: "Failed to update meeting note" });
+    }
+  });
+
+  // Delete meeting note
+  app.delete("/api/meeting-notes/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteMeetingNote(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Meeting note not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting meeting note:", error);
+      res.status(500).json({ error: "Failed to delete meeting note" });
+    }
   });
 
   const httpServer = createServer(app);
