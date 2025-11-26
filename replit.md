@@ -144,3 +144,16 @@ The system implements comprehensive data interconnection to eliminate manual ret
   - Incidents to Action tile: Shows count of open/investigating incidents with orange gradient, clickable to view incident details
   - Unassigned Clients tile: Shows clients without care manager assignments with purple gradient, clickable to view client list
   - All tiles have interactive modals with drill-down navigation to client profiles
+- **Client List Page Enhancements**:
+  - White color scheme with subtle shadows for modern, clean appearance
+  - List/Grid view toggle with responsive grid layout for client cards
+  - Density controls (Compact/Standard/Expanded) for adjusting row height and information density
+  - Column visibility dropdown with toggleable columns (Client column locked as required)
+  - Quick action buttons on row hover (Call, Email, Add Appointment)
+  - Three-dot menu with View/Edit/Assign Staff/Archive options
+  - All preferences persisted to localStorage per user
+- **NDIS Funding Type Badges**: Color-coded badges for NDIS funding management types:
+  - Navy blue for Plan-Managed
+  - Dark purple for Agency-Managed  
+  - Orange for Self-Managed
+  - Uses CSS variables for proper light/dark mode support
