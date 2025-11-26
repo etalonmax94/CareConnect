@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign } from "lucide-react";
+import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign, Shield, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,6 +10,24 @@ import ComplianceIndicator from "@/components/ComplianceIndicator";
 import { useQuery } from "@tanstack/react-query";
 import type { Client, ActivityLog } from "@shared/schema";
 import { Link } from "wouter";
+
+interface OpenIncident {
+  id: string;
+  clientId: string;
+  incidentType: string;
+  severity: string;
+  status: string;
+  incidentDate: string;
+  description: string;
+}
+
+interface UnassignedClient {
+  id: string;
+  participantName: string;
+  category: string;
+  phoneNumber: string | null;
+  createdAt: string;
+}
 
 interface DashboardData {
   totalClients: number;
@@ -24,6 +42,9 @@ interface DashboardData {
   overdueItems: number;
   overdueItemsList: Array<{ clientId: string; clientName: string; documentType: string; dueDate: string }>;
   openIncidents: number;
+  openIncidentsList: OpenIncident[];
+  unassignedClients: number;
+  unassignedClientsList: UnassignedClient[];
   totalBudgetAllocated: number;
   totalBudgetUsed: number;
 }
@@ -47,7 +68,7 @@ interface BudgetAlertsData {
   alerts: BudgetAlert[];
 }
 
-type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | "birthdays" | "budgetAlerts" | null;
+type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | "birthdays" | "budgetAlerts" | "incidents" | "unassignedClients" | null;
 
 export default function Dashboard() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -301,6 +322,76 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
               <span>Click to view details</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`hover-elevate cursor-pointer border-0 ${
+            (dashboardData?.openIncidents || 0) > 0 
+              ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white'
+              : 'bg-gradient-to-br from-slate-500 to-slate-600 text-white'
+          }`}
+          onClick={() => setActiveModal("incidents")}
+          data-testid="card-incidents"
+        >
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-base font-semibold opacity-90 mb-3">Incidents to Action</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-open-incidents">
+                  {dashboardData?.openIncidents || 0}
+                </p>
+                <div className="flex items-center gap-1 opacity-90">
+                  <span className="text-sm font-semibold">
+                    {(dashboardData?.openIncidents || 0) > 0 
+                      ? "Require attention" 
+                      : "All incidents resolved"}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-white/20">
+                <Shield className="w-7 h-7" />
+              </div>
+            </div>
+            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
+              <span>Click to view incidents</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`hover-elevate cursor-pointer border-0 ${
+            (dashboardData?.unassignedClients || 0) > 0 
+              ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white'
+              : 'bg-gradient-to-br from-slate-500 to-slate-600 text-white'
+          }`}
+          onClick={() => setActiveModal("unassignedClients")}
+          data-testid="card-unassigned-clients"
+        >
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-base font-semibold opacity-90 mb-3">Unassigned Clients</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-unassigned-clients">
+                  {dashboardData?.unassignedClients || 0}
+                </p>
+                <div className="flex items-center gap-1 opacity-90">
+                  <span className="text-sm font-semibold">
+                    {(dashboardData?.unassignedClients || 0) > 0 
+                      ? "Need Care Manager" 
+                      : "All clients assigned"}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-white/20">
+                <UserX className="w-7 h-7" />
+              </div>
+            </div>
+            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
+              <span>Click to view clients</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </CardContent>
@@ -774,6 +865,123 @@ export default function Dashboard() {
                   <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-20" />
                   <p>All budgets are healthy</p>
                   <p className="text-sm mt-1">No budgets at 80% or higher usage</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Incidents to Action Modal */}
+      <Dialog open={activeModal === "incidents"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-orange-600" />
+              Incidents Requiring Action
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3">
+              {dashboardData?.openIncidentsList && dashboardData.openIncidentsList.length > 0 ? (
+                dashboardData.openIncidentsList.map((incident) => (
+                  <Link key={incident.id} href={`/clients/${incident.clientId}`} data-testid={`link-incident-${incident.id}`}>
+                    <Card className={`hover-elevate cursor-pointer ${
+                      incident.severity === "critical" || incident.severity === "major"
+                        ? 'border-red-200 dark:border-red-800' 
+                        : 'border-orange-200 dark:border-orange-800'
+                    }`} data-testid={`card-incident-${incident.id}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium capitalize">{incident.incidentType.replace(/_/g, ' ')}</p>
+                              <Badge variant={
+                                incident.severity === "critical" ? "destructive" :
+                                incident.severity === "major" ? "destructive" :
+                                "secondary"
+                              } className={
+                                incident.severity === "minor" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" : ""
+                              }>
+                                {incident.severity}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {incident.description}
+                            </p>
+                          </div>
+                          <div className="text-right ml-4">
+                            <Badge variant={incident.status === "open" ? "outline" : "secondary"} 
+                              className={incident.status === "investigating" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : ""}>
+                              {incident.status}
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatDate(incident.incidentDate)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Shield className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>All incidents resolved</p>
+                  <p className="text-sm mt-1">No open or investigating incidents</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unassigned Clients Modal */}
+      <Dialog open={activeModal === "unassignedClients"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserX className="w-5 h-5 text-purple-600" />
+              Clients Without Care Manager
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3">
+              {dashboardData?.unassignedClientsList && dashboardData.unassignedClientsList.length > 0 ? (
+                dashboardData.unassignedClientsList.map((client) => (
+                  <Link key={client.id} href={`/clients/${client.id}`} data-testid={`link-unassigned-${client.id}`}>
+                    <Card className="hover-elevate cursor-pointer border-purple-200 dark:border-purple-800" 
+                      data-testid={`card-unassigned-${client.id}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium" data-testid={`text-unassigned-name-${client.id}`}>{client.participantName}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <CategoryBadge category={client.category} />
+                              {client.phoneNumber && (
+                                <span className="text-sm text-muted-foreground">{client.phoneNumber}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline" className="border-purple-300 text-purple-600 dark:border-purple-700 dark:text-purple-400">
+                              <UserX className="w-3 h-3 mr-1" />
+                              No Care Manager
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Added {formatDate(client.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <UsersRound className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>All clients have Care Managers</p>
+                  <p className="text-sm mt-1">Every active client has a care manager assigned</p>
                 </div>
               )}
             </div>

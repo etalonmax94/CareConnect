@@ -65,9 +65,22 @@ const QLD_PUBLIC_HOLIDAYS_2024_2025 = [
   "Additional holidays may vary by region"
 ];
 
+interface QuoteSendHistoryItem {
+  id: string;
+  recipientEmail: string | null;
+  recipientName: string | null;
+  sentById: string | null;
+  sentByName: string | null;
+  deliveryMethod: string | null;
+  deliveryStatus: string | null;
+  notes: string | null;
+  sentAt: string;
+}
+
 interface QuoteWithDetails extends Quote {
   lineItems: QuoteLineItem[];
   statusHistory: any[];
+  sendHistory?: QuoteSendHistoryItem[];
 }
 
 interface RateBreakdown {
@@ -313,7 +326,7 @@ export default function QuoteEditor() {
     });
   };
 
-  const handleStatusChange = (newStatus: QuoteStatus) => {
+  const handleStatusChange = async (newStatus: QuoteStatus) => {
     const statusUpdates: Record<string, any> = { status: newStatus };
     const now = new Date().toISOString();
     if (newStatus === "sent") {
@@ -323,7 +336,23 @@ export default function QuoteEditor() {
     } else if (newStatus === "declined") {
       statusUpdates.declinedAt = now;
     }
+    
     updateQuoteMutation.mutate(statusUpdates);
+    
+    // Record send history when quote is sent
+    if (newStatus === "sent" && quote) {
+      try {
+        await apiRequest("POST", `/api/quotes/${quote.id}/send-history`, {
+          recipientEmail: client?.email || null,
+          recipientName: client?.participantName || null,
+          deliveryMethod: "manual",
+          deliveryStatus: "sent"
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/quotes', params.id] });
+      } catch (error) {
+        console.error("Failed to record send history:", error);
+      }
+    }
   };
 
   // Calculate quote totals from all line items
@@ -336,7 +365,7 @@ export default function QuoteEditor() {
     return { weekly, annual };
   }, [quote?.lineItems]);
 
-  const handleTriggerPdfDownload = (blob: Blob | null, filename: string) => {
+  const handleTriggerPdfDownload = async (blob: Blob | null, filename: string) => {
     if (!blob) return;
     
     const url = URL.createObjectURL(blob);
@@ -349,6 +378,22 @@ export default function QuoteEditor() {
     URL.revokeObjectURL(url);
     
     toast({ title: "PDF downloaded successfully" });
+    
+    // Record send history for PDF download
+    if (quote) {
+      try {
+        await apiRequest("POST", `/api/quotes/${quote.id}/send-history`, {
+          recipientEmail: null,
+          recipientName: null,
+          deliveryMethod: "download",
+          deliveryStatus: "sent",
+          notes: `PDF downloaded: ${filename}`
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/quotes', params.id] });
+      } catch (error) {
+        console.error("Failed to record download history:", error);
+      }
+    }
   };
 
   const convertToBudgetMutation = useMutation({
@@ -1129,10 +1174,12 @@ export default function QuoteEditor() {
                           <span>Weekly Total:</span>
                           <span className="font-medium">${quoteTotals.weekly.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>GST (NDIS Exempt):</span>
-                          <span>$0.00</span>
-                        </div>
+                        {isNdisClient && (
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>GST (NDIS Exempt):</span>
+                            <span>$0.00</span>
+                          </div>
+                        )}
                         <Separator />
                         <div className="flex justify-between font-bold text-xl">
                           <span>Annual Total:</span>
@@ -1168,6 +1215,20 @@ export default function QuoteEditor() {
                 <p className="font-medium">{quote.quoteNumber}</p>
               </div>
               <div>
+                <Label className="text-xs text-muted-foreground">Quote Title</Label>
+                {isEditable ? (
+                  <Input
+                    value={quote.title}
+                    onChange={(e) => updateQuoteMutation.mutate({ title: e.target.value })}
+                    placeholder="Enter quote title..."
+                    className="mt-1"
+                    data-testid="input-quote-title"
+                  />
+                ) : (
+                  <p className="font-medium">{quote.title}</p>
+                )}
+              </div>
+              <div>
                 <Label className="text-xs text-muted-foreground">Created</Label>
                 <p className="font-medium">{new Date(quote.createdAt).toLocaleDateString('en-AU')}</p>
               </div>
@@ -1177,12 +1238,20 @@ export default function QuoteEditor() {
                   <p className="font-medium">{new Date(quote.validUntil).toLocaleDateString('en-AU')}</p>
                 </div>
               )}
-              {quote.description && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Description</Label>
-                  <p className="text-sm">{quote.description}</p>
-                </div>
-              )}
+              <div>
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                {isEditable ? (
+                  <Textarea
+                    value={quote.description || ""}
+                    onChange={(e) => updateQuoteMutation.mutate({ description: e.target.value })}
+                    placeholder="Enter quote description..."
+                    className="mt-1 min-h-[60px]"
+                    data-testid="input-quote-description"
+                  />
+                ) : (
+                  <p className="text-sm">{quote.description || "No description"}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -1207,7 +1276,9 @@ export default function QuoteEditor() {
                 <div className="text-center pt-2">
                   <p className="text-xs text-muted-foreground">Annual Total</p>
                   <p className="text-3xl font-bold text-primary">${quoteTotals.annual.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-1">GST Exempt (NDIS)</p>
+                  {isNdisClient && (
+                    <p className="text-xs text-muted-foreground mt-1">GST Exempt (NDIS)</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1225,6 +1296,73 @@ export default function QuoteEditor() {
                     ? "This quote has been converted to budget allocations" 
                     : "This quote can be converted to budget allocations using the button above"}
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Send History */}
+          {quote.sendHistory && quote.sendHistory.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Send className="w-4 h-4" />
+                  Send History
+                </CardTitle>
+                <CardDescription>Track of quote deliveries</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {quote.sendHistory.map((send) => (
+                    <div key={send.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                      <div className="p-1.5 rounded-full bg-primary/10">
+                        {send.deliveryMethod === "email" ? (
+                          <FileText className="w-3 h-3 text-primary" />
+                        ) : send.deliveryMethod === "download" ? (
+                          <Download className="w-3 h-3 text-primary" />
+                        ) : (
+                          <Send className="w-3 h-3 text-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">
+                            {send.deliveryMethod === "email" ? "Emailed" : 
+                             send.deliveryMethod === "download" ? "Downloaded" : "Sent"}
+                          </span>
+                          {send.recipientEmail && (
+                            <span className="text-xs text-muted-foreground">
+                              to {send.recipientEmail}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>By {send.sentByName || "System"}</span>
+                          <span>•</span>
+                          <span>{new Date(send.sentAt).toLocaleString('en-AU', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</span>
+                        </div>
+                        {send.notes && (
+                          <p className="text-xs text-muted-foreground mt-1 italic">{send.notes}</p>
+                        )}
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${
+                          send.deliveryStatus === "delivered" ? "text-green-600 border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800" :
+                          send.deliveryStatus === "bounced" || send.deliveryStatus === "failed" ? "text-red-600 border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800" :
+                          "text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800"
+                        }`}
+                      >
+                        {send.deliveryStatus || "Sent"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}

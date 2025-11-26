@@ -823,3 +823,31 @@ export const insertQuoteStatusHistorySchema = createInsertSchema(quoteStatusHist
 
 export type InsertQuoteStatusHistory = z.infer<typeof insertQuoteStatusHistorySchema>;
 export type QuoteStatusHistory = typeof quoteStatusHistory.$inferSelect;
+
+// Quote Send History - Track each time a quote is sent
+export type QuoteSendDeliveryStatus = "sent" | "delivered" | "bounced" | "failed";
+export type QuoteSendMethod = "email" | "manual" | "download";
+
+export const quoteSendHistory = pgTable("quote_send_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  recipientEmail: text("recipient_email"),
+  recipientName: text("recipient_name"),
+  sentById: varchar("sent_by_id").references(() => users.id, { onDelete: "set null" }),
+  sentByName: text("sent_by_name"),
+  deliveryMethod: text("delivery_method").$type<QuoteSendMethod>().default("email"),
+  deliveryStatus: text("delivery_status").$type<QuoteSendDeliveryStatus>().default("sent"),
+  notes: text("notes"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+export const insertQuoteSendHistorySchema = createInsertSchema(quoteSendHistory, {
+  deliveryMethod: z.enum(["email", "manual", "download"]).optional(),
+  deliveryStatus: z.enum(["sent", "delivered", "bounced", "failed"]).optional(),
+}).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertQuoteSendHistory = z.infer<typeof insertQuoteSendHistorySchema>;
+export type QuoteSendHistory = typeof quoteSendHistory.$inferSelect;

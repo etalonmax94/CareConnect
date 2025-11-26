@@ -1107,6 +1107,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
       
+      // Get open/investigating incidents for action
+      const openIncidentsList = allIncidents
+        .filter(i => i.status === 'open' || i.status === 'investigating')
+        .map(i => ({
+          id: i.id,
+          clientId: i.clientId,
+          incidentType: i.incidentType,
+          severity: i.severity,
+          status: i.status,
+          incidentDate: i.incidentDate,
+          description: i.description
+        }));
+      
+      // Get unassigned clients (clients without a care_manager assignment)
+      const allAssignments = await Promise.all(
+        allClients.map(c => storage.getAssignmentsByClient(c.id))
+      );
+      
+      const unassignedClients = allClients
+        .filter((client, index) => {
+          if (client.isArchived === "yes") return false;
+          const assignments = allAssignments[index];
+          return !assignments.some(a => a.assignmentType === "care_manager" && (!a.endDate || new Date(a.endDate) > today));
+        })
+        .map(c => ({
+          id: c.id,
+          participantName: c.participantName,
+          category: c.category,
+          phoneNumber: c.phoneNumber,
+          createdAt: c.createdAt
+        }));
+      
       res.json({
         totalClients: allClients.length,
         newClients: newClientsCount,
@@ -1119,7 +1151,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueThisMonthItems: dueThisMonth,
         overdueItems: overdueItems.length,
         overdueItemsList: overdueItems,
-        openIncidents: allIncidents.filter(i => i.status === 'open' || i.status === 'investigating').length,
+        openIncidents: openIncidentsList.length,
+        openIncidentsList: openIncidentsList,
+        unassignedClients: unassignedClients.length,
+        unassignedClientsList: unassignedClients,
         totalBudgetAllocated: allBudgets.reduce((sum, b) => sum + parseFloat(b.totalAllocated || "0"), 0),
         totalBudgetUsed: allBudgets.reduce((sum, b) => sum + parseFloat(b.used || "0"), 0)
       });
@@ -2278,7 +2313,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const lineItems = await storage.getLineItemsByQuote(req.params.id);
       const statusHistory = await storage.getStatusHistoryByQuote(req.params.id);
-      res.json({ ...quote, lineItems, statusHistory });
+      const sendHistory = await storage.getSendHistoryByQuote(req.params.id);
+      res.json({ ...quote, lineItems, statusHistory, sendHistory });
     } catch (error) {
       console.error("Error fetching quote:", error);
       res.status(500).json({ error: "Failed to fetch quote" });
@@ -2442,6 +2478,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting quote line item:", error);
       res.status(500).json({ error: "Failed to delete quote line item" });
+    }
+  });
+
+  // ==================== QUOTE SEND HISTORY ROUTES ====================
+  
+  // Get send history for a quote
+  app.get("/api/quotes/:quoteId/send-history", async (req, res) => {
+    try {
+      const sendHistory = await storage.getSendHistoryByQuote(req.params.quoteId);
+      res.json(sendHistory);
+    } catch (error) {
+      console.error("Error fetching quote send history:", error);
+      res.status(500).json({ error: "Failed to fetch quote send history" });
+    }
+  });
+
+  // Record a quote send event
+  app.post("/api/quotes/:quoteId/send-history", async (req, res) => {
+    try {
+      const sendRecord = await storage.createSendHistory({
+        ...req.body,
+        quoteId: req.params.quoteId,
+        sentById: req.session?.user?.id,
+        sentByName: req.session?.user?.displayName || "System"
+      });
+      res.status(201).json(sendRecord);
+    } catch (error) {
+      console.error("Error recording quote send:", error);
+      res.status(500).json({ error: "Failed to record quote send" });
     }
   });
 

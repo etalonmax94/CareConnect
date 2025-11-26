@@ -3,7 +3,7 @@ import {
   clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
-  ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory,
+  ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
@@ -18,7 +18,8 @@ import {
   type InsertClientGoal, type ClientGoal,
   type InsertNdisPriceGuideItem, type NdisPriceGuideItem,
   type InsertQuote, type Quote, type InsertQuoteLineItem, type QuoteLineItem,
-  type InsertQuoteStatusHistory, type QuoteStatusHistory
+  type InsertQuoteStatusHistory, type QuoteStatusHistory,
+  type InsertQuoteSendHistory, type QuoteSendHistory
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
 
@@ -185,6 +186,10 @@ export interface IStorage {
   // Quote Status History
   getStatusHistoryByQuote(quoteId: string): Promise<QuoteStatusHistory[]>;
   createStatusHistory(history: InsertQuoteStatusHistory): Promise<QuoteStatusHistory>;
+  
+  // Quote Send History
+  getSendHistoryByQuote(quoteId: string): Promise<QuoteSendHistory[]>;
+  createSendHistory(history: InsertQuoteSendHistory): Promise<QuoteSendHistory>;
 }
 
 export class DbStorage implements IStorage {
@@ -1053,6 +1058,18 @@ export class DbStorage implements IStorage {
 
   async createStatusHistory(history: InsertQuoteStatusHistory): Promise<QuoteStatusHistory> {
     const result = await db.insert(quoteStatusHistory).values(history).returning();
+    return result[0];
+  }
+  
+  // Quote Send History
+  async getSendHistoryByQuote(quoteId: string): Promise<QuoteSendHistory[]> {
+    return await db.select().from(quoteSendHistory)
+      .where(eq(quoteSendHistory.quoteId, quoteId))
+      .orderBy(desc(quoteSendHistory.sentAt));
+  }
+
+  async createSendHistory(history: InsertQuoteSendHistory): Promise<QuoteSendHistory> {
+    const result = await db.insert(quoteSendHistory).values(history).returning();
     return result[0];
   }
 }

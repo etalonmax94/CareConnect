@@ -140,3 +140,7 @@ The system implements comprehensive data interconnection to eliminate manual ret
 - **Service-Budget Linking**: Service deliveries now link to budget categories via budgetId field with automatic budget usage tracking
 - **Services Tab**: New tab in ClientProfile for recording service deliveries with budget linking, staff assignment, and real-time budget impact display
 - **Budget Alerts Dashboard**: Color-coded alert card (green healthy, orange low budget 80%+, rose overspent 100%+) with modal showing detailed alerts by client
+- **Dashboard Tiles Enhanced**:
+  - Incidents to Action tile: Shows count of open/investigating incidents with orange gradient, clickable to view incident details
+  - Unassigned Clients tile: Shows clients without care manager assignments with purple gradient, clickable to view client list
+  - All tiles have interactive modals with drill-down navigation to client profiles
