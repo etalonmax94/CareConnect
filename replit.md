@@ -146,12 +146,18 @@ The system implements comprehensive data interconnection to eliminate manual ret
   - All tiles have interactive modals with drill-down navigation to client profiles
 - **Client List Page Enhancements**:
   - White color scheme with subtle shadows for modern, clean appearance
-  - List/Grid view toggle with responsive grid layout for client cards
-  - Density controls (Compact/Standard/Expanded) for adjusting row height and information density
-  - Column visibility dropdown with toggleable columns (Client column locked as required)
+  - **Display Options Popover**: Consolidated view controls into a single popover with:
+    - View Mode toggle (List/Grid buttons)
+    - Density selector (Compact/Standard/Expanded radio group)
+    - Visible Columns section with toggle switches (Client column locked as required)
+    - Preview text on button showing current settings (e.g., "List • Standard")
   - Quick action buttons on row hover (Call, Email, Add Appointment)
   - Three-dot menu with View/Edit/Assign Staff/Archive options
   - All preferences persisted to localStorage per user
+- **Sidebar Optimization**:
+  - Default collapsed (icon-only) state for more content space
+  - Settings removed from sidebar menu (accessible via user dropdown)
+  - Toggle button to expand/collapse sidebar
 - **NDIS Funding Type Badges**: Color-coded badges for NDIS funding management types:
   - Navy blue for Plan-Managed
   - Dark purple for Agency-Managed  
