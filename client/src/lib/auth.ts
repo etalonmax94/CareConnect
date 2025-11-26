@@ -25,12 +25,23 @@ export function removeAuthToken(): void {
 }
 
 export function extractAndStoreTokenFromUrl(): boolean {
-  console.log('[Auth] Checking URL for token:', window.location.href);
+  const fullUrl = window.location.href;
+  console.log('[Auth] Checking URL for token:', fullUrl);
+  
+  // Check for error parameters
   const urlParams = new URLSearchParams(window.location.search);
+  const error = urlParams.get('error');
+  if (error) {
+    console.error('[Auth] OAuth error in URL:', error);
+    alert('OAuth Error: ' + error);
+    return false;
+  }
+  
   const token = urlParams.get('token');
   
   if (token) {
     console.log('[Auth] Token found in URL, storing...');
+    console.log('[Auth] Token length:', token.length);
     setAuthToken(token);
     
     urlParams.delete('token');
@@ -42,6 +53,6 @@ export function extractAndStoreTokenFromUrl(): boolean {
     return true;
   }
   
-  console.log('[Auth] No token in URL');
+  console.log('[Auth] No token in URL. Full search params:', window.location.search);
   return false;
 }
