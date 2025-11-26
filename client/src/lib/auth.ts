@@ -25,10 +25,12 @@ export function removeAuthToken(): void {
 }
 
 export function extractAndStoreTokenFromUrl(): boolean {
+  console.log('[Auth] Checking URL for token:', window.location.href);
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get('token');
   
   if (token) {
+    console.log('[Auth] Token found in URL, storing...');
     setAuthToken(token);
     
     urlParams.delete('token');
@@ -36,8 +38,10 @@ export function extractAndStoreTokenFromUrl(): boolean {
     const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
     window.history.replaceState({}, '', newUrl);
     
+    console.log('[Auth] Token stored successfully');
     return true;
   }
   
+  console.log('[Auth] No token in URL');
   return false;
 }
