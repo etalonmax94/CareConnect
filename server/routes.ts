@@ -396,21 +396,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== AUTH ROUTES ====================
   
-  // Get current user session
-  app.get("/api/auth/me", (req, res) => {
+  // Get current user session (supports both session and JWT)
+  app.get("/api/auth/me", async (req, res) => {
     // Prevent caching of auth status
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.set('Pragma', 'no-cache');
     
+    // First try session auth
     if (req.session?.user) {
-      res.json({ 
+      return res.json({ 
         authenticated: true, 
         user: req.session.user,
         needsRoleSelection: req.session.user.isFirstLogin === "yes" || req.session.user.roles.length === 0
       });
-    } else {
-      res.json({ authenticated: false, user: null });
     }
+    
+    // Then try JWT auth from Authorization header
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const payload = verifyAuthToken(token);
+      
+      if (payload) {
+        // Get fresh user data from database (convert userId to string)
+        const user = await storage.getUserById(String(payload.userId));
+        if (user) {
+          const sessionUser = {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            roles: user.roles as string[],
+            isFirstLogin: user.isFirstLogin || "no",
+            approvalStatus: user.approvalStatus || "approved"
+          };
+          return res.json({ 
+            authenticated: true, 
+            user: sessionUser,
+            needsRoleSelection: user.isFirstLogin === "yes" || (user.roles?.length ?? 0) === 0
+          });
+        }
+      }
+    }
+    
+    res.json({ authenticated: false, user: null });
   });
 
   // Initiate Zoho OAuth login
