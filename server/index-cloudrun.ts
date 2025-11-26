@@ -20,7 +20,14 @@ export async function setupApiOnly(app: Express, _server: Server) {
     ].filter(Boolean);
     
     const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
+    // Check if origin is in allowed list OR is a Replit dev URL
+    const isAllowedOrigin = origin && (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.replit.dev') ||
+      origin.endsWith('.repl.co')
+    );
+    
+    if (isAllowedOrigin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');

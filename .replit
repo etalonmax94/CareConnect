@@ -60,3 +60,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_mem_db:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+VITE_API_URL = "https://careconnect-124485508170.australia-southeast1.run.app"
