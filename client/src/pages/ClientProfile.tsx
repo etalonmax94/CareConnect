@@ -601,74 +601,74 @@ export default function ClientProfile() {
   return (
     <div className="h-full -m-6 flex flex-col">
       {/* Profile Header */}
-      <div className="bg-slate-800 dark:bg-slate-900 text-white px-6 py-4">
+      <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-sky-500 dark:from-blue-700 dark:via-blue-600 dark:to-blue-500 text-white px-6 py-5 shadow-lg">
         <div className="flex items-start gap-4">
           <Link href="/clients">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" data-testid="button-back">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/15 rounded-full" data-testid="button-back">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
           
-          <Avatar className="w-16 h-16 border-2 border-white/20 flex-shrink-0">
+          <Avatar className="w-16 h-16 border-2 border-white/30 flex-shrink-0 shadow-md">
             <AvatarImage src={client.photo || undefined} alt={client.participantName} />
-            <AvatarFallback className="text-xl bg-primary text-white font-bold">{getInitials(client.participantName)}</AvatarFallback>
+            <AvatarFallback className="text-xl bg-yellow-400 text-blue-900 font-bold">{getInitials(client.participantName)}</AvatarFallback>
           </Avatar>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold truncate">{client.participantName}</h1>
-              <Badge className={`${isArchived ? 'bg-amber-500' : 'bg-green-500'} text-white border-0`}>
+              <Badge className={`${isArchived ? 'bg-amber-500' : 'bg-emerald-500'} text-white border-0 shadow-sm`}>
                 {isArchived ? 'Archived' : 'Active'}
               </Badge>
               {client.isOnboarded !== "yes" && !isArchived && (
-                <Badge className="bg-teal-500 text-white border-0">New</Badge>
+                <Badge className="bg-yellow-400 text-blue-900 border-0 font-semibold shadow-sm">New</Badge>
               )}
             </div>
             
             {/* Quick Info Chips */}
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               {clientAge && (
-                <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
-                  <CalendarDays className="w-4 h-4 text-slate-400" />
+                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                  <CalendarDays className="w-4 h-4 text-white/70" />
                   <div>
-                    <p className="text-[10px] uppercase text-slate-400">Age</p>
+                    <p className="text-[10px] uppercase text-white/70 font-medium">Age</p>
                     <p className="text-sm font-semibold">{clientAge}</p>
                   </div>
                 </div>
               )}
               
-              <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
-                <User className="w-4 h-4 text-slate-400" />
+              <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                <User className="w-4 h-4 text-white/70" />
                 <div>
-                  <p className="text-[10px] uppercase text-slate-400">ID</p>
+                  <p className="text-[10px] uppercase text-white/70 font-medium">ID</p>
                   <p className="text-sm font-semibold font-mono truncate max-w-[100px]" title={client.id}>{client.id.substring(0, 10)}...</p>
                 </div>
               </div>
               
               {client.category === "NDIS" && getNdisNumber() && (
-                <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
-                  <div className="w-2 h-2 bg-green-400 rounded-full" />
+                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full shadow-sm" />
                   <div>
-                    <p className="text-[10px] uppercase text-slate-400">NDIS</p>
+                    <p className="text-[10px] uppercase text-white/70 font-medium">NDIS</p>
                     <p className="text-sm font-semibold font-mono">{getNdisNumber()}</p>
                   </div>
                 </div>
               )}
               
               {client.category === "Support at Home" && getHcpNumber() && (
-                <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
-                  <div className="w-2 h-2 bg-green-400 rounded-full" />
+                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full shadow-sm" />
                   <div>
-                    <p className="text-[10px] uppercase text-slate-400">HCP</p>
+                    <p className="text-[10px] uppercase text-white/70 font-medium">HCP</p>
                     <p className="text-sm font-semibold font-mono">{getHcpNumber()}</p>
                   </div>
                 </div>
               )}
               
-              <div className="flex items-center gap-2 bg-slate-700/50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
-                <CreditCard className="w-4 h-4 text-slate-400" />
+              <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                <CreditCard className="w-4 h-4 text-white/70" />
                 <div>
-                  <p className="text-[10px] uppercase text-slate-400">Care Category</p>
+                  <p className="text-[10px] uppercase text-white/70 font-medium">Care Category</p>
                   <p className="text-sm font-semibold">{client.category}</p>
                 </div>
               </div>
@@ -682,7 +682,7 @@ export default function ClientProfile() {
                 onClick={() => restoreMutation.mutate()}
                 disabled={restoreMutation.isPending}
                 data-testid="button-restore-client"
-                className="gap-2 bg-white text-slate-800 hover:bg-slate-100"
+                className="gap-2 bg-yellow-400 text-blue-900 hover:bg-yellow-300 font-semibold shadow-sm"
               >
                 <RotateCcw className="w-4 h-4" />
                 {restoreMutation.isPending ? "Restoring..." : "Restore"}
@@ -690,14 +690,14 @@ export default function ClientProfile() {
             ) : (
               <>
                 <Link href={`/clients/${params?.id}/edit`}>
-                  <Button variant="outline" className="gap-2 border-white/30 text-white hover:bg-white/10" data-testid="button-edit-client">
+                  <Button variant="outline" className="gap-2 border-white/40 text-white hover:bg-white/15 backdrop-blur-sm" data-testid="button-edit-client">
                     <Pencil className="w-4 h-4" />
                     Edit Profile
                   </Button>
                 </Link>
                 {client.zohoWorkdriveLink && (
                   <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-service-agreement">
-                    <Button className="gap-2 bg-green-600 hover:bg-green-700 text-white">
+                    <Button className="gap-2 bg-yellow-400 text-blue-900 hover:bg-yellow-300 font-semibold shadow-sm">
                       <FileText className="w-4 h-4" />
                       Service Agreement
                     </Button>
@@ -707,7 +707,7 @@ export default function ClientProfile() {
                   variant="outline"
                   onClick={() => setArchiveModalOpen(true)}
                   data-testid="button-archive-client"
-                  className="gap-2 border-white/30 text-white hover:bg-white/10"
+                  className="gap-2 border-white/40 text-white hover:bg-white/15 backdrop-blur-sm"
                 >
                   <Archive className="w-4 h-4" />
                   <span className="sr-only">Archive Client</span>
@@ -731,14 +731,13 @@ export default function ClientProfile() {
       )}
 
       {client.isOnboarded !== "yes" && !isArchived && (
-        <Alert variant="default" className="mx-6 mt-4 border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/30">
-          <Sparkles className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-          <AlertDescription className="text-teal-800 dark:text-teal-200 flex items-center justify-between">
-            <span><strong>New Client</strong> - This client has not been onboarded yet.</span>
+        <Alert variant="default" className="mx-6 mt-4 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+          <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200 flex items-center justify-between gap-4">
+            <span className="flex items-center"><strong>New Client</strong> - This client has not been onboarded yet.</span>
             <Button 
               size="sm" 
-              variant="outline" 
-              className="ml-4 border-teal-300 text-teal-700 hover:bg-teal-100 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-900/50"
+              className="ml-4 bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               onClick={() => onboardMutation.mutate()}
               disabled={onboardMutation.isPending}
               data-testid="button-onboard-client"
