@@ -63,8 +63,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 p-4">
-      <Card className="w-full max-w-md shadow-2xl border-0">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="mx-auto flex items-center justify-center mb-2">
             <img src={logoImage} alt="EmpowerLink" className="h-10 w-auto" data-testid="img-logo" />

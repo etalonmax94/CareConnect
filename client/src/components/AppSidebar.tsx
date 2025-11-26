@@ -141,8 +141,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
       )}>
         <div className="flex items-center justify-center">
           {isCollapsed ? (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center shadow-sm">
-              <span className="text-blue-900 font-bold text-sm">E</span>
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <span className="text-primary font-bold text-sm">E</span>
             </div>
           ) : (
             <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto" />
@@ -154,8 +154,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
         {!isCollapsed && user && (
           <div className="px-3 py-3 mb-1">
             <div className="flex items-center gap-2 text-sidebar-foreground">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center shadow-sm">
-                <User className="w-4 h-4 text-blue-900" />
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <User className="w-4 h-4 text-muted-foreground" />
               </div>
               <span className="text-sm font-medium" data-testid="text-user-greeting">
                 Hi {displayName}
