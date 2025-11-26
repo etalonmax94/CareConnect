@@ -10,24 +10,14 @@ import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
 const isDevelopment = import.meta.env.DEV;
-// Hardcode Cloud Run URL for production OAuth flow  
-const API_BASE_URL = 'https://careconnect-124485508170.australia-southeast1.run.app';
-
-// Debug logging
-console.log("Login loaded - API_BASE_URL:", API_BASE_URL);
+// Use Cloud Run URL for OAuth flow  
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://careconnect-124485508170.australia-southeast1.run.app';
 
 export default function Login() {
   const [devName, setDevName] = useState("Developer");
   const [devRole, setDevRole] = useState("admin");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-
-  const handleZohoLogin = () => {
-    // Use Cloud Run backend for OAuth
-    const targetUrl = `${API_BASE_URL}/api/auth/zoho`;
-    alert(`Redirecting to: ${targetUrl}`);
-    window.location.href = targetUrl;
-  };
 
   const handleDevLogin = async () => {
     setIsLoading(true);
@@ -87,9 +77,6 @@ export default function Login() {
             <LogIn className="h-5 w-5" />
             Sign in with Zoho
           </a>
-          <p className="text-xs text-muted-foreground text-center">
-            Debug: Clicking will go to {API_BASE_URL}/api/auth/zoho
-          </p>
 
           {isDevelopment && (
             <>

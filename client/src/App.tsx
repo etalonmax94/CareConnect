@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -9,6 +10,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import GlobalSearch from "@/components/GlobalSearch";
 import UserProfileDropdown from "@/components/UserProfileDropdown";
 import { Button } from "@/components/ui/button";
+import { extractAndStoreTokenFromUrl } from "@/lib/auth";
 import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
 import ClientProfile from "@/pages/ClientProfile";
@@ -138,6 +140,13 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
 
 function AppContent() {
   const [location] = useLocation();
+  
+  useEffect(() => {
+    const tokenExtracted = extractAndStoreTokenFromUrl();
+    if (tokenExtracted) {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    }
+  }, []);
   
   const { data: auth, isLoading } = useQuery<AuthResponse>({
     queryKey: ["/api/auth/me"],

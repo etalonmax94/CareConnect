@@ -1,7 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getAuthToken } from "./auth";
 
 // API base URL - use Cloud Run backend in production, same-origin in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://careconnect-124485508170.australia-southeast1.run.app';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -10,17 +11,33 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Prepend API base URL for cross-origin requests
   const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
+  
+  const headers: Record<string, string> = {
+    ...getAuthHeaders(),
+  };
+  
+  if (data) {
+    headers['Content-Type'] = 'application/json';
+  }
   
   const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -35,11 +52,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Build the URL from query key parts and prepend API base URL
     const path = queryKey.join("/");
     const fullUrl = path.startsWith('/') ? `${API_BASE_URL}${path}` : path;
     
     const res = await fetch(fullUrl, {
+      headers: getAuthHeaders(),
       credentials: "include",
     });
 

@@ -16,6 +16,11 @@ import { fromZodError } from "zod-validation-error";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import jwt from "jsonwebtoken";
+
+// JWT secret for cross-domain auth (use SESSION_SECRET as fallback)
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'empowerlink-jwt-secret-change-in-production';
+const JWT_EXPIRES_IN = '7d'; // Token valid for 7 days
 
 // Configure multer for file uploads
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -163,16 +168,105 @@ function getBaseUrl(req: Request): string {
   return `${protocol}://${host}`;
 }
 
-// Auth middleware - check if user is authenticated
-function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.session?.user) {
-    return res.status(401).json({ error: "Authentication required" });
+// JWT token payload interface
+interface JwtPayload {
+  userId: number;
+  email: string;
+  displayName: string;
+  roles: UserRole[];
+  approvalStatus: string;
+  iat?: number;
+  exp?: number;
+}
+
+// Generate JWT token for cross-domain auth
+function generateAuthToken(user: {
+  id: number | string;
+  email: string;
+  displayName: string | null;
+  roles: UserRole[];
+  approvalStatus: string | null;
+}): string {
+  const payload: JwtPayload = {
+    userId: typeof user.id === 'string' ? parseInt(user.id, 10) : user.id,
+    email: user.email,
+    displayName: user.displayName || user.email,
+    roles: user.roles || [],
+    approvalStatus: user.approvalStatus || 'pending'
+  };
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+// Verify JWT token
+function verifyAuthToken(token: string): JwtPayload | null {
+  try {
+    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  } catch (error) {
+    console.log("JWT verification failed:", error);
+    return null;
   }
-  next();
+}
+
+// Auth middleware - check if user is authenticated (supports both session and JWT)
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // First try session auth
+  if (req.session?.user) {
+    return next();
+  }
+  
+  // Then try JWT auth from Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const payload = verifyAuthToken(token);
+    if (payload) {
+      // Set user info from JWT to request for downstream handlers
+      (req as any).jwtUser = payload;
+      // Also set to session-like structure for compatibility
+      req.session.user = {
+        id: String(payload.userId),
+        email: payload.email,
+        displayName: payload.displayName,
+        firstName: null,
+        lastName: null,
+        roles: payload.roles,
+        isFirstLogin: "no",
+        approvalStatus: payload.approvalStatus as "approved" | "pending" | "rejected"
+      };
+      return next();
+    }
+  }
+  
+  return res.status(401).json({ error: "Authentication required" });
 }
 
 // Auth middleware - check if user has completed role selection
 function requireRoles(req: Request, res: Response, next: NextFunction) {
+  // First check JWT auth
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const payload = verifyAuthToken(token);
+    if (payload) {
+      if (!payload.roles || payload.roles.length === 0) {
+        return res.status(403).json({ error: "Role selection required", needsRoleSelection: true });
+      }
+      (req as any).jwtUser = payload;
+      req.session.user = {
+        id: String(payload.userId),
+        email: payload.email,
+        displayName: payload.displayName,
+        firstName: null,
+        lastName: null,
+        roles: payload.roles,
+        isFirstLogin: "no",
+        approvalStatus: payload.approvalStatus as "approved" | "pending" | "rejected"
+      };
+      return next();
+    }
+  }
+  
+  // Fall back to session auth
   if (!req.session?.user) {
     return res.status(401).json({ error: "Authentication required" });
   }
@@ -510,11 +604,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect(getRedirectUrl("/?error=user_create_error"));
       }
       
+      // Generate JWT token for cross-domain auth
+      const authToken = generateAuthToken({
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        roles: user.roles as UserRole[],
+        approvalStatus: user.approvalStatus
+      });
+      console.log("Generated auth token for user:", user.email);
+      
       // Check approval status - pending users go to waiting page
       if (user.approvalStatus === "pending") {
         console.log(`User ${userEmail} is pending approval - redirecting to pending page`);
         
-        // Set minimal session for pending user
+        // Set minimal session for pending user (for same-domain compatibility)
         req.session.userId = user.id;
         req.session.user = {
           id: user.id,
@@ -530,9 +634,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return req.session.save((err) => {
           if (err) {
             console.error("Session save error:", err);
-            return res.redirect(getRedirectUrl("/login?error=session_error"));
           }
-          res.redirect(getRedirectUrl("/pending-approval"));
+          // Include token in redirect URL for cross-domain auth
+          res.redirect(getRedirectUrl(`/pending-approval?token=${authToken}`));
         });
       }
       
@@ -542,7 +646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect(getRedirectUrl("/login?error=access_denied"));
       }
       
-      // Set session for approved user
+      // Set session for approved user (for same-domain compatibility)
       req.session.userId = user.id;
       req.session.user = {
         id: user.id,
@@ -559,13 +663,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.save((err) => {
         if (err) {
           console.error("Session save error:", err);
-          return res.redirect(getRedirectUrl("/login?error=session_error"));
         }
         
         console.log("Session saved successfully for user:", user.email);
         
-        // Approved users go directly to dashboard
-        res.redirect(getRedirectUrl("/"));
+        // Include token in redirect URL for cross-domain auth
+        // Frontend will extract and store the token
+        res.redirect(getRedirectUrl(`/?token=${authToken}`));
       });
     } catch (error) {
       console.error("Zoho OAuth callback error:", error);
