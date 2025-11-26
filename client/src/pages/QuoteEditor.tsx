@@ -133,6 +133,8 @@ export default function QuoteEditor() {
     enabled: !!quote?.clientId,
   });
 
+  const isNdisClient = client?.category === "NDIS";
+
   const { data: priceGuideItems = [] } = useQuery<NdisPriceGuideItem[]>({
     queryKey: ["/api/price-guide/search", priceGuideSearch],
     queryFn: async () => {
@@ -530,10 +532,22 @@ export default function QuoteEditor() {
               <Label className="text-xs text-muted-foreground">Client Name</Label>
               <p className="font-medium text-lg">{client?.participantName || "Unknown Client"}</p>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">NDIS Number</Label>
-              <p className="font-medium">{(client?.ndisDetails as any)?.ndisNumber || "N/A"}</p>
-            </div>
+            {isNdisClient ? (
+              <div>
+                <Label className="text-xs text-muted-foreground">NDIS Number</Label>
+                <p className="font-medium">{(client?.ndisDetails as any)?.ndisNumber || "N/A"}</p>
+              </div>
+            ) : client?.category === "Support at Home" ? (
+              <div>
+                <Label className="text-xs text-muted-foreground">HCP Number</Label>
+                <p className="font-medium">{(client?.supportAtHomeDetails as any)?.hcpNumber || "N/A"}</p>
+              </div>
+            ) : (
+              <div>
+                <Label className="text-xs text-muted-foreground">Client Reference</Label>
+                <p className="font-medium">{client?.medicareNumber || "N/A"}</p>
+              </div>
+            )}
             <div>
               <Label className="text-xs text-muted-foreground">Category</Label>
               <Badge variant="outline">{client?.category || "Unknown"}</Badge>
@@ -548,7 +562,9 @@ export default function QuoteEditor() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">NDIS Service Items</CardTitle>
+                  <CardTitle className="text-base">
+                    {isNdisClient ? "NDIS Service Items" : "Service Items"}
+                  </CardTitle>
                   <CardDescription>Add services with detailed pricing for each day type</CardDescription>
                 </div>
                 {isEditable && (
@@ -561,80 +577,90 @@ export default function QuoteEditor() {
                     </DialogTrigger>
                     <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
                       <DialogHeader>
-                        <DialogTitle>Add NDIS Service Item</DialogTitle>
+                        <DialogTitle>
+                          {isNdisClient ? "Add NDIS Service Item" : "Add Service Item"}
+                        </DialogTitle>
                         <DialogDescription>
-                          Search the NDIS Price Guide or enter service details manually with comprehensive pricing
+                          {isNdisClient 
+                            ? "Search the NDIS Price Guide or enter service details manually with comprehensive pricing"
+                            : "Enter service details with comprehensive pricing for your quote"
+                          }
                         </DialogDescription>
                       </DialogHeader>
                       <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
                         <div className="space-y-6 py-4">
-                          {/* NDIS Price Guide Search */}
-                          <div className="space-y-3">
-                            <Label className="font-medium">Search NDIS Price Guide</Label>
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input
-                                placeholder="Search by support item number or name..."
-                                value={priceGuideSearch}
-                                onChange={(e) => setPriceGuideSearch(e.target.value)}
-                                className="pl-9"
-                                data-testid="input-price-guide-search"
-                              />
-                            </div>
-                            {priceGuideItems.length > 0 && (
-                              <div className="max-h-48 overflow-y-auto border rounded-md">
-                                {priceGuideItems.map(item => (
-                                  <div
-                                    key={item.id}
-                                    className={`p-3 cursor-pointer hover:bg-muted border-b last:border-b-0 ${selectedPriceItem?.id === item.id ? 'bg-muted' : ''}`}
-                                    onClick={() => handleSelectPriceItem(item)}
-                                    data-testid={`price-guide-item-${item.id}`}
-                                  >
-                                    <div className="flex justify-between">
-                                      <span className="font-medium text-sm">{item.supportItemNumber}</span>
-                                      <span className="text-sm font-medium">${item.weekdayRate || item.priceLimit}/hr</span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">{item.supportItemName}</p>
-                                    {item.supportCategory && (
-                                      <Badge variant="secondary" className="mt-1 text-xs">{item.supportCategory}</Badge>
-                                    )}
+                          {/* NDIS Price Guide Search - Only for NDIS clients */}
+                          {isNdisClient && (
+                            <>
+                              <div className="space-y-3">
+                                <Label className="font-medium">Search NDIS Price Guide</Label>
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input
+                                    placeholder="Search by support item number or name..."
+                                    value={priceGuideSearch}
+                                    onChange={(e) => setPriceGuideSearch(e.target.value)}
+                                    className="pl-9"
+                                    data-testid="input-price-guide-search"
+                                  />
+                                </div>
+                                {priceGuideItems.length > 0 && (
+                                  <div className="max-h-48 overflow-y-auto border rounded-md">
+                                    {priceGuideItems.map(item => (
+                                      <div
+                                        key={item.id}
+                                        className={`p-3 cursor-pointer hover:bg-muted border-b last:border-b-0 ${selectedPriceItem?.id === item.id ? 'bg-muted' : ''}`}
+                                        onClick={() => handleSelectPriceItem(item)}
+                                        data-testid={`price-guide-item-${item.id}`}
+                                      >
+                                        <div className="flex justify-between">
+                                          <span className="font-medium text-sm">{item.supportItemNumber}</span>
+                                          <span className="text-sm font-medium">${item.weekdayRate || item.priceLimit}/hr</span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">{item.supportItemName}</p>
+                                        {item.supportCategory && (
+                                          <Badge variant="secondary" className="mt-1 text-xs">{item.supportCategory}</Badge>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                )}
                               </div>
-                            )}
-                          </div>
-
-                          <Separator />
+                              <Separator />
+                            </>
+                          )}
 
                           {/* Service Details */}
                           <div className="space-y-4">
                             <Label className="font-medium">Service Details</Label>
                             <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label className="text-sm">Support Item Number</Label>
-                                <Input
-                                  value={itemSupportNumber}
-                                  onChange={(e) => setItemSupportNumber(e.target.value)}
-                                  placeholder="e.g., 01_011_0107_1_1"
-                                  data-testid="input-support-number"
-                                />
-                              </div>
-                              <div className="space-y-2">
+                              {isNdisClient && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Support Item Number</Label>
+                                  <Input
+                                    value={itemSupportNumber}
+                                    onChange={(e) => setItemSupportNumber(e.target.value)}
+                                    placeholder="e.g., 01_011_0107_1_1"
+                                    data-testid="input-support-number"
+                                  />
+                                </div>
+                              )}
+                              <div className={`space-y-2 ${!isNdisClient ? 'col-span-2' : ''}`}>
                                 <Label className="text-sm">Category</Label>
                                 <Input
                                   value={itemCategory}
                                   onChange={(e) => setItemCategory(e.target.value)}
-                                  placeholder="e.g., Core - Assistance with Daily Life"
+                                  placeholder={isNdisClient ? "e.g., Core - Assistance with Daily Life" : "e.g., Personal Care, Nursing, Domestic"}
                                   data-testid="input-category"
                                 />
                               </div>
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-sm">Support Item Name</Label>
+                              <Label className="text-sm">{isNdisClient ? "Support Item Name" : "Service Name"}</Label>
                               <Input
                                 value={itemSupportName}
                                 onChange={(e) => setItemSupportName(e.target.value)}
-                                placeholder="e.g., Assistance with Self-Care Activities"
+                                placeholder={isNdisClient ? "e.g., Assistance with Self-Care Activities" : "e.g., Personal Care Support"}
                                 data-testid="input-support-name"
                               />
                             </div>

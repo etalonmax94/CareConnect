@@ -187,6 +187,8 @@ export function QuotePDF({
   companyPhone = "1300 EMPOWER",
   companyEmail = "info@empowerlink.au"
 }: QuotePDFProps) {
+  const isNdisClient = client?.category === "NDIS";
+  
   const formatCurrency = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
     return `$${num.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -241,7 +243,10 @@ export function QuotePDF({
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.companyName}>{companyName}</Text>
-          <Text style={styles.companyTagline}>NDIS Registered Provider | ABN XX XXX XXX XXX</Text>
+          <Text style={styles.companyTagline}>
+            {isNdisClient ? "NDIS Registered Provider | " : "Care Services Provider | "}
+            ABN XX XXX XXX XXX
+          </Text>
           <Text style={styles.quoteTitle}>{quote.title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
             <Text style={styles.quoteNumber}>{quote.quoteNumber}</Text>
@@ -253,13 +258,25 @@ export function QuotePDF({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Client Information</Text>
           <View style={styles.row}>
-            <Text style={styles.label}>Participant Name:</Text>
+            <Text style={styles.label}>{isNdisClient ? "Participant Name:" : "Client Name:"}</Text>
             <Text style={styles.value}>{client?.participantName || 'Unknown Client'}</Text>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>NDIS Number:</Text>
-            <Text style={styles.value}>{(client?.ndisDetails as any)?.ndisNumber || 'N/A'}</Text>
-          </View>
+          {isNdisClient ? (
+            <View style={styles.row}>
+              <Text style={styles.label}>NDIS Number:</Text>
+              <Text style={styles.value}>{(client?.ndisDetails as any)?.ndisNumber || 'N/A'}</Text>
+            </View>
+          ) : client?.category === "Support at Home" ? (
+            <View style={styles.row}>
+              <Text style={styles.label}>HCP Number:</Text>
+              <Text style={styles.value}>{(client?.supportAtHomeDetails as any)?.hcpNumber || 'N/A'}</Text>
+            </View>
+          ) : (
+            <View style={styles.row}>
+              <Text style={styles.label}>Client Reference:</Text>
+              <Text style={styles.value}>{client?.medicareNumber || 'N/A'}</Text>
+            </View>
+          )}
           <View style={styles.row}>
             <Text style={styles.label}>Category:</Text>
             <Text style={styles.value}>{client?.category || 'N/A'}</Text>
@@ -304,21 +321,21 @@ export function QuotePDF({
           <Text style={styles.sectionTitle}>Service Items</Text>
           <View style={styles.table}>
             <View style={styles.tableHeader}>
-              <Text style={styles.col1}>Service Description</Text>
-              <Text style={styles.col2}>Support Item</Text>
-              <Text style={styles.col3}>Rate Breakdown</Text>
+              <Text style={isNdisClient ? styles.col1 : { width: '40%' }}>Service Description</Text>
+              {isNdisClient && <Text style={styles.col2}>Support Item</Text>}
+              <Text style={isNdisClient ? styles.col3 : { width: '35%' }}>Rate Breakdown</Text>
               <Text style={styles.col4}>Annual Total</Text>
             </View>
             {quote.lineItems?.map((item, index) => (
               <View key={item.id} style={index % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
-                <View style={styles.col1}>
+                <View style={isNdisClient ? styles.col1 : { width: '40%' }}>
                   <Text>{item.supportItemName || item.description}</Text>
                   {item.notes && (
                     <Text style={styles.rateBreakdown}>{item.notes}</Text>
                   )}
                 </View>
-                <Text style={styles.col2}>{item.supportItemNumber || '-'}</Text>
-                <View style={styles.col3}>
+                {isNdisClient && <Text style={styles.col2}>{item.supportItemNumber || '-'}</Text>}
+                <View style={isNdisClient ? styles.col3 : { width: '35%' }}>
                   <Text style={{ fontSize: 8 }}>{getRateBreakdown(item)}</Text>
                   <Text style={{ fontSize: 8, marginTop: 2, color: '#666' }}>
                     Weekly: {formatCurrency(item.weeklyTotal || "0")}
@@ -339,20 +356,30 @@ export function QuotePDF({
             <Text style={styles.totalValue}>{formatCurrency(calculateWeeklyTotal())}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>GST (NDIS Exempt):</Text>
+            <Text style={styles.totalLabel}>
+              {isNdisClient ? "GST (NDIS Exempt):" : "GST:"}
+            </Text>
             <Text style={styles.totalValue}>$0.00</Text>
           </View>
           <View style={styles.grandTotal}>
             <Text style={styles.grandTotalLabel}>Annual Total:</Text>
             <Text style={styles.grandTotalValue}>{formatCurrency(calculateAnnualTotal())}</Text>
           </View>
-          <Text style={styles.gstNote}>* All NDIS services are GST exempt</Text>
+          {isNdisClient && (
+            <Text style={styles.gstNote}>* All NDIS services are GST exempt</Text>
+          )}
         </View>
 
         {/* Valid Until Notice */}
         {quote.validUntil && (
           <View style={styles.validUntil}>
-            <Text>This quote is valid until {formatDate(quote.validUntil)}. Prices are subject to change after this date and may be adjusted based on the current NDIS Price Guide.</Text>
+            <Text>
+              This quote is valid until {formatDate(quote.validUntil)}. 
+              {isNdisClient 
+                ? " Prices are subject to change after this date and may be adjusted based on the current NDIS Price Guide."
+                : " Prices are subject to change after this date."
+              }
+            </Text>
           </View>
         )}
 
@@ -370,7 +397,7 @@ export function QuotePDF({
             {companyName} | {companyAddress} | {companyPhone} | {companyEmail}
           </Text>
           <Text style={styles.footerText}>
-            NDIS Registered Provider | Generated on {new Date().toLocaleDateString('en-AU')}
+            {isNdisClient ? "NDIS Registered Provider | " : ""}Generated on {new Date().toLocaleDateString('en-AU')}
           </Text>
         </View>
       </Page>

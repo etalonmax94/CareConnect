@@ -8,7 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Settings as SettingsIcon, MapPin, FileText, Bell, Shield, Building2, Save, Loader2 } from "lucide-react";
+import { Settings as SettingsIcon, MapPin, FileText, Bell, Shield, Building2, Save, Loader2, Calculator, FileCheck2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SettingsData {
   officeAddress?: string;
@@ -33,6 +35,21 @@ interface SettingsData {
     dataRetentionDays: number;
     auditLogging: boolean;
     encryptSensitiveData: boolean;
+  };
+  quoteSettings?: {
+    showWeekdayRate: boolean;
+    showSaturdayRate: boolean;
+    showSundayRate: boolean;
+    showPublicHolidayRate: boolean;
+    showEveningRate: boolean;
+    showNightRate: boolean;
+    defaultWeeksPerYear: number;
+    enableQldPublicHolidayUplift: boolean;
+    defaultTermsAndConditions: string;
+    defaultPaymentTerms: string;
+    defaultValidityDays: number;
+    requireNdisCodeForNdis: boolean;
+    quoteNumberPrefix: string;
   };
 }
 
@@ -68,6 +85,21 @@ export default function Settings() {
       auditLogging: true,
       encryptSensitiveData: true,
     },
+    quoteSettings: {
+      showWeekdayRate: true,
+      showSaturdayRate: true,
+      showSundayRate: true,
+      showPublicHolidayRate: true,
+      showEveningRate: true,
+      showNightRate: true,
+      defaultWeeksPerYear: 48,
+      enableQldPublicHolidayUplift: true,
+      defaultTermsAndConditions: "Services provided under this quote are subject to the National Disability Insurance Scheme (NDIS) Terms of Business and our Service Agreement. Rates quoted are GST-exempt for NDIS participants.",
+      defaultPaymentTerms: "Payment due within 14 days of invoice date. NDIS participants will be billed directly through the NDIA portal.",
+      defaultValidityDays: 30,
+      requireNdisCodeForNdis: true,
+      quoteNumberPrefix: "Q",
+    },
     ...settings,
   });
 
@@ -88,6 +120,7 @@ export default function Settings() {
         saveSetting("reportPreferences", formData.reportPreferences),
         saveSetting("notificationPreferences", formData.notificationPreferences),
         saveSetting("privacySettings", formData.privacySettings),
+        saveSetting("quoteSettings", formData.quoteSettings),
       ]);
       
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
@@ -150,6 +183,10 @@ export default function Settings() {
           <TabsTrigger value="privacy" data-testid="tab-privacy">
             <Shield className="w-4 h-4 mr-2" />
             Privacy & Compliance
+          </TabsTrigger>
+          <TabsTrigger value="quotes" data-testid="tab-quotes">
+            <FileCheck2 className="w-4 h-4 mr-2" />
+            Quotes
           </TabsTrigger>
         </TabsList>
 
@@ -493,6 +530,291 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="quotes">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rate Column Display</CardTitle>
+                <CardDescription>
+                  Choose which rate columns appear by default on new quotes
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Weekday Rate</p>
+                      <p className="text-sm text-muted-foreground">Mon-Fri standard hours</p>
+                    </div>
+                    <Switch
+                      checked={formData.quoteSettings?.showWeekdayRate ?? true}
+                      onCheckedChange={(checked) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, showWeekdayRate: checked }
+                        })
+                      }
+                      data-testid="switch-weekday-rate"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Saturday Rate</p>
+                      <p className="text-sm text-muted-foreground">Saturday penalty rates</p>
+                    </div>
+                    <Switch
+                      checked={formData.quoteSettings?.showSaturdayRate ?? true}
+                      onCheckedChange={(checked) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, showSaturdayRate: checked }
+                        })
+                      }
+                      data-testid="switch-saturday-rate"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Sunday Rate</p>
+                      <p className="text-sm text-muted-foreground">Sunday penalty rates</p>
+                    </div>
+                    <Switch
+                      checked={formData.quoteSettings?.showSundayRate ?? true}
+                      onCheckedChange={(checked) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, showSundayRate: checked }
+                        })
+                      }
+                      data-testid="switch-sunday-rate"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Public Holiday Rate</p>
+                      <p className="text-sm text-muted-foreground">Public holiday penalty rates</p>
+                    </div>
+                    <Switch
+                      checked={formData.quoteSettings?.showPublicHolidayRate ?? true}
+                      onCheckedChange={(checked) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, showPublicHolidayRate: checked }
+                        })
+                      }
+                      data-testid="switch-public-holiday-rate"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Evening Rate</p>
+                      <p className="text-sm text-muted-foreground">Evening hours (after 6pm)</p>
+                    </div>
+                    <Switch
+                      checked={formData.quoteSettings?.showEveningRate ?? true}
+                      onCheckedChange={(checked) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, showEveningRate: checked }
+                        })
+                      }
+                      data-testid="switch-evening-rate"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Night Rate</p>
+                      <p className="text-sm text-muted-foreground">Overnight hours (after 9pm)</p>
+                    </div>
+                    <Switch
+                      checked={formData.quoteSettings?.showNightRate ?? true}
+                      onCheckedChange={(checked) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, showNightRate: checked }
+                        })
+                      }
+                      data-testid="switch-night-rate"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Annual Calculation Defaults</CardTitle>
+                <CardDescription>
+                  Default settings for annual quote calculations
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="weeksPerYear">Default Weeks Per Year</Label>
+                    <Select 
+                      value={String(formData.quoteSettings?.defaultWeeksPerYear ?? 48)}
+                      onValueChange={(v) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, defaultWeeksPerYear: parseInt(v) }
+                        })
+                      }
+                    >
+                      <SelectTrigger id="weeksPerYear" data-testid="select-weeks-per-year">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="48">48 weeks (accounts for holidays)</SelectItem>
+                        <SelectItem value="50">50 weeks</SelectItem>
+                        <SelectItem value="52">52 weeks (full year)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      48 weeks is recommended to account for annual leave and public holidays
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="validityDays">Quote Validity Period (days)</Label>
+                    <Input
+                      id="validityDays"
+                      type="number"
+                      value={formData.quoteSettings?.defaultValidityDays ?? 30}
+                      onChange={(e) => 
+                        setFormData({
+                          ...formData,
+                          quoteSettings: { ...formData.quoteSettings!, defaultValidityDays: parseInt(e.target.value) || 30 }
+                        })
+                      }
+                      placeholder="30"
+                      data-testid="input-validity-days"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="font-medium">QLD Public Holiday Uplift</p>
+                    <p className="text-sm text-muted-foreground">
+                      Add rate difference for 12 QLD public holidays to annual calculation
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.quoteSettings?.enableQldPublicHolidayUplift ?? true}
+                    onCheckedChange={(checked) => 
+                      setFormData({
+                        ...formData,
+                        quoteSettings: { ...formData.quoteSettings!, enableQldPublicHolidayUplift: checked }
+                      })
+                    }
+                    data-testid="switch-qld-uplift"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quote Numbering</CardTitle>
+                <CardDescription>
+                  Configure how quote numbers are generated
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quotePrefix">Quote Number Prefix</Label>
+                  <Input
+                    id="quotePrefix"
+                    value={formData.quoteSettings?.quoteNumberPrefix ?? "Q"}
+                    onChange={(e) => 
+                      setFormData({
+                        ...formData,
+                        quoteSettings: { ...formData.quoteSettings!, quoteNumberPrefix: e.target.value }
+                      })
+                    }
+                    placeholder="Q"
+                    className="max-w-xs"
+                    data-testid="input-quote-prefix"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Quote numbers will be formatted as: {formData.quoteSettings?.quoteNumberPrefix || "Q"}2025-0001
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="font-medium">Require NDIS Support Item Code</p>
+                    <p className="text-sm text-muted-foreground">
+                      Make NDIS support item code mandatory for NDIS client quotes
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.quoteSettings?.requireNdisCodeForNdis ?? true}
+                    onCheckedChange={(checked) => 
+                      setFormData({
+                        ...formData,
+                        quoteSettings: { ...formData.quoteSettings!, requireNdisCodeForNdis: checked }
+                      })
+                    }
+                    data-testid="switch-require-ndis-code"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Default Quote Content</CardTitle>
+                <CardDescription>
+                  Set default terms and conditions that appear on new quotes
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="termsAndConditions">Terms and Conditions</Label>
+                  <Textarea
+                    id="termsAndConditions"
+                    value={formData.quoteSettings?.defaultTermsAndConditions ?? ""}
+                    onChange={(e) => 
+                      setFormData({
+                        ...formData,
+                        quoteSettings: { ...formData.quoteSettings!, defaultTermsAndConditions: e.target.value }
+                      })
+                    }
+                    placeholder="Enter default terms and conditions..."
+                    className="min-h-[100px]"
+                    data-testid="textarea-terms"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="paymentTerms">Payment Terms</Label>
+                  <Textarea
+                    id="paymentTerms"
+                    value={formData.quoteSettings?.defaultPaymentTerms ?? ""}
+                    onChange={(e) => 
+                      setFormData({
+                        ...formData,
+                        quoteSettings: { ...formData.quoteSettings!, defaultPaymentTerms: e.target.value }
+                      })
+                    }
+                    placeholder="Enter default payment terms..."
+                    className="min-h-[80px]"
+                    data-testid="textarea-payment-terms"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h4 className="font-medium text-blue-900 dark:text-blue-100">Multi-Category Support</h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                Quotes automatically adapt based on client category. NDIS Support Item codes are hidden 
+                for Support at Home and Private clients, and terms can be customized per quote.
+              </p>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
