@@ -1,13 +1,29 @@
-import { Clock, LogOut, Mail, RefreshCw, Loader2 } from "lucide-react";
+import { Clock, LogOut, Mail, RefreshCw, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
 export default function PendingApproval() {
   const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<"pending" | "rejected" | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        const data = await response.json();
+        if (data.authenticated && data.user?.approvalStatus) {
+          setStatus(data.user.approvalStatus as "pending" | "rejected");
+        }
+      } catch {
+        // Ignore errors
+      }
+    };
+    checkStatus();
+  }, []);
 
   const handleRefresh = async () => {
     setIsLoading(true);
@@ -20,9 +36,12 @@ export default function PendingApproval() {
       } else if (!data.authenticated) {
         window.location.href = "/login";
       } else {
+        setStatus(data.user?.approvalStatus as "pending" | "rejected");
         toast({
-          title: "Still Pending",
-          description: "Your account is still awaiting approval. Please check back later.",
+          title: status === "rejected" ? "Access Denied" : "Still Pending",
+          description: status === "rejected" 
+            ? "Your access request has been denied." 
+            : "Your account is still awaiting approval. Please check back later.",
         });
       }
     } catch {
@@ -46,6 +65,8 @@ export default function PendingApproval() {
     }
   };
 
+  const isRejected = status === "rejected";
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -53,50 +74,82 @@ export default function PendingApproval() {
           <div className="mx-auto flex items-center justify-center mb-2">
             <img src={logoImage} alt="EmpowerLink" className="h-10 w-auto" data-testid="img-logo" />
           </div>
-          <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
-            <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+          <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${
+            isRejected 
+              ? "bg-red-100 dark:bg-red-900/20" 
+              : "bg-amber-100 dark:bg-amber-900/20"
+          }`}>
+            {isRejected ? (
+              <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            ) : (
+              <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            )}
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Awaiting Approval</CardTitle>
+          <CardTitle className="text-2xl font-bold text-foreground">
+            {isRejected ? "Access Denied" : "Awaiting Approval"}
+          </CardTitle>
           <CardDescription className="text-base">
-            Your account is pending approval from an administrator
+            {isRejected 
+              ? "Your access request has been denied by an administrator"
+              : "Your account is pending approval from an administrator"
+            }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center text-sm text-muted-foreground space-y-3">
-            <p>
-              Thank you for registering with EmpowerLink. Your account has been created 
-              and is now awaiting approval from a Director or Operations Manager.
-            </p>
-            <p>
-              You will be able to access the system once your account has been approved 
-              and a role has been assigned to you.
-            </p>
+            {isRejected ? (
+              <>
+                <p>
+                  Your request to access EmpowerLink has been reviewed and denied.
+                </p>
+                <p>
+                  If you believe this is an error, please contact your manager or 
+                  the system administrator for assistance.
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  Thank you for registering with EmpowerLink. Your account has been created 
+                  and is now awaiting approval from a Director or Operations Manager.
+                </p>
+                <p>
+                  You will be able to access the system once your account has been approved 
+                  and a role has been assigned to you.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Mail className="h-4 w-4" />
-              <span>Need urgent access?</span>
+              <span>{isRejected ? "Need help?" : "Need urgent access?"}</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Contact your manager or administrator to expedite the approval process.
+              {isRejected 
+                ? "Contact your manager or administrator to discuss your access request."
+                : "Contact your manager or administrator to expedite the approval process."
+              }
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
-            <Button 
-              onClick={handleRefresh} 
-              className="w-full gap-2"
-              disabled={isLoading}
-              data-testid="button-check-status"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Check Approval Status
-            </Button>
+            {!isRejected && (
+              <Button 
+                onClick={handleRefresh} 
+                className="w-full gap-2"
+                disabled={isLoading}
+                data-testid="button-check-status"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Check Approval Status
+              </Button>
+            )}
             
             <Button 
               variant="outline" 

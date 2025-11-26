@@ -174,8 +174,8 @@ function AppContent() {
     return <Redirect to="/login" />;
   }
 
-  // Check if user is pending approval
-  if (auth.user?.approvalStatus === "pending") {
+  // Check if user is pending approval or rejected
+  if (auth.user?.approvalStatus === "pending" || auth.user?.approvalStatus === "rejected") {
     return <Redirect to="/pending-approval" />;
   }
 
