@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { 
-  clients, progressNotes, invoices, budgets, settings, activityLog, incidentReports, privacyConsents,
+  clients, progressNotes, invoices, budgets, settings, activityLog, auditLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
@@ -8,6 +8,7 @@ import {
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
+  type InsertAuditLog, type AuditLog,
   type InsertIncidentReport, type IncidentReport, type InsertPrivacyConsent, type PrivacyConsent,
   type InsertStaff, type Staff, type InsertSupportCoordinator, type SupportCoordinator,
   type InsertPlanManager, type PlanManager, type InsertNdisService, type NdisService,
@@ -25,7 +26,7 @@ import {
   type InsertClientBehavior, type ClientBehavior,
   type InsertLeadershipMeetingNote, type LeadershipMeetingNote
 } from "@shared/schema";
-import { eq, desc, or, ilike, and, gte, sql } from "drizzle-orm";
+import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Clients
@@ -69,6 +70,21 @@ export interface IStorage {
   getRecentActivity(limit?: number): Promise<ActivityLog[]>;
   getActivityByClient(clientId: string): Promise<ActivityLog[]>;
   logActivity(log: InsertActivityLog): Promise<ActivityLog>;
+  
+  // Audit Log
+  getAuditLogs(filters?: {
+    entityType?: string;
+    entityId?: string;
+    operation?: string;
+    userId?: string;
+    clientId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ logs: AuditLog[]; total: number }>;
+  getAuditLogById(id: string): Promise<AuditLog | undefined>;
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   
   // Incident Reports
   getAllIncidentReports(): Promise<IncidentReport[]>;
@@ -503,6 +519,70 @@ export class DbStorage implements IStorage {
 
   async logActivity(log: InsertActivityLog): Promise<ActivityLog> {
     const result = await db.insert(activityLog).values(log).returning();
+    return result[0];
+  }
+
+  // Audit Log
+  async getAuditLogs(filters?: {
+    entityType?: string;
+    entityId?: string;
+    operation?: string;
+    userId?: string;
+    clientId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ logs: AuditLog[]; total: number }> {
+    const conditions: any[] = [];
+    
+    if (filters?.entityType) {
+      conditions.push(eq(auditLog.entityType, filters.entityType));
+    }
+    if (filters?.entityId) {
+      conditions.push(eq(auditLog.entityId, filters.entityId));
+    }
+    if (filters?.operation) {
+      conditions.push(eq(auditLog.operation, filters.operation));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(auditLog.userId, filters.userId));
+    }
+    if (filters?.clientId) {
+      conditions.push(eq(auditLog.clientId, filters.clientId));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(auditLog.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(auditLog.createdAt, filters.endDate));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(auditLog)
+      .where(whereClause);
+    
+    const logs = await db.select().from(auditLog)
+      .where(whereClause)
+      .orderBy(desc(auditLog.createdAt))
+      .limit(filters?.limit || 50)
+      .offset(filters?.offset || 0);
+    
+    return { 
+      logs, 
+      total: Number(countResult[0]?.count || 0) 
+    };
+  }
+
+  async getAuditLogById(id: string): Promise<AuditLog | undefined> {
+    const result = await db.select().from(auditLog).where(eq(auditLog.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const result = await db.insert(auditLog).values(log).returning();
     return result[0];
   }
 

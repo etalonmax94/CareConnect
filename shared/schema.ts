@@ -433,6 +433,38 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
 
+// Comprehensive Audit Log for detailed change tracking
+export const auditLog = pgTable("audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // client, document, note, incident, budget, etc.
+  entityId: varchar("entity_id").notNull(),
+  entityName: text("entity_name"), // Human-readable name of the entity
+  operation: text("operation").notNull().$type<"create" | "update" | "delete" | "archive" | "restore">(),
+  changedFields: text("changed_fields").array(), // List of fields that were changed
+  oldValues: json("old_values").$type<Record<string, unknown>>(), // Previous values
+  newValues: json("new_values").$type<Record<string, unknown>>(), // New values
+  userId: varchar("user_id"),
+  userName: text("user_name").notNull(),
+  userRole: text("user_role"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }), // Related client if applicable
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLog, {
+  operation: z.enum(["create", "update", "delete", "archive", "restore"]),
+  changedFields: z.array(z.string()).optional().nullable(),
+  oldValues: z.record(z.unknown()).optional().nullable(),
+  newValues: z.record(z.unknown()).optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLog.$inferSelect;
+
 // Incident Reports
 export const incidentReports = pgTable("incident_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
