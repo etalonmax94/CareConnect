@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import CategoryBadge from "./CategoryBadge";
-import FundingTypeBadge from "./FundingTypeBadge";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
 import { ArrowUpDown, ArrowUp, ArrowDown, Phone, Mail, CalendarPlus, Star, StarOff, Heart, HeartOff, Sparkles, MoreHorizontal, Eye, Edit, UserPlus, Archive } from "lucide-react";
 import { useLocation } from "wouter";
@@ -20,7 +19,6 @@ interface ColumnVisibility {
   phone: boolean;
   careManager: boolean;
   compliance: boolean;
-  fundingType: boolean;
 }
 
 interface ClientTableProps {
@@ -40,7 +38,6 @@ const defaultColumnVisibility: ColumnVisibility = {
   phone: true,
   careManager: true,
   compliance: true,
-  fundingType: true,
 };
 
 export default function ClientTable({ 
@@ -223,9 +220,6 @@ export default function ClientTable({
                   </button>
                 </TableHead>
               )}
-              {columnVisibility.fundingType && (
-                <TableHead>Funding Type</TableHead>
-              )}
               {columnVisibility.phone && (
                 <TableHead>
                   <button 
@@ -270,7 +264,6 @@ export default function ClientTable({
               const clientAge = calculateAge(client.dateOfBirth);
               const isNewClient = client.isOnboarded !== "yes";
               const isHovered = hoveredClientId === client.id;
-              const fundingType = client.category === "NDIS" ? client.ndisDetails?.ndisFundingType : null;
               
               return (
                 <TableRow 
@@ -353,15 +346,6 @@ export default function ClientTable({
                           <p className="text-xs text-muted-foreground font-mono">{clientId}</p>
                         )}
                       </div>
-                    </TableCell>
-                  )}
-                  {columnVisibility.fundingType && (
-                    <TableCell>
-                      {fundingType ? (
-                        <FundingTypeBadge fundingType={fundingType} />
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
                     </TableCell>
                   )}
                   {columnVisibility.phone && (

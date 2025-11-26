@@ -26,7 +26,6 @@ interface ColumnVisibility {
   phone: boolean;
   careManager: boolean;
   compliance: boolean;
-  fundingType: boolean;
 }
 
 const defaultColumnVisibility: ColumnVisibility = {
@@ -35,7 +34,6 @@ const defaultColumnVisibility: ColumnVisibility = {
   phone: true,
   careManager: true,
   compliance: true,
-  fundingType: true,
 };
 
 export default function Clients() {
@@ -297,15 +295,6 @@ export default function Clients() {
                           checked={columnVisibility.category} 
                           onCheckedChange={() => toggleColumn("category")}
                           data-testid="toggle-column-category"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="col-funding" className="text-sm cursor-pointer">Funding Type</Label>
-                        <Switch 
-                          id="col-funding" 
-                          checked={columnVisibility.fundingType} 
-                          onCheckedChange={() => toggleColumn("fundingType")}
-                          data-testid="toggle-column-funding"
                         />
                       </div>
                       <div className="flex items-center justify-between">
