@@ -182,17 +182,75 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                 <FormField
                   control={form.control}
-                  name="homeAddress"
+                  name="streetAddress"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Home Address</FormLabel>
+                      <FormLabel>Street Address</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="Street, City, State, Postcode" data-testid="input-address" />
+                        <Input {...field} value={field.value || ""} placeholder="123 Main Street" data-testid="input-street-address" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="suburb"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Suburb/City</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="Sydney" data-testid="input-suburb" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="state"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>State</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-state">
+                              <SelectValue placeholder="Select state" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="NSW">NSW</SelectItem>
+                            <SelectItem value="VIC">VIC</SelectItem>
+                            <SelectItem value="QLD">QLD</SelectItem>
+                            <SelectItem value="WA">WA</SelectItem>
+                            <SelectItem value="SA">SA</SelectItem>
+                            <SelectItem value="TAS">TAS</SelectItem>
+                            <SelectItem value="ACT">ACT</SelectItem>
+                            <SelectItem value="NT">NT</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="postcode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Postcode</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="2000" maxLength={4} data-testid="input-postcode" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}

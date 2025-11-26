@@ -966,10 +966,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vcfContent.push(`EMAIL:${client.email}`);
       }
       
-      // Add address (homeAddress is a single field)
-      if (client.homeAddress) {
-        vcfContent.push(`ADR;TYPE=HOME:;;${client.homeAddress};;;;Australia`);
-        vcfContent.push(`LABEL;TYPE=HOME:${client.homeAddress}`);
+      // Add address - prefer separate fields if available, otherwise use homeAddress
+      if (client.streetAddress || client.homeAddress) {
+        const street = client.streetAddress || client.homeAddress || '';
+        const city = client.suburb || '';
+        const state = client.state || '';
+        const postcode = client.postcode || '';
+        vcfContent.push(`ADR;TYPE=HOME:;;${street};${city};${state};${postcode};Australia`);
+        
+        // Build label from available parts
+        const addressParts = [client.streetAddress || client.homeAddress, client.suburb, client.state, client.postcode].filter(Boolean);
+        vcfContent.push(`LABEL;TYPE=HOME:${addressParts.join(', ')}`);
       }
       
       // Add birthday
@@ -982,8 +989,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vcfContent.push(`NOTE:${notesText}`);
       }
       
-      // Add organization
-      vcfContent.push('ORG:EmpowerLink Client');
+      // Build organization section with notification preferences
+      const notifPrefs = client.notificationPreferences;
+      const notifParts: string[] = [];
+      if (notifPrefs?.smsArrival || notifPrefs?.smsSchedule) {
+        notifParts.push('SMS Arrivals & Schedules');
+      }
+      if (notifPrefs?.callArrival || notifPrefs?.callSchedule) {
+        notifParts.push('Calls Arrivals & Schedules');
+      }
+      const notifText = notifParts.length > 0 ? notifParts.join(', ') : '';
+      
+      // Add organization with notification preference
+      if (notifText) {
+        vcfContent.push(`ORG:EmpowerLink Client - ${notifText}`);
+      } else {
+        vcfContent.push('ORG:EmpowerLink Client');
+      }
       
       // Add photo if exists
       if (client.photo) {

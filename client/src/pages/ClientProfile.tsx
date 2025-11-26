@@ -1171,12 +1171,43 @@ export default function ClientProfile() {
                           </div>
                         )}
                       </div>
-                      {client.homeAddress && (
+                      
+                      {/* Notification Preferences */}
+                      {client.notificationPreferences && (client.notificationPreferences.smsArrival || client.notificationPreferences.smsSchedule || client.notificationPreferences.callArrival || client.notificationPreferences.callSchedule) && (
+                        <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                          <Bell className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">Notification Preference</p>
+                            <p className="text-sm font-medium" data-testid="text-notification-pref">
+                              {(() => {
+                                const prefs = [];
+                                if (client.notificationPreferences?.smsArrival || client.notificationPreferences?.smsSchedule) {
+                                  prefs.push('SMS Arrivals & Schedules');
+                                }
+                                if (client.notificationPreferences?.callArrival || client.notificationPreferences?.callSchedule) {
+                                  prefs.push('Calls Arrivals & Schedules');
+                                }
+                                return prefs.join(', ') || 'None';
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {(client.homeAddress || client.streetAddress) && (
                         <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
                           <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
                           <div className="flex-1">
                             <p className="text-xs text-muted-foreground">Address</p>
-                            <p className="text-sm font-medium">{client.homeAddress}</p>
+                            <p className="text-sm font-medium">
+                              {client.streetAddress ? (
+                                <>
+                                  {client.streetAddress}
+                                  {(client.suburb || client.state || client.postcode) && <br />}
+                                  {[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}
+                                </>
+                              ) : client.homeAddress}
+                            </p>
                             {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
                               <p className="text-xs text-muted-foreground mt-1">
                                 <Navigation className="w-3 h-3 inline mr-1" />
