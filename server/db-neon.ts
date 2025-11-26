@@ -14,3 +14,5 @@ export const db = drizzle({
   schema,
   ws: ws,
 });
+
+console.log('Database: Using Neon serverless connection (WebSocket)');

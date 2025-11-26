@@ -18,6 +18,10 @@ COPY server ./server
 COPY drizzle.config.ts ./
 COPY tsconfig.json ./
 
+# IMPORTANT: Replace Neon serverless db.ts with Cloud SQL pg driver version
+# This is necessary because Cloud SQL uses standard PostgreSQL, not Neon's WebSocket protocol
+RUN cp server/db-cloudsql.ts server/db.ts
+
 # Build ONLY the backend server for Cloud Run (skip frontend, API-only)
 RUN npx esbuild server/index-cloudrun.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.mjs
 

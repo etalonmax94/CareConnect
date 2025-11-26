@@ -1,0 +1,63 @@
+
+2025-11-26 20:55:53.996 DDUT
+Node.js v20.19.6
+
+2025-11-26 20:55:54.266 DDUT
+Container called exit(1).
+
+2025-11-26 20:55:54.381 DDUT
+Default STARTUP TCP probe failed 1 time consecutively for container "placeholder-1" on port 8080. The instance was not started. Connection failed with status CANCELLED.
+
+2025-11-26 20:55:55.028 DDUT
+Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+
+2025-11-26 20:55:56.053 DDUT
+file:///app/dist/index.mjs:6
+
+2025-11-26 20:55:56.054 DDUT
+throw Error('Dynamic require of "' + x + '" is not supported');
+
+2025-11-26 20:55:56.054 DDUT
+^
+
+2025-11-26 20:55:56.054 DDUT
+Error: Dynamic require of "drizzle-orm/node-postgres" is not supported at file:///app/dist/index.mjs:6:9 at file:///app/dist/index.mjs:861:23 at ModuleJob.run (node:internal/modules/esm/module_job:325:25) at async ModuleLoader.import (node:internal/modules/esm/loader:606:24) at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+2025-11-26 20:55:56.054 DDUT
+Node.js v20.19.6
+
+2025-11-26 20:55:56.267 DDUT
+Container called exit(1).
+
+2025-11-26 20:55:56.354 DDUT
+Default STARTUP TCP probe failed 1 time consecutively for container "placeholder-1" on port 8080. The instance was not started. Connection failed with status CANCELLED.
+
+2025-11-26 20:55:56.620 DDUT
+Cloud Run ReplaceService careconnect-00012-xjf  {@type: type.googleapis.com/google.cloud.audit.AuditLog, methodName: /Services.ReplaceService, resourceName: namespaces/empowerlinkcrm/revisions/careconnect-00012-xjf, response: {…}, serviceName: run.googleapis.com, status: {…}}
+
+2025-11-26 20:55:56.706 DDUT
+Cloud Run ReplaceService careconnect  {@type: type.googleapis.com/google.cloud.audit.AuditLog, methodName: /Services.ReplaceService, resourceName: namespaces/empowerlinkcrm/services/careconnect, response: {…}, serviceName: run.googleapis.com, status: {…}}
+
+2025-11-26 20:55:58.028 DDUT
+Starting new instance. Reason: MANUAL_OR_CUSTOMER_MIN_INSTANCE - Instance started because of customer-configured min-instances or manual scaling.
+
+2025-11-26 20:55:59.075 DDUT
+file:///app/dist/index.mjs:6
+
+2025-11-26 20:55:59.075 DDUT
+throw Error('Dynamic require of "' + x + '" is not supported');
+
+2025-11-26 20:55:59.075 DDUT
+^
+
+2025-11-26 20:55:59.075 DDUT
+Error: Dynamic require of "drizzle-orm/node-postgres" is not supported at file:///app/dist/index.mjs:6:9 at file:///app/dist/index.mjs:861:23 at ModuleJob.run (node:internal/modules/esm/module_job:325:25) at async ModuleLoader.import (node:internal/modules/esm/loader:606:24) at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+2025-11-26 20:55:59.075 DDUT
+Node.js v20.19.6
+
+2025-11-26 20:55:59.292 DDUT
+Container called exit(1).
+
+2025-11-26 20:55:59.368 DDUT
+Default STARTUP TCP probe failed 1 time consecutively for container "placeholder-1" on port 8080. The instance was not started. Connection failed with status CANCELLED.
