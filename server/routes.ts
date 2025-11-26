@@ -152,7 +152,12 @@ const ZOHO_TOKEN_URL = "https://accounts.zoho.com.au/oauth/v2/token";
 const ZOHO_USER_URL = "https://accounts.zoho.com.au/oauth/user/info";
 
 // Get base URL for redirects
+// For Cloud Run, use CLOUD_RUN_URL env var to ensure consistent OAuth callback URL
 function getBaseUrl(req: Request): string {
+  // Use explicit Cloud Run URL if set (required for OAuth callback consistency)
+  if (process.env.CLOUD_RUN_URL) {
+    return process.env.CLOUD_RUN_URL;
+  }
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   return `${protocol}://${host}`;
