@@ -1,4 +1,4 @@
-import { Home, Users, FileText, BarChart3, Settings, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, ChevronRight } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -79,7 +79,6 @@ const menuCategories: MenuCategory[] = [
     label: "System",
     items: [
       { title: "Reports", url: "/reports", icon: BarChart3, iconColor: "text-orange-500" },
-      { title: "Settings", url: "/settings", icon: Settings, iconColor: "text-slate-500" },
     ],
   },
 ];

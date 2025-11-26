@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Archive, Users, Filter, LayoutGrid, LayoutList, Columns, ChevronDown, Rows3, Rows2, Rows4 } from "lucide-react";
+import { Plus, Archive, Users, Filter, LayoutGrid, LayoutList, SlidersHorizontal, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ClientTable from "@/components/ClientTable";
 import ClientGrid from "@/components/ClientGrid";
 import type { Client, ClientCategory } from "@shared/schema";
@@ -218,81 +221,127 @@ export default function Clients() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)}>
-            <ToggleGroupItem value="list" aria-label="List view" data-testid="view-list">
-              <LayoutList className="w-4 h-4" />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="grid" aria-label="Grid view" data-testid="view-grid">
-              <LayoutGrid className="w-4 h-4" />
-            </ToggleGroupItem>
-          </ToggleGroup>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" data-testid="button-display-options">
+              <SlidersHorizontal className="w-4 h-4 mr-2" />
+              Display
+              <span className="ml-2 text-xs text-muted-foreground">
+                {viewMode === "list" ? "List" : "Grid"} • {density.charAt(0).toUpperCase() + density.slice(1)}
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72" data-testid="popover-display-options">
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium text-sm mb-3">View Mode</h4>
+                <div className="flex gap-2">
+                  <Button
+                    variant={viewMode === "list" ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 gap-2"
+                    onClick={() => setViewMode("list")}
+                    data-testid="view-list"
+                  >
+                    <LayoutList className="w-4 h-4" />
+                    List
+                  </Button>
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 gap-2"
+                    onClick={() => setViewMode("grid")}
+                    data-testid="view-grid"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                    Grid
+                  </Button>
+                </div>
+              </div>
 
-          <ToggleGroup type="single" value={density} onValueChange={(v) => v && setDensity(v as DensityMode)}>
-            <ToggleGroupItem value="compact" aria-label="Compact" data-testid="density-compact" title="Compact">
-              <Rows3 className="w-4 h-4" />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="standard" aria-label="Standard" data-testid="density-standard" title="Standard">
-              <Rows2 className="w-4 h-4" />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="expanded" aria-label="Expanded" data-testid="density-expanded" title="Expanded">
-              <Rows4 className="w-4 h-4" />
-            </ToggleGroupItem>
-          </ToggleGroup>
+              <Separator />
 
-          {viewMode === "list" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-columns">
-                  <Columns className="w-4 h-4 mr-2" />
-                  Columns
-                  <ChevronDown className="w-4 h-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.client}
-                  disabled
-                  className="opacity-60 cursor-not-allowed"
-                >
-                  Client (required)
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.category}
-                  onCheckedChange={() => toggleColumn("category")}
-                >
-                  Category
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.fundingType}
-                  onCheckedChange={() => toggleColumn("fundingType")}
-                >
-                  Funding Type
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.phone}
-                  onCheckedChange={() => toggleColumn("phone")}
-                >
-                  Phone
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.careManager}
-                  onCheckedChange={() => toggleColumn("careManager")}
-                >
-                  Care Manager
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.compliance}
-                  onCheckedChange={() => toggleColumn("compliance")}
-                >
-                  Compliance
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
+              <div>
+                <h4 className="font-medium text-sm mb-3">Density</h4>
+                <RadioGroup value={density} onValueChange={(v) => setDensity(v as DensityMode)}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="compact" id="density-compact" data-testid="density-compact" />
+                    <Label htmlFor="density-compact" className="cursor-pointer">Compact</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="standard" id="density-standard" data-testid="density-standard" />
+                    <Label htmlFor="density-standard" className="cursor-pointer">Standard</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="expanded" id="density-expanded" data-testid="density-expanded" />
+                    <Label htmlFor="density-expanded" className="cursor-pointer">Expanded</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {viewMode === "list" && (
+                <>
+                  <Separator />
+
+                  <div>
+                    <h4 className="font-medium text-sm mb-3">Visible Columns</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm text-muted-foreground">Client (required)</Label>
+                        <Switch checked disabled className="opacity-50" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="col-category" className="text-sm cursor-pointer">Category</Label>
+                        <Switch 
+                          id="col-category" 
+                          checked={columnVisibility.category} 
+                          onCheckedChange={() => toggleColumn("category")}
+                          data-testid="toggle-column-category"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="col-funding" className="text-sm cursor-pointer">Funding Type</Label>
+                        <Switch 
+                          id="col-funding" 
+                          checked={columnVisibility.fundingType} 
+                          onCheckedChange={() => toggleColumn("fundingType")}
+                          data-testid="toggle-column-funding"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="col-phone" className="text-sm cursor-pointer">Phone</Label>
+                        <Switch 
+                          id="col-phone" 
+                          checked={columnVisibility.phone} 
+                          onCheckedChange={() => toggleColumn("phone")}
+                          data-testid="toggle-column-phone"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="col-care-manager" className="text-sm cursor-pointer">Care Manager</Label>
+                        <Switch 
+                          id="col-care-manager" 
+                          checked={columnVisibility.careManager} 
+                          onCheckedChange={() => toggleColumn("careManager")}
+                          data-testid="toggle-column-care-manager"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="col-compliance" className="text-sm cursor-pointer">Compliance</Label>
+                        <Switch 
+                          id="col-compliance" 
+                          checked={columnVisibility.compliance} 
+                          onCheckedChange={() => toggleColumn("compliance")}
+                          data-testid="toggle-column-compliance"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {activeTab === "active" ? (
