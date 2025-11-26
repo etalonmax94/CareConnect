@@ -2,49 +2,12 @@
 // This version does NOT serve static files (frontend is hosted separately on Replit)
 
 import { type Server } from "node:http";
-import express, { type Express } from "express";
-import runApp, { app } from "./app";
-
-// CORS configuration - MUST be applied BEFORE routes are registered
-// This middleware runs early in the request pipeline
-function setupCors() {
-  app.use((req, res, next) => {
-    // Allow requests from production frontend domains
-    const allowedOrigins = [
-      'https://app.empowerlink.au',
-      'https://empowerlink.au',
-      'http://localhost:5000', // Local development
-      'http://localhost:3000', // Alternative local dev port
-      process.env.ALLOWED_ORIGIN // Allow custom origin via env var
-    ].filter(Boolean);
-    
-    const origin = req.headers.origin;
-    // Check if origin is in allowed list OR is a Replit dev URL
-    const isAllowedOrigin = origin && (
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.replit.dev') ||
-      origin.endsWith('.repl.co')
-    );
-    
-    if (isAllowedOrigin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      res.status(204).end();
-      return;
-    }
-    
-    next();
-  });
-}
+import { type Express } from "express";
+import runApp from "./app";
 
 // For Cloud Run backend-only deployment, we skip static file serving
 // The frontend is hosted separately (e.g., on Replit)
+// Note: CORS is now handled in app.ts as the first middleware
 export async function setupApiOnly(_app: Express, _server: Server) {
   // For any unmatched routes in a backend-only deployment, return 404
   // This includes both non-API routes and undefined API endpoints
@@ -57,7 +20,5 @@ export async function setupApiOnly(_app: Express, _server: Server) {
 }
 
 (async () => {
-  // Apply CORS BEFORE routes are registered
-  setupCors();
   await runApp(setupApiOnly);
 })();

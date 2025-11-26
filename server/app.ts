@@ -44,6 +44,40 @@ export const app = express();
 // Trust proxy - required for secure cookies when running behind a reverse proxy (like Replit)
 app.set('trust proxy', 1);
 
+// CORS configuration - MUST be first middleware for cross-origin requests
+// This is especially important for Cloud Run where frontend is hosted separately
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'https://app.empowerlink.au',
+    'https://empowerlink.au',
+    'http://localhost:5000',
+    'http://localhost:3000',
+    process.env.ALLOWED_ORIGIN
+  ].filter(Boolean) as string[];
+  
+  const origin = req.headers.origin;
+  const isAllowedOrigin = origin && (
+    allowedOrigins.includes(origin) ||
+    origin.endsWith('.replit.dev') ||
+    origin.endsWith('.repl.co')
+  );
+  
+  if (isAllowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
+  // Handle preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  
+  next();
+});
+
 // Session store setup
 const SessionStore = MemoryStore(session);
 
