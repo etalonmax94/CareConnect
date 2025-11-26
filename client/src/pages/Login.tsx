@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { LogIn, TestTube2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
 const DEV_ROLES = [
   "Support Worker",
@@ -62,14 +63,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl font-bold text-primary-foreground">E</span>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 p-4">
+      <Card className="w-full max-w-md shadow-2xl border-0">
+        <CardHeader className="text-center space-y-4 pb-2">
+          <div className="mx-auto flex items-center justify-center mb-2">
+            <img src={logoImage} alt="EmpowerLink" className="h-10 w-auto" data-testid="img-logo" />
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to EmpowerLink</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold text-foreground">Welcome Back</CardTitle>
+          <CardDescription className="text-base">
             Healthcare CRM for NDIS, Aged Care & Private Clients
           </CardDescription>
         </CardHeader>
