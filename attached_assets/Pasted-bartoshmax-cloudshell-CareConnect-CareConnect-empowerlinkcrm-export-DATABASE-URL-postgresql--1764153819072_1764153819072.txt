@@ -1,0 +1,51 @@
+bartoshmax@cloudshell:~/CareConnect/CareConnect (empowerlinkcrm)$ export DATABASE_URL='postgresql://mainlogin:Porsche2023!!@35.189.33.53:5432/postgres?sslmode=require'
+npm run db:push
+
+> rest-express@1.0.0 db:push
+> drizzle-kit push
+
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/bartoshmax/CareConnect/CareConnect/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⡿] Pulling schema from database...
+Error: unable to verify the first certificate; if the root CA is installed locally, try running Node.js with --use-system-ca
+    at /home/bartoshmax/CareConnect/CareConnect/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.query (/home/bartoshmax/CareConnect/CareConnect/node_modules/drizzle-kit/bin.cjs:80601:26)
+    at async fromDatabase2 (/home/bartoshmax/CareConnect/CareConnect/node_modules/drizzle-kit/bin.cjs:19253:25) {
+  code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+}
+bartoshmax@cloudshell:~/CareConnect/CareConnect (empowerlinkcrm)$ export DATABASE_URL='postgresql://mainlogin:Porsche2023!!@35.189.33.53:5432/postgres?sslmode=no-verify'
+npm run db:push
+
+> rest-express@1.0.0 db:push
+> drizzle-kit push
+
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/bartoshmax/CareConnect/CareConnect/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣻] Pulling schema from database...
+error: password authentication failed for user "mainlogin"
+    at /home/bartoshmax/CareConnect/CareConnect/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.query (/home/bartoshmax/CareConnect/CareConnect/node_modules/drizzle-kit/bin.cjs:80601:26)
+    at async fromDatabase2 (/home/bartoshmax/CareConnect/CareConnect/node_modules/drizzle-kit/bin.cjs:19253:25) {
+  length: 105,
+  severity: 'FATAL',
+  code: '28P01',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'auth.c',
+  line: '360',
+  routine: 'auth_failed'
+}
+bartoshmax@cloudshell:~/CareConnect/CareConnect (empowerlinkcrm)$ 
