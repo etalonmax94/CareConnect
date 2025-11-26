@@ -92,10 +92,24 @@ export function AppSidebar({ user }: AppSidebarProps) {
   
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout", {});
+      // Clear JWT token from localStorage first
+      localStorage.removeItem('empowerlink_auth_token');
+      
+      // Try to call logout API (for session-based auth)
+      try {
+        await apiRequest("POST", "/api/auth/logout", {});
+      } catch {
+        // Ignore API errors - token is already cleared
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.clear();
+      window.location.href = "/login";
+    },
+    onError: () => {
+      // Force redirect even on error
+      localStorage.removeItem('empowerlink_auth_token');
+      queryClient.clear();
       window.location.href = "/login";
     },
   });

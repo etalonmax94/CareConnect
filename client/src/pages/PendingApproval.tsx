@@ -58,9 +58,19 @@ export default function PendingApproval() {
   const handleLogout = async () => {
     setIsLoading(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      // Clear JWT token from localStorage first
+      localStorage.removeItem('empowerlink_auth_token');
+      
+      // Try to call logout API
+      try {
+        await fetch("/api/auth/logout", { method: "POST" });
+      } catch {
+        // Ignore API errors - token is already cleared
+      }
+      
       window.location.href = "/login";
     } catch {
+      localStorage.removeItem('empowerlink_auth_token');
       window.location.href = "/login";
     }
   };

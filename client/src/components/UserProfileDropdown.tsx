@@ -61,11 +61,26 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
 
   const handleSignOut = async () => {
     try {
-      await apiRequest("POST", "/api/auth/logout");
+      // Clear JWT token from localStorage first
+      localStorage.removeItem('empowerlink_auth_token');
+      
+      // Try to call logout API (for session-based auth)
+      try {
+        await apiRequest("POST", "/api/auth/logout");
+      } catch {
+        // Ignore API errors - token is already cleared
+      }
+      
+      // Clear query cache
       queryClient.clear();
-      setLocation("/login");
+      
+      // Force full page redirect to login
+      window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);
+      // Force redirect even on error
+      localStorage.removeItem('empowerlink_auth_token');
+      window.location.href = "/login";
     }
   };
 
