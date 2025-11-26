@@ -292,10 +292,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Zoho user email:", userEmail);
       
+      // Pre-approved admin emails - these users are auto-approved with their respective roles
+      const PRE_APPROVED_ADMINS: Record<string, UserRole[]> = {
+        "max.bartosh@empowerlink.au": ["director"],
+        "sarah.little@empowerlink.au": ["operations_manager"]
+      };
+      
       // Check if user exists in our database
       let user = await storage.getUserByEmail(userEmail);
+      let isNewUser = false;
       
       if (!user) {
+        isNewUser = true;
+        
+        // Check if email is pre-approved admin
+        const preApprovedRoles = PRE_APPROVED_ADMINS[userEmail.toLowerCase()];
+        
+        // Check if email matches existing staff member for auto-linking
+        const matchingStaff = await storage.getStaffByEmail(userEmail);
+        
+        // Determine initial approval status and roles
+        let initialApprovalStatus: "approved" | "pending" = "pending";
+        let initialRoles: UserRole[] = [];
+        
+        if (preApprovedRoles) {
+          initialApprovalStatus = "approved";
+          initialRoles = preApprovedRoles;
+          console.log(`Pre-approved admin login: ${userEmail} with roles: ${preApprovedRoles.join(", ")}`);
+        }
+        
         // Create new user
         user = await storage.createUser({
           zohoUserId: userId,
@@ -303,13 +328,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           displayName: displayName,
           firstName: firstName,
           lastName: lastName,
-          roles: [],
-          isFirstLogin: "yes",
+          roles: initialRoles,
+          isFirstLogin: preApprovedRoles ? "no" : "yes",
           isActive: "yes",
+          approvalStatus: initialApprovalStatus,
+          approvedBy: preApprovedRoles ? "system" : null,
+          approvedAt: preApprovedRoles ? new Date() : null,
+          staffId: matchingStaff?.id || null,
           zohoAccessToken: access_token,
           zohoRefreshToken: refresh_token,
           zohoTokenExpiresAt: expiresAt
         });
+        
+        // If matched to staff, update staff record to link back to user
+        if (matchingStaff && user) {
+          await storage.updateStaff(matchingStaff.id, { userId: user.id });
+          console.log(`Auto-linked user ${userEmail} to staff member ${matchingStaff.name}`);
+        }
       } else {
         // Update existing user tokens
         await storage.updateUserTokens(user.id, access_token, refresh_token, expiresAt);
@@ -320,7 +355,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect("/?error=user_create_error");
       }
       
-      // Set session
+      // Check approval status - pending users go to waiting page
+      if (user.approvalStatus === "pending") {
+        console.log(`User ${userEmail} is pending approval - redirecting to pending page`);
+        
+        // Set minimal session for pending user
+        req.session.userId = user.id;
+        req.session.user = {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roles: [],
+          isFirstLogin: "yes",
+          approvalStatus: "pending"
+        };
+        
+        return req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return res.redirect("/login?error=session_error");
+          }
+          res.redirect("/pending-approval");
+        });
+      }
+      
+      // Check if user was rejected
+      if (user.approvalStatus === "rejected") {
+        console.log(`User ${userEmail} was rejected - redirecting to login with error`);
+        return res.redirect("/login?error=access_denied");
+      }
+      
+      // Set session for approved user
       req.session.userId = user.id;
       req.session.user = {
         id: user.id,
@@ -329,7 +396,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: user.firstName,
         lastName: user.lastName,
         roles: user.roles as string[],
-        isFirstLogin: user.isFirstLogin || "no"
+        isFirstLogin: user.isFirstLogin || "no",
+        approvalStatus: user.approvalStatus || "approved"
       };
       
       // Explicitly save session before redirecting
@@ -341,12 +409,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log("Session saved successfully for user:", user.email);
         
-        // Redirect based on whether roles are set
-        if (user.isFirstLogin === "yes" || !user.roles || user.roles.length === 0) {
-          res.redirect("/select-role");
-        } else {
-          res.redirect("/");
-        }
+        // Approved users go directly to dashboard
+        res.redirect("/");
       });
     } catch (error) {
       console.error("Zoho OAuth callback error:", error);
@@ -447,6 +511,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Development login successful"
       });
     });
+  });
+
+  // ==================== USER APPROVAL ROUTES ====================
+  
+  // Get pending users (Director and Operations Manager only)
+  app.get("/api/users/pending", requireAuth, async (req, res) => {
+    try {
+      const userRoles = req.session.user?.roles || [];
+      
+      // Only Directors and Operations Managers can view pending users
+      const canApprove = userRoles.some((role: string) => 
+        ["director", "operations_manager"].includes(role)
+      );
+      
+      if (!canApprove) {
+        return res.status(403).json({ error: "Not authorized to view pending users" });
+      }
+      
+      const pendingUsers = await storage.getPendingUsers();
+      res.json(pendingUsers);
+    } catch (error) {
+      console.error("Error fetching pending users:", error);
+      res.status(500).json({ error: "Failed to fetch pending users" });
+    }
+  });
+  
+  // Get all users (for admin purposes)
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      const userRoles = req.session.user?.roles || [];
+      
+      // Only Directors and Operations Managers can view all users
+      const canViewAll = userRoles.some((role: string) => 
+        ["director", "operations_manager", "admin"].includes(role)
+      );
+      
+      if (!canViewAll) {
+        return res.status(403).json({ error: "Not authorized to view users" });
+      }
+      
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+  
+  // Approve a pending user
+  app.post("/api/users/:id/approve", requireAuth, async (req, res) => {
+    try {
+      const userRoles = req.session.user?.roles || [];
+      
+      // Only Directors and Operations Managers can approve users
+      const canApprove = userRoles.some((role: string) => 
+        ["director", "operations_manager"].includes(role)
+      );
+      
+      if (!canApprove) {
+        return res.status(403).json({ error: "Not authorized to approve users" });
+      }
+      
+      const { roles } = req.body;
+      
+      if (!Array.isArray(roles) || roles.length === 0) {
+        return res.status(400).json({ error: "At least one role must be assigned" });
+      }
+      
+      // Validate roles
+      const validRoles = USER_ROLES.map(r => r.value);
+      const invalidRoles = roles.filter((r: string) => !validRoles.includes(r as UserRole));
+      if (invalidRoles.length > 0) {
+        return res.status(400).json({ error: `Invalid roles: ${invalidRoles.join(", ")}` });
+      }
+      
+      const approvedBy = req.session.user?.email || "Unknown";
+      const approvedUser = await storage.approveUser(req.params.id, approvedBy, roles as UserRole[]);
+      
+      if (!approvedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Log the approval action
+      await storage.logActivity({
+        action: "user_approved",
+        description: `User ${approvedUser.email} approved with roles: ${roles.join(", ")}`,
+        performedBy: approvedBy
+      });
+      
+      res.json(approvedUser);
+    } catch (error) {
+      console.error("Error approving user:", error);
+      res.status(500).json({ error: "Failed to approve user" });
+    }
+  });
+  
+  // Reject a pending user
+  app.post("/api/users/:id/reject", requireAuth, async (req, res) => {
+    try {
+      const userRoles = req.session.user?.roles || [];
+      
+      // Only Directors and Operations Managers can reject users
+      const canReject = userRoles.some((role: string) => 
+        ["director", "operations_manager"].includes(role)
+      );
+      
+      if (!canReject) {
+        return res.status(403).json({ error: "Not authorized to reject users" });
+      }
+      
+      const { reason } = req.body;
+      const rejectedBy = req.session.user?.email || "Unknown";
+      const rejectedUser = await storage.rejectUser(req.params.id, rejectedBy);
+      
+      if (!rejectedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Log the rejection action
+      await storage.logActivity({
+        action: "user_rejected",
+        description: `User ${rejectedUser.email} access denied${reason ? `: ${reason}` : ""}`,
+        performedBy: rejectedBy
+      });
+      
+      res.json(rejectedUser);
+    } catch (error) {
+      console.error("Error rejecting user:", error);
+      res.status(500).json({ error: "Failed to reject user" });
+    }
+  });
+  
+  // Update user roles (admin only)
+  app.patch("/api/users/:id/roles", requireAuth, async (req, res) => {
+    try {
+      const userRoles = req.session.user?.roles || [];
+      
+      // Only Directors and Operations Managers can update roles
+      const canUpdateRoles = userRoles.some((role: string) => 
+        ["director", "operations_manager"].includes(role)
+      );
+      
+      if (!canUpdateRoles) {
+        return res.status(403).json({ error: "Not authorized to update user roles" });
+      }
+      
+      const { roles } = req.body;
+      
+      if (!Array.isArray(roles) || roles.length === 0) {
+        return res.status(400).json({ error: "At least one role must be assigned" });
+      }
+      
+      // Validate roles
+      const validRoles = USER_ROLES.map(r => r.value);
+      const invalidRoles = roles.filter((r: string) => !validRoles.includes(r as UserRole));
+      if (invalidRoles.length > 0) {
+        return res.status(400).json({ error: `Invalid roles: ${invalidRoles.join(", ")}` });
+      }
+      
+      const updatedUser = await storage.updateUserRoles(req.params.id, roles as UserRole[]);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Log the role update
+      await storage.logActivity({
+        action: "user_roles_updated",
+        description: `User ${updatedUser.email} roles updated to: ${roles.join(", ")}`,
+        performedBy: req.session.user?.email || "Unknown"
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user roles:", error);
+      res.status(500).json({ error: "Failed to update user roles" });
+    }
   });
 
   // ==================== CLIENT ROUTES ====================

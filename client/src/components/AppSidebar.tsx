@@ -1,4 +1,4 @@
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -100,6 +100,14 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
   const displayName = user?.firstName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
 
+  const canApproveUsers = user?.roles?.some(role => 
+    ["director", "operations_manager"].includes(role)
+  ) ?? false;
+
+  const adminItems: MenuItem[] = canApproveUsers ? [
+    { title: "User Approvals", url: "/user-approvals", icon: Shield, iconColor: "text-red-500" },
+  ] : [];
+
   const renderMenuItem = (item: MenuItem) => {
     const isActive = location === item.url;
     const menuContent = (
@@ -182,6 +190,25 @@ export function AppSidebar({ user }: AppSidebarProps) {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+        
+        {adminItems.length > 0 && (
+          <SidebarGroup className="py-1">
+            {!isCollapsed && (
+              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
+                Admin
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-0.5">
+                {adminItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    {renderMenuItem(item)}
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       
       {user && (

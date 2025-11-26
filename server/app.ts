@@ -23,6 +23,7 @@ declare module "express-session" {
       lastName?: string | null;
       roles: string[];
       isFirstLogin: string;
+      approvalStatus?: string;
     };
   }
 }

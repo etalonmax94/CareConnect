@@ -26,6 +26,8 @@ import Quotes from "@/pages/Quotes";
 import QuoteEditor from "@/pages/QuoteEditor";
 import Login from "@/pages/Login";
 import SelectRole from "@/pages/SelectRole";
+import PendingApproval from "@/pages/PendingApproval";
+import UserApprovals from "@/pages/UserApprovals";
 import NotFound from "@/pages/not-found";
 import { Loader2, ExternalLink, Calendar } from "lucide-react";
 
@@ -39,6 +41,7 @@ interface AuthResponse {
     lastName?: string | null;
     roles: string[];
     isFirstLogin: string;
+    approvalStatus?: string;
   } | null;
   needsRoleSelection?: boolean;
 }
@@ -62,6 +65,7 @@ function ProtectedRouter() {
       <Route path="/reports" component={Reports} />
       <Route path="/leadership-meeting" component={LeadershipMeeting} />
       <Route path="/settings" component={Settings} />
+      <Route path="/user-approvals" component={UserApprovals} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -154,9 +158,25 @@ function AppContent() {
     return <SelectRole />;
   }
 
+  // Handle pending-approval page
+  if (location === "/pending-approval") {
+    if (!auth?.authenticated) {
+      return <Redirect to="/login" />;
+    }
+    if (auth.user?.approvalStatus === "approved") {
+      return <Redirect to="/" />;
+    }
+    return <PendingApproval />;
+  }
+
   // For all other routes, require full authentication
   if (!auth?.authenticated) {
     return <Redirect to="/login" />;
+  }
+
+  // Check if user is pending approval
+  if (auth.user?.approvalStatus === "pending") {
+    return <Redirect to="/pending-approval" />;
   }
 
   if (auth.needsRoleSelection) {
