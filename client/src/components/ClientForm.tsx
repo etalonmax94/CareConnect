@@ -69,9 +69,13 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
     }
   };
 
+  const onFormError = (errors: any) => {
+    console.error("Form validation errors:", errors);
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit, onFormError)} className="space-y-6">
         <Tabs defaultValue="basic" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
