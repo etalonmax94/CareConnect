@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { SuburbAutocomplete } from "@/components/AddressAutocomplete";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 interface ClientFormProps {
   client?: Client;
@@ -24,6 +26,7 @@ interface ClientFormProps {
 export default function ClientForm({ client, onSubmit, onCancel }: ClientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<ClientCategory>(client?.category || "NDIS");
+  const [formSubmitted, setFormSubmitted] = useState(false);
 
   // Fetch staff, support coordinators, and plan managers for dropdowns
   const { data: allStaff = [] } = useQuery<Staff[]>({
@@ -65,8 +68,18 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
     } as any,
   });
 
+  const isDirty = form.formState.isDirty;
+  const { showWarning, confirmNavigation, handleConfirm, handleCancel } = useUnsavedChanges({
+    hasChanges: isDirty && !formSubmitted,
+  });
+
+  const handleCancelWithWarning = () => {
+    confirmNavigation(onCancel);
+  };
+
   const handleSubmit = async (data: InsertClient) => {
     setIsSubmitting(true);
+    setFormSubmitted(true);
     try {
       await onSubmit(data);
     } finally {
@@ -1111,7 +1124,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
         </Tabs>
 
         <div className="flex justify-end gap-3 pt-6 border-t">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} data-testid="button-cancel">
+          <Button type="button" variant="outline" onClick={handleCancelWithWarning} disabled={isSubmitting} data-testid="button-cancel">
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting} data-testid="button-submit">
@@ -1119,6 +1132,13 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
             {client ? "Update Client" : "Create Client"}
           </Button>
         </div>
+
+        <UnsavedChangesDialog
+          open={showWarning}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+          description="You have unsaved changes to this client form. Are you sure you want to leave? Your changes will be lost."
+        />
       </form>
     </Form>
   );
