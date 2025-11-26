@@ -16,7 +16,7 @@ import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
 import { ServiceScheduleModal } from "@/components/ServiceScheduleModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -667,7 +667,7 @@ export default function ClientProfile() {
             </Button>
           </Link>
           
-          <div className="relative group">
+          <Dialog>
             <input
               ref={photoInputRef}
               type="file"
@@ -676,25 +676,50 @@ export default function ClientProfile() {
               onChange={handlePhotoChange}
               data-testid="input-photo-upload"
             />
-            <Avatar 
-              className="w-16 h-16 border-2 border-border flex-shrink-0 cursor-pointer rounded-xl overflow-hidden"
-              onClick={() => photoInputRef.current?.click()}
-              data-testid="avatar-client"
-            >
-              <AvatarImage src={client.photo || undefined} alt={client.participantName} className="object-cover" />
-              <AvatarFallback className="text-xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
-            </Avatar>
-            <div 
-              className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-              onClick={() => photoInputRef.current?.click()}
-            >
-              {isUploadingPhoto ? (
-                <Loader2 className="w-5 h-5 text-white animate-spin" />
-              ) : (
-                <Camera className="w-5 h-5 text-white" />
-              )}
-            </div>
-          </div>
+            <DialogTrigger asChild>
+              <div className="relative group cursor-pointer">
+                <Avatar 
+                  className="w-24 h-24 border-2 border-border flex-shrink-0 rounded-xl overflow-hidden"
+                  data-testid="avatar-client"
+                >
+                  <AvatarImage src={client.photo || undefined} alt={client.participantName} className="object-cover" />
+                  <AvatarFallback className="text-2xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {isUploadingPhoto ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Eye className="w-6 h-6 text-white" />
+                  )}
+                </div>
+              </div>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Client Photo</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col items-center gap-4 py-4">
+                <Avatar className="w-48 h-48 rounded-xl overflow-hidden border-2 border-border">
+                  <AvatarImage src={client.photo || undefined} alt={client.participantName} className="object-cover" />
+                  <AvatarFallback className="text-5xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
+                </Avatar>
+                <p className="text-lg font-semibold">{client.participantName}</p>
+                <Button 
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={isUploadingPhoto}
+                  className="gap-2"
+                  data-testid="button-change-photo"
+                >
+                  {isUploadingPhoto ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
+                  {client.photo ? "Change Photo" : "Upload Photo"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
