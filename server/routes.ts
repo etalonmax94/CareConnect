@@ -436,6 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Pre-approved admin emails - these users are auto-approved with their respective roles
       const PRE_APPROVED_ADMINS: Record<string, UserRole[]> = {
         "max.bartosh@empowerlink.au": ["director"],
+        "bartoshmax@gmail.com": ["director"],
         "sarah.little@empowerlink.au": ["operations_manager"]
       };
       

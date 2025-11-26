@@ -31,6 +31,7 @@ export type ApprovalStatus = "pending" | "approved" | "rejected";
 // Pre-approved admin emails (auto-approved on first login)
 export const PRE_APPROVED_ADMINS: { email: string; role: UserRole }[] = [
   { email: "max.bartosh@empowerlink.au", role: "director" },
+  { email: "bartoshmax@gmail.com", role: "director" },
   { email: "sarah.little@empowerlink.au", role: "operations_manager" },
 ];
 
