@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -78,13 +78,21 @@ function ProtectedRouter() {
 }
 
 function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> }) {
+  const [location] = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(location === "/");
+  
+  // Auto-expand sidebar on dashboard, collapse on other pages
+  useEffect(() => {
+    setSidebarOpen(location === "/");
+  }, [location]);
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "4rem",
   };
 
   return (
-    <SidebarProvider defaultOpen={false} style={style as React.CSSProperties}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">
