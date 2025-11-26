@@ -1392,6 +1392,269 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== FINANCIAL REPORTS ====================
+
+  // Comprehensive financial summary report
+  app.get("/api/reports/financial-summary", async (req, res) => {
+    try {
+      const { startDate, endDate, clientId } = req.query;
+      
+      const allClients = await storage.getAllClients();
+      const allBudgets = await storage.getAllBudgets();
+      const allInvoices = await storage.getAllInvoices();
+      const allServiceDeliveries = await storage.getAllServiceDeliveries();
+      const allStaff = await storage.getAllStaff();
+      
+      const clientMap = new Map(allClients.map(c => [c.id, c]));
+      const staffMap = new Map(allStaff.map(s => [s.id, s]));
+      
+      // Filter by date range if provided
+      let filteredDeliveries = allServiceDeliveries;
+      let filteredInvoices = allInvoices;
+      
+      if (startDate) {
+        const start = new Date(startDate as string);
+        filteredDeliveries = filteredDeliveries.filter(d => new Date(d.deliveredAt) >= start);
+        filteredInvoices = filteredInvoices.filter(i => new Date(i.date) >= start);
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        filteredDeliveries = filteredDeliveries.filter(d => new Date(d.deliveredAt) <= end);
+        filteredInvoices = filteredInvoices.filter(i => new Date(i.date) <= end);
+      }
+      if (clientId) {
+        filteredDeliveries = filteredDeliveries.filter(d => d.clientId === clientId);
+        filteredInvoices = filteredInvoices.filter(i => i.clientId === clientId);
+      }
+      
+      // Calculate totals
+      const totalBudgetAllocated = allBudgets.reduce((sum, b) => sum + parseFloat(b.totalAllocated || "0"), 0);
+      const totalBudgetUsed = allBudgets.reduce((sum, b) => sum + parseFloat(b.used || "0"), 0);
+      const totalBudgetRemaining = totalBudgetAllocated - totalBudgetUsed;
+      
+      const totalServiceRevenue = filteredDeliveries
+        .filter(d => d.status === "completed")
+        .reduce((sum, d) => sum + parseFloat(d.amount || "0"), 0);
+      
+      const totalServiceHours = filteredDeliveries
+        .filter(d => d.status === "completed")
+        .reduce((sum, d) => sum + (parseFloat(d.durationMinutes || "0") / 60), 0);
+      
+      const invoicePending = filteredInvoices.filter(i => i.status === "pending");
+      const invoicePaid = filteredInvoices.filter(i => i.status === "paid");
+      const invoiceOverdue = filteredInvoices.filter(i => i.status === "overdue");
+      
+      const totalPending = invoicePending.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+      const totalPaid = invoicePaid.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+      const totalOverdue = invoiceOverdue.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+      
+      // Budget breakdown by category
+      const budgetByCategory: Record<string, { allocated: number; used: number; remaining: number }> = {};
+      allBudgets.forEach(b => {
+        if (!budgetByCategory[b.category]) {
+          budgetByCategory[b.category] = { allocated: 0, used: 0, remaining: 0 };
+        }
+        const allocated = parseFloat(b.totalAllocated || "0");
+        const used = parseFloat(b.used || "0");
+        budgetByCategory[b.category].allocated += allocated;
+        budgetByCategory[b.category].used += used;
+        budgetByCategory[b.category].remaining += (allocated - used);
+      });
+      
+      // Service delivery breakdown by client
+      const servicesByClient: Record<string, { clientName: string; services: number; revenue: number; hours: number }> = {};
+      filteredDeliveries.filter(d => d.status === "completed").forEach(d => {
+        const client = clientMap.get(d.clientId);
+        if (!servicesByClient[d.clientId]) {
+          servicesByClient[d.clientId] = { 
+            clientName: client?.participantName || "Unknown", 
+            services: 0, 
+            revenue: 0, 
+            hours: 0 
+          };
+        }
+        servicesByClient[d.clientId].services++;
+        servicesByClient[d.clientId].revenue += parseFloat(d.amount || "0");
+        servicesByClient[d.clientId].hours += parseFloat(d.durationMinutes || "0") / 60;
+      });
+      
+      res.json({
+        summary: {
+          totalBudgetAllocated,
+          totalBudgetUsed,
+          totalBudgetRemaining,
+          budgetUtilization: totalBudgetAllocated > 0 ? Math.round((totalBudgetUsed / totalBudgetAllocated) * 100) : 0,
+          totalServiceRevenue,
+          totalServiceHours: Math.round(totalServiceHours * 10) / 10,
+          totalServicesDelivered: filteredDeliveries.filter(d => d.status === "completed").length,
+          invoiceSummary: {
+            pending: { count: invoicePending.length, amount: totalPending },
+            paid: { count: invoicePaid.length, amount: totalPaid },
+            overdue: { count: invoiceOverdue.length, amount: totalOverdue }
+          }
+        },
+        budgetByCategory: Object.entries(budgetByCategory).map(([category, data]) => ({
+          category,
+          ...data,
+          utilization: data.allocated > 0 ? Math.round((data.used / data.allocated) * 100) : 0
+        })),
+        servicesByClient: Object.entries(servicesByClient)
+          .map(([clientId, data]) => ({ clientId, ...data }))
+          .sort((a, b) => b.revenue - a.revenue),
+        reportPeriod: {
+          startDate: startDate || null,
+          endDate: endDate || null,
+          generatedAt: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching financial summary:", error);
+      res.status(500).json({ error: "Failed to fetch financial summary" });
+    }
+  });
+
+  // Detailed service deliveries report
+  app.get("/api/reports/service-deliveries", async (req, res) => {
+    try {
+      const { startDate, endDate, clientId, staffId, status } = req.query;
+      
+      const allClients = await storage.getAllClients();
+      const allStaff = await storage.getAllStaff();
+      let deliveries = await storage.getAllServiceDeliveries();
+      
+      const clientMap = new Map(allClients.map(c => [c.id, c]));
+      const staffMap = new Map(allStaff.map(s => [s.id, s]));
+      
+      // Apply filters
+      if (startDate) {
+        const start = new Date(startDate as string);
+        deliveries = deliveries.filter(d => new Date(d.deliveredAt) >= start);
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        deliveries = deliveries.filter(d => new Date(d.deliveredAt) <= end);
+      }
+      if (clientId) {
+        deliveries = deliveries.filter(d => d.clientId === clientId);
+      }
+      if (staffId) {
+        deliveries = deliveries.filter(d => d.staffId === staffId);
+      }
+      if (status) {
+        deliveries = deliveries.filter(d => d.status === status);
+      }
+      
+      const report = deliveries.map(d => {
+        const client = clientMap.get(d.clientId);
+        const staff = d.staffId ? staffMap.get(d.staffId) : null;
+        
+        return {
+          id: d.id,
+          date: d.deliveredAt,
+          clientId: d.clientId,
+          clientName: client?.participantName || "Unknown",
+          clientCategory: client?.category || "Unknown",
+          staffId: d.staffId,
+          staffName: staff?.name || "Unassigned",
+          serviceName: d.serviceName,
+          serviceCode: d.serviceCode,
+          serviceCategory: d.serviceCategory,
+          amount: parseFloat(d.amount || "0"),
+          durationMinutes: parseFloat(d.durationMinutes || "0"),
+          rateType: d.rateType || "weekday",
+          status: d.status,
+          notes: d.notes
+        };
+      });
+      
+      // Calculate totals
+      const completedServices = report.filter(r => r.status === "completed");
+      const totalRevenue = completedServices.reduce((sum, r) => sum + r.amount, 0);
+      const totalHours = completedServices.reduce((sum, r) => sum + (r.durationMinutes / 60), 0);
+      
+      res.json({
+        deliveries: report,
+        totals: {
+          totalServices: report.length,
+          completedServices: completedServices.length,
+          cancelledServices: report.filter(r => r.status === "cancelled").length,
+          noShowServices: report.filter(r => r.status === "no_show").length,
+          totalRevenue,
+          totalHours: Math.round(totalHours * 10) / 10
+        },
+        filters: { startDate, endDate, clientId, staffId, status }
+      });
+    } catch (error) {
+      console.error("Error fetching service deliveries report:", error);
+      res.status(500).json({ error: "Failed to fetch service deliveries report" });
+    }
+  });
+
+  // Detailed invoices report
+  app.get("/api/reports/invoices", async (req, res) => {
+    try {
+      const { startDate, endDate, clientId, status } = req.query;
+      
+      const allClients = await storage.getAllClients();
+      let invoiceList = await storage.getAllInvoices();
+      
+      const clientMap = new Map(allClients.map(c => [c.id, c]));
+      
+      // Apply filters
+      if (startDate) {
+        const start = new Date(startDate as string);
+        invoiceList = invoiceList.filter(i => new Date(i.date) >= start);
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        invoiceList = invoiceList.filter(i => new Date(i.date) <= end);
+      }
+      if (clientId) {
+        invoiceList = invoiceList.filter(i => i.clientId === clientId);
+      }
+      if (status) {
+        invoiceList = invoiceList.filter(i => i.status === status);
+      }
+      
+      const report = invoiceList.map(i => {
+        const client = clientMap.get(i.clientId);
+        return {
+          id: i.id,
+          invoiceNumber: i.invoiceNumber,
+          date: i.date,
+          clientId: i.clientId,
+          clientName: client?.participantName || "Unknown",
+          clientCategory: client?.category || "Unknown",
+          amount: parseFloat(i.amount || "0"),
+          status: i.status,
+          description: i.description
+        };
+      });
+      
+      const pending = report.filter(r => r.status === "pending");
+      const paid = report.filter(r => r.status === "paid");
+      const overdue = report.filter(r => r.status === "overdue");
+      
+      res.json({
+        invoices: report,
+        totals: {
+          totalInvoices: report.length,
+          totalAmount: report.reduce((sum, r) => sum + r.amount, 0),
+          pending: { count: pending.length, amount: pending.reduce((sum, r) => sum + r.amount, 0) },
+          paid: { count: paid.length, amount: paid.reduce((sum, r) => sum + r.amount, 0) },
+          overdue: { count: overdue.length, amount: overdue.reduce((sum, r) => sum + r.amount, 0) }
+        },
+        filters: { startDate, endDate, clientId, status }
+      });
+    } catch (error) {
+      console.error("Error fetching invoices report:", error);
+      res.status(500).json({ error: "Failed to fetch invoices report" });
+    }
+  });
+
   // ==================== STAFF ROUTES ====================
   
   // Get all staff

@@ -49,6 +49,7 @@ export interface IStorage {
   createProgressNote(note: InsertProgressNote): Promise<ProgressNote>;
   
   // Invoices
+  getAllInvoices(): Promise<Invoice[]>;
   getInvoicesByClientId(clientId: string): Promise<Invoice[]>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   
@@ -145,6 +146,7 @@ export interface IStorage {
   deleteAssignment(id: string): Promise<boolean>;
   
   // Service Deliveries
+  getAllServiceDeliveries(): Promise<ServiceDelivery[]>;
   getServiceDeliveriesByClient(clientId: string): Promise<ServiceDelivery[]>;
   getServiceDeliveriesByStaff(staffId: string): Promise<ServiceDelivery[]>;
   createServiceDelivery(delivery: InsertServiceDelivery): Promise<ServiceDelivery>;
@@ -411,6 +413,10 @@ export class DbStorage implements IStorage {
   }
 
   // Invoices
+  async getAllInvoices(): Promise<Invoice[]> {
+    return await db.select().from(invoices).orderBy(desc(invoices.date));
+  }
+
   async getInvoicesByClientId(clientId: string): Promise<Invoice[]> {
     return await db.select().from(invoices)
       .where(eq(invoices.clientId, clientId))
@@ -812,6 +818,10 @@ export class DbStorage implements IStorage {
   }
 
   // Service Deliveries
+  async getAllServiceDeliveries(): Promise<ServiceDelivery[]> {
+    return await db.select().from(serviceDeliveries).orderBy(desc(serviceDeliveries.deliveredAt));
+  }
+
   async getServiceDeliveriesByClient(clientId: string): Promise<ServiceDelivery[]> {
     return await db.select().from(serviceDeliveries)
       .where(eq(serviceDeliveries.clientId, clientId))

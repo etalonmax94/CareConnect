@@ -6,10 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { FileText, Users, AlertTriangle, DollarSign, MapPin, FileX, Loader2, ChevronRight, User } from "lucide-react";
+import { FileText, Users, AlertTriangle, DollarSign, MapPin, FileX, Loader2, ChevronRight, User, Download, FileSpreadsheet, Calendar as CalendarIcon, TrendingUp, Receipt, Clock } from "lucide-react";
 import { Link } from "wouter";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { DateRange } from "react-day-picker";
 import type { Client } from "@shared/schema";
+import { exportToExcel, exportMultipleSheetsToExcel, downloadPDF, formatCurrency } from "@/lib/exportUtils";
+import { FinancialReportPDF } from "@/components/FinancialReportPDF";
+import { useToast } from "@/hooks/use-toast";
 
 interface AgeDemographics {
   [key: string]: number;
@@ -60,6 +68,91 @@ interface DistanceReport {
   }>;
 }
 
+interface FinancialSummary {
+  summary: {
+    totalBudgetAllocated: number;
+    totalBudgetUsed: number;
+    totalBudgetRemaining: number;
+    budgetUtilization: number;
+    totalServiceRevenue: number;
+    totalServiceHours: number;
+    totalServicesDelivered: number;
+    invoiceSummary: {
+      pending: { count: number; amount: number };
+      paid: { count: number; amount: number };
+      overdue: { count: number; amount: number };
+    };
+  };
+  budgetByCategory: Array<{
+    category: string;
+    allocated: number;
+    used: number;
+    remaining: number;
+    utilization: number;
+  }>;
+  servicesByClient: Array<{
+    clientId: string;
+    clientName: string;
+    services: number;
+    revenue: number;
+    hours: number;
+  }>;
+  reportPeriod: {
+    startDate: string | null;
+    endDate: string | null;
+    generatedAt: string;
+  };
+}
+
+interface ServiceDeliveryReport {
+  deliveries: Array<{
+    id: string;
+    date: string;
+    clientId: string;
+    clientName: string;
+    clientCategory: string;
+    staffId: string | null;
+    staffName: string;
+    serviceName: string;
+    serviceCode: string | null;
+    serviceCategory: string | null;
+    amount: number;
+    durationMinutes: number;
+    rateType: string;
+    status: string;
+    notes: string | null;
+  }>;
+  totals: {
+    totalServices: number;
+    completedServices: number;
+    cancelledServices: number;
+    noShowServices: number;
+    totalRevenue: number;
+    totalHours: number;
+  };
+}
+
+interface InvoiceReport {
+  invoices: Array<{
+    id: string;
+    invoiceNumber: string;
+    date: string;
+    clientId: string;
+    clientName: string;
+    clientCategory: string;
+    amount: number;
+    status: string;
+    description: string | null;
+  }>;
+  totals: {
+    totalInvoices: number;
+    totalAmount: number;
+    pending: { count: number; amount: number };
+    paid: { count: number; amount: number };
+    overdue: { count: number; amount: number };
+  };
+}
+
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 const AGE_RANGES: Record<string, [number, number]> = {
@@ -84,6 +177,12 @@ function calculateAge(dateOfBirth: string | null): number | null {
 
 export default function Reports() {
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(subMonths(new Date(), 2)),
+    to: endOfMonth(new Date()),
+  });
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
 
   const { data: ageDemographics, isLoading: ageLoading } = useQuery<AgeDemographics>({
     queryKey: ["/api/reports/age-demographics"],
@@ -108,6 +207,144 @@ export default function Reports() {
   const { data: distanceData, isLoading: distanceLoading } = useQuery<DistanceReport>({
     queryKey: ["/api/reports/distance"],
   });
+
+  const buildQueryParams = () => {
+    const params = new URLSearchParams();
+    if (dateRange?.from) params.set("startDate", dateRange.from.toISOString());
+    if (dateRange?.to) params.set("endDate", dateRange.to.toISOString());
+    return params.toString();
+  };
+
+  const { data: financialSummary, isLoading: financialLoading, refetch: refetchFinancial } = useQuery<FinancialSummary>({
+    queryKey: ["/api/reports/financial-summary", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/financial-summary?${buildQueryParams()}`);
+      if (!res.ok) throw new Error("Failed to fetch financial summary");
+      return res.json();
+    },
+  });
+
+  const { data: serviceDeliveryReport, isLoading: servicesLoading } = useQuery<ServiceDeliveryReport>({
+    queryKey: ["/api/reports/service-deliveries", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/service-deliveries?${buildQueryParams()}`);
+      if (!res.ok) throw new Error("Failed to fetch service deliveries");
+      return res.json();
+    },
+  });
+
+  const { data: invoiceReport, isLoading: invoicesLoading } = useQuery<InvoiceReport>({
+    queryKey: ["/api/reports/invoices", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/invoices?${buildQueryParams()}`);
+      if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
+    },
+  });
+
+  const handleExportPDF = async () => {
+    if (!financialSummary) return;
+    setIsExporting(true);
+    try {
+      await downloadPDF(
+        <FinancialReportPDF data={financialSummary} reportType="summary" companyName="EmpowerLink" />,
+        `EmpowerLink_Financial_Report_${format(new Date(), "yyyy-MM-dd")}`
+      );
+      toast({ title: "PDF Downloaded", description: "Financial report has been exported successfully." });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Failed to generate PDF report.", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (!financialSummary || !serviceDeliveryReport || !invoiceReport) return;
+    setIsExporting(true);
+    try {
+      const sheets = [
+        {
+          name: "Summary",
+          data: {
+            headers: ["Metric", "Value"],
+            rows: [
+              ["Total Budget Allocated", formatCurrency(financialSummary.summary.totalBudgetAllocated)],
+              ["Total Budget Used", formatCurrency(financialSummary.summary.totalBudgetUsed)],
+              ["Budget Remaining", formatCurrency(financialSummary.summary.totalBudgetRemaining)],
+              ["Budget Utilization", `${financialSummary.summary.budgetUtilization}%`],
+              ["Service Revenue", formatCurrency(financialSummary.summary.totalServiceRevenue)],
+              ["Service Hours", `${financialSummary.summary.totalServiceHours} hrs`],
+              ["Services Delivered", financialSummary.summary.totalServicesDelivered],
+              ["Pending Invoices", `${financialSummary.summary.invoiceSummary.pending.count} (${formatCurrency(financialSummary.summary.invoiceSummary.pending.amount)})`],
+              ["Paid Invoices", `${financialSummary.summary.invoiceSummary.paid.count} (${formatCurrency(financialSummary.summary.invoiceSummary.paid.amount)})`],
+              ["Overdue Invoices", `${financialSummary.summary.invoiceSummary.overdue.count} (${formatCurrency(financialSummary.summary.invoiceSummary.overdue.amount)})`],
+            ],
+          },
+        },
+        {
+          name: "Budget by Category",
+          data: {
+            headers: ["Category", "Allocated", "Used", "Remaining", "Utilization %"],
+            rows: financialSummary.budgetByCategory.map(b => [
+              b.category,
+              formatCurrency(b.allocated),
+              formatCurrency(b.used),
+              formatCurrency(b.remaining),
+              `${b.utilization}%`,
+            ]),
+          },
+        },
+        {
+          name: "Services by Client",
+          data: {
+            headers: ["Client", "Services", "Revenue", "Hours"],
+            rows: financialSummary.servicesByClient.map(s => [
+              s.clientName,
+              s.services,
+              formatCurrency(s.revenue),
+              s.hours.toFixed(1),
+            ]),
+          },
+        },
+        {
+          name: "Service Deliveries",
+          data: {
+            headers: ["Date", "Client", "Service", "Staff", "Amount", "Duration (min)", "Status"],
+            rows: serviceDeliveryReport.deliveries.map(d => [
+              format(new Date(d.date), "dd/MM/yyyy"),
+              d.clientName,
+              d.serviceName,
+              d.staffName,
+              formatCurrency(d.amount),
+              d.durationMinutes,
+              d.status,
+            ]),
+          },
+        },
+        {
+          name: "Invoices",
+          data: {
+            headers: ["Invoice #", "Date", "Client", "Amount", "Status", "Description"],
+            rows: invoiceReport.invoices.map(i => [
+              i.invoiceNumber,
+              format(new Date(i.date), "dd/MM/yyyy"),
+              i.clientName,
+              formatCurrency(i.amount),
+              i.status,
+              i.description || "",
+            ]),
+          },
+        },
+      ];
+
+      await exportMultipleSheetsToExcel(sheets, `EmpowerLink_Financial_Report_${format(new Date(), "yyyy-MM-dd")}`);
+      toast({ title: "Excel Downloaded", description: "Financial report has been exported successfully." });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Failed to generate Excel report.", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const ageChartData = ageDemographics ? Object.entries(ageDemographics).map(([range, count]) => ({
     range,
@@ -186,6 +423,10 @@ export default function Reports() {
           <TabsTrigger value="distance" data-testid="tab-distance">
             <MapPin className="w-4 h-4 mr-2" />
             Distance from Office
+          </TabsTrigger>
+          <TabsTrigger value="financial" data-testid="tab-financial">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Financial Reports
           </TabsTrigger>
         </TabsList>
 
@@ -569,6 +810,288 @@ export default function Reports() {
                 </div>
               </CardContent>
             </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="financial" className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Financial Reports</h2>
+              <p className="text-sm text-muted-foreground">
+                Comprehensive financial overview with export capabilities
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2" data-testid="button-date-range">
+                    <CalendarIcon className="h-4 w-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "dd MMM")} - {format(dateRange.to, "dd MMM yyyy")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "dd MMM yyyy")
+                      )
+                    ) : (
+                      "Select date range"
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                    defaultMonth={dateRange?.from}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button 
+                variant="outline" 
+                className="gap-2" 
+                onClick={handleExportPDF}
+                disabled={isExporting || financialLoading || !financialSummary}
+                data-testid="button-export-pdf"
+              >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Export PDF
+              </Button>
+              <Button 
+                variant="outline" 
+                className="gap-2" 
+                onClick={handleExportExcel}
+                disabled={isExporting || financialLoading || !financialSummary}
+                data-testid="button-export-excel"
+              >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                Export Excel
+              </Button>
+            </div>
+          </div>
+
+          {financialLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+          ) : financialSummary ? (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                      <DollarSign className="h-4 w-4" />
+                      Budget Allocated
+                    </div>
+                    <p className="text-2xl font-bold" data-testid="text-budget-allocated">
+                      {formatCurrency(financialSummary.summary.totalBudgetAllocated)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                      <TrendingUp className="h-4 w-4" />
+                      Budget Used
+                    </div>
+                    <p className="text-2xl font-bold" data-testid="text-budget-used">
+                      {formatCurrency(financialSummary.summary.totalBudgetUsed)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {financialSummary.summary.budgetUtilization}% utilization
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                      <Receipt className="h-4 w-4" />
+                      Service Revenue
+                    </div>
+                    <p className="text-2xl font-bold" data-testid="text-service-revenue">
+                      {formatCurrency(financialSummary.summary.totalServiceRevenue)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                      <Clock className="h-4 w-4" />
+                      Service Hours
+                    </div>
+                    <p className="text-2xl font-bold" data-testid="text-service-hours">
+                      {financialSummary.summary.totalServiceHours} hrs
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {financialSummary.summary.totalServicesDelivered} services
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mb-1">Pending Invoices</p>
+                    <p className="text-2xl font-bold text-amber-600" data-testid="text-pending-invoices">
+                      {financialSummary.summary.invoiceSummary.pending.count}
+                    </p>
+                    <p className="text-sm text-amber-600">
+                      {formatCurrency(financialSummary.summary.invoiceSummary.pending.amount)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-green-700 dark:text-green-400 mb-1">Paid Invoices</p>
+                    <p className="text-2xl font-bold text-green-600" data-testid="text-paid-invoices">
+                      {financialSummary.summary.invoiceSummary.paid.count}
+                    </p>
+                    <p className="text-sm text-green-600">
+                      {formatCurrency(financialSummary.summary.invoiceSummary.paid.amount)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-red-700 dark:text-red-400 mb-1">Overdue Invoices</p>
+                    <p className="text-2xl font-bold text-red-600" data-testid="text-overdue-invoices">
+                      {financialSummary.summary.invoiceSummary.overdue.count}
+                    </p>
+                    <p className="text-sm text-red-600">
+                      {formatCurrency(financialSummary.summary.invoiceSummary.overdue.amount)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Budget by Category</CardTitle>
+                    <CardDescription>Allocation and utilization by support category</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {financialSummary.budgetByCategory.length > 0 ? (
+                      <div className="space-y-4">
+                        {financialSummary.budgetByCategory.map((category) => (
+                          <div key={category.category} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{category.category}</span>
+                              <span className="text-sm text-muted-foreground">
+                                {formatCurrency(category.used)} / {formatCurrency(category.allocated)}
+                              </span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full ${category.utilization > 80 ? 'bg-red-500' : category.utilization > 60 ? 'bg-amber-500' : 'bg-green-500'}`}
+                                style={{ width: `${Math.min(category.utilization, 100)}%` }}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{category.utilization}% used</span>
+                              <span>{formatCurrency(category.remaining)} remaining</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No budget data available</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Clients by Revenue</CardTitle>
+                    <CardDescription>Service revenue breakdown by client</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {financialSummary.servicesByClient.length > 0 ? (
+                      <ScrollArea className="h-[300px]">
+                        <div className="space-y-3">
+                          {financialSummary.servicesByClient.slice(0, 10).map((client, index) => (
+                            <Link key={client.clientId} href={`/clients/${client.clientId}`}>
+                              <div className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                                    {index + 1}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{client.clientName}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {client.services} services | {client.hours.toFixed(1)} hrs
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-medium">{formatCurrency(client.revenue)}</p>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No service data available</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {serviceDeliveryReport && serviceDeliveryReport.deliveries.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Service Deliveries</CardTitle>
+                    <CardDescription>
+                      {serviceDeliveryReport.totals.totalServices} services | {formatCurrency(serviceDeliveryReport.totals.totalRevenue)} revenue | {serviceDeliveryReport.totals.totalHours} hours
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-[300px]">
+                      <div className="space-y-2">
+                        {serviceDeliveryReport.deliveries.slice(0, 20).map((delivery) => (
+                          <div key={delivery.id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                            <div className="flex items-center gap-4">
+                              <div className="text-muted-foreground min-w-[80px]">
+                                {format(new Date(delivery.date), "dd MMM")}
+                              </div>
+                              <div>
+                                <p className="font-medium">{delivery.clientName}</p>
+                                <p className="text-xs text-muted-foreground">{delivery.serviceName}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="font-medium">{formatCurrency(delivery.amount)}</p>
+                                <p className="text-xs text-muted-foreground">{delivery.durationMinutes} min</p>
+                              </div>
+                              <Badge variant={delivery.status === "completed" ? "default" : delivery.status === "cancelled" ? "destructive" : "secondary"}>
+                                {delivery.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No financial data available</p>
+              <p className="text-sm">Financial reports will appear here when data is recorded</p>
+            </div>
           )}
         </TabsContent>
       </Tabs>
