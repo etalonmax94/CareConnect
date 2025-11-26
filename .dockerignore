@@ -1,0 +1,64 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (we rebuild in Docker)
+dist
+.vite
+
+# Development files
+*.md
+*.log
+.env
+.env.*
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Frontend (not needed for backend-only container)
+client
+public
+attached_assets
+vite.config.ts
+
+# Testing
+coverage
+*.test.ts
+*.spec.ts
+__tests__
+
+# Replit specific
+.replit
+replit.nix
+.config
+.cache
+
+# Documentation
+docs
+*.md
+LICENSE
+
+# Design files
+design_guidelines.md
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Uploads (mount as volume in production)
+uploads/*
+!uploads/.gitkeep

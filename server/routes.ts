@@ -276,6 +276,17 @@ function getDistanceFromOffice(address: string | null | undefined): number | nul
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ==================== HEALTH CHECK ====================
+  
+  // Health check endpoint for Cloud Run and load balancers
+  app.get("/api/health", (_req, res) => {
+    res.json({ 
+      status: "healthy", 
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || "1.0.0"
+    });
+  });
+
   // ==================== AUTH ROUTES ====================
   
   // Get current user session
