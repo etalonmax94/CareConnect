@@ -6,8 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import ThemeToggle from "@/components/ThemeToggle";
 import GlobalSearch from "@/components/GlobalSearch";
+import UserProfileDropdown from "@/components/UserProfileDropdown";
 import { Button } from "@/components/ui/button";
 import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
@@ -78,14 +78,18 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
       <div className="flex h-screen w-full">
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between px-6 py-3 border-b sticky top-0 bg-background z-50">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-3">
+          <header className="flex items-center justify-between gap-4 px-4 py-2 border-b sticky top-0 bg-background z-50">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+            </div>
+            <div className="flex-1 flex justify-center max-w-2xl mx-auto">
               <GlobalSearch />
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
                     onClick={() => window.open("https://app.connecteam.com", "_blank")}
                     data-testid="button-connecteam"
@@ -97,7 +101,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
                   <p>Open Connecteam</p>
                 </TooltipContent>
               </Tooltip>
-              <ThemeToggle />
+              <UserProfileDropdown user={user} />
             </div>
           </header>
           <main className="flex-1 overflow-y-auto p-6">

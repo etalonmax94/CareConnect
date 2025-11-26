@@ -232,20 +232,21 @@ export default function GlobalSearch() {
 
   const hasResults = searchResults.length > 0;
 
+  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  
   return (
     <>
-      <Button
-        variant="outline"
-        className="relative h-9 w-9 p-0 xl:h-9 xl:w-60 xl:justify-start xl:px-3 xl:py-2"
+      <button
+        className="relative flex items-center h-10 w-full max-w-md bg-muted/50 hover:bg-muted border border-border rounded-lg px-4 py-2 text-sm text-muted-foreground transition-colors"
         onClick={() => setOpen(true)}
         data-testid="button-global-search"
       >
-        <Search className="h-4 w-4 xl:mr-2" />
-        <span className="hidden xl:inline-flex">Search everything...</span>
-        <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-6 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 xl:flex">
-          <span className="text-xs">⌘</span>K
+        <Search className="h-4 w-4 mr-3 flex-shrink-0" />
+        <span className="flex-1 text-left">Search anything...</span>
+        <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+          {isMac ? "⌘" : "Ctrl"}+K
         </kbd>
-      </Button>
+      </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg p-0">
