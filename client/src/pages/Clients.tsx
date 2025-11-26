@@ -151,7 +151,7 @@ export default function Clients() {
             data-testid="tab-active-clients"
           >
             <Users className="w-4 h-4" />
-            Active Clients
+            Active
             <Badge variant={activeTab === "active" ? "secondary" : "outline"} className="ml-1">
               {activeClients.length}
             </Badge>
@@ -172,11 +172,11 @@ export default function Clients() {
           <div className="h-6 w-px bg-border mx-1" />
 
           <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as ClientCategory | "All")}>
-            <SelectTrigger className="w-[160px]" data-testid="filter-category">
-              <SelectValue placeholder="All Categories" />
+            <SelectTrigger className="w-[140px]" data-testid="filter-category">
+              <SelectValue placeholder="Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="All">All Categories</SelectItem>
+              <SelectItem value="All">Categories</SelectItem>
               <SelectItem value="NDIS">NDIS</SelectItem>
               <SelectItem value="Support at Home">Support at Home</SelectItem>
               <SelectItem value="Private">Private</SelectItem>
@@ -184,11 +184,11 @@ export default function Clients() {
           </Select>
 
           <Select value={selectedCareManager} onValueChange={setSelectedCareManager}>
-            <SelectTrigger className="w-[180px]" data-testid="filter-care-manager">
-              <SelectValue placeholder="All Care Managers" />
+            <SelectTrigger className="w-[160px]" data-testid="filter-care-manager">
+              <SelectValue placeholder="Care Managers" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="All">All Care Managers</SelectItem>
+              <SelectItem value="All">Care Managers</SelectItem>
               {careManagers.map(cm => (
                 <SelectItem key={cm} value={cm}>{cm}</SelectItem>
               ))}
@@ -196,11 +196,11 @@ export default function Clients() {
           </Select>
 
           <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
-            <SelectTrigger className="w-[160px]" data-testid="filter-compliance">
-              <SelectValue placeholder="All Compliance" />
+            <SelectTrigger className="w-[140px]" data-testid="filter-compliance">
+              <SelectValue placeholder="Compliance" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="All">All Compliance</SelectItem>
+              <SelectItem value="All">Compliance</SelectItem>
               <SelectItem value="compliant">Compliant</SelectItem>
               <SelectItem value="due-soon">Due Soon</SelectItem>
               <SelectItem value="overdue">Overdue</SelectItem>
