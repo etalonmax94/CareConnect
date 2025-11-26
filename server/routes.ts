@@ -576,9 +576,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Zoho user email:", userEmail);
       
       // Pre-approved admin emails - these users are auto-approved with their respective roles
+      // Only @empowerlink.au emails are allowed for Zoho sign-on
       const PRE_APPROVED_ADMINS: Record<string, UserRole[]> = {
         "max.bartosh@empowerlink.au": ["director"],
-        "bartoshmax@gmail.com": ["director"],
         "sarah.little@empowerlink.au": ["operations_manager"]
       };
       
