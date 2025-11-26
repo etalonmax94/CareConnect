@@ -1,15 +1,29 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAuthToken } from "./auth";
 
-// API base URL - use Cloud Run backend only when we have a token (cross-domain auth)
-// For same-origin requests (dev server with sessions), use empty string
+// Cloud Run API URL
+const CLOUD_RUN_URL = import.meta.env.VITE_API_URL || 'https://careconnect-124485508170.australia-southeast1.run.app';
+
+// Check if we're on the production domain (app.empowerlink.au)
+function isProductionDomain(): boolean {
+  const hostname = window.location.hostname;
+  return hostname === 'app.empowerlink.au' || hostname === 'empowerlink.au';
+}
+
+// API base URL - in production always use Cloud Run, in dev use same-origin unless we have a token
 function getApiBaseUrl(): string {
-  const token = getAuthToken();
-  // If we have a JWT token, we're doing cross-domain auth with Cloud Run
-  if (token) {
-    return import.meta.env.VITE_API_URL || 'https://careconnect-124485508170.australia-southeast1.run.app';
+  // In production, always use Cloud Run
+  if (isProductionDomain()) {
+    return CLOUD_RUN_URL;
   }
-  // No token = same-origin (dev server with sessions)
+  
+  // In development, use Cloud Run if we have a token, otherwise same-origin
+  const token = getAuthToken();
+  if (token) {
+    return CLOUD_RUN_URL;
+  }
+  
+  // Dev mode with no token = same-origin (session auth)
   return '';
 }
 
