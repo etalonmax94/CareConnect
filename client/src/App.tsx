@@ -21,6 +21,7 @@ import GPs from "@/pages/GPs";
 import Pharmacies from "@/pages/Pharmacies";
 import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
+import AuditLog from "@/pages/AuditLog";
 import LeadershipMeeting from "@/pages/LeadershipMeeting";
 import Quotes from "@/pages/Quotes";
 import QuoteEditor from "@/pages/QuoteEditor";
@@ -29,7 +30,7 @@ import SelectRole from "@/pages/SelectRole";
 import PendingApproval from "@/pages/PendingApproval";
 import UserApprovals from "@/pages/UserApprovals";
 import NotFound from "@/pages/not-found";
-import { Loader2, ExternalLink, Calendar } from "lucide-react";
+import { Loader2, ExternalLink, Calendar, Mail } from "lucide-react";
 
 interface AuthResponse {
   authenticated: boolean;
@@ -63,6 +64,7 @@ function ProtectedRouter() {
       <Route path="/quotes" component={Quotes} />
       <Route path="/quotes/:id" component={QuoteEditor} />
       <Route path="/reports" component={Reports} />
+      <Route path="/audit-log" component={AuditLog} />
       <Route path="/leadership-meeting" component={LeadershipMeeting} />
       <Route path="/settings" component={Settings} />
       <Route path="/user-approvals" component={UserApprovals} />
@@ -90,6 +92,21 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
               <GlobalSearch />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => window.open("https://mail.zoho.com.au", "_blank")}
+                    data-testid="button-zoho-email"
+                  >
+                    <Mail className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Zoho Email</p>
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

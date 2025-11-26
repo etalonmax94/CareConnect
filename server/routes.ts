@@ -93,6 +93,57 @@ const uploadPhoto = multer({
   }
 });
 
+// Audit logging helper function
+interface AuditLogOptions {
+  entityType: string;
+  entityId: string;
+  entityName?: string;
+  operation: "create" | "update" | "delete" | "archive" | "restore";
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
+  changedFields?: string[];
+  clientId?: string;
+  req: Request;
+}
+
+async function logAudit(options: AuditLogOptions): Promise<void> {
+  try {
+    const user = (options.req.session as any)?.user;
+    
+    await storage.createAuditLog({
+      entityType: options.entityType,
+      entityId: options.entityId,
+      entityName: options.entityName,
+      operation: options.operation,
+      oldValues: options.oldValues,
+      newValues: options.newValues,
+      changedFields: options.changedFields,
+      userId: user?.id || null,
+      userName: user?.displayName || user?.email || 'System',
+      userRole: user?.roles?.[0] || null,
+      ipAddress: options.req.ip || options.req.headers['x-forwarded-for'] as string || null,
+      userAgent: options.req.headers['user-agent'] || null,
+      clientId: options.clientId,
+    });
+  } catch (error) {
+    console.error("Failed to create audit log:", error);
+  }
+}
+
+// Helper to detect changed fields between old and new values
+function getChangedFields(oldValues: Record<string, any>, newValues: Record<string, any>): string[] {
+  const changedFields: string[] = [];
+  const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
+  
+  for (const key of allKeys) {
+    if (JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])) {
+      changedFields.push(key);
+    }
+  }
+  
+  return changedFields;
+}
+
 // Zoho OAuth Configuration
 const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID;
 const ZOHO_CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET;
@@ -868,7 +919,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: client.id,
         action: "client_created",
         description: `New client ${client.participantName} was added`,
-        performedBy: "System"
+        performedBy: (req.session as any)?.user?.displayName || "System"
+      });
+      
+      // Create audit log
+      await logAudit({
+        entityType: "client",
+        entityId: client.id,
+        entityName: client.participantName,
+        operation: "create",
+        newValues: validationResult.data as Record<string, unknown>,
+        clientId: client.id,
+        req
       });
       
       const clientWithAge = {
@@ -904,6 +966,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: errorMessage });
       }
       
+      // Store old values for audit
+      const oldValues = { ...existingClient };
+      
       const client = await storage.updateClient(req.params.id, validationResult.data);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
@@ -914,7 +979,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: client.id,
         action: "client_updated",
         description: `Client ${client.participantName} was updated`,
-        performedBy: "System"
+        performedBy: (req.session as any)?.user?.displayName || "System"
+      });
+      
+      // Create audit log with field-level changes
+      const changedFields = getChangedFields(oldValues as any, client as any);
+      await logAudit({
+        entityType: "client",
+        entityId: client.id,
+        entityName: client.participantName,
+        operation: "update",
+        oldValues: oldValues as Record<string, unknown>,
+        newValues: client as Record<string, unknown>,
+        changedFields,
+        clientId: client.id,
+        req
       });
       
       const clientWithAge = {
@@ -932,10 +1011,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete client
   app.delete("/api/clients/:id", async (req, res) => {
     try {
+      // Get client info before deletion for audit log
+      const existingClient = await storage.getClientById(req.params.id);
+      
       const success = await storage.deleteClient(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Client not found" });
       }
+      
+      // Create audit log for deletion
+      if (existingClient) {
+        await logAudit({
+          entityType: "client",
+          entityId: req.params.id,
+          entityName: existingClient.participantName,
+          operation: "delete",
+          oldValues: existingClient as Record<string, unknown>,
+          req
+        });
+      }
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting client:", error);
@@ -964,7 +1059,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: client.id,
         action: "client_archived",
         description: `Client archived. Reason: ${reason.trim()}. Retention until: ${client.retentionUntil}`,
-        performedBy: userId,
+        performedBy: (req.session as any)?.user?.displayName || userId,
+      });
+      
+      // Create audit log for archive
+      await logAudit({
+        entityType: "client",
+        entityId: client.id,
+        entityName: client.participantName,
+        operation: "archive",
+        newValues: { archiveReason: reason.trim(), retentionUntil: client.retentionUntil },
+        clientId: client.id,
+        req
       });
       
       res.json(client);
@@ -990,7 +1096,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: client.id,
         action: "client_restored",
         description: "Client restored from archive",
-        performedBy: userId,
+        performedBy: (req.session as any)?.user?.displayName || userId,
+      });
+      
+      // Create audit log for restore
+      await logAudit({
+        entityType: "client",
+        entityId: client.id,
+        entityName: client.participantName,
+        operation: "restore",
+        clientId: client.id,
+        req
       });
       
       res.json(client);
@@ -1277,6 +1393,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Audit Log endpoints
+  app.get("/api/audit-logs", async (req, res) => {
+    try {
+      const filters = {
+        entityType: req.query.entityType as string | undefined,
+        entityId: req.query.entityId as string | undefined,
+        operation: req.query.operation as string | undefined,
+        userId: req.query.userId as string | undefined,
+        clientId: req.query.clientId as string | undefined,
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
+        offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
+      };
+      
+      const result = await storage.getAuditLogs(filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  app.get("/api/audit-logs/:id", async (req, res) => {
+    try {
+      const log = await storage.getAuditLogById(req.params.id);
+      if (!log) {
+        return res.status(404).json({ error: "Audit log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Error fetching audit log:", error);
+      res.status(500).json({ error: "Failed to fetch audit log" });
+    }
+  });
+
   // Incident Reports endpoints
   app.get("/api/incidents", async (req, res) => {
     try {
@@ -1314,7 +1466,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: incident.clientId,
         action: "incident_reported",
         description: `New ${incident.incidentType} incident reported (${incident.severity} severity)`,
-        performedBy: incident.reportedBy
+        performedBy: (req.session as any)?.user?.displayName || incident.reportedBy
+      });
+      
+      // Create audit log
+      await logAudit({
+        entityType: "incident",
+        entityId: incident.id,
+        entityName: `${incident.incidentType} - ${incident.severity}`,
+        operation: "create",
+        newValues: validationResult.data as Record<string, unknown>,
+        clientId: incident.clientId,
+        req
       });
       
       res.status(201).json(incident);
@@ -1326,10 +1489,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/incidents/:id", async (req, res) => {
     try {
+      // Get existing incident for audit log
+      const existingIncident = await storage.getIncidentsByClient(req.body.clientId || '').then(
+        incidents => incidents.find(i => i.id === req.params.id)
+      );
+      
       const incident = await storage.updateIncidentReport(req.params.id, req.body);
       if (!incident) {
         return res.status(404).json({ error: "Incident not found" });
       }
+      
+      // Create audit log for update
+      const changedFields = existingIncident ? getChangedFields(existingIncident as any, incident as any) : [];
+      await logAudit({
+        entityType: "incident",
+        entityId: incident.id,
+        entityName: `${incident.incidentType} - ${incident.severity}`,
+        operation: "update",
+        oldValues: existingIncident as Record<string, unknown>,
+        newValues: incident as Record<string, unknown>,
+        changedFields,
+        clientId: incident.clientId,
+        req
+      });
+      
       res.json(incident);
     } catch (error) {
       console.error("Error updating incident:", error);
@@ -2444,7 +2627,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: req.params.clientId,
         action: "document_uploaded",
         description: `Document ${document.fileName} was uploaded`,
-        performedBy: "System"
+        performedBy: (req.session as any)?.user?.displayName || "System"
+      });
+      
+      // Create audit log
+      await logAudit({
+        entityType: "document",
+        entityId: document.id,
+        entityName: document.fileName,
+        operation: "create",
+        newValues: validationResult.data as Record<string, unknown>,
+        clientId: req.params.clientId,
+        req
       });
       
       res.status(201).json(document);
@@ -2462,6 +2656,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Authentication required" });
       }
       
+      // Get document info before deletion for audit log
+      const existingDoc = await storage.getDocumentById(req.params.id);
+      
       const deleted = await storage.deleteDocument(req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Document not found" });
@@ -2469,11 +2666,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Log the deletion
       await storage.logActivity({
-        clientId: null,
+        clientId: existingDoc?.clientId || null,
         action: "document_deleted",
-        description: `Document was deleted`,
-        performedBy: req.session.user.email || "Unknown"
+        description: `Document ${existingDoc?.fileName || ''} was deleted`,
+        performedBy: (req.session as any)?.user?.displayName || req.session.user.email || "Unknown"
       });
+      
+      // Create audit log for deletion
+      if (existingDoc) {
+        await logAudit({
+          entityType: "document",
+          entityId: req.params.id,
+          entityName: existingDoc.fileName,
+          operation: "delete",
+          oldValues: existingDoc as Record<string, unknown>,
+          clientId: existingDoc.clientId,
+          req
+        });
+      }
       
       res.status(204).send();
     } catch (error) {
