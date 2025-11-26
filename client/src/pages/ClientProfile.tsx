@@ -121,7 +121,7 @@ interface DistanceData {
   officeAddress: string;
 }
 
-type ProfileSection = "overview" | "care" | "people" | "services" | "admin";
+type ProfileSection = "overview" | "details" | "program" | "team" | "goals" | "documents" | "clinical" | "services" | "budget";
 
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
@@ -586,12 +586,16 @@ export default function ClientProfile() {
 
   const assignedStaffCount = staffAssignments?.filter(a => !a.endDate || new Date(a.endDate) > new Date()).length || 0;
 
-  const sidebarItems: { id: ProfileSection; label: string; icon: any; badge?: string; badgeColor?: string; description?: string }[] = [
-    { id: "overview", label: "Overview", icon: User, description: "At-a-glance information" },
-    { id: "care", label: "Care", icon: Heart, description: "Medical, Behaviors, Goals" },
-    { id: "people", label: "People", icon: Users, description: "Contacts, Staff, Team" },
-    { id: "services", label: "Services", icon: Clock, description: "Appointments, Notes" },
-    { id: "admin", label: "Admin", icon: Settings, description: "Documents, Budget, Meeting Notes" },
+  const sidebarItems: { id: ProfileSection; label: string; icon: any; badge?: string; badgeColor?: string }[] = [
+    { id: "overview", label: "Overview", icon: User },
+    { id: "details", label: "Personal Details", icon: UserCircle },
+    { id: "program", label: "Program Info", icon: ClipboardCheck },
+    { id: "team", label: "Care Team", icon: Users },
+    { id: "goals", label: "Goals", icon: Target },
+    { id: "documents", label: "Documents", icon: FileText },
+    { id: "clinical", label: "Clinical Notes", icon: Stethoscope },
+    { id: "services", label: "Services", icon: Clock },
+    { id: "budget", label: "Budget Details", icon: DollarSign, badge: totalBudget === 0 ? "Setup" : undefined, badgeColor: "text-amber-600" },
   ];
 
   return (
@@ -1231,193 +1235,21 @@ export default function ClientProfile() {
             </div>
           )}
 
-          {/* Care Section - Medical Info, Behaviors, Goals */}
-          {activeSection === "care" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-primary" />
-                    Care Information
-                  </h2>
-                  <p className="text-sm text-muted-foreground">Medical details, behaviors, and care goals</p>
-                </div>
-              </div>
+          {/* Other sections - using existing Tabs content */}
+          {activeSection !== "overview" && (
+            <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as ProfileSection)} className="space-y-6">
+              <TabsList className="w-full justify-start overflow-x-auto lg:hidden">
+                <TabsTrigger value="details" data-testid="tab-details">Personal Details</TabsTrigger>
+                <TabsTrigger value="program" data-testid="tab-program">Program Info</TabsTrigger>
+                <TabsTrigger value="team" data-testid="tab-team">Care Team</TabsTrigger>
+                <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
+                <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+                <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
+                <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
+                <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
+              </TabsList>
 
-              {/* Sub-navigation for Care section */}
-              <Tabs defaultValue="medical" className="space-y-4">
-                <TabsList className="grid w-full max-w-lg grid-cols-3">
-                  <TabsTrigger value="medical" data-testid="tab-care-medical">Medical Info</TabsTrigger>
-                  <TabsTrigger value="behaviors" data-testid="tab-care-behaviors">Behaviors</TabsTrigger>
-                  <TabsTrigger value="goals" data-testid="tab-care-goals">Goals</TabsTrigger>
-                </TabsList>
-
-                {/* Medical Information */}
-                <TabsContent value="medical" className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Personal Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Personal Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
-                            <p className="text-sm mt-1">{client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString('en-AU') : "Not provided"}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Age</p>
-                            <p className="text-sm mt-1">{clientAge ? `${clientAge} years` : "Not provided"}</p>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Medicare Number</p>
-                          <p className="text-sm mt-1 font-mono">{client.medicareNumber || "Not provided"}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Clinical Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Clinical Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Main Diagnosis</p>
-                          <p className="text-sm mt-1">{client.mainDiagnosis || "Not provided"}</p>
-                        </div>
-                        {client.allergies && (
-                          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                            <p className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
-                              <AlertTriangle className="w-4 h-4" />
-                              ALLERGIES
-                            </p>
-                            <p className="text-sm mt-1 font-bold text-red-600 dark:text-red-300" data-testid="text-allergies">
-                              {client.allergies}
-                            </p>
-                          </div>
-                        )}
-                        {/* Advanced Care Directive */}
-                        <div className={`p-3 rounded-lg border ${
-                          client.advancedCareDirective === "NFR" 
-                            ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
-                            : client.advancedCareDirective === "For Resus"
-                            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                            : "bg-muted/50 border-border"
-                        }`}>
-                          <p className={`text-sm font-bold flex items-center gap-2 ${
-                            client.advancedCareDirective === "NFR"
-                              ? "text-purple-700 dark:text-purple-400"
-                              : client.advancedCareDirective === "For Resus"
-                              ? "text-green-700 dark:text-green-400"
-                              : "text-muted-foreground"
-                          }`}>
-                            {client.advancedCareDirective === "NFR" ? (
-                              <HeartOff className="w-4 h-4" />
-                            ) : client.advancedCareDirective === "For Resus" ? (
-                              <Heart className="w-4 h-4" />
-                            ) : (
-                              <FileText className="w-4 h-4" />
-                            )}
-                            ADVANCED CARE DIRECTIVE
-                          </p>
-                          <p className={`text-sm mt-1 font-bold ${
-                            client.advancedCareDirective === "NFR"
-                              ? "text-purple-600 dark:text-purple-300"
-                              : client.advancedCareDirective === "For Resus"
-                              ? "text-green-600 dark:text-green-300"
-                              : "text-muted-foreground"
-                          }`} data-testid="text-acd">
-                            {client.advancedCareDirective === "NFR" 
-                              ? "NFR - Not For Resuscitation"
-                              : client.advancedCareDirective === "For Resus"
-                              ? "For Resus - For Resuscitation"
-                              : "Not Specified"}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Risk Assessment */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Risk Assessment</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center gap-3">
-                          <p className="text-sm font-medium text-muted-foreground">Risk Score</p>
-                          {client.riskAssessmentScore ? (
-                            <Badge className={`${
-                              parseInt(client.riskAssessmentScore) <= 3 ? 'bg-green-500' :
-                              parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
-                              'bg-red-500'
-                            } text-white border-0`}>
-                              {client.riskAssessmentScore}/10
-                            </Badge>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Not assessed</span>
-                          )}
-                        </div>
-                        {client.riskAssessmentScore && parseInt(client.riskAssessmentScore) > 6 && (
-                          <Alert variant="destructive">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertDescription>
-                              High risk client - ensure appropriate safety measures are in place
-                            </AlertDescription>
-                          </Alert>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {/* Service Preferences */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Service Preferences</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Frequency of Services</p>
-                          <p className="text-sm mt-1">{client.frequencyOfServices || "Not specified"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Notification Preferences</p>
-                          <div className="mt-1">
-                            <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Communication Needs</p>
-                          <p className="text-sm mt-1">{client.communicationNeeds || "No special needs"}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </TabsContent>
-
-                {/* Behaviors Tab */}
-                <TabsContent value="behaviors" className="space-y-6">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-base">Behavioral Notes</CardTitle>
-                      <Button size="sm" variant="outline" className="gap-1" disabled={isArchived}>
-                        <Plus className="w-3 h-3" />
-                        Add Behavior
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-8">
-                        <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
-                        <p className="text-sm text-muted-foreground">No behavioral notes recorded yet</p>
-                        <p className="text-xs text-muted-foreground mt-1">Add behavior patterns, triggers, and interventions</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                {/* Goals Tab - Reuse existing goals content */}
-                <TabsContent value="goals" className="space-y-6">
+              <TabsContent value="details" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
