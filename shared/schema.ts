@@ -639,9 +639,12 @@ export const serviceDeliveries = pgTable("service_deliveries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   staffId: varchar("staff_id").references(() => staff.id, { onDelete: "set null" }),
+  budgetId: varchar("budget_id").references(() => budgets.id, { onDelete: "set null" }),
   serviceCode: text("service_code"),
   serviceName: text("service_name").notNull(),
   serviceCategory: text("service_category"),
+  amount: text("amount"),
+  rateType: text("rate_type").$type<"weekday" | "saturday" | "sunday" | "public_holiday" | "evening" | "night">(),
   deliveredAt: timestamp("delivered_at").notNull(),
   durationMinutes: text("duration_minutes"),
   quantity: text("quantity"),
@@ -654,6 +657,9 @@ export const serviceDeliveries = pgTable("service_deliveries", {
 export const insertServiceDeliverySchema = createInsertSchema(serviceDeliveries, {
   status: z.enum(["scheduled", "completed", "cancelled", "no_show"]).optional(),
   staffId: z.string().optional().nullable(),
+  budgetId: z.string().optional().nullable(),
+  amount: z.string().optional().nullable(),
+  rateType: z.enum(["weekday", "saturday", "sunday", "public_holiday", "evening", "night"]).optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,

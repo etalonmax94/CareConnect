@@ -20,7 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 
 function NotificationBadge({ type }: { type: string }) {
@@ -177,6 +177,70 @@ export default function ClientProfile() {
     queryKey: ["/api/clients", params?.id, "goals"],
     enabled: !!params?.id,
   });
+
+  const { data: serviceDeliveries = [] } = useQuery<ServiceDelivery[]>({
+    queryKey: ["/api/clients", params?.id, "service-deliveries"],
+    enabled: !!params?.id,
+  });
+
+  // Service delivery management state
+  const [addServiceOpen, setAddServiceOpen] = useState(false);
+  const [serviceName, setServiceName] = useState("");
+  const [serviceAmount, setServiceAmount] = useState("");
+  const [serviceBudgetId, setServiceBudgetId] = useState("");
+  const [serviceStaffId, setServiceStaffId] = useState("");
+  const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [serviceDuration, setServiceDuration] = useState("");
+  const [serviceNotes, setServiceNotes] = useState("");
+  const [serviceRateType, setServiceRateType] = useState<"weekday" | "saturday" | "sunday" | "public_holiday" | "evening" | "night">("weekday");
+
+  const addServiceMutation = useMutation({
+    mutationFn: async (data: { 
+      serviceName: string; 
+      amount?: string; 
+      budgetId?: string;
+      staffId?: string;
+      deliveredAt: string;
+      durationMinutes?: string;
+      notes?: string;
+      rateType?: string;
+      status: string;
+    }) => {
+      return apiRequest("POST", `/api/clients/${params?.id}/service-deliveries`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "service-deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets", params?.id] });
+      setAddServiceOpen(false);
+      resetServiceForm();
+      toast({ title: "Service recorded successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to record service", description: error?.message, variant: "destructive" });
+    }
+  });
+
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/service-deliveries/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "service-deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets", params?.id] });
+      toast({ title: "Service deleted" });
+    },
+  });
+
+  const resetServiceForm = () => {
+    setServiceName("");
+    setServiceAmount("");
+    setServiceBudgetId("");
+    setServiceStaffId("");
+    setServiceDate(new Date().toISOString().split('T')[0]);
+    setServiceDuration("");
+    setServiceNotes("");
+    setServiceRateType("weekday");
+  };
 
   // Goal management state
   const [addGoalOpen, setAddGoalOpen] = useState(false);
@@ -767,6 +831,7 @@ export default function ClientProfile() {
           <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
           <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
           <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
+          <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
           <TabsTrigger value="budget" data-testid="tab-budget">Budget Details</TabsTrigger>
         </TabsList>
 
@@ -1693,6 +1758,249 @@ export default function ClientProfile() {
                   })
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="services" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Service Deliveries
+                </CardTitle>
+                {!isArchived && (
+                  <Dialog open={addServiceOpen} onOpenChange={setAddServiceOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" data-testid="button-add-service">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Record Service
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Record Service Delivery</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Service Name *</Label>
+                          <Input 
+                            placeholder="e.g., Personal Care, Transport, etc."
+                            value={serviceName}
+                            onChange={(e) => setServiceName(e.target.value)}
+                            data-testid="input-service-name"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Date *</Label>
+                            <Input 
+                              type="date"
+                              value={serviceDate}
+                              onChange={(e) => setServiceDate(e.target.value)}
+                              data-testid="input-service-date"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Duration (mins)</Label>
+                            <Input 
+                              type="number"
+                              placeholder="60"
+                              value={serviceDuration}
+                              onChange={(e) => setServiceDuration(e.target.value)}
+                              data-testid="input-service-duration"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Amount ($)</Label>
+                            <Input 
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={serviceAmount}
+                              onChange={(e) => setServiceAmount(e.target.value)}
+                              data-testid="input-service-amount"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Rate Type</Label>
+                            <Select value={serviceRateType} onValueChange={(v: any) => setServiceRateType(v)}>
+                              <SelectTrigger data-testid="select-service-rate-type">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="weekday">Weekday</SelectItem>
+                                <SelectItem value="saturday">Saturday</SelectItem>
+                                <SelectItem value="sunday">Sunday</SelectItem>
+                                <SelectItem value="public_holiday">Public Holiday</SelectItem>
+                                <SelectItem value="evening">Evening</SelectItem>
+                                <SelectItem value="night">Night</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Link to Budget</Label>
+                          <Select value={serviceBudgetId} onValueChange={setServiceBudgetId}>
+                            <SelectTrigger data-testid="select-service-budget">
+                              <SelectValue placeholder="Select budget category..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">No budget link</SelectItem>
+                              {budgets?.map((budget) => (
+                                <SelectItem key={budget.id} value={budget.id}>
+                                  {budget.category} (${parseFloat(budget.totalAllocated).toLocaleString()} allocated)
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {serviceBudgetId && serviceAmount && (
+                            <p className="text-xs text-muted-foreground">
+                              Amount will be automatically added to budget usage
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Staff Member</Label>
+                          <Select value={serviceStaffId} onValueChange={setServiceStaffId}>
+                            <SelectTrigger data-testid="select-service-staff">
+                              <SelectValue placeholder="Select staff..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">Not specified</SelectItem>
+                              {staffList.map((staff) => (
+                                <SelectItem key={staff.id} value={staff.id}>
+                                  {staff.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Textarea 
+                            placeholder="Additional notes..."
+                            value={serviceNotes}
+                            onChange={(e) => setServiceNotes(e.target.value)}
+                            data-testid="input-service-notes"
+                          />
+                        </div>
+                        <Button 
+                          onClick={() => addServiceMutation.mutate({
+                            serviceName,
+                            amount: serviceAmount || undefined,
+                            budgetId: serviceBudgetId || undefined,
+                            staffId: serviceStaffId || undefined,
+                            deliveredAt: new Date(serviceDate).toISOString(),
+                            durationMinutes: serviceDuration || undefined,
+                            notes: serviceNotes || undefined,
+                            rateType: serviceRateType,
+                            status: "completed"
+                          })}
+                          disabled={!serviceName || !serviceDate || addServiceMutation.isPending}
+                          className="w-full"
+                          data-testid="button-submit-service"
+                        >
+                          {addServiceMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          Record Service
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {serviceDeliveries.length > 0 ? (
+                <div className="space-y-3">
+                  {serviceDeliveries.map((service) => {
+                    const linkedBudget = budgets?.find(b => b.id === service.budgetId);
+                    const staffMember = staffList.find(s => s.id === service.staffId);
+                    return (
+                      <div 
+                        key={service.id} 
+                        className="p-3 border rounded-lg bg-card"
+                        data-testid={`service-${service.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium text-sm">{service.serviceName}</h4>
+                              {service.status && (
+                                <Badge variant={service.status === "completed" ? "default" : "secondary"} className="text-xs capitalize">
+                                  {service.status}
+                                </Badge>
+                              )}
+                              {service.rateType && (
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {service.rateType.replace("_", " ")}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(service.deliveredAt).toLocaleDateString('en-AU')}
+                              </span>
+                              {service.durationMinutes && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {service.durationMinutes} mins
+                                </span>
+                              )}
+                              {staffMember && (
+                                <span className="flex items-center gap-1">
+                                  <User className="w-3 h-3" />
+                                  {staffMember.name}
+                                </span>
+                              )}
+                            </div>
+                            {linkedBudget && (
+                              <p className="text-xs text-primary mt-1">
+                                Linked to: {linkedBudget.category}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {service.amount && (
+                              <span className="font-medium text-sm">
+                                ${parseFloat(service.amount).toLocaleString()}
+                              </span>
+                            )}
+                            {!isArchived && (
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => deleteServiceMutation.mutate(service.id)}
+                                data-testid={`button-delete-service-${service.id}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {service.notes && (
+                          <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                            {service.notes}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Clock className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No service deliveries recorded</p>
+                  {!isArchived && (
+                    <p className="text-xs text-muted-foreground mt-1">Click "Record Service" to add service delivery records</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

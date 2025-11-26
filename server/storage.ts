@@ -49,6 +49,7 @@ export interface IStorage {
   
   // Budgets
   getBudgetsByClientId(clientId: string): Promise<Budget[]>;
+  getBudget(id: string): Promise<Budget | undefined>;
   getAllBudgets(): Promise<Budget[]>;
   createBudget(budget: InsertBudget): Promise<Budget>;
   updateBudget(id: string, budget: Partial<InsertBudget>): Promise<Budget | undefined>;
@@ -396,6 +397,11 @@ export class DbStorage implements IStorage {
     return await db.select().from(budgets)
       .where(eq(budgets.clientId, clientId))
       .orderBy(desc(budgets.createdAt));
+  }
+  
+  async getBudget(id: string): Promise<Budget | undefined> {
+    const result = await db.select().from(budgets).where(eq(budgets.id, id)).limit(1);
+    return result[0];
   }
 
   async getAllBudgets(): Promise<Budget[]> {
@@ -790,20 +796,80 @@ export class DbStorage implements IStorage {
 
   async createServiceDelivery(delivery: InsertServiceDelivery): Promise<ServiceDelivery> {
     const result = await db.insert(serviceDeliveries).values(delivery).returning();
+    
+    // Auto-update budget usage if amount and budgetId are provided and status is completed
+    if (result[0] && delivery.budgetId && delivery.amount && delivery.status === "completed") {
+      await this.adjustBudgetUsage(delivery.budgetId, parseFloat(delivery.amount));
+    }
+    
     return result[0];
   }
 
   async updateServiceDelivery(id: string, deliveryUpdate: Partial<InsertServiceDelivery>): Promise<ServiceDelivery | undefined> {
+    // Get the existing delivery to check for budget/amount changes
+    const existing = await db.select().from(serviceDeliveries).where(eq(serviceDeliveries.id, id)).limit(1);
+    const oldDelivery = existing[0];
+    
     const result = await db.update(serviceDeliveries)
       .set({ ...deliveryUpdate as any })
       .where(eq(serviceDeliveries.id, id))
       .returning();
+    
+    const newDelivery = result[0];
+    
+    // Handle budget usage adjustments
+    if (oldDelivery && newDelivery) {
+      const wasCompleted = oldDelivery.status === "completed";
+      const isNowCompleted = (deliveryUpdate.status ?? oldDelivery.status) === "completed";
+      const oldAmount = oldDelivery.amount ? parseFloat(oldDelivery.amount) : 0;
+      const newAmount = deliveryUpdate.amount !== undefined 
+        ? (deliveryUpdate.amount ? parseFloat(deliveryUpdate.amount) : 0)
+        : oldAmount;
+      const oldBudgetId = oldDelivery.budgetId;
+      const newBudgetId = deliveryUpdate.budgetId !== undefined ? deliveryUpdate.budgetId : oldBudgetId;
+      
+      // If previously completed with budget, subtract old amount
+      if (wasCompleted && oldBudgetId && oldAmount > 0) {
+        await this.adjustBudgetUsage(oldBudgetId, -oldAmount);
+      }
+      
+      // If now completed with budget, add new amount
+      if (isNowCompleted && newBudgetId && newAmount > 0) {
+        await this.adjustBudgetUsage(newBudgetId, newAmount);
+      }
+    }
+    
     return result[0];
   }
 
   async deleteServiceDelivery(id: string): Promise<boolean> {
+    // Get the delivery first to check budget
+    const existing = await db.select().from(serviceDeliveries).where(eq(serviceDeliveries.id, id)).limit(1);
+    const delivery = existing[0];
+    
     const result = await db.delete(serviceDeliveries).where(eq(serviceDeliveries.id, id)).returning();
+    
+    // If was completed with budget, subtract amount
+    if (result.length > 0 && delivery && delivery.budgetId && delivery.amount && delivery.status === "completed") {
+      await this.adjustBudgetUsage(delivery.budgetId, -parseFloat(delivery.amount));
+    }
+    
     return result.length > 0;
+  }
+  
+  // Helper method to adjust budget usage
+  private async adjustBudgetUsage(budgetId: string, amountChange: number): Promise<void> {
+    if (amountChange === 0 || isNaN(amountChange)) return;
+    
+    const budget = await this.getBudget(budgetId);
+    if (!budget) return;
+    
+    const currentUsed = parseFloat(budget.used) || 0;
+    const newUsed = Math.max(0, currentUsed + amountChange); // Never go negative
+    
+    await db.update(budgets)
+      .set({ used: newUsed.toFixed(2), updatedAt: new Date() })
+      .where(eq(budgets.id, budgetId));
   }
 
   // Client Goals
