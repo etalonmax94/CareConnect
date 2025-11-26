@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
 const isDevelopment = import.meta.env.DEV;
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export default function Login() {
   const [devName, setDevName] = useState("Developer");
@@ -18,7 +19,8 @@ export default function Login() {
   const { toast } = useToast();
 
   const handleZohoLogin = () => {
-    window.location.href = "/api/auth/zoho";
+    // Use Cloud Run backend for OAuth
+    window.location.href = `${API_BASE_URL}/api/auth/zoho`;
   };
 
   const handleDevLogin = async () => {

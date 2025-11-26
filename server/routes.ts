@@ -275,6 +275,14 @@ function getDistanceFromOffice(address: string | null | undefined): number | nul
   return null;
 }
 
+// Frontend URL for redirects (used in hybrid deployment where frontend is hosted separately)
+const FRONTEND_URL = process.env.FRONTEND_URL || '';
+
+// Helper to get redirect URL (uses FRONTEND_URL if set, otherwise relative path)
+function getRedirectUrl(path: string): string {
+  return FRONTEND_URL ? `${FRONTEND_URL}${path}` : path;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== HEALTH CHECK ====================
   
@@ -307,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Validate Zoho credentials are configured
     if (!ZOHO_CLIENT_ID || !ZOHO_CLIENT_SECRET) {
       console.error("Zoho OAuth credentials not configured");
-      return res.redirect("/login?error=oauth_not_configured");
+      return res.redirect(getRedirectUrl("/login?error=oauth_not_configured"));
     }
     
     const baseUrl = getBaseUrl(req);
@@ -335,17 +343,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Validate Zoho credentials are configured
     if (!ZOHO_CLIENT_ID || !ZOHO_CLIENT_SECRET) {
       console.error("Zoho OAuth credentials not configured in callback");
-      return res.redirect("/login?error=oauth_not_configured");
+      return res.redirect(getRedirectUrl("/login?error=oauth_not_configured"));
     }
     
     if (error) {
       console.error("Zoho OAuth error:", error);
-      return res.redirect("/login?error=oauth_error");
+      return res.redirect(getRedirectUrl("/login?error=oauth_error"));
     }
     
     if (!code) {
       console.error("No code received");
-      return res.redirect("/login?error=no_code");
+      return res.redirect(getRedirectUrl("/login?error=no_code"));
     }
     
     try {
@@ -371,7 +379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (tokens.error) {
         console.error("Zoho token error:", tokens);
-        return res.redirect("/login?error=token_error");
+        return res.redirect(getRedirectUrl("/login?error=token_error"));
       }
       
       console.log("Token keys received:", Object.keys(tokens).join(", "));
@@ -428,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!userEmail) {
         console.error("Failed to get Zoho user info:", zohoUser);
-        return res.redirect("/login?error=user_info_error");
+        return res.redirect(getRedirectUrl("/login?error=user_info_error"));
       }
       
       console.log("Zoho user email:", userEmail);
@@ -494,7 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!user) {
-        return res.redirect("/?error=user_create_error");
+        return res.redirect(getRedirectUrl("/?error=user_create_error"));
       }
       
       // Check approval status - pending users go to waiting page
@@ -517,16 +525,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return req.session.save((err) => {
           if (err) {
             console.error("Session save error:", err);
-            return res.redirect("/login?error=session_error");
+            return res.redirect(getRedirectUrl("/login?error=session_error"));
           }
-          res.redirect("/pending-approval");
+          res.redirect(getRedirectUrl("/pending-approval"));
         });
       }
       
       // Check if user was rejected
       if (user.approvalStatus === "rejected") {
         console.log(`User ${userEmail} was rejected - redirecting to login with error`);
-        return res.redirect("/login?error=access_denied");
+        return res.redirect(getRedirectUrl("/login?error=access_denied"));
       }
       
       // Set session for approved user
@@ -546,17 +554,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.save((err) => {
         if (err) {
           console.error("Session save error:", err);
-          return res.redirect("/login?error=session_error");
+          return res.redirect(getRedirectUrl("/login?error=session_error"));
         }
         
         console.log("Session saved successfully for user:", user.email);
         
         // Approved users go directly to dashboard
-        res.redirect("/");
+        res.redirect(getRedirectUrl("/"));
       });
     } catch (error) {
       console.error("Zoho OAuth callback error:", error);
-      res.redirect("/?error=callback_error");
+      res.redirect(getRedirectUrl("/?error=callback_error"));
     }
   });
 
