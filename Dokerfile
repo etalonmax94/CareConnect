@@ -1,0 +1,23 @@
+# Use official Node image
+FROM node:20-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy package.json and package-lock.json
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy all files
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+# Expose the port Cloud Run uses
+EXPOSE 8080
+
+# Start the backend (compiled JS entry file)
+CMD ["node", "dist/main.js"]
