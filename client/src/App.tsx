@@ -70,6 +70,7 @@ function ProtectedRouter() {
 function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> }) {
   const style = {
     "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "4rem",
   };
 
   return (

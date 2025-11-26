@@ -3,13 +3,12 @@ import type { Client, ClientCategory } from "@shared/schema";
 import { calculateAge } from "@shared/schema";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import CategoryBadge from "./CategoryBadge";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
-import { Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff, Heart, HeartOff, Sparkles } from "lucide-react";
+import { Eye, ArrowUpDown, ArrowUp, ArrowDown, Phone, Star, StarOff, Heart, HeartOff, Sparkles } from "lucide-react";
 
 interface ClientTableProps {
   clients: Client[];
@@ -21,10 +20,8 @@ type SortField = "name" | "category" | "careManager" | "phone" | "compliance";
 type SortDirection = "asc" | "desc";
 
 export default function ClientTable({ clients, onViewClient, isArchiveView = false }: ClientTableProps) {
-  const [selectedCategory, setSelectedCategory] = useState<ClientCategory | "All">("All");
   const [selectedCareManager, setSelectedCareManager] = useState<string>("All");
   const [selectedCompliance, setSelectedCompliance] = useState<string>("All");
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [pinnedClients, setPinnedClients] = useState<Set<string>>(new Set());
@@ -58,20 +55,15 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
 
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
-      const matchesCategory = selectedCategory === "All" || client.category === selectedCategory;
       const matchesCareManager = selectedCareManager === "All" || client.careTeam?.careManager === selectedCareManager;
       const compStatus = getComplianceStatus(client.clinicalDocuments?.carePlanDate);
       const matchesCompliance = selectedCompliance === "All" || 
         (selectedCompliance === "compliant" && compStatus === "compliant") ||
         (selectedCompliance === "due-soon" && compStatus === "due-soon") ||
         (selectedCompliance === "overdue" && compStatus === "overdue");
-      const matchesSearch = client.participantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.careTeam?.careManager?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.phoneNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        getClientId(client)?.includes(searchTerm);
-      return matchesCategory && matchesCareManager && matchesCompliance && matchesSearch;
+      return matchesCareManager && matchesCompliance;
     });
-  }, [clients, selectedCategory, selectedCareManager, selectedCompliance, searchTerm]);
+  }, [clients, selectedCareManager, selectedCompliance]);
 
   const sortedClients = useMemo(() => {
     const pinned = filteredClients.filter(c => pinnedClients.has(c.id));
@@ -144,55 +136,30 @@ export default function ClientTable({ clients, onViewClient, isArchiveView = fal
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search clients, phone numbers, IDs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            data-testid="input-search"
-          />
-        </div>
-        
-        <div className="flex flex-wrap gap-3">
-          <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as ClientCategory | "All")}>
-            <SelectTrigger className="w-[160px]" data-testid="filter-category">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Categories</SelectItem>
-              <SelectItem value="NDIS">NDIS</SelectItem>
-              <SelectItem value="Support at Home">Support at Home</SelectItem>
-              <SelectItem value="Private">Private</SelectItem>
-            </SelectContent>
-          </Select>
+      <div className="flex flex-wrap gap-3">
+        <Select value={selectedCareManager} onValueChange={setSelectedCareManager}>
+          <SelectTrigger className="w-[180px]" data-testid="filter-care-manager">
+            <SelectValue placeholder="All Care Managers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Care Managers</SelectItem>
+            {careManagers.map(cm => (
+              <SelectItem key={cm} value={cm}>{cm}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          <Select value={selectedCareManager} onValueChange={setSelectedCareManager}>
-            <SelectTrigger className="w-[180px]" data-testid="filter-care-manager">
-              <SelectValue placeholder="All Care Managers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Care Managers</SelectItem>
-              {careManagers.map(cm => (
-                <SelectItem key={cm} value={cm}>{cm}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
-            <SelectTrigger className="w-[160px]" data-testid="filter-compliance">
-              <SelectValue placeholder="All Compliance" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Compliance</SelectItem>
-              <SelectItem value="compliant">Compliant</SelectItem>
-              <SelectItem value="due-soon">Due Soon</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
+          <SelectTrigger className="w-[160px]" data-testid="filter-compliance">
+            <SelectValue placeholder="All Compliance" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Compliance</SelectItem>
+            <SelectItem value="compliant">Compliant</SelectItem>
+            <SelectItem value="due-soon">Due Soon</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="border rounded-md">
