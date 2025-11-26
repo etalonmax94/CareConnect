@@ -1225,6 +1225,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Budget alerts - returns budgets at 80%+ or overspent (100%+)
+  app.get("/api/reports/budget-alerts", async (req, res) => {
+    try {
+      const allBudgets = await storage.getAllBudgets();
+      const allClients = await storage.getAllClients();
+      
+      const clientMap = new Map(allClients.map(c => [c.id, c]));
+      
+      const budgetAlerts = allBudgets
+        .map(budget => {
+          const client = clientMap.get(budget.clientId);
+          const allocated = parseFloat(budget.totalAllocated || "0");
+          const used = parseFloat(budget.used || "0");
+          const percentUsed = allocated > 0 ? Math.round((used / allocated) * 100) : 0;
+          
+          return {
+            id: budget.id,
+            clientId: budget.clientId,
+            clientName: client?.participantName || "Unknown",
+            category: budget.category,
+            allocated,
+            used,
+            remaining: allocated - used,
+            percentUsed,
+            alertType: percentUsed >= 100 ? "overspent" as const : percentUsed >= 80 ? "low" as const : null
+          };
+        })
+        .filter(b => b.alertType !== null);
+      
+      const overspentCount = budgetAlerts.filter(b => b.alertType === "overspent").length;
+      const lowCount = budgetAlerts.filter(b => b.alertType === "low").length;
+      
+      res.json({
+        totalAlerts: budgetAlerts.length,
+        overspentCount,
+        lowCount,
+        alerts: budgetAlerts.sort((a, b) => b.percentUsed - a.percentUsed)
+      });
+    } catch (error) {
+      console.error("Error fetching budget alerts:", error);
+      res.status(500).json({ error: "Failed to fetch budget alerts" });
+    }
+  });
+
   app.get("/api/reports/missing-documents", async (req, res) => {
     try {
       const allClients = await storage.getAllClients();

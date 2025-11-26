@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound } from "lucide-react";
+import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,7 +28,26 @@ interface DashboardData {
   totalBudgetUsed: number;
 }
 
-type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | "birthdays" | null;
+interface BudgetAlert {
+  id: string;
+  clientId: string;
+  clientName: string;
+  category: string;
+  allocated: number;
+  used: number;
+  remaining: number;
+  percentUsed: number;
+  alertType: "overspent" | "low";
+}
+
+interface BudgetAlertsData {
+  totalAlerts: number;
+  overspentCount: number;
+  lowCount: number;
+  alerts: BudgetAlert[];
+}
+
+type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | "birthdays" | "budgetAlerts" | null;
 
 export default function Dashboard() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -59,6 +78,10 @@ export default function Dashboard() {
 
   const { data: upcomingBirthdays = [] } = useQuery<BirthdayClient[]>({
     queryKey: ["/api/clients/birthdays/30"],
+  });
+
+  const { data: budgetAlerts } = useQuery<BudgetAlertsData>({
+    queryKey: ["/api/reports/budget-alerts"],
   });
 
   const ndisClients = clients.filter(c => c.category === "NDIS").length;
@@ -237,6 +260,47 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-1 mt-2 text-red-100 text-sm">
               <span>Click to view overdue</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`hover-elevate cursor-pointer border-0 ${
+            (budgetAlerts?.overspentCount || 0) > 0 
+              ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white'
+              : (budgetAlerts?.totalAlerts || 0) > 0 
+                ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white'
+                : 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white'
+          }`}
+          onClick={() => setActiveModal("budgetAlerts")}
+          data-testid="card-budget-alerts"
+        >
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-base font-semibold opacity-90 mb-3">Budget Alerts</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-budget-alerts">
+                  {budgetAlerts?.totalAlerts || 0}
+                </p>
+                <div className="flex items-center gap-1 opacity-90">
+                  {(budgetAlerts?.overspentCount || 0) > 0 ? (
+                    <span className="text-sm font-semibold">
+                      {budgetAlerts?.overspentCount} overspent, {budgetAlerts?.lowCount} low
+                    </span>
+                  ) : (budgetAlerts?.totalAlerts || 0) > 0 ? (
+                    <span className="text-sm font-semibold">{budgetAlerts?.lowCount} budgets at 80%+</span>
+                  ) : (
+                    <span className="text-sm font-semibold">All budgets healthy</span>
+                  )}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-white/20">
+                <DollarSign className="w-7 h-7" />
+              </div>
+            </div>
+            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
+              <span>Click to view details</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </CardContent>
@@ -650,6 +714,66 @@ export default function Dashboard() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Cake className="w-12 h-12 mx-auto mb-3 opacity-20" />
                   <p>No birthdays in the next 30 days</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Budget Alerts Modal */}
+      <Dialog open={activeModal === "budgetAlerts"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-orange-600" />
+              Budget Alerts
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3">
+              {budgetAlerts?.alerts && budgetAlerts.alerts.length > 0 ? (
+                budgetAlerts.alerts.map((alert) => (
+                  <Link key={alert.id} href={`/clients/${alert.clientId}`}>
+                    <Card className={`hover-elevate cursor-pointer ${
+                      alert.alertType === "overspent" 
+                        ? 'border-red-200 dark:border-red-800' 
+                        : 'border-orange-200 dark:border-orange-800'
+                    }`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{alert.clientName}</p>
+                            <p className="text-sm text-muted-foreground">{alert.category}</p>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={alert.alertType === "overspent" ? "destructive" : "secondary"} 
+                              className={alert.alertType === "low" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" : ""}>
+                              {alert.alertType === "overspent" ? (
+                                <>
+                                  <AlertTriangle className="w-3 h-3 mr-1" />
+                                  {alert.percentUsed}% - Over Budget
+                                </>
+                              ) : (
+                                <>
+                                  {alert.percentUsed}% - Low Budget
+                                </>
+                              )}
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              ${alert.used.toLocaleString()} / ${alert.allocated.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>All budgets are healthy</p>
+                  <p className="text-sm mt-1">No budgets at 80% or higher usage</p>
                 </div>
               )}
             </div>
