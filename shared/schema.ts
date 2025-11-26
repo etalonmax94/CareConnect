@@ -95,6 +95,11 @@ export const clients = pgTable("clients", {
   medicareNumber: text("medicare_number"),
   nokEpoa: text("nok_epoa"),
   frequencyOfServices: text("frequency_of_services"),
+  serviceSchedule: json("service_schedule").$type<{
+    week1: { [day: string]: { startTime: string; endTime: string; }[] };
+    week2: { [day: string]: { startTime: string; endTime: string; }[] };
+    notes?: string;
+  }>(),
   mainDiagnosis: text("main_diagnosis"),
   allergies: text("allergies"),
   advancedCareDirective: text("advanced_care_directive").$type<"NFR" | "For Resus" | "None" | null>(),
