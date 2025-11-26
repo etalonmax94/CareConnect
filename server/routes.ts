@@ -640,6 +640,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Generate JWT token for cross-domain auth
+      console.log("=== GENERATING JWT TOKEN ===");
+      console.log("User object keys:", Object.keys(user));
+      console.log("User ID:", user.id);
+      console.log("User ID type:", typeof user.id);
+      console.log("User email:", user.email);
+      
       const authToken = generateAuthToken({
         id: user.id,
         email: user.email,
@@ -648,6 +654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         approvalStatus: user.approvalStatus
       });
       console.log("Generated auth token for user:", user.email);
+      console.log("Token payload userId will be:", user.id);
       
       // Check approval status - pending users go to waiting page
       if (user.approvalStatus === "pending") {
