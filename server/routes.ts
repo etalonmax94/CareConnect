@@ -1043,7 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vcfContent.push(`NOTE:${notesText}`);
       }
       
-      // Build organization section with notification preferences
+      // Build notification preferences for organization field
       const notifPrefs = client.notificationPreferences;
       const notifParts: string[] = [];
       if (notifPrefs?.smsArrival || notifPrefs?.smsSchedule) {
@@ -1052,13 +1052,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (notifPrefs?.callArrival || notifPrefs?.callSchedule) {
         notifParts.push('Calls Arrivals & Schedules');
       }
-      const notifText = notifParts.length > 0 ? notifParts.join(', ') : '';
       
-      // Add organization with notification preference
-      if (notifText) {
-        vcfContent.push(`ORG:EmpowerLink Client - ${notifText}`);
-      } else {
-        vcfContent.push('ORG:EmpowerLink Client');
+      // Only add ORG field if there are notification preferences
+      if (notifParts.length > 0) {
+        vcfContent.push(`ORG:${notifParts.join(', ')}`);
       }
       
       // Add photo if exists
