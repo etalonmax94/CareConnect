@@ -51,6 +51,10 @@
   --funding-agency-managed-foreground: 0 0% 100%;
   --funding-self-managed: 32 90% 50%;
   --funding-self-managed-foreground: 0 0% 100%;
+  /* NDIS Funding Type Colors */
+  --ndis-plan-managed: 212 60% 35%;
+  --ndis-agency-managed: 270 45% 40%;
+  --ndis-self-managed: 30 85% 50%;
   --font-sans: Inter, system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -140,6 +144,10 @@
   --funding-agency-managed-foreground: 0 0% 100%;
   --funding-self-managed: 32 90% 55%;
   --funding-self-managed-foreground: 0 0% 100%;
+  /* NDIS Funding Type Colors */
+  --ndis-plan-managed: 212 65% 45%;
+  --ndis-agency-managed: 270 50% 50%;
+  --ndis-self-managed: 30 80% 55%;
   --chart-2: 142 55% 50%;
   --chart-3: 200 60% 55%;
   --chart-4: 280 50% 60%;

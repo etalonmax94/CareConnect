@@ -426,10 +426,19 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                     name="ndisDetails.ndisFundingType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Funding Type</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="e.g., Core + Capacity Building" data-testid="input-funding-type" />
-                        </FormControl>
+                        <FormLabel>Funding Management Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-funding-type">
+                              <SelectValue placeholder="Select funding management type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Plan-Managed">Plan-Managed</SelectItem>
+                            <SelectItem value="Agency-Managed">Agency-Managed</SelectItem>
+                            <SelectItem value="Self-Managed">Self-Managed</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -633,6 +633,19 @@ export default function ClientProfile() {
               <Badge variant={isArchived ? "secondary" : "default"} className={isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}>
                 {isArchived ? 'Archived' : 'Active'}
               </Badge>
+              <CategoryBadge category={client.category} />
+              {client.category === "NDIS" && client.ndisDetails?.ndisFundingType && (
+                <Badge 
+                  className={`border-0 text-white ${
+                    client.ndisDetails.ndisFundingType === "Plan-Managed" ? "bg-[hsl(var(--ndis-plan-managed))]" :
+                    client.ndisDetails.ndisFundingType === "Agency-Managed" ? "bg-[hsl(var(--ndis-agency-managed))]" :
+                    client.ndisDetails.ndisFundingType === "Self-Managed" ? "bg-[hsl(var(--ndis-self-managed))]" :
+                    "bg-slate-500"
+                  }`}
+                >
+                  {client.ndisDetails.ndisFundingType}
+                </Badge>
+              )}
               {client.isOnboarded !== "yes" && !isArchived && (
                 <Badge variant="secondary">New</Badge>
               )}
