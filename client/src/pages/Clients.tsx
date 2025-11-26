@@ -37,9 +37,16 @@ const defaultColumnVisibility: ColumnVisibility = {
 };
 
 export default function Clients() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
-  const [selectedCategory, setSelectedCategory] = useState<ClientCategory | "All">("All");
+  const [selectedCategory, setSelectedCategory] = useState<ClientCategory | "All">(() => {
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get("category");
+    if (category === "NDIS" || category === "Support at Home" || category === "Private") {
+      return category;
+    }
+    return "All";
+  });
   const [selectedCareManager, setSelectedCareManager] = useState<string>("All");
   const [selectedCompliance, setSelectedCompliance] = useState<string>("All");
   
@@ -73,6 +80,14 @@ export default function Clients() {
   useEffect(() => {
     localStorage.setItem("clientColumnVisibility", JSON.stringify(columnVisibility));
   }, [columnVisibility]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get("category");
+    if (category === "NDIS" || category === "Support at Home" || category === "Private") {
+      setSelectedCategory(category);
+    }
+  }, [location]);
 
   const { data: activeClients = [], isLoading: isLoadingActive } = useQuery<Client[]>({
     queryKey: ["/api/clients/active"],

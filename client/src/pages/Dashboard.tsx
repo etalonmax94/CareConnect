@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign, Shield, UserX, UserPlus } from "lucide-react";
+import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign, Shield, UserX, UserPlus, Accessibility, Home, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import CategoryBadge from "@/components/CategoryBadge";
 import ComplianceIndicator from "@/components/ComplianceIndicator";
 import { useQuery } from "@tanstack/react-query";
 import type { Client, ActivityLog, Staff } from "@shared/schema";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 interface OpenIncident {
   id: string;
@@ -118,9 +119,16 @@ export default function Dashboard() {
     return createdDate >= thirtyDaysAgo;
   }).length;
 
+  const [, setLocation] = useLocation();
+  
   const ndisClients = clients.filter(c => c.category === "NDIS").length;
   const supportClients = clients.filter(c => c.category === "Support at Home").length;
   const privateClients = clients.filter(c => c.category === "Private").length;
+  const totalClients = clients.length;
+  
+  const ndisPercentage = totalClients > 0 ? Math.round((ndisClients / totalClients) * 100) : 0;
+  const supportPercentage = totalClients > 0 ? Math.round((supportClients / totalClients) * 100) : 0;
+  const privatePercentage = totalClients > 0 ? Math.round((privateClients / totalClients) * 100) : 0;
 
   const compliantClients = clients.filter(c => {
     const docs = c.clinicalDocuments || {};
@@ -442,30 +450,83 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Client Distribution</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              Client Distribution
+            </CardTitle>
+            <Badge variant="secondary">
+              {totalClients} total
+            </Badge>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CategoryBadge category="NDIS" />
-                <span className="text-sm text-muted-foreground">NDIS Clients</span>
+            <div 
+              className="p-3 rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 hover-elevate cursor-pointer transition-all"
+              onClick={() => setLocation("/clients?category=NDIS")}
+              data-testid="card-distribution-ndis"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-900/50">
+                    <Accessibility className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">NDIS Clients</span>
+                    <span className="text-xs text-muted-foreground ml-2">({ndisPercentage}%)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold text-blue-600 dark:text-blue-400" data-testid="text-ndis-count">{ndisClients}</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </div>
               </div>
-              <span className="text-xl font-semibold" data-testid="text-ndis-count">{ndisClients}</span>
+              <Progress value={ndisPercentage} className="h-1.5 bg-blue-100 dark:bg-blue-900/30" />
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CategoryBadge category="Support at Home" />
-                <span className="text-sm text-muted-foreground">Support at Home</span>
+
+            <div 
+              className="p-3 rounded-lg border-l-4 border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 hover-elevate cursor-pointer transition-all"
+              onClick={() => setLocation("/clients?category=Support at Home")}
+              data-testid="card-distribution-support"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 rounded-md bg-emerald-100 dark:bg-emerald-900/50">
+                    <Home className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">Support at Home</span>
+                    <span className="text-xs text-muted-foreground ml-2">({supportPercentage}%)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-support-count">{supportClients}</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </div>
               </div>
-              <span className="text-xl font-semibold" data-testid="text-support-count">{supportClients}</span>
+              <Progress value={supportPercentage} className="h-1.5 bg-emerald-100 dark:bg-emerald-900/30" />
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CategoryBadge category="Private" />
-                <span className="text-sm text-muted-foreground">Private Clients</span>
+
+            <div 
+              className="p-3 rounded-lg border-l-4 border-l-violet-500 bg-violet-50/50 dark:bg-violet-950/20 hover-elevate cursor-pointer transition-all"
+              onClick={() => setLocation("/clients?category=Private")}
+              data-testid="card-distribution-private"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 rounded-md bg-violet-100 dark:bg-violet-900/50">
+                    <Wallet className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">Private Clients</span>
+                    <span className="text-xs text-muted-foreground ml-2">({privatePercentage}%)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold text-violet-600 dark:text-violet-400" data-testid="text-private-count">{privateClients}</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </div>
               </div>
-              <span className="text-xl font-semibold" data-testid="text-private-count">{privateClients}</span>
+              <Progress value={privatePercentage} className="h-1.5 bg-violet-100 dark:bg-violet-900/30" />
             </div>
           </CardContent>
         </Card>
