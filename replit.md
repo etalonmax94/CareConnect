@@ -36,6 +36,19 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 - **Date Handling**: Robust date formatting and validation, supporting over 40 compliance form dates.
 - **Distance Calculation**: Uses the Haversine formula for distance calculations.
 
+## Developer Access (Development Only)
+In development mode (`NODE_ENV=development`), a "Developer Access" panel appears on the login page below the Zoho login button. This allows developers to:
+- Enter a custom display name
+- Select a role (Admin, Manager, Care Coordinator, Support Worker, Finance, Viewer)
+- Login without requiring Zoho OAuth credentials
+
+The developer login creates a session with:
+- User ID: `dev-user-001`
+- Email: `test@empowerlink.local`
+- Selected display name and role
+
+This feature is automatically hidden in production builds (`import.meta.env.DEV` check on frontend, `NODE_ENV === "production"` check on backend).
+
 ## External Dependencies
 - **Zoho OAuth2**: User authentication and authorization.
 - **PostgreSQL (Neon)**: Relational database.
