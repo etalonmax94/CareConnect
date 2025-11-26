@@ -621,7 +621,7 @@ export default function ClientProfile() {
                 {isArchived ? 'Archived' : 'Active'}
               </Badge>
               {client.isOnboarded !== "yes" && !isArchived && (
-                <Badge className="bg-blue-500 text-white border-0">New</Badge>
+                <Badge className="bg-teal-500 text-white border-0">New</Badge>
               )}
             </div>
             
@@ -731,14 +731,14 @@ export default function ClientProfile() {
       )}
 
       {client.isOnboarded !== "yes" && !isArchived && (
-        <Alert variant="default" className="mx-6 mt-4 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
-          <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          <AlertDescription className="text-blue-800 dark:text-blue-200 flex items-center justify-between">
+        <Alert variant="default" className="mx-6 mt-4 border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/30">
+          <Sparkles className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+          <AlertDescription className="text-teal-800 dark:text-teal-200 flex items-center justify-between">
             <span><strong>New Client</strong> - This client has not been onboarded yet.</span>
             <Button 
               size="sm" 
               variant="outline" 
-              className="ml-4 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              className="ml-4 border-teal-300 text-teal-700 hover:bg-teal-100 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-900/50"
               onClick={() => onboardMutation.mutate()}
               disabled={onboardMutation.isPending}
               data-testid="button-onboard-client"
@@ -858,11 +858,11 @@ export default function ClientProfile() {
                     </Alert>
                   )}
                   {client.advancedCareDirective && client.advancedCareDirective !== "None" && (
-                    <Alert className={`${client.advancedCareDirective === "NFR" ? "border-purple-300 bg-purple-50 dark:border-purple-800 dark:bg-purple-950/30" : "border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"}`}>
+                    <Alert className={`${client.advancedCareDirective === "NFR" ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30" : "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"}`}>
                       <FileText className="h-4 w-4" />
                       <AlertDescription className="font-medium">
                         <span className="font-bold">Advanced Care Directive: </span>
-                        <Badge className={`ml-2 ${client.advancedCareDirective === "NFR" ? "bg-purple-600" : "bg-blue-600"} text-white border-0`}>
+                        <Badge className={`ml-2 ${client.advancedCareDirective === "NFR" ? "bg-rose-600" : "bg-emerald-600"} text-white border-0`}>
                           {client.advancedCareDirective === "NFR" ? "Not For Resuscitation" : "For Resuscitation"}
                         </Badge>
                       </AlertDescription>
@@ -881,35 +881,35 @@ export default function ClientProfile() {
 
               {/* Quick Info Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card className="bg-slate-50 dark:bg-slate-900/50">
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-teal-50/50 to-white dark:from-teal-950/20 dark:to-card">
                   <CardContent className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-slate-500" />
-                      <span className="text-xs text-muted-foreground">Service Type</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Activity className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                      <span className="text-xs text-muted-foreground font-medium">Service Type</span>
                     </div>
-                    <p className="text-sm font-semibold mt-1">{client.serviceType || 'Not specified'}</p>
+                    <p className="text-sm font-semibold">{client.serviceType || 'Not specified'}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-slate-50 dark:bg-slate-900/50">
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50/50 to-white dark:from-emerald-950/20 dark:to-card">
                   <CardContent className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Navigation className="w-4 h-4 text-slate-500" />
-                      <span className="text-xs text-muted-foreground">Distance</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Navigation className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-xs text-muted-foreground font-medium">Distance</span>
                     </div>
-                    <p className="text-sm font-semibold mt-1">
+                    <p className="text-sm font-semibold">
                       {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined 
-                        ? `${distanceData.distanceKm} km from office` 
+                        ? `${distanceData.distanceKm} km` 
                         : 'Not calculated'}
                     </p>
                   </CardContent>
                 </Card>
-                <Card className="bg-slate-50 dark:bg-slate-900/50 md:col-span-2">
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-50/50 to-white dark:from-slate-900/30 dark:to-card md:col-span-2">
                   <CardContent className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Car className="w-4 h-4 text-slate-500" />
-                      <span className="text-xs text-muted-foreground">Parking / Access</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Car className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+                      <span className="text-xs text-muted-foreground font-medium">Parking / Access</span>
                     </div>
-                    <p className="text-sm font-semibold mt-1">{client.parkingInstructions || 'No instructions provided'}</p>
+                    <p className="text-sm font-semibold">{client.parkingInstructions || 'No instructions provided'}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -1790,8 +1790,8 @@ export default function ClientProfile() {
                   {goals.map((goal) => {
                     const statusConfig: Record<string, { label: string; className: string; icon: JSX.Element }> = {
                       not_started: { label: "Not Started", className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300", icon: <Clock className="w-3 h-3" /> },
-                      in_progress: { label: "In Progress", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300", icon: <TrendingUp className="w-3 h-3" /> },
-                      achieved: { label: "Achieved", className: "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300", icon: <CheckCircle className="w-3 h-3" /> },
+                      in_progress: { label: "In Progress", className: "bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300", icon: <TrendingUp className="w-3 h-3" /> },
+                      achieved: { label: "Achieved", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300", icon: <CheckCircle className="w-3 h-3" /> },
                       on_hold: { label: "On Hold", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300", icon: <AlertTriangle className="w-3 h-3" /> },
                     };
                     const status = statusConfig[goal.status] || statusConfig.not_started;
@@ -1957,10 +1957,10 @@ export default function ClientProfile() {
                     const noteAuthor = note.authorId ? staffList.find(s => s.id === note.authorId) : null;
                     const typeColors: Record<string, string> = {
                       progress: "border-primary",
-                      clinical: "border-blue-500",
+                      clinical: "border-teal-500",
                       incident: "border-red-500",
                       complaint: "border-amber-500",
-                      feedback: "border-green-500",
+                      feedback: "border-emerald-500",
                     };
                     return (
                       <div 
@@ -2111,10 +2111,10 @@ export default function ClientProfile() {
                       critical: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200",
                     };
                     const statusColors: Record<string, string> = {
-                      open: "bg-red-100 text-red-800",
-                      investigating: "bg-amber-100 text-amber-800",
-                      resolved: "bg-blue-100 text-blue-800",
-                      closed: "bg-gray-100 text-gray-800",
+                      open: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+                      investigating: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
+                      resolved: "bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300",
+                      closed: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300",
                     };
                     return (
                       <div 
