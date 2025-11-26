@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
-import { Upload, Eye, FileText, Trash2, ExternalLink, Loader2 } from "lucide-react";
+import { Upload, Eye, FileText, Trash2, ExternalLink, Loader2, File, Link } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Document } from "@shared/schema";
 
 type ClinicalDocuments = {
@@ -53,6 +55,11 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [fileUrl, setFileUrl] = useState("");
   const [fileName, setFileName] = useState("");
+  const [uploadMode, setUploadMode] = useState<"file" | "link">("file");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const { data: uploadedDocs = [] } = useQuery<Document[]>({
     queryKey: ["/api/clients", clientId, "documents"],
@@ -69,6 +76,8 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
       setFileUrl("");
       setFileName("");
       setSelectedDocType("");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     },
   });
 
@@ -81,13 +90,84 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
     },
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        toast({
+          title: "Invalid file type",
+          description: "Please select a PDF file",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select a file smaller than 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedFile(file);
+      setFileName(file.name);
+    }
+  };
+
+  const handleUploadFile = async () => {
+    if (!selectedDocType || !selectedFile) return;
+    
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("documentType", selectedDocType);
+      formData.append("fileName", fileName || selectedFile.name);
+
+      const response = await fetch(`/api/clients/${clientId}/documents/upload`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId, "documents"] });
+      setUploadDialogOpen(false);
+      setFileUrl("");
+      setFileName("");
+      setSelectedDocType("");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      
+      toast({
+        title: "Document uploaded",
+        description: "The document has been uploaded successfully",
+      });
+    } catch {
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload the document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleUpload = () => {
-    if (!selectedDocType || !fileName || !fileUrl) return;
-    uploadMutation.mutate({
-      documentType: selectedDocType,
-      fileName,
-      fileUrl,
-    });
+    if (uploadMode === "file") {
+      handleUploadFile();
+    } else {
+      if (!selectedDocType || !fileName || !fileUrl) return;
+      uploadMutation.mutate({
+        documentType: selectedDocType,
+        fileName,
+        fileUrl,
+      });
+    }
   };
 
   const getUploadedDoc = (docType: string) => {
@@ -196,37 +276,79 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                         <DialogTitle>Upload {doc.name}</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
-                        <p className="text-sm text-muted-foreground">
-                          Enter the document details. The file should be uploaded to Zoho WorkDrive and the link provided here.
-                        </p>
-                        <div className="space-y-2">
-                          <Label htmlFor="fileName">File Name</Label>
-                          <Input 
-                            id="fileName"
-                            value={fileName}
-                            onChange={(e) => setFileName(e.target.value)}
-                            placeholder="e.g., Service_Agreement_2024.pdf"
-                            data-testid="input-doc-filename"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="fileUrl">Document URL (from Zoho WorkDrive)</Label>
-                          <Input 
-                            id="fileUrl"
-                            value={fileUrl}
-                            onChange={(e) => setFileUrl(e.target.value)}
-                            placeholder="https://workdrive.zoho.com/..."
-                            data-testid="input-doc-url"
-                          />
-                        </div>
+                        <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as "file" | "link")}>
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="file" className="gap-2">
+                              <File className="w-4 h-4" />
+                              Upload PDF
+                            </TabsTrigger>
+                            <TabsTrigger value="link" className="gap-2">
+                              <Link className="w-4 h-4" />
+                              External Link
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="file" className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="pdfFile">Select PDF File</Label>
+                              <Input 
+                                id="pdfFile"
+                                type="file"
+                                accept=".pdf,application/pdf"
+                                onChange={handleFileSelect}
+                                ref={fileInputRef}
+                                className="cursor-pointer"
+                                data-testid="input-doc-file"
+                              />
+                              <p className="text-xs text-muted-foreground">Maximum file size: 10MB</p>
+                            </div>
+                            {selectedFile && (
+                              <div className="p-3 bg-muted rounded-lg flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-red-600" />
+                                <span className="text-sm truncate">{selectedFile.name}</span>
+                                <span className="text-xs text-muted-foreground ml-auto">
+                                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                                </span>
+                              </div>
+                            )}
+                          </TabsContent>
+                          <TabsContent value="link" className="space-y-4 mt-4">
+                            <p className="text-sm text-muted-foreground">
+                              Enter the document details for an external link (e.g., Zoho WorkDrive).
+                            </p>
+                            <div className="space-y-2">
+                              <Label htmlFor="fileName">File Name</Label>
+                              <Input 
+                                id="fileName"
+                                value={fileName}
+                                onChange={(e) => setFileName(e.target.value)}
+                                placeholder="e.g., Service_Agreement_2024.pdf"
+                                data-testid="input-doc-filename"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="fileUrl">Document URL</Label>
+                              <Input 
+                                id="fileUrl"
+                                value={fileUrl}
+                                onChange={(e) => setFileUrl(e.target.value)}
+                                placeholder="https://..."
+                                data-testid="input-doc-url"
+                              />
+                            </div>
+                          </TabsContent>
+                        </Tabs>
                         <Button 
                           onClick={handleUpload} 
-                          disabled={!fileName || !fileUrl || uploadMutation.isPending}
+                          disabled={
+                            uploadMode === "file" 
+                              ? !selectedFile || isUploading
+                              : !fileName || !fileUrl || uploadMutation.isPending
+                          }
                           className="w-full"
                           data-testid="button-submit-upload"
                         >
-                          {uploadMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                          Upload Document
+                          {(isUploading || uploadMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          {uploadMode === "file" ? "Upload PDF" : "Save Link"}
                         </Button>
                       </div>
                     </DialogContent>

@@ -630,13 +630,13 @@ export default function ClientProfile() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
-              <Badge variant={isArchived ? "secondary" : "default"} className={isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}>
+              <Badge variant={isArchived ? "secondary" : "default"} className={`h-6 px-2.5 ${isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}`}>
                 {isArchived ? 'Archived' : 'Active'}
               </Badge>
-              <CategoryBadge category={client.category} />
+              <CategoryBadge category={client.category} className="h-6 px-2.5" />
               {client.category === "NDIS" && client.ndisDetails?.ndisFundingType && (
                 <Badge 
-                  className={`border-0 text-white ${
+                  className={`h-6 px-2.5 border-0 text-white ${
                     client.ndisDetails.ndisFundingType === "Plan-Managed" ? "bg-[hsl(var(--ndis-plan-managed))]" :
                     client.ndisDetails.ndisFundingType === "Agency-Managed" ? "bg-[hsl(var(--ndis-agency-managed))]" :
                     client.ndisDetails.ndisFundingType === "Self-Managed" ? "bg-[hsl(var(--ndis-self-managed))]" :
@@ -647,14 +647,18 @@ export default function ClientProfile() {
                 </Badge>
               )}
               {client.isOnboarded !== "yes" && !isArchived && (
-                <Badge variant="secondary">New</Badge>
+                <Badge variant="secondary" className="h-6 px-2.5">New</Badge>
               )}
             </div>
             
-            {/* Quick Info Chips */}
+            {/* Quick Info Chips - Interactive */}
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               {clientAge && (
-                <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5">
+                <div 
+                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                  onClick={() => setActiveSection("details")}
+                  data-testid="chip-age"
+                >
                   <CalendarDays className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <p className="text-[10px] uppercase text-muted-foreground font-medium">Age</p>
@@ -663,7 +667,11 @@ export default function ClientProfile() {
                 </div>
               )}
               
-              <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5">
+              <div 
+                className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                onClick={() => setActiveSection("details")}
+                data-testid="chip-id"
+              >
                 <User className="w-4 h-4 text-muted-foreground" />
                 <div>
                   <p className="text-[10px] uppercase text-muted-foreground font-medium">ID</p>
@@ -672,7 +680,11 @@ export default function ClientProfile() {
               </div>
               
               {client.category === "NDIS" && getNdisNumber() && (
-                <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5">
+                <div 
+                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                  onClick={() => setActiveSection("program")}
+                  data-testid="chip-ndis"
+                >
                   <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                   <div>
                     <p className="text-[10px] uppercase text-muted-foreground font-medium">NDIS</p>
@@ -682,7 +694,11 @@ export default function ClientProfile() {
               )}
               
               {client.category === "Support at Home" && getHcpNumber() && (
-                <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5">
+                <div 
+                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                  onClick={() => setActiveSection("program")}
+                  data-testid="chip-hcp"
+                >
                   <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                   <div>
                     <p className="text-[10px] uppercase text-muted-foreground font-medium">HCP</p>
@@ -691,7 +707,11 @@ export default function ClientProfile() {
                 </div>
               )}
               
-              <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5">
+              <div 
+                className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                onClick={() => setActiveSection("program")}
+                data-testid="chip-category"
+              >
                 <CreditCard className="w-4 h-4 text-muted-foreground" />
                 <div>
                   <p className="text-[10px] uppercase text-muted-foreground font-medium">Care Category</p>
@@ -818,9 +838,13 @@ export default function ClientProfile() {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Stat Cards Row - Clean design with borders */}
+          {/* Stat Cards Row - Clean design with borders - Interactive */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <Card className="bg-card">
+            <Card 
+              className="bg-card hover-elevate cursor-pointer"
+              onClick={() => setActiveSection("details")}
+              data-testid="stat-age"
+            >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
@@ -834,7 +858,11 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
             
-            <Card className="bg-card">
+            <Card 
+              className="bg-card hover-elevate cursor-pointer"
+              onClick={() => setActiveSection("program")}
+              data-testid="stat-support-level"
+            >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
@@ -848,7 +876,11 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
             
-            <Card className="bg-card">
+            <Card 
+              className="bg-card hover-elevate cursor-pointer"
+              onClick={() => setActiveSection("staff")}
+              data-testid="stat-assigned-staff"
+            >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
@@ -862,7 +894,11 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
             
-            <Card className="bg-card">
+            <Card 
+              className="bg-card hover-elevate cursor-pointer"
+              onClick={() => setActiveSection("budget")}
+              data-testid="stat-budget"
+            >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
@@ -913,9 +949,13 @@ export default function ClientProfile() {
                 </div>
               )}
 
-              {/* Quick Info Row */}
+              {/* Quick Info Row - Interactive */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card className="bg-card">
+                <Card 
+                  className="bg-card hover-elevate cursor-pointer"
+                  onClick={() => setActiveSection("services")}
+                  data-testid="card-service-type"
+                >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Activity className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
@@ -924,7 +964,11 @@ export default function ClientProfile() {
                     <p className="text-sm font-semibold">{client.serviceType || 'Not specified'}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-card">
+                <Card 
+                  className="bg-card hover-elevate cursor-pointer"
+                  onClick={() => setActiveSection("details")}
+                  data-testid="card-risk-score"
+                >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
@@ -945,11 +989,15 @@ export default function ClientProfile() {
                         </span>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">Not assessed</p>
+                      <p className="text-sm font-semibold">Not assessed</p>
                     )}
                   </CardContent>
                 </Card>
-                <Card className="bg-card md:col-span-2">
+                <Card 
+                  className="bg-card md:col-span-2 hover-elevate cursor-pointer"
+                  onClick={() => setActiveSection("details")}
+                  data-testid="card-parking"
+                >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Car className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
@@ -1226,9 +1274,9 @@ export default function ClientProfile() {
                       )}
 
                       {client.category === "Private" && client.medicareNumber && (
-                        <div className="p-3 bg-muted/30 rounded-lg">
-                          <p className="text-xs text-muted-foreground">Medicare Number</p>
-                          <p className="text-sm font-semibold font-mono">{client.medicareNumber}</p>
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                          <p className="text-xs text-emerald-700 dark:text-emerald-400">Medicare Number</p>
+                          <p className="text-sm font-semibold font-mono text-emerald-900 dark:text-emerald-100">{client.medicareNumber}</p>
                         </div>
                       )}
                     </CardContent>
@@ -1338,7 +1386,7 @@ export default function ClientProfile() {
                               {client.riskAssessmentScore}/10
                             </Badge>
                           ) : (
-                            <span className="text-sm text-muted-foreground">Not assessed</span>
+                            <span className="text-sm font-semibold">Not assessed</span>
                           )}
                         </div>
                       </div>

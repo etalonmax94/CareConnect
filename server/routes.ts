@@ -13,6 +13,52 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+// Configure multer for file uploads
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Sanitize filename to prevent path traversal
+function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.\./g, '_');
+}
+
+const storage_config = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const clientId = (req as any).params.clientId;
+    if (clientId) {
+      const clientDir = path.join(uploadsDir, sanitizeFilename(clientId));
+      if (!fs.existsSync(clientDir)) {
+        fs.mkdirSync(clientDir, { recursive: true });
+      }
+      cb(null, clientDir);
+    } else {
+      cb(null, uploadsDir);
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const safeOriginalName = sanitizeFilename(file.originalname);
+    cb(null, uniqueSuffix + '-' + safeOriginalName);
+  }
+});
+
+const upload = multer({
+  storage: storage_config,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  }
+});
 
 // Zoho OAuth Configuration
 const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID;
@@ -2400,6 +2446,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting document:", error);
       res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+
+  // Upload document file (PDF)
+  app.post("/api/clients/:clientId/documents/upload", upload.single("file"), async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const { documentType, fileName } = req.body;
+      if (!documentType) {
+        return res.status(400).json({ error: "Document type is required" });
+      }
+      
+      // Validate document type
+      const validDocumentTypes = [
+        "Service Agreement", "NDIS Plan", "Care Plan", "Risk Assessment",
+        "Medical Report", "Consent Form", "Progress Report", "Assessment",
+        "Referral", "Certificate", "Policy Document", "Other"
+      ];
+      if (!validDocumentTypes.includes(documentType)) {
+        return res.status(400).json({ error: "Invalid document type" });
+      }
+
+      // Create a URL to serve the uploaded file with client ID for authorization
+      const safeClientId = sanitizeFilename(req.params.clientId);
+      const fileUrl = `/uploads/${safeClientId}/${req.file.filename}`;
+      
+      const document = await storage.createDocument({
+        clientId: req.params.clientId,
+        documentType,
+        fileName: fileName || req.file.originalname,
+        fileUrl,
+      });
+
+      // Log activity
+      await storage.logActivity({
+        clientId: req.params.clientId,
+        action: "document_uploaded",
+        description: `Document ${document.fileName} was uploaded`,
+        performedBy: req.session.user.email || "System"
+      });
+
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  // Serve uploaded files with client authorization
+  app.get("/uploads/:clientId/:filename", async (req, res) => {
+    // Basic security check - ensure user is authenticated
+    if (!req.session?.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const { clientId, filename } = req.params;
+    
+    // Sanitize to prevent path traversal
+    const safeClientId = sanitizeFilename(clientId);
+    const safeFilename = sanitizeFilename(filename);
+    
+    // Prevent any attempt to traverse directories
+    if (safeClientId !== clientId || safeFilename !== filename) {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+    
+    try {
+      // Verify the client exists
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      // Get all documents for this client
+      const documents = await storage.getDocumentsByClient(clientId);
+      
+      // Find the exact document that matches this file URL
+      const expectedUrl = `/uploads/${safeClientId}/${safeFilename}`;
+      const documentRecord = documents.find(doc => doc.fileUrl === expectedUrl);
+      
+      if (!documentRecord) {
+        // Document not found in database - don't serve the file
+        console.warn(`Unauthorized access attempt: ${expectedUrl} not in client ${clientId} documents`);
+        return res.status(403).json({ error: "Access denied - document not found" });
+      }
+      
+      // Document is verified to belong to this client - serve it
+      const filePath = path.join(uploadsDir, safeClientId, safeFilename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      // Set content type for PDF
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${documentRecord.fileName}"`);
+      res.sendFile(filePath);
+    } catch (error) {
+      console.error("Error serving file:", error);
+      res.status(500).json({ error: "Failed to serve file" });
     }
   });
 
