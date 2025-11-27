@@ -121,7 +121,8 @@ export const clients = pgTable("clients", {
   phoneNumber: text("phone_number"),
   email: text("email"),
   medicareNumber: text("medicare_number"),
-  nokEpoa: text("nok_epoa"),
+  nokEpoa: text("nok_epoa"), // Next of Kin info (name, relationship, phone)
+  epoa: text("epoa"), // Enduring Power of Attorney (name, relationship, phone)
   frequencyOfServices: text("frequency_of_services"),
   serviceSchedule: json("service_schedule").$type<{
     week1: { [day: string]: { startTime: string; endTime: string; }[] };

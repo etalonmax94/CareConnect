@@ -642,6 +642,9 @@ export default function ClientProfile() {
   const [editEmergencyContactName, setEditEmergencyContactName] = useState<string>("");
   const [editEmergencyContactPhone, setEditEmergencyContactPhone] = useState<string>("");
   const [editEmergencyContactRelationship, setEditEmergencyContactRelationship] = useState<string>("");
+  const [editEpoaName, setEditEpoaName] = useState<string>("");
+  const [editEpoaPhone, setEditEpoaPhone] = useState<string>("");
+  const [editEpoaRelationship, setEditEpoaRelationship] = useState<string>("");
   const [editServiceType, setEditServiceType] = useState<string>("");
   const [editZohoWorkdriveLink, setEditZohoWorkdriveLink] = useState<string>("");
   
@@ -741,6 +744,14 @@ export default function ClientProfile() {
         setEditEmergencyContactRelationship(nokParts[1] || "");
         setEditEmergencyContactPhone(nokParts[2] || "");
         break;
+      case "epoa":
+      case "epoaPersonalDetails":
+        const epoaInfo = client?.epoa || "";
+        const epoaParts = epoaInfo.split(' - ');
+        setEditEpoaName(epoaParts[0] || "");
+        setEditEpoaRelationship(epoaParts[1] || "");
+        setEditEpoaPhone(epoaParts[2] || "");
+        break;
       case "serviceType":
         setEditServiceType(client?.serviceType || "");
         break;
@@ -839,6 +850,11 @@ export default function ClientProfile() {
       case "emergencyContact":
         const emergencyInfo = [editEmergencyContactName, editEmergencyContactRelationship, editEmergencyContactPhone].filter(Boolean).join(' - ');
         updateFieldMutation.mutate({ nokEpoa: emergencyInfo });
+        break;
+      case "epoa":
+      case "epoaPersonalDetails":
+        const epoaFullInfo = [editEpoaName, editEpoaRelationship, editEpoaPhone].filter(Boolean).join(' - ');
+        updateFieldMutation.mutate({ epoa: epoaFullInfo });
         break;
       case "serviceType":
         updateFieldMutation.mutate({ serviceType: editServiceType as any });
@@ -1896,6 +1912,86 @@ export default function ClientProfile() {
                           return <p className="text-sm text-muted-foreground">Click to add emergency contact</p>;
                         })()}
                       </div>
+
+                      {/* EPOA - Enduring Power of Attorney - Highlighted block */}
+                      <div 
+                        className={`p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 ${!isArchived && editingField !== "epoa" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "epoa" && startEditing("epoa")}
+                        data-testid="field-epoa-overview"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                            <p className="text-xs font-medium text-purple-700 dark:text-purple-300 uppercase tracking-wide">EPOA (Power of Attorney)</p>
+                          </div>
+                          {!isArchived && editingField !== "epoa" && (
+                            <Pencil className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                          )}
+                        </div>
+                        {editingField === "epoa" ? (
+                          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editEpoaName}
+                              onChange={(e) => setEditEpoaName(e.target.value)}
+                              placeholder="EPOA name..."
+                              className="h-8 text-sm"
+                              data-testid="input-epoa-name"
+                            />
+                            <Input
+                              value={editEpoaPhone}
+                              onChange={(e) => setEditEpoaPhone(e.target.value)}
+                              placeholder="Phone number..."
+                              className="h-8 text-sm"
+                              data-testid="input-epoa-phone"
+                            />
+                            <Select value={editEpoaRelationship} onValueChange={setEditEpoaRelationship}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-epoa-relationship">
+                                <SelectValue placeholder="Relationship..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="spouse">Spouse</SelectItem>
+                                <SelectItem value="parent">Parent</SelectItem>
+                                <SelectItem value="child">Child</SelectItem>
+                                <SelectItem value="sibling">Sibling</SelectItem>
+                                <SelectItem value="friend">Friend</SelectItem>
+                                <SelectItem value="solicitor">Solicitor</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("epoa")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : client.epoa ? (
+                          (() => {
+                            const epoaParts = client.epoa.split(' - ');
+                            const name = epoaParts[0];
+                            const relationship = epoaParts[1];
+                            const phone = epoaParts[2];
+                            return (
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold text-sm">{name}</p>
+                                  {relationship && <p className="text-xs text-muted-foreground capitalize">{relationship}</p>}
+                                </div>
+                                {phone && (
+                                  <a href={`tel:${phone}`} className="text-sm text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
+                                    <Phone className="w-3 h-3" />
+                                    {phone}
+                                  </a>
+                                )}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Click to add EPOA</p>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -2313,14 +2409,14 @@ export default function ClientProfile() {
                         )}
                       </div>
                       
-                      {/* NOK / EPOA - Inline Editable */}
+                      {/* Next of Kin - Inline Editable */}
                       <div 
                         className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "nokEpoa" ? "cursor-pointer hover-elevate" : ""}`}
                         onClick={() => editingField !== "nokEpoa" && startEditing("nokEpoa")}
-                        data-testid="field-nok-epoa"
+                        data-testid="field-nok"
                       >
                         <div className="flex items-center justify-between">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Next of Kin / EPOA</p>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Next of Kin (NOK)</p>
                           {!isArchived && editingField !== "nokEpoa" && (
                             <Pencil className="w-3 h-3 text-muted-foreground" />
                           )}
@@ -2330,10 +2426,11 @@ export default function ClientProfile() {
                             <Input
                               value={editNokEpoa}
                               onChange={(e) => setEditNokEpoa(e.target.value)}
-                              placeholder="Enter NOK/EPOA..."
+                              placeholder="Name - Relationship - Phone"
                               className="h-8 text-sm"
-                              data-testid="input-nok-epoa-inline"
+                              data-testid="input-nok-inline"
                             />
+                            <p className="text-xs text-muted-foreground">Format: Name - Relationship - Phone</p>
                             <div className="flex gap-1">
                               <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("nokEpoa")} disabled={updateFieldMutation.isPending}>
                                 {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
@@ -2345,6 +2442,72 @@ export default function ClientProfile() {
                           </div>
                         ) : (
                           <p className="text-sm mt-1 font-medium">{client.nokEpoa || "Click to add"}</p>
+                        )}
+                      </div>
+                      
+                      {/* EPOA - Enduring Power of Attorney - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "epoaPersonalDetails" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "epoaPersonalDetails" && startEditing("epoaPersonalDetails")}
+                        data-testid="field-epoa-personal"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">EPOA (Power of Attorney)</p>
+                          {!isArchived && editingField !== "epoaPersonalDetails" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "epoaPersonalDetails" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editEpoaName}
+                              onChange={(e) => setEditEpoaName(e.target.value)}
+                              placeholder="EPOA name..."
+                              className="h-8 text-sm"
+                              data-testid="input-epoa-name-personal"
+                            />
+                            <Select value={editEpoaRelationship} onValueChange={setEditEpoaRelationship}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-epoa-relationship-personal">
+                                <SelectValue placeholder="Relationship..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="spouse">Spouse</SelectItem>
+                                <SelectItem value="parent">Parent</SelectItem>
+                                <SelectItem value="child">Child</SelectItem>
+                                <SelectItem value="sibling">Sibling</SelectItem>
+                                <SelectItem value="friend">Friend</SelectItem>
+                                <SelectItem value="solicitor">Solicitor</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              value={editEpoaPhone}
+                              onChange={(e) => setEditEpoaPhone(e.target.value)}
+                              placeholder="Phone number..."
+                              className="h-8 text-sm"
+                              data-testid="input-epoa-phone-personal"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("epoaPersonalDetails")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : client.epoa ? (
+                          (() => {
+                            const epoaParts = client.epoa.split(' - ');
+                            return (
+                              <div className="mt-1">
+                                <p className="text-sm font-medium">{epoaParts[0]}</p>
+                                {epoaParts[1] && <p className="text-xs text-muted-foreground capitalize">{epoaParts[1]}{epoaParts[2] ? ` - ${epoaParts[2]}` : ''}</p>}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <p className="text-sm mt-1 text-muted-foreground">Click to add</p>
                         )}
                       </div>
                       
