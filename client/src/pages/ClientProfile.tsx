@@ -635,6 +635,7 @@ export default function ClientProfile() {
   const [editGpId, setEditGpId] = useState<string>("");
   const [editPharmacyId, setEditPharmacyId] = useState<string>("");
   const [editSupportCoordinatorId, setEditSupportCoordinatorId] = useState<string>("");
+  const [editCareManagerId, setEditCareManagerId] = useState<string>("");
   const [editNokEpoa, setEditNokEpoa] = useState<string>("");
   const [editMedicareNumber, setEditMedicareNumber] = useState<string>("");
   const [editNotificationsPreference, setEditNotificationsPreference] = useState<string>("");
@@ -711,6 +712,9 @@ export default function ClientProfile() {
         break;
       case "supportCoordinator":
         setEditSupportCoordinatorId(client?.careTeam?.supportCoordinatorId || "");
+        break;
+      case "careManager":
+        setEditCareManagerId(client?.careTeam?.careManagerId || "");
         break;
       case "nokEpoa":
         setEditNokEpoa(client?.nokEpoa || "");
@@ -794,6 +798,18 @@ export default function ClientProfile() {
           careTeam: { 
             ...currentCareTeam, 
             supportCoordinatorId: editSupportCoordinatorId || undefined 
+          } as any 
+        });
+        break;
+      case "careManager":
+        // Update careTeam JSON with the new care manager ID
+        const careTeamForManager = client?.careTeam || {};
+        const selectedManager = staffList.find(s => s.id === editCareManagerId);
+        updateFieldMutation.mutate({ 
+          careTeam: { 
+            ...careTeamForManager, 
+            careManagerId: editCareManagerId || undefined,
+            careManager: selectedManager?.name || undefined
           } as any 
         });
         break;
@@ -2645,57 +2661,115 @@ export default function ClientProfile() {
 
         <TabsContent value="team" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Care Manager - Interactive Card */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Primary Care Team
-                </CardTitle>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Care Manager
+                  </CardTitle>
+                  {!isArchived && editingField !== "careManager" && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => startEditing("careManager")}
+                      data-testid="button-edit-care-manager-team"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {client.careTeam?.careManager && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback>{client.careTeam.careManager.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{client.careTeam.careManager}</p>
-                      <p className="text-xs text-muted-foreground">Care Manager</p>
+                {editingField === "careManager" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select Care Manager</Label>
+                      <Select value={editCareManagerId} onValueChange={setEditCareManagerId}>
+                        <SelectTrigger data-testid="select-care-manager-team">
+                          <SelectValue placeholder="Select a Care Manager..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No Care Manager</SelectItem>
+                          {staffList.filter(s => s.role === "care_manager" || s.role === "admin").map((staff) => (
+                            <SelectItem key={staff.id} value={staff.id}>{staff.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    {client.careTeam?.careManagerId && (
-                      <Link 
-                        href={`/staff?highlight=${client.careTeam.careManagerId}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-care-manager"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    )}
-                  </div>
-                )}
-                {client.careTeam?.generalPractitioner && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback>{client.careTeam.generalPractitioner.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{client.careTeam.generalPractitioner}</p>
-                      <p className="text-xs text-muted-foreground">General Practitioner</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveField("careManager")} disabled={updateFieldMutation.isPending} data-testid="button-save-care-manager-team">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-care-manager-team">
+                        Cancel
+                      </Button>
                     </div>
-                    {client.generalPractitionerId && (
-                      <Link 
-                        href={`/gps?highlight=${client.generalPractitionerId}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-gp-team"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    )}
                   </div>
-                )}
-                {!client.careTeam?.careManager && !client.careTeam?.generalPractitioner && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No primary care team assigned</p>
-                )}
+                ) : (() => {
+                  const careManagerStaff = client.careTeam?.careManagerId ? staffList.find(s => s.id === client.careTeam?.careManagerId) : null;
+                  if (careManagerStaff) {
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <Avatar className="w-10 h-10">
+                            <AvatarFallback>{careManagerStaff.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold">{careManagerStaff.name}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{(careManagerStaff.role || "staff").replace("_", " ")}</p>
+                          </div>
+                          <Link 
+                            href={`/staff/${careManagerStaff.id}`}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                            data-testid="link-care-manager-team"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                        {careManagerStaff.phone && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="w-4 h-4 text-muted-foreground" />
+                            <a href={`tel:${careManagerStaff.phone}`} className="text-primary hover:underline">{careManagerStaff.phone}</a>
+                          </div>
+                        )}
+                        {careManagerStaff.email && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="w-4 h-4 text-muted-foreground" />
+                            <a href={`mailto:${careManagerStaff.email}`} className="text-primary hover:underline">{careManagerStaff.email}</a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  if (client.careTeam?.careManager) {
+                    return (
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback>{client.careTeam.careManager.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{client.careTeam.careManager}</p>
+                          <p className="text-xs text-muted-foreground">Contact details not available</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-center py-4">
+                      <User className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-sm text-muted-foreground">No care manager assigned</p>
+                      {!isArchived && (
+                        <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("careManager")} data-testid="button-assign-care-manager-team">
+                          <Plus className="w-3 h-3 mr-1" /> Assign Care Manager
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
@@ -2821,116 +2895,6 @@ export default function ClientProfile() {
                 </CardContent>
               </Card>
             )}
-
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Staff Assignments
-                  </CardTitle>
-                  {!isArchived && (
-                    <Dialog open={addAssignmentOpen} onOpenChange={setAddAssignmentOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" data-testid="button-add-assignment">
-                          <Plus className="w-4 h-4 mr-1" />
-                          Assign Staff
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Assign Staff Member</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label>Staff Member</Label>
-                            <Select value={assignmentStaffId} onValueChange={setAssignmentStaffId}>
-                              <SelectTrigger data-testid="select-assignment-staff">
-                                <SelectValue placeholder="Select staff member..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {staffList.filter(s => !staffAssignments.some(a => a.staffId === s.id && !a.endDate)).map(staff => (
-                                  <SelectItem key={staff.id} value={staff.id}>
-                                    {staff.name} ({(staff.role || "staff").replace("_", " ")})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Assignment Type</Label>
-                            <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as typeof assignmentType)}>
-                              <SelectTrigger data-testid="select-assignment-type">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="primary_support">Primary Support Worker</SelectItem>
-                                <SelectItem value="secondary_support">Secondary Support Worker</SelectItem>
-                                <SelectItem value="care_manager">Care Manager</SelectItem>
-                                <SelectItem value="clinical_nurse">Clinical Nurse</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button 
-                            onClick={() => addAssignmentMutation.mutate({ staffId: assignmentStaffId, assignmentType })}
-                            disabled={!assignmentStaffId || addAssignmentMutation.isPending}
-                            className="w-full"
-                            data-testid="button-submit-assignment"
-                          >
-                            {addAssignmentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Assign Staff
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {staffAssignments.filter(a => !a.endDate).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No staff currently assigned</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {staffAssignments.filter(a => !a.endDate).map(assignment => {
-                      const staff = staffList.find(s => s.id === assignment.staffId);
-                      const typeLabels: Record<string, string> = {
-                        primary_support: "Primary Support Worker",
-                        secondary_support: "Secondary Support Worker",
-                        care_manager: "Care Manager",
-                        clinical_nurse: "Clinical Nurse",
-                      };
-                      return (
-                        <div key={assignment.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg" data-testid={`assignment-${assignment.id}`}>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback>{staff?.name?.charAt(0) || "?"}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <Link href={`/staff/${assignment.staffId}`}>
-                                <p className="text-sm font-medium hover:underline cursor-pointer">{staff?.name || "Unknown"}</p>
-                              </Link>
-                              <p className="text-xs text-muted-foreground">{typeLabels[assignment.assignmentType] || assignment.assignmentType}</p>
-                              <p className="text-xs text-muted-foreground">Since {assignment.startDate ? new Date(assignment.startDate).toLocaleDateString() : "N/A"}</p>
-                            </div>
-                          </div>
-                          {!isArchived && (
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => removeAssignmentMutation.mutate(assignment.id)}
-                              data-testid={`button-remove-assignment-${assignment.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             {/* Preferred Staff Section */}
             <Card>
