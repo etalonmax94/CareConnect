@@ -1244,6 +1244,63 @@ export default function ClientProfile() {
                   <p className="text-sm font-semibold text-foreground">{client.category}</p>
                 </div>
               </div>
+
+              {/* Onboarding Status Chip */}
+              {!isArchived && (
+                client.isOnboarded !== "yes" ? (
+                  <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <p className="text-[10px] uppercase text-amber-700 dark:text-amber-300 font-medium">New Client</p>
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Not yet onboarded</p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        className="h-6 text-xs ml-2"
+                        onClick={() => onboardMutation.mutate()}
+                        disabled={onboardMutation.isPending}
+                        data-testid="button-onboard-client"
+                      >
+                        {onboardMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 mr-1" />}
+                        Mark Onboarded
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div 
+                        className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                        data-testid="chip-onboarding"
+                      >
+                        <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <div>
+                          <p className="text-[10px] uppercase text-emerald-700 dark:text-emerald-300 font-medium">Onboarded</p>
+                          <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                            {client.onboardedAt ? new Date(client.onboardedAt).toLocaleDateString() : 'Completed'}
+                          </p>
+                        </div>
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="start">
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Onboarding Details</h4>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Calendar className="w-4 h-4" />
+                            <span>Date: {client.onboardedAt ? new Date(client.onboardedAt).toLocaleDateString() : 'Unknown'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <User className="w-4 h-4" />
+                            <span>By: {client.onboardedBy || 'Unknown staff member'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )
+              )}
             </div>
           </div>
           
@@ -1340,59 +1397,6 @@ export default function ClientProfile() {
             Records retained until: {client.retentionUntil || 'N/A'}.
           </AlertDescription>
         </Alert>
-      )}
-
-      {/* Onboarding Status - Adaptive display */}
-      {!isArchived && (
-        <div className="mx-3 sm:mx-6 mt-2 sm:mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-card">
-          {client.isOnboarded !== "yes" ? (
-            <>
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                <span className="text-xs sm:text-sm"><strong>New Client</strong> - Not yet onboarded</span>
-              </div>
-              <Button 
-                size="sm" 
-                className="h-7 sm:h-8 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto"
-                onClick={() => onboardMutation.mutate()}
-                disabled={onboardMutation.isPending}
-                data-testid="button-onboard-client"
-              >
-                {onboardMutation.isPending ? <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />}
-                Mark as Onboarded
-              </Button>
-            </>
-          ) : (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button 
-                  className="flex items-center gap-2 hover:bg-muted/50 rounded-md px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer w-full sm:w-auto"
-                  data-testid="button-onboarding-details"
-                >
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">
-                    Onboarding completed on {client.onboardedAt ? new Date(client.onboardedAt).toLocaleDateString() : 'Unknown date'}
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64" align="start">
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm">Onboarding Details</h4>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      <span>Date: {client.onboardedAt ? new Date(client.onboardedAt).toLocaleDateString() : 'Unknown'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <User className="w-4 h-4" />
-                      <span>By: {client.onboardedBy || 'Unknown staff member'}</span>
-                    </div>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
       )}
 
       {/* Mobile Section Navigation - Horizontal scroll */}
