@@ -31,6 +31,7 @@ import Quotes from "@/pages/Quotes";
 import QuoteEditor from "@/pages/QuoteEditor";
 import Appointments from "@/pages/Appointments";
 import FormTemplates from "@/pages/FormTemplates";
+import SilHouses from "@/pages/SilHouses";
 import Login from "@/pages/Login";
 import SelectRole from "@/pages/SelectRole";
 import PendingApproval from "@/pages/PendingApproval";
@@ -73,6 +74,7 @@ function ProtectedRouter() {
       <Route path="/quotes/:id" component={QuoteEditor} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/form-templates" component={FormTemplates} />
+      <Route path="/sil-houses" component={SilHouses} />
       <Route path="/reports" component={Reports} />
       <Route path="/audit-log" component={AuditLog} />
       <Route path="/leadership-meeting" component={LeadershipMeeting} />
