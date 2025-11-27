@@ -82,27 +82,40 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
   const isDashboard = location === "/";
   const [userToggledSidebar, setUserToggledSidebar] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   
-  // Auto-expand sidebar on dashboard, respect user toggle on other pages
+  // Detect mobile screen (iPhone size < 640px)
   useEffect(() => {
-    if (isDashboard) {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  // Auto-collapse sidebar on mobile, auto-expand on dashboard (desktop only)
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    } else if (isDashboard) {
       setSidebarOpen(true);
       setUserToggledSidebar(false);
     } else if (!userToggledSidebar) {
       setSidebarOpen(false);
     }
-  }, [isDashboard, userToggledSidebar]);
+  }, [isDashboard, userToggledSidebar, isMobile]);
 
   const handleSidebarChange = (open: boolean) => {
     setSidebarOpen(open);
-    if (!isDashboard) {
+    if (!isDashboard && !isMobile) {
       setUserToggledSidebar(true);
     }
   };
 
   const style = {
     "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "4rem",
+    "--sidebar-width-icon": "3.5rem",
   };
 
   return (

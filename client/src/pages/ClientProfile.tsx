@@ -648,12 +648,12 @@ export default function ClientProfile() {
   ];
 
   return (
-    <div className="h-full -m-6 flex flex-col">
+    <div className="h-full -m-4 sm:-m-6 flex flex-col">
       {/* Profile Header */}
-      <div className="bg-card border-b px-6 py-5">
-        <div className="flex items-start gap-4">
+      <div className="bg-card border-b px-3 sm:px-6 py-3 sm:py-5">
+        <div className="flex items-start gap-2 sm:gap-4">
           <Link href="/clients">
-            <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-back">
+            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 sm:h-10 sm:w-10" data-testid="button-back">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
@@ -668,19 +668,19 @@ export default function ClientProfile() {
               data-testid="input-photo-upload"
             />
             <DialogTrigger asChild>
-              <div className="relative group cursor-pointer">
+              <div className="relative group cursor-pointer flex-shrink-0">
                 <Avatar 
-                  className="w-24 h-24 border-2 border-border flex-shrink-0 rounded-xl overflow-hidden"
+                  className="w-14 h-14 sm:w-24 sm:h-24 border-2 border-border rounded-xl overflow-hidden"
                   data-testid="avatar-client"
                 >
                   <AvatarImage src={client.photo || undefined} alt={client.participantName} className="object-cover" />
-                  <AvatarFallback className="text-2xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
+                  <AvatarFallback className="text-lg sm:text-2xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
                 </Avatar>
                 <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   {isUploadingPhoto ? (
-                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    <Loader2 className="w-4 h-4 sm:w-6 sm:h-6 text-white animate-spin" />
                   ) : (
-                    <Eye className="w-6 h-6 text-white" />
+                    <Eye className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                   )}
                 </div>
               </div>
@@ -713,20 +713,20 @@ export default function ClientProfile() {
           </Dialog>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
               {client.clientNumber && (
-                <Badge variant="secondary" className="font-mono text-sm h-6 px-2.5" data-testid="badge-client-number">
+                <Badge variant="secondary" className="font-mono text-xs sm:text-sm h-5 sm:h-6 px-1.5 sm:px-2.5" data-testid="badge-client-number">
                   {formatClientNumber(client.clientNumber)}
                 </Badge>
               )}
-              <h1 className="text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
-              <Badge variant={isArchived ? "secondary" : "default"} className={`h-6 px-2.5 ${isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}`}>
+              <h1 className="text-lg sm:text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
+              <Badge variant={isArchived ? "secondary" : "default"} className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs ${isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}`}>
                 {isArchived ? 'Archived' : 'Active'}
               </Badge>
-              <CategoryBadge category={client.category} className="h-6 px-2.5" />
+              <CategoryBadge category={client.category} className="h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs" />
               {client.category === "NDIS" && client.ndisDetails?.ndisFundingType && (
                 <Badge 
-                  className={`h-6 px-2.5 border-0 text-white ${
+                  className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs border-0 text-white hidden sm:inline-flex ${
                     client.ndisDetails.ndisFundingType === "Plan-Managed" ? "bg-[hsl(var(--ndis-plan-managed))]" :
                     client.ndisDetails.ndisFundingType === "Agency-Managed" ? "bg-[hsl(var(--ndis-agency-managed))]" :
                     client.ndisDetails.ndisFundingType === "Self-Managed" ? "bg-[hsl(var(--ndis-self-managed))]" :
@@ -737,12 +737,12 @@ export default function ClientProfile() {
                 </Badge>
               )}
               {client.isOnboarded !== "yes" && !isArchived && (
-                <Badge variant="secondary" className="h-6 px-2.5">New</Badge>
+                <Badge variant="secondary" className="h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs">New</Badge>
               )}
             </div>
             
-            {/* Quick Info Chips - Interactive */}
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
+            {/* Quick Info Chips - Interactive - Hidden on mobile, shown on tablet+ */}
+            <div className="hidden sm:flex items-center gap-2 mt-3 flex-wrap">
               {clientAge && (
                 <div 
                   className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
@@ -813,44 +813,45 @@ export default function ClientProfile() {
             </div>
           </div>
           
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Action Buttons - Hidden on mobile, shown as icons on tablet, full on desktop */}
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {isArchived ? (
               <Button 
                 onClick={() => restoreMutation.mutate()}
                 disabled={restoreMutation.isPending}
                 data-testid="button-restore-client"
-                className="gap-2"
+                size="sm"
+                className="h-8 sm:h-9 gap-1 sm:gap-2 text-xs sm:text-sm"
               >
-                <RotateCcw className="w-4 h-4" />
-                {restoreMutation.isPending ? "Restoring..." : "Restore"}
+                <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">{restoreMutation.isPending ? "Restoring..." : "Restore"}</span>
               </Button>
             ) : (
               <>
                 <Link href={`/clients/${params?.id}/edit`}>
-                  <Button variant="outline" className="gap-2" data-testid="button-edit-client">
-                    <Pencil className="w-4 h-4" />
-                    Edit Profile
+                  <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:gap-2 sm:px-3" data-testid="button-edit-client">
+                    <Pencil className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Edit</span>
                   </Button>
                 </Link>
                 {hasServiceAgreement ? (
                   client.zohoWorkdriveLink ? (
                     <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-service-agreement">
-                      <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-                        <FileCheck className="w-4 h-4" />
-                        Service Agreement
+                      <Button size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:gap-2 sm:px-3 bg-emerald-600 hover:bg-emerald-700 text-white">
+                        <FileCheck className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden md:inline">Agreement</span>
                       </Button>
                     </a>
                   ) : (
-                    <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="link-service-agreement-uploaded">
-                      <FileCheck className="w-4 h-4" />
-                      Service Agreement
+                    <Button size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:gap-2 sm:px-3 bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="link-service-agreement-uploaded">
+                      <FileCheck className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span className="hidden md:inline">Agreement</span>
                     </Button>
                   )
                 ) : (
-                  <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white" data-testid="link-service-agreement-missing">
-                    <FileWarning className="w-4 h-4" />
-                    Service Agreement
+                  <Button size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:gap-2 sm:px-3 bg-red-600 hover:bg-red-700 text-white" data-testid="link-service-agreement-missing">
+                    <FileWarning className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden md:inline">Agreement</span>
                   </Button>
                 )}
                 <Tooltip>
@@ -858,12 +859,13 @@ export default function ClientProfile() {
                     <Button 
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8 sm:h-9 sm:w-9"
                       onClick={() => {
                         window.location.href = `/api/clients/${params?.id}/vcf`;
                       }}
                       data-testid="button-download-contact"
                     >
-                      <Download className="w-4 h-4" />
+                      <Download className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span className="sr-only">Download iPhone contact file</span>
                     </Button>
                   </TooltipTrigger>
@@ -876,10 +878,11 @@ export default function ClientProfile() {
                     <Button 
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8 sm:h-9 sm:w-9"
                       onClick={() => setArchiveModalOpen(true)}
                       data-testid="button-archive-client"
                     >
-                      <Archive className="w-4 h-4" />
+                      <Archive className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span className="sr-only">Archive Client</span>
                     </Button>
                   </TooltipTrigger>
@@ -895,9 +898,9 @@ export default function ClientProfile() {
 
       {/* Alerts */}
       {isArchived && (
-        <Alert variant="default" className="mx-6 mt-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+        <Alert variant="default" className="mx-3 sm:mx-6 mt-2 sm:mt-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
           <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertDescription className="text-amber-800 dark:text-amber-200">
+          <AlertDescription className="text-xs sm:text-sm text-amber-800 dark:text-amber-200">
             This client record is archived and read-only. Archived on: {client.archivedAt ? new Date(client.archivedAt).toLocaleDateString() : 'Unknown'}. 
             Reason: {client.archiveReason || 'Not specified'}. 
             Records retained until: {client.retentionUntil || 'N/A'}.
@@ -906,24 +909,51 @@ export default function ClientProfile() {
       )}
 
       {client.isOnboarded !== "yes" && !isArchived && (
-        <div className="mx-6 mt-4 flex items-center gap-3 p-3 rounded-lg border bg-card">
-          <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
-          <span className="flex-1 text-sm"><strong>New Client</strong> - This client has not been onboarded yet.</span>
+        <div className="mx-3 sm:mx-6 mt-2 sm:mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-card">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+            <span className="text-xs sm:text-sm"><strong>New Client</strong> - Not yet onboarded</span>
+          </div>
           <Button 
             size="sm" 
+            className="h-7 sm:h-8 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto"
             onClick={() => onboardMutation.mutate()}
             disabled={onboardMutation.isPending}
             data-testid="button-onboard-client"
           >
-            {onboardMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+            {onboardMutation.isPending ? <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />}
             Mark as Onboarded
           </Button>
         </div>
       )}
 
+      {/* Mobile Section Navigation - Horizontal scroll */}
+      <div className="lg:hidden border-b overflow-x-auto bg-muted/30">
+        <nav className="flex p-2 gap-1 min-w-max">
+          {sidebarItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                activeSection === item.id 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-background hover:bg-muted text-foreground border'
+              }`}
+              data-testid={`nav-${item.id}`}
+            >
+              <item.icon className="w-3.5 h-3.5" />
+              {item.label}
+              {item.badge && (
+                <span className={`ml-1 text-[10px] ${item.badgeColor || ''}`}>{item.badge}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+      </div>
+
       {/* Main Content with Sidebar */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar Navigation */}
+        {/* Left Sidebar Navigation - Desktop only */}
         <div className="w-56 border-r bg-muted/30 flex-shrink-0 hidden lg:block">
           <div className="p-4 border-b">
             <p className="font-semibold text-sm">Client Profile</p>
@@ -954,22 +984,22 @@ export default function ClientProfile() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6">
           {/* Stat Cards Row - Clean design with borders - Interactive */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
             <Card 
               className="bg-card hover-elevate cursor-pointer"
               onClick={() => setActiveSection("details")}
               data-testid="stat-age"
             >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
-                    <CalendarDays className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              <CardContent className="p-2.5 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
+                    <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-600 dark:text-teal-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Age</p>
-                    <p className="text-xl font-semibold">{clientAge || '-'}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Age</p>
+                    <p className="text-base sm:text-xl font-semibold">{clientAge || '-'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -980,14 +1010,14 @@ export default function ClientProfile() {
               onClick={() => setActiveSection("program")}
               data-testid="stat-support-level"
             >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
-                    <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <CardContent className="p-2.5 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
+                    <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Support Level</p>
-                    <p className="text-xl font-semibold">{getSupportLevel() || '-'}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Support</p>
+                    <p className="text-base sm:text-xl font-semibold truncate">{getSupportLevel() || '-'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -998,14 +1028,14 @@ export default function ClientProfile() {
               onClick={() => setActiveSection("team")}
               data-testid="stat-assigned-staff"
             >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
-                    <Users className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+              <CardContent className="p-2.5 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 dark:text-slate-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Assigned Staff</p>
-                    <p className="text-xl font-semibold">{assignedStaffCount}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Staff</p>
+                    <p className="text-base sm:text-xl font-semibold">{assignedStaffCount}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1016,14 +1046,14 @@ export default function ClientProfile() {
               onClick={() => setActiveSection("budget")}
               data-testid="stat-budget"
             >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
-                    <DollarSign className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+              <CardContent className="p-2.5 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
+                    <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-600 dark:text-violet-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Budget Left</p>
-                    <p className="text-xl font-semibold">${remainingBudget.toLocaleString()}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Budget</p>
+                    <p className="text-base sm:text-xl font-semibold">${remainingBudget.toLocaleString()}</p>
                   </div>
                 </div>
               </CardContent>

@@ -170,53 +170,53 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-xl sm:text-2xl font-semibold">Dashboard</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Overview of client management and compliance status
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link href="/leadership-meeting">
-            <Button variant="outline" data-testid="button-leadership-meeting">
-              <UsersRound className="w-4 h-4 mr-2" />
-              Leadership Meeting
+            <Button variant="outline" size="sm" className="h-9 sm:h-10 text-xs sm:text-sm" data-testid="button-leadership-meeting">
+              <UsersRound className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Leadership Meeting</span>
             </Button>
           </Link>
           <Link href="/clients/new">
-            <Button data-testid="button-add-client">
-              <Plus className="w-4 h-4 mr-2" />
-              Add New Client
+            <Button size="sm" className="h-9 sm:h-10 text-xs sm:text-sm" data-testid="button-add-client">
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add New Client</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         <Card 
           className="hover-elevate cursor-pointer bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0"
           onClick={() => setActiveModal("newClients")}
           data-testid="card-total-clients"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold text-blue-50 mb-3">Total Clients</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-total-clients">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-base font-semibold text-blue-50 mb-1 sm:mb-3">Total Clients</p>
+                <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-total-clients">
                   {dashboardData?.totalClients || clients.length}
                 </p>
                 <div className="flex items-center gap-1 text-blue-50">
-                  <span className="text-xl font-bold">+{dashboardData?.newClients || 0}</span>
-                  <span className="text-sm font-semibold">new in 30 days</span>
+                  <span className="text-sm sm:text-xl font-bold">+{dashboardData?.newClients || 0}</span>
+                  <span className="text-[10px] sm:text-sm font-semibold">new</span>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <Users className="w-7 h-7" />
+              <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                <Users className="w-4 h-4 sm:w-7 sm:h-7" />
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-2 text-blue-100 text-sm">
+            <div className="hidden sm:flex items-center gap-1 mt-2 text-blue-100 text-sm">
               <span>Click to view new clients</span>
               <ChevronRight className="w-4 h-4" />
             </div>
@@ -228,24 +228,24 @@ export default function Dashboard() {
           onClick={() => setActiveModal("compliance")}
           data-testid="card-compliance-rate"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold text-emerald-50 mb-3">Compliance Rate</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-compliance-rate">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-base font-semibold text-emerald-50 mb-1 sm:mb-3">Compliance</p>
+                <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-compliance-rate">
                   {dashboardData?.complianceRate?.percentage || 0}%
                 </p>
                 <div className="flex items-center gap-1 text-emerald-50">
-                  <span className="text-sm font-semibold">
-                    {dashboardData?.complianceRate?.compliant || 0} compliant / {dashboardData?.complianceRate?.nonCompliant || 0} non-compliant
+                  <span className="text-[10px] sm:text-sm font-semibold truncate">
+                    {dashboardData?.complianceRate?.compliant || 0}/{dashboardData?.complianceRate?.nonCompliant || 0}
                   </span>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <FileCheck className="w-7 h-7" />
+              <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                <FileCheck className="w-4 h-4 sm:w-7 sm:h-7" />
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-2 text-emerald-100 text-sm">
+            <div className="hidden sm:flex items-center gap-1 mt-2 text-emerald-100 text-sm">
               <span>Click to view details</span>
               <ChevronRight className="w-4 h-4" />
             </div>
@@ -257,22 +257,22 @@ export default function Dashboard() {
           onClick={() => setActiveModal("dueThisMonth")}
           data-testid="card-due-this-month"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold text-amber-50 mb-3">Due This Month</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-due-this-month">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-base font-semibold text-amber-50 mb-1 sm:mb-3">Due This Month</p>
+                <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-due-this-month">
                   {dashboardData?.dueThisMonth || 0}
                 </p>
-                <p className="text-sm font-semibold text-amber-50">
-                  Documents requiring review
+                <p className="text-[10px] sm:text-sm font-semibold text-amber-50 truncate">
+                  Docs to review
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <Clock className="w-7 h-7" />
+              <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                <Clock className="w-4 h-4 sm:w-7 sm:h-7" />
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-2 text-amber-100 text-sm">
+            <div className="hidden sm:flex items-center gap-1 mt-2 text-amber-100 text-sm">
               <span>Click to view documents</span>
               <ChevronRight className="w-4 h-4" />
             </div>
@@ -284,23 +284,22 @@ export default function Dashboard() {
           onClick={() => setActiveModal("overdue")}
           data-testid="card-overdue-items"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold text-red-50 mb-3">Overdue Items</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-overdue-items">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-base font-semibold text-red-50 mb-1 sm:mb-3">Overdue</p>
+                <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-overdue-items">
                   {dashboardData?.overdueItems || 0}
                 </p>
                 <div className="flex items-center gap-1 text-red-50">
-                  <span className="text-xl font-bold">⚠</span>
-                  <span className="text-sm font-semibold">Urgent action required</span>
+                  <span className="text-[10px] sm:text-sm font-semibold truncate">Urgent</span>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <AlertTriangle className="w-7 h-7" />
+              <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                <AlertTriangle className="w-4 h-4 sm:w-7 sm:h-7" />
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-2 text-red-100 text-sm">
+            <div className="hidden sm:flex items-center gap-1 mt-2 text-red-100 text-sm">
               <span>Click to view overdue</span>
               <ChevronRight className="w-4 h-4" />
             </div>
@@ -312,23 +311,23 @@ export default function Dashboard() {
             className="hover-elevate cursor-pointer border-0 bg-gradient-to-br from-teal-500 to-teal-600 text-white"
             data-testid="card-staff-members"
           >
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-base font-semibold text-teal-50 mb-3">Staff Members</p>
-                  <p className="text-5xl font-bold mb-3" data-testid="text-stat-staff-count">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-base font-semibold text-teal-50 mb-1 sm:mb-3">Staff</p>
+                  <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-staff-count">
                     {activeStaff.length}
                   </p>
                   <div className="flex items-center gap-1 text-teal-50">
-                    <span className="text-xl font-bold">+{newStaffIn30Days}</span>
-                    <span className="text-sm font-semibold">new in 30 days</span>
+                    <span className="text-sm sm:text-xl font-bold">+{newStaffIn30Days}</span>
+                    <span className="text-[10px] sm:text-sm font-semibold">new</span>
                   </div>
                 </div>
-                <div className="p-3 rounded-lg bg-white/20">
-                  <UserPlus className="w-7 h-7" />
+                <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                  <UserPlus className="w-4 h-4 sm:w-7 sm:h-7" />
                 </div>
               </div>
-              <div className="flex items-center gap-1 mt-2 text-teal-100 text-sm">
+              <div className="hidden sm:flex items-center gap-1 mt-2 text-teal-100 text-sm">
                 <span>Click to manage staff</span>
                 <ChevronRight className="w-4 h-4" />
               </div>
@@ -345,26 +344,24 @@ export default function Dashboard() {
           onClick={() => setActiveModal("incidents")}
           data-testid="card-incidents"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold opacity-90 mb-3">Incidents to Action</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-open-incidents">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-base font-semibold opacity-90 mb-1 sm:mb-3">Incidents</p>
+                <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-open-incidents">
                   {dashboardData?.openIncidents || 0}
                 </p>
                 <div className="flex items-center gap-1 opacity-90">
-                  <span className="text-sm font-semibold">
-                    {(dashboardData?.openIncidents || 0) > 0 
-                      ? "Require attention" 
-                      : "All incidents resolved"}
+                  <span className="text-[10px] sm:text-sm font-semibold truncate">
+                    {(dashboardData?.openIncidents || 0) > 0 ? "Action needed" : "Resolved"}
                   </span>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <Shield className="w-7 h-7" />
+              <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                <Shield className="w-4 h-4 sm:w-7 sm:h-7" />
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
+            <div className="hidden sm:flex items-center gap-1 mt-2 opacity-80 text-sm">
               <span>Click to view incidents</span>
               <ChevronRight className="w-4 h-4" />
             </div>
@@ -380,26 +377,24 @@ export default function Dashboard() {
           onClick={() => setActiveModal("unassignedClients")}
           data-testid="card-unassigned-clients"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold opacity-90 mb-3">Unassigned Clients</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-unassigned-clients">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-base font-semibold opacity-90 mb-1 sm:mb-3">Unassigned</p>
+                <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-unassigned-clients">
                   {dashboardData?.unassignedClients || 0}
                 </p>
                 <div className="flex items-center gap-1 opacity-90">
-                  <span className="text-sm font-semibold">
-                    {(dashboardData?.unassignedClients || 0) > 0 
-                      ? "Need Care Manager" 
-                      : "All clients assigned"}
+                  <span className="text-[10px] sm:text-sm font-semibold truncate">
+                    {(dashboardData?.unassignedClients || 0) > 0 ? "Need CM" : "All assigned"}
                   </span>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <UserX className="w-7 h-7" />
+              <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                <UserX className="w-4 h-4 sm:w-7 sm:h-7" />
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
+            <div className="hidden sm:flex items-center gap-1 mt-2 opacity-80 text-sm">
               <span>Click to view clients</span>
               <ChevronRight className="w-4 h-4" />
             </div>
