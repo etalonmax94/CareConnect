@@ -757,7 +757,11 @@ export default function ClientProfile() {
         setEditCareManagerId(client?.careTeam?.careManagerId || "");
         break;
       case "nokEpoa":
-        setEditNokEpoa(client?.nokEpoa || "");
+        const nokInfoPersonal = client?.nokEpoa || "";
+        const nokPartsPersonal = nokInfoPersonal.split(' - ');
+        setEditEmergencyContactName(nokPartsPersonal[0] || "");
+        setEditEmergencyContactRelationship(nokPartsPersonal[1] || "");
+        setEditEmergencyContactPhone(nokPartsPersonal[2] || "");
         break;
       case "medicareNumber":
         setEditMedicareNumber(client?.medicareNumber || "");
@@ -862,7 +866,8 @@ export default function ClientProfile() {
         });
         break;
       case "nokEpoa":
-        updateFieldMutation.mutate({ nokEpoa: editNokEpoa });
+        const nokFullInfo = [editEmergencyContactName, editEmergencyContactRelationship, editEmergencyContactPhone].filter(Boolean).join(' - ');
+        updateFieldMutation.mutate({ nokEpoa: nokFullInfo });
         break;
       case "medicareNumber":
         updateFieldMutation.mutate({ medicareNumber: editMedicareNumber });
@@ -2595,7 +2600,7 @@ export default function ClientProfile() {
                         )}
                       </div>
                       
-                      {/* Next of Kin - Inline Editable */}
+                      {/* Next of Kin - Inline Editable - Matching EPOA structure */}
                       <div 
                         className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "nokEpoa" ? "cursor-pointer hover-elevate" : ""}`}
                         onClick={() => editingField !== "nokEpoa" && startEditing("nokEpoa")}
@@ -2610,13 +2615,33 @@ export default function ClientProfile() {
                         {editingField === "nokEpoa" ? (
                           <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
                             <Input
-                              value={editNokEpoa}
-                              onChange={(e) => setEditNokEpoa(e.target.value)}
-                              placeholder="Name - Relationship - Phone"
+                              value={editEmergencyContactName}
+                              onChange={(e) => setEditEmergencyContactName(e.target.value)}
+                              placeholder="NOK name..."
                               className="h-8 text-sm"
-                              data-testid="input-nok-inline"
+                              data-testid="input-nok-name"
                             />
-                            <p className="text-xs text-muted-foreground">Format: Name - Relationship - Phone</p>
+                            <Select value={editEmergencyContactRelationship} onValueChange={setEditEmergencyContactRelationship}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-nok-relationship">
+                                <SelectValue placeholder="Relationship..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="spouse">Spouse</SelectItem>
+                                <SelectItem value="parent">Parent</SelectItem>
+                                <SelectItem value="child">Child</SelectItem>
+                                <SelectItem value="sibling">Sibling</SelectItem>
+                                <SelectItem value="friend">Friend</SelectItem>
+                                <SelectItem value="carer">Carer</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              value={editEmergencyContactPhone}
+                              onChange={(e) => setEditEmergencyContactPhone(e.target.value)}
+                              placeholder="Phone number..."
+                              className="h-8 text-sm"
+                              data-testid="input-nok-phone"
+                            />
                             <div className="flex gap-1">
                               <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("nokEpoa")} disabled={updateFieldMutation.isPending}>
                                 {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
@@ -2626,8 +2651,18 @@ export default function ClientProfile() {
                               </Button>
                             </div>
                           </div>
+                        ) : client.nokEpoa ? (
+                          (() => {
+                            const nokParts = client.nokEpoa.split(' - ');
+                            return (
+                              <div className="mt-1">
+                                <p className="text-sm font-medium">{nokParts[0]}</p>
+                                {nokParts[1] && <p className="text-xs text-muted-foreground capitalize">{nokParts[1]}{nokParts[2] ? ` - ${nokParts[2]}` : ''}</p>}
+                              </div>
+                            );
+                          })()
                         ) : (
-                          <p className="text-sm mt-1 font-medium">{client.nokEpoa || "Click to add"}</p>
+                          <p className="text-sm mt-1 text-muted-foreground">Click to add</p>
                         )}
                       </div>
                       
