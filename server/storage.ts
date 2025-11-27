@@ -3,7 +3,7 @@ import {
   clients, progressNotes, invoices, budgets, settings, activityLog, auditLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   alliedHealthProfessionals,
-  documents, clientStaffAssignments, serviceDeliveries, clientGoals, goalUpdates,
+  documents, clientStaffAssignments, serviceDeliveries, clientGoals, goalUpdates, goalActionPlans,
   clientDocumentFolders, clientDocumentCompliance,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
   clientContacts, clientBehaviors, leadershipMeetingNotes,
@@ -32,6 +32,7 @@ import {
   type InsertServiceDelivery, type ServiceDelivery,
   type InsertClientGoal, type ClientGoal,
   type InsertGoalUpdate, type GoalUpdate,
+  type InsertGoalActionPlan, type GoalActionPlan,
   type InsertNdisPriceGuideItem, type NdisPriceGuideItem,
   type InsertQuote, type Quote, type InsertQuoteLineItem, type QuoteLineItem,
   type InsertQuoteStatusHistory, type QuoteStatusHistory,
@@ -242,6 +243,13 @@ export interface IStorage {
   // Goal Updates (Audit Trail)
   getGoalUpdates(goalId: string): Promise<GoalUpdate[]>;
   createGoalUpdate(update: InsertGoalUpdate): Promise<GoalUpdate>;
+  
+  // Goal Action Plans
+  getActionPlansByGoal(goalId: string): Promise<GoalActionPlan[]>;
+  getActionPlanById(id: string): Promise<GoalActionPlan | undefined>;
+  createActionPlan(plan: InsertGoalActionPlan): Promise<GoalActionPlan>;
+  updateActionPlan(id: string, plan: Partial<InsertGoalActionPlan>): Promise<GoalActionPlan | undefined>;
+  deleteActionPlan(id: string): Promise<boolean>;
   
   // Budget Management
   deleteBudget(id: string): Promise<boolean>;
@@ -1616,6 +1624,36 @@ export class DbStorage implements IStorage {
   async createGoalUpdate(update: InsertGoalUpdate): Promise<GoalUpdate> {
     const result = await db.insert(goalUpdates).values(update).returning();
     return result[0];
+  }
+
+  // Goal Action Plans
+  async getActionPlansByGoal(goalId: string): Promise<GoalActionPlan[]> {
+    return await db.select().from(goalActionPlans)
+      .where(eq(goalActionPlans.goalId, goalId))
+      .orderBy(goalActionPlans.order);
+  }
+
+  async getActionPlanById(id: string): Promise<GoalActionPlan | undefined> {
+    const result = await db.select().from(goalActionPlans).where(eq(goalActionPlans.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createActionPlan(plan: InsertGoalActionPlan): Promise<GoalActionPlan> {
+    const result = await db.insert(goalActionPlans).values(plan).returning();
+    return result[0];
+  }
+
+  async updateActionPlan(id: string, plan: Partial<InsertGoalActionPlan>): Promise<GoalActionPlan | undefined> {
+    const result = await db.update(goalActionPlans)
+      .set({ ...plan as any, updatedAt: new Date() })
+      .where(eq(goalActionPlans.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteActionPlan(id: string): Promise<boolean> {
+    const result = await db.delete(goalActionPlans).where(eq(goalActionPlans.id, id)).returning();
+    return result.length > 0;
   }
 
   // Budget Management

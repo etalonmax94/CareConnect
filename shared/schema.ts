@@ -529,7 +529,7 @@ export type InsertClientGoal = z.infer<typeof insertClientGoalSchema>;
 export type ClientGoal = typeof clientGoals.$inferSelect;
 
 // Goal Updates - Audit trail for goal changes and notes
-export type GoalUpdateType = "status_change" | "progress_update" | "note" | "review" | "created" | "edited" | "archived" | "unarchived";
+export type GoalUpdateType = "status_change" | "progress_update" | "note" | "review" | "created" | "edited" | "archived" | "unarchived" | "achievement_step" | "idea";
 
 export const goalUpdates = pgTable("goal_updates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -538,13 +538,14 @@ export const goalUpdates = pgTable("goal_updates", {
   previousValue: text("previous_value"), // For status/progress changes
   newValue: text("new_value"), // For status/progress changes
   note: text("note"), // Additional notes or comments
+  details: json("details").$type<Record<string, unknown>>(), // Extra structured data for ideas/achievement steps
   performedBy: varchar("performed_by"),
   performedByName: text("performed_by_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertGoalUpdateSchema = createInsertSchema(goalUpdates, {
-  updateType: z.enum(["status_change", "progress_update", "note", "review", "created", "edited", "archived", "unarchived"]),
+  updateType: z.enum(["status_change", "progress_update", "note", "review", "created", "edited", "archived", "unarchived", "achievement_step", "idea"]),
 }).omit({
   id: true,
   createdAt: true,
@@ -552,6 +553,38 @@ export const insertGoalUpdateSchema = createInsertSchema(goalUpdates, {
 
 export type InsertGoalUpdate = z.infer<typeof insertGoalUpdateSchema>;
 export type GoalUpdate = typeof goalUpdates.$inferSelect;
+
+// Goal Action Plans - Structured strategies for achieving goals
+export type ActionPlanStatus = "pending" | "in_progress" | "completed" | "cancelled";
+
+export const goalActionPlans = pgTable("goal_action_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  goalId: varchar("goal_id").notNull().references(() => clientGoals.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  steps: json("steps").$type<string[]>().default([]), // Ordered list of steps
+  assignedStaffId: varchar("assigned_staff_id").references(() => staff.id, { onDelete: "set null" }),
+  dueDate: date("due_date"),
+  status: text("status").notNull().$type<ActionPlanStatus>().default("pending"),
+  completedAt: timestamp("completed_at"),
+  order: integer("order").default(1),
+  createdBy: varchar("created_by"),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGoalActionPlanSchema = createInsertSchema(goalActionPlans, {
+  status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
+  steps: z.array(z.string()).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertGoalActionPlan = z.infer<typeof insertGoalActionPlanSchema>;
+export type GoalActionPlan = typeof goalActionPlans.$inferSelect;
 
 // Invoices
 export const invoices = pgTable("invoices", {

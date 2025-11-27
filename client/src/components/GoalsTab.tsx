@@ -19,13 +19,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Target, Plus, Loader2, Clock, TrendingUp, CheckCircle, AlertTriangle, Calendar, 
   MoreVertical, Pencil, Copy, Archive, Trash2, ChevronDown, ChevronRight, 
   Heart, Users, Shield, DollarSign, Sparkles, FileText, MessageSquare,
-  Filter, ArrowUpDown, RotateCcw, User, CalendarDays, History
+  Filter, ArrowUpDown, RotateCcw, User, CalendarDays, History, Lightbulb,
+  ListTodo, X, Save, Eye
 } from "lucide-react";
-import type { ClientGoal, GoalUpdate, Staff, GoalCategory, GoalStatus } from "@shared/schema";
+import type { ClientGoal, GoalUpdate, Staff, GoalCategory, GoalStatus, GoalActionPlan } from "@shared/schema";
 
 interface GoalsTabProps {
   clientId: string;
@@ -58,6 +62,14 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<ClientGoal | null>(null);
+  
+  // State for goal detail sheet
+  const [goalSheetOpen, setGoalSheetOpen] = useState(false);
+  const [sheetTab, setSheetTab] = useState<"details" | "actions" | "ideas">("details");
+  const [newActionPlanTitle, setNewActionPlanTitle] = useState("");
+  const [newActionPlanDescription, setNewActionPlanDescription] = useState("");
+  const [newIdeaNote, setNewIdeaNote] = useState("");
+  const [editingActionPlan, setEditingActionPlan] = useState<string | null>(null);
   
   // Form states
   const [goalTitle, setGoalTitle] = useState("");
@@ -92,7 +104,12 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
   
   const { data: goalUpdates = [] } = useQuery<GoalUpdate[]>({
     queryKey: ["/api/goals", selectedGoal?.id, "updates"],
-    enabled: !!selectedGoal?.id && notesOpen,
+    enabled: !!selectedGoal?.id && (notesOpen || goalSheetOpen),
+  });
+  
+  const { data: actionPlans = [] } = useQuery<GoalActionPlan[]>({
+    queryKey: ["/api/goals", selectedGoal?.id, "action-plans"],
+    enabled: !!selectedGoal?.id && goalSheetOpen,
   });
   
   // Mutations
@@ -197,6 +214,69 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
     }
   });
   
+  // Action plan mutations
+  const addActionPlanMutation = useMutation({
+    mutationFn: async ({ goalId, title, description }: { goalId: string; title: string; description?: string }) => {
+      return apiRequest("POST", `/api/goals/${goalId}/action-plans`, { title, description });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/goals", selectedGoal?.id, "action-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goals", selectedGoal?.id, "updates"] });
+      setNewActionPlanTitle("");
+      setNewActionPlanDescription("");
+      toast({ title: "Strategy added" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add strategy", variant: "destructive" });
+    }
+  });
+  
+  const updateActionPlanMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<GoalActionPlan> }) => {
+      return apiRequest("PATCH", `/api/action-plans/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/goals", selectedGoal?.id, "action-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goals", selectedGoal?.id, "updates"] });
+      setEditingActionPlan(null);
+      toast({ title: "Strategy updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update strategy", variant: "destructive" });
+    }
+  });
+  
+  const deleteActionPlanMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/action-plans/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/goals", selectedGoal?.id, "action-plans"] });
+      toast({ title: "Strategy deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete strategy", variant: "destructive" });
+    }
+  });
+  
+  // Add idea mutation
+  const addIdeaMutation = useMutation({
+    mutationFn: async ({ goalId, note }: { goalId: string; note: string }) => {
+      return apiRequest("POST", `/api/goals/${goalId}/updates`, {
+        updateType: "idea",
+        note
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/goals", selectedGoal?.id, "updates"] });
+      setNewIdeaNote("");
+      toast({ title: "Idea added" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add idea", variant: "destructive" });
+    }
+  });
+  
   // Helper functions
   const resetForm = () => {
     setGoalTitle("");
@@ -240,6 +320,30 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
     setInlineEditingId(null);
     setInlineEditTitle("");
     setInlineEditDescription("");
+  };
+  
+  const openGoalSheet = (goal: ClientGoal) => {
+    setSelectedGoal(goal);
+    setGoalSheetOpen(true);
+    setSheetTab("details");
+    // Pre-populate form fields for editing
+    setGoalTitle(goal.title);
+    setGoalDescription(goal.description || "");
+    setGoalTargetDate(goal.targetDate || "");
+    setGoalStatus(goal.status);
+    setGoalCategory(goal.category || "other");
+    setGoalProgress(goal.progressPercent || 0);
+    setGoalResponsibleStaff(goal.responsibleStaffId || "none");
+    setGoalNextReviewDate(goal.nextReviewDate || "");
+  };
+  
+  const closeGoalSheet = () => {
+    setGoalSheetOpen(false);
+    setSelectedGoal(null);
+    setNewActionPlanTitle("");
+    setNewActionPlanDescription("");
+    setNewIdeaNote("");
+    setEditingActionPlan(null);
   };
   
   const getStaffById = (staffId: string | null) => {
@@ -851,6 +955,410 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Goal Detail Sheet - Interactive slide-out panel */}
+      <Sheet open={goalSheetOpen} onOpenChange={(open) => { if (!open) closeGoalSheet(); }}>
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              {selectedGoal?.title}
+            </SheetTitle>
+            <SheetDescription>
+              View and manage goal details, strategies, and ideas
+            </SheetDescription>
+          </SheetHeader>
+          
+          {selectedGoal && (
+            <div className="mt-6">
+              <Tabs value={sheetTab} onValueChange={(v) => setSheetTab(v as typeof sheetTab)}>
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="details" className="gap-1">
+                    <Eye className="w-3 h-3" />
+                    Details
+                  </TabsTrigger>
+                  <TabsTrigger value="actions" className="gap-1">
+                    <ListTodo className="w-3 h-3" />
+                    Strategies
+                  </TabsTrigger>
+                  <TabsTrigger value="ideas" className="gap-1">
+                    <Lightbulb className="w-3 h-3" />
+                    Ideas
+                  </TabsTrigger>
+                </TabsList>
+                
+                {/* Details Tab */}
+                <TabsContent value="details" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Goal Title</Label>
+                      <Input 
+                        value={goalTitle}
+                        onChange={(e) => setGoalTitle(e.target.value)}
+                        disabled={isArchived || selectedGoal.isArchived === "yes"}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Textarea 
+                        value={goalDescription}
+                        onChange={(e) => setGoalDescription(e.target.value)}
+                        rows={3}
+                        disabled={isArchived || selectedGoal.isArchived === "yes"}
+                        placeholder="Describe the goal in detail..."
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select 
+                          value={goalCategory} 
+                          onValueChange={(v) => setGoalCategory(v as GoalCategory)}
+                          disabled={isArchived || selectedGoal.isArchived === "yes"}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
+                              <SelectItem key={key} value={key}>
+                                <span className="flex items-center gap-2">
+                                  <config.icon className={`w-3 h-3 ${config.color}`} />
+                                  {config.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select 
+                          value={goalStatus} 
+                          onValueChange={(v) => setGoalStatus(v as GoalStatus)}
+                          disabled={isArchived || selectedGoal.isArchived === "yes"}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="not_started">Not Started</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectItem value="achieved">Achieved</SelectItem>
+                            <SelectItem value="on_hold">On Hold</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Target Date</Label>
+                        <Input 
+                          type="date" 
+                          value={goalTargetDate}
+                          onChange={(e) => setGoalTargetDate(e.target.value)}
+                          disabled={isArchived || selectedGoal.isArchived === "yes"}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Next Review</Label>
+                        <Input 
+                          type="date" 
+                          value={goalNextReviewDate}
+                          onChange={(e) => setGoalNextReviewDate(e.target.value)}
+                          disabled={isArchived || selectedGoal.isArchived === "yes"}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Progress ({goalProgress}%)</Label>
+                      <Slider
+                        value={[goalProgress]}
+                        onValueChange={(v) => setGoalProgress(v[0])}
+                        max={100}
+                        step={5}
+                        className="py-2"
+                        disabled={isArchived || selectedGoal.isArchived === "yes"}
+                      />
+                      <Progress value={goalProgress} className="h-2" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Responsible Staff</Label>
+                      <Select 
+                        value={goalResponsibleStaff} 
+                        onValueChange={setGoalResponsibleStaff}
+                        disabled={isArchived || selectedGoal.isArchived === "yes"}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select staff member..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No assignment</SelectItem>
+                          {staffList.filter(s => s.isActive === "yes").map((staff) => (
+                            <SelectItem key={staff.id} value={staff.id}>
+                              <span className="flex items-center gap-2">
+                                <User className="w-3 h-3" />
+                                {staff.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {!isArchived && selectedGoal.isArchived !== "yes" && (
+                      <Button 
+                        onClick={() => {
+                          updateGoalMutation.mutate({ 
+                            id: selectedGoal.id, 
+                            data: { 
+                              title: goalTitle, 
+                              description: goalDescription || undefined,
+                              targetDate: goalTargetDate || undefined,
+                              status: goalStatus,
+                              category: goalCategory,
+                              progressPercent: goalProgress,
+                              responsibleStaffId: goalResponsibleStaff && goalResponsibleStaff !== "none" ? goalResponsibleStaff : undefined,
+                              nextReviewDate: goalNextReviewDate || undefined,
+                            }
+                          });
+                        }}
+                        disabled={!goalTitle.trim() || updateGoalMutation.isPending}
+                        className="w-full"
+                      >
+                        {updateGoalMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </Button>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                {/* Strategies Tab */}
+                <TabsContent value="actions" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Add strategies, action plans, or steps to help achieve this goal.
+                    </div>
+                    
+                    {/* Add new strategy */}
+                    {!isArchived && selectedGoal.isArchived !== "yes" && (
+                      <Card className="border-dashed">
+                        <CardContent className="pt-4 space-y-3">
+                          <Input
+                            placeholder="Strategy title (e.g., 'Weekly check-ins')"
+                            value={newActionPlanTitle}
+                            onChange={(e) => setNewActionPlanTitle(e.target.value)}
+                          />
+                          <Textarea
+                            placeholder="Describe how to achieve this (optional)..."
+                            value={newActionPlanDescription}
+                            onChange={(e) => setNewActionPlanDescription(e.target.value)}
+                            rows={2}
+                          />
+                          <Button 
+                            onClick={() => {
+                              if (newActionPlanTitle.trim()) {
+                                addActionPlanMutation.mutate({
+                                  goalId: selectedGoal.id,
+                                  title: newActionPlanTitle,
+                                  description: newActionPlanDescription || undefined
+                                });
+                              }
+                            }}
+                            disabled={!newActionPlanTitle.trim() || addActionPlanMutation.isPending}
+                            size="sm"
+                            className="w-full"
+                          >
+                            {addActionPlanMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add Strategy
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Existing strategies */}
+                    <div className="space-y-3">
+                      {actionPlans.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <ListTodo className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No strategies yet</p>
+                          <p className="text-xs">Add ways to help achieve this goal</p>
+                        </div>
+                      ) : (
+                        actionPlans.map((plan) => (
+                          <Card key={plan.id} className={plan.status === "completed" ? "opacity-60" : ""}>
+                            <CardContent className="pt-4">
+                              <div className="flex items-start gap-3">
+                                <Checkbox
+                                  checked={plan.status === "completed"}
+                                  onCheckedChange={(checked) => {
+                                    updateActionPlanMutation.mutate({
+                                      id: plan.id,
+                                      data: { 
+                                        status: checked ? "completed" : "pending",
+                                        completedAt: checked ? new Date() : undefined
+                                      }
+                                    });
+                                  }}
+                                  disabled={isArchived || selectedGoal.isArchived === "yes"}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className={`font-medium text-sm ${plan.status === "completed" ? "line-through" : ""}`}>
+                                    {plan.title}
+                                  </h4>
+                                  {plan.description && (
+                                    <p className="text-sm text-muted-foreground mt-1">{plan.description}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                    <span>{new Date(plan.createdAt).toLocaleDateString("en-AU")}</span>
+                                    {plan.createdByName && (
+                                      <>
+                                        <span>•</span>
+                                        <span>by {plan.createdByName}</span>
+                                      </>
+                                    )}
+                                    {plan.status === "completed" && (
+                                      <Badge variant="secondary" className="text-xs gap-1">
+                                        <CheckCircle className="w-3 h-3" />
+                                        Completed
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                {!isArchived && selectedGoal.isArchived !== "yes" && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    onClick={() => deleteActionPlanMutation.mutate(plan.id)}
+                                    disabled={deleteActionPlanMutation.isPending}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                {/* Ideas Tab */}
+                <TabsContent value="ideas" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Capture ideas, thoughts, or notes about this goal.
+                    </div>
+                    
+                    {/* Add new idea */}
+                    {!isArchived && selectedGoal.isArchived !== "yes" && (
+                      <div className="flex gap-2">
+                        <Textarea
+                          placeholder="Write an idea or note..."
+                          value={newIdeaNote}
+                          onChange={(e) => setNewIdeaNote(e.target.value)}
+                          rows={2}
+                          className="flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && e.metaKey && newIdeaNote.trim()) {
+                              addIdeaMutation.mutate({ goalId: selectedGoal.id, note: newIdeaNote });
+                            }
+                          }}
+                        />
+                        <Button
+                          onClick={() => {
+                            if (newIdeaNote.trim()) {
+                              addIdeaMutation.mutate({ goalId: selectedGoal.id, note: newIdeaNote });
+                            }
+                          }}
+                          disabled={!newIdeaNote.trim() || addIdeaMutation.isPending}
+                          size="icon"
+                          className="shrink-0"
+                        >
+                          {addIdeaMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {/* Ideas list - filter updates by type=idea */}
+                    <div className="space-y-3">
+                      {goalUpdates.filter(u => u.updateType === "idea").length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Lightbulb className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No ideas yet</p>
+                          <p className="text-xs">Capture thoughts about achieving this goal</p>
+                        </div>
+                      ) : (
+                        goalUpdates.filter(u => u.updateType === "idea").map((update) => (
+                          <Card key={update.id}>
+                            <CardContent className="pt-4">
+                              <div className="flex items-start gap-2">
+                                <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="text-sm">{update.note}</p>
+                                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                    <User className="w-3 h-3" />
+                                    <span>{update.performedByName || "Unknown"}</span>
+                                    <span>•</span>
+                                    <span>{new Date(update.createdAt).toLocaleDateString("en-AU")}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                    
+                    {/* Recent Activity */}
+                    <Separator />
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <History className="w-4 h-4" />
+                        Recent Activity
+                      </h4>
+                      <ScrollArea className="h-[200px]">
+                        {goalUpdates.filter(u => u.updateType !== "idea").length === 0 ? (
+                          <div className="text-center py-4 text-muted-foreground text-sm">
+                            No activity yet
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {goalUpdates.filter(u => u.updateType !== "idea").slice(0, 10).map((update) => (
+                              <div key={update.id} className="text-xs p-2 rounded bg-muted/30">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {update.updateType.replace("_", " ")}
+                                  </Badge>
+                                  <span className="text-muted-foreground">
+                                    {new Date(update.createdAt).toLocaleDateString("en-AU")}
+                                  </span>
+                                </div>
+                                {update.note && <p className="mt-1">{update.note}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
   
@@ -868,8 +1376,9 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
     return (
       <div 
         key={goal.id} 
-        className={`p-4 border rounded-lg bg-card border-l-4 ${status.borderColor} ${goalIsOverdue ? "ring-1 ring-red-300 dark:ring-red-800" : ""}`}
+        className={`p-4 border rounded-lg bg-card border-l-4 ${status.borderColor} ${goalIsOverdue ? "ring-1 ring-red-300 dark:ring-red-800" : ""} cursor-pointer hover-elevate transition-all`}
         data-testid={`goal-${goal.id}`}
+        onClick={() => openGoalSheet(goal)}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -886,7 +1395,7 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
                 <div className="group flex items-center gap-1">
                   <h4 
                     className="font-medium text-sm cursor-text hover:text-primary transition-colors"
-                    onClick={() => !isGoalArchived && !isArchived && startInlineEdit(goal)}
+                    onClick={(e) => { e.stopPropagation(); if (!isGoalArchived && !isArchived) startInlineEdit(goal); }}
                   >
                     {goal.title}
                   </h4>
@@ -937,14 +1446,14 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
             ) : goal.description ? (
               <p 
                 className="text-sm text-muted-foreground mt-1 cursor-text hover:text-foreground/80 transition-colors"
-                onClick={() => !isArchived && !isGoalArchived && startInlineEdit(goal)}
+                onClick={(e) => { e.stopPropagation(); if (!isArchived && !isGoalArchived) startInlineEdit(goal); }}
               >
                 {goal.description}
               </p>
             ) : !isArchived && !isGoalArchived ? (
               <button 
                 className="text-xs text-muted-foreground/60 hover:text-muted-foreground mt-1 italic cursor-text"
-                onClick={() => startInlineEdit(goal)}
+                onClick={(e) => { e.stopPropagation(); startInlineEdit(goal); }}
               >
                 Click to add description...
               </button>
@@ -952,7 +1461,7 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
             
             {/* Inline edit buttons */}
             {isEditing && (
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                 <Button size="sm" onClick={saveInlineEdit} disabled={updateGoalMutation.isPending}>
                   {updateGoalMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
                 </Button>
@@ -1018,7 +1527,7 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
           
           {/* Actions */}
           {!isArchived && !isEditing && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               {/* Quick status change */}
               <Select 
                 value={goal.status} 
@@ -1043,9 +1552,13 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => openGoalSheet(goal)}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Details
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => openEditDialog(goal)}>
                     <Pencil className="w-4 h-4 mr-2" />
-                    Edit Details
+                    Edit in Dialog
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => { setSelectedGoal(goal); setNotesOpen(true); }}>
                     <History className="w-4 h-4 mr-2" />

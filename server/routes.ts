@@ -4118,7 +4118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add a note/update to a goal
   app.post("/api/goals/:id/updates", async (req, res) => {
     try {
-      const { updateType, note, previousValue, newValue } = req.body;
+      const { updateType, note, previousValue, newValue, details } = req.body;
       
       if (!updateType) {
         return res.status(400).json({ error: "Update type is required" });
@@ -4131,6 +4131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         note,
         previousValue,
         newValue,
+        details,
         performedBy: req.session?.user?.id || null,
         performedByName
       });
@@ -4139,6 +4140,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating goal update:", error);
       res.status(500).json({ error: "Failed to create goal update" });
+    }
+  });
+
+  // ==================== GOAL ACTION PLANS ROUTES ====================
+  
+  // Get action plans for a goal
+  app.get("/api/goals/:id/action-plans", async (req, res) => {
+    try {
+      const plans = await storage.getActionPlansByGoal(req.params.id);
+      res.json(plans);
+    } catch (error) {
+      console.error("Error fetching action plans:", error);
+      res.status(500).json({ error: "Failed to fetch action plans" });
+    }
+  });
+
+  // Create action plan for a goal
+  app.post("/api/goals/:id/action-plans", async (req, res) => {
+    try {
+      const createdByName = req.session?.user?.name || req.session?.user?.email || "System";
+      const plan = await storage.createActionPlan({
+        ...req.body,
+        goalId: req.params.id,
+        createdBy: req.session?.user?.id || null,
+        createdByName
+      });
+      
+      // Log as goal update for audit trail
+      await storage.createGoalUpdate({
+        goalId: req.params.id,
+        updateType: "achievement_step",
+        note: `Added action plan: ${plan.title}`,
+        details: { actionPlanId: plan.id },
+        performedBy: req.session?.user?.id || null,
+        performedByName: createdByName
+      });
+      
+      res.status(201).json(plan);
+    } catch (error) {
+      console.error("Error creating action plan:", error);
+      res.status(500).json({ error: "Failed to create action plan" });
+    }
+  });
+
+  // Update action plan
+  app.patch("/api/action-plans/:id", async (req, res) => {
+    try {
+      const plan = await storage.updateActionPlan(req.params.id, req.body);
+      if (!plan) {
+        return res.status(404).json({ error: "Action plan not found" });
+      }
+      
+      // Log status change if completed
+      if (req.body.status === "completed") {
+        const performedByName = req.session?.user?.name || req.session?.user?.email || "System";
+        await storage.createGoalUpdate({
+          goalId: plan.goalId,
+          updateType: "achievement_step",
+          note: `Completed action plan: ${plan.title}`,
+          details: { actionPlanId: plan.id, status: "completed" },
+          performedBy: req.session?.user?.id || null,
+          performedByName
+        });
+      }
+      
+      res.json(plan);
+    } catch (error) {
+      console.error("Error updating action plan:", error);
+      res.status(500).json({ error: "Failed to update action plan" });
+    }
+  });
+
+  // Delete action plan
+  app.delete("/api/action-plans/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteActionPlan(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Action plan not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting action plan:", error);
+      res.status(500).json({ error: "Failed to delete action plan" });
     }
   });
 
