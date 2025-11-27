@@ -686,6 +686,23 @@ export default function ClientProfile() {
   const [editZohoWorkdriveLink, setEditZohoWorkdriveLink] = useState<string>("");
   const [editCommunicationNeeds, setEditCommunicationNeeds] = useState<string>("");
   
+  // Program Info state variables
+  const [editCategory, setEditCategory] = useState<string>("");
+  // NDIS fields
+  const [editNdisNumber, setEditNdisNumber] = useState<string>("");
+  const [editNdisFundingType, setEditNdisFundingType] = useState<string>("");
+  const [editNdisPlanStartDate, setEditNdisPlanStartDate] = useState<string>("");
+  const [editNdisPlanEndDate, setEditNdisPlanEndDate] = useState<string>("");
+  const [editNdisScheduleOfSupports, setEditNdisScheduleOfSupports] = useState<string>("");
+  // SaH fields
+  const [editSahNumber, setEditSahNumber] = useState<string>("");
+  const [editSahFundingLevel, setEditSahFundingLevel] = useState<string>("");
+  const [editSahScheduleOfSupports, setEditSahScheduleOfSupports] = useState<string>("");
+  // Private fields
+  const [editPaymentMethod, setEditPaymentMethod] = useState<string>("");
+  const [editServiceRates, setEditServiceRates] = useState<string>("");
+  const [editBillingPreferences, setEditBillingPreferences] = useState<string>("");
+  
   // Inline field update mutation
   const updateFieldMutation = useMutation({
     mutationFn: async (data: Partial<Client>) => {
@@ -803,6 +820,43 @@ export default function ClientProfile() {
       case "communicationNeeds":
         setEditCommunicationNeeds(client?.communicationNeeds || "");
         break;
+      // Program Info fields
+      case "category":
+        setEditCategory(client?.category || "");
+        break;
+      case "ndisNumber":
+        setEditNdisNumber(client?.ndisDetails?.ndisNumber || "");
+        break;
+      case "ndisFundingType":
+        setEditNdisFundingType(client?.ndisDetails?.ndisFundingType || "");
+        break;
+      case "ndisPlanStartDate":
+        setEditNdisPlanStartDate(client?.ndisDetails?.ndisPlanStartDate || "");
+        break;
+      case "ndisPlanEndDate":
+        setEditNdisPlanEndDate(client?.ndisDetails?.ndisPlanEndDate || "");
+        break;
+      case "ndisScheduleOfSupports":
+        setEditNdisScheduleOfSupports(client?.ndisDetails?.scheduleOfSupports || "");
+        break;
+      case "sahNumber":
+        setEditSahNumber(client?.supportAtHomeDetails?.sahNumber || "");
+        break;
+      case "sahFundingLevel":
+        setEditSahFundingLevel(client?.supportAtHomeDetails?.sahFundingLevel || "");
+        break;
+      case "sahScheduleOfSupports":
+        setEditSahScheduleOfSupports(client?.supportAtHomeDetails?.scheduleOfSupports || "");
+        break;
+      case "paymentMethod":
+        setEditPaymentMethod(client?.privateClientDetails?.paymentMethod || "");
+        break;
+      case "serviceRates":
+        setEditServiceRates(client?.privateClientDetails?.serviceRates || "");
+        break;
+      case "billingPreferences":
+        setEditBillingPreferences(client?.privateClientDetails?.billingPreferences || "");
+        break;
     }
   };
 
@@ -910,6 +964,74 @@ export default function ClientProfile() {
         break;
       case "communicationNeeds":
         updateFieldMutation.mutate({ communicationNeeds: editCommunicationNeeds });
+        break;
+      // Program Info fields
+      case "category":
+        // When category changes, we need to update the category and initialize the appropriate details object
+        const categoryUpdate: any = { category: editCategory as any };
+        if (editCategory === "NDIS" && !client?.ndisDetails) {
+          categoryUpdate.ndisDetails = {};
+        } else if (editCategory === "Support at Home" && !client?.supportAtHomeDetails) {
+          categoryUpdate.supportAtHomeDetails = {};
+        } else if (editCategory === "Private" && !client?.privateClientDetails) {
+          categoryUpdate.privateClientDetails = {};
+        }
+        updateFieldMutation.mutate(categoryUpdate);
+        break;
+      case "ndisNumber":
+        updateFieldMutation.mutate({ 
+          ndisDetails: { ...(client?.ndisDetails || {}), ndisNumber: editNdisNumber } as any 
+        });
+        break;
+      case "ndisFundingType":
+        updateFieldMutation.mutate({ 
+          ndisDetails: { ...(client?.ndisDetails || {}), ndisFundingType: editNdisFundingType } as any 
+        });
+        break;
+      case "ndisPlanStartDate":
+        updateFieldMutation.mutate({ 
+          ndisDetails: { ...(client?.ndisDetails || {}), ndisPlanStartDate: editNdisPlanStartDate } as any 
+        });
+        break;
+      case "ndisPlanEndDate":
+        updateFieldMutation.mutate({ 
+          ndisDetails: { ...(client?.ndisDetails || {}), ndisPlanEndDate: editNdisPlanEndDate } as any 
+        });
+        break;
+      case "ndisScheduleOfSupports":
+        updateFieldMutation.mutate({ 
+          ndisDetails: { ...(client?.ndisDetails || {}), scheduleOfSupports: editNdisScheduleOfSupports } as any 
+        });
+        break;
+      case "sahNumber":
+        updateFieldMutation.mutate({ 
+          supportAtHomeDetails: { ...(client?.supportAtHomeDetails || {}), sahNumber: editSahNumber } as any 
+        });
+        break;
+      case "sahFundingLevel":
+        updateFieldMutation.mutate({ 
+          supportAtHomeDetails: { ...(client?.supportAtHomeDetails || {}), sahFundingLevel: editSahFundingLevel } as any 
+        });
+        break;
+      case "sahScheduleOfSupports":
+        updateFieldMutation.mutate({ 
+          supportAtHomeDetails: { ...(client?.supportAtHomeDetails || {}), scheduleOfSupports: editSahScheduleOfSupports } as any 
+        });
+        break;
+      case "paymentMethod":
+        updateFieldMutation.mutate({ 
+          privateClientDetails: { ...(client?.privateClientDetails || {}), paymentMethod: editPaymentMethod } as any 
+        });
+        break;
+      case "serviceRates":
+        updateFieldMutation.mutate({ 
+          privateClientDetails: { ...(client?.privateClientDetails || {}), serviceRates: editServiceRates } as any 
+        });
+        break;
+      case "billingPreferences":
+        updateFieldMutation.mutate({ 
+          privateClientDetails: { ...(client?.privateClientDetails || {}), billingPreferences: editBillingPreferences } as any 
+        });
         break;
     }
   };
