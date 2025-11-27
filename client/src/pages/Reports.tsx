@@ -391,19 +391,19 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <FileText className="w-6 h-6" />
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      <div className="text-center sm:text-left">
+        <h1 className="text-xl sm:text-2xl font-semibold flex items-center justify-center sm:justify-start gap-2">
+          <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
           Reports
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Comprehensive analytics and insights for your healthcare clients
         </p>
       </div>
 
-      <Tabs defaultValue="age" className="space-y-6">
-        <TabsList className="w-full justify-start overflow-x-auto">
+      <Tabs defaultValue="age" className="space-y-4 sm:space-y-6">
+        <TabsList className="w-full justify-start flex-wrap overflow-x-auto h-auto gap-1 p-1">
           <TabsTrigger value="age" data-testid="tab-age-demo">
             <Users className="w-4 h-4 mr-2" />
             Age Demographics

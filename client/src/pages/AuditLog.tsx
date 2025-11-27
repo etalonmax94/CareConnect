@@ -264,13 +264,13 @@ export default function AuditLogPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">Audit Log</h1>
-          <p className="text-muted-foreground">Track all changes made to the system for compliance and review</p>
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="text-center sm:text-left">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground" data-testid="text-page-title">Audit Log</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Track all changes made to the system for compliance and review</p>
         </div>
-        <Button onClick={exportToCSV} variant="outline" className="gap-2" data-testid="button-export-csv">
+        <Button size="sm" onClick={exportToCSV} variant="outline" className="gap-2 w-full sm:w-auto" data-testid="button-export-csv">
           <Download className="w-4 h-4" />
           Export CSV
         </Button>

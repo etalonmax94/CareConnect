@@ -1,6 +1,6 @@
+import { useEffect } from "react";
 import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -88,22 +88,20 @@ const menuCategories: MenuCategory[] = [
 
 export function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
-  const { state, setOpen } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile screen
+  // Auto-close sidebar on mobile after navigation (watches location changes)
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [location, isMobile, setOpenMobile]);
 
-  // Auto-close sidebar on mobile after navigation
+  // Fallback for immediate close on menu click
   const handleMenuClick = () => {
     if (isMobile) {
-      setOpen(false);
+      setOpenMobile(false);
     }
   };
   
@@ -150,8 +148,12 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
   const renderMenuItem = (item: MenuItem) => {
     const isActive = location === item.url;
+    const handleNavigation = (e: React.MouseEvent) => {
+      handleMenuClick();
+    };
+    
     const menuContent = (
-      <Link href={item.url} onClick={handleMenuClick} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <Link href={item.url} onClick={handleNavigation} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
         <div className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
           isCollapsed ? "justify-center" : "",

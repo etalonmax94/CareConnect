@@ -139,16 +139,16 @@ export default function Clients() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Clients</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="text-center sm:text-left">
+          <h1 className="text-xl sm:text-2xl font-semibold">Clients</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Manage all client records across NDIS, Support at Home, and Private categories
           </p>
         </div>
         <Link href="/clients/new">
-          <Button data-testid="button-add-client">
+          <Button size="sm" className="w-full sm:w-auto" data-testid="button-add-client">
             <Plus className="w-4 h-4 mr-2" />
             Add New Client
           </Button>

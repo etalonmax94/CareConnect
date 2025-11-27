@@ -267,17 +267,17 @@ export default function PharmaciesPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="text-center sm:text-left">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground" data-testid="text-page-title">
             Pharmacies
           </h1>
-          <p className="text-muted-foreground">Manage pharmacy database for client medication needs</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage pharmacy database for client medication needs</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-add-pharmacy">
+            <Button size="sm" className="w-full sm:w-auto" data-testid="button-add-pharmacy">
               <Plus className="w-4 h-4 mr-2" />
               Add Pharmacy
             </Button>
