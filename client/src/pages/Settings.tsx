@@ -141,54 +141,57 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <SettingsIcon className="w-6 h-6" />
+          <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+            <SettingsIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             Settings
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Configure your CRM preferences and company information
           </p>
         </div>
-        <Button onClick={handleSaveAll} disabled={isSaving} data-testid="button-save-settings">
+        <Button onClick={handleSaveAll} disabled={isSaving} size="sm" className="w-full sm:w-auto" data-testid="button-save-settings">
           {isSaving ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
             <Save className="w-4 h-4 mr-2" />
           )}
-          Save All Settings
+          <span className="hidden sm:inline">Save All Settings</span>
+          <span className="sm:hidden">Save</span>
         </Button>
       </div>
 
-      <Tabs defaultValue="company" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="company" data-testid="tab-company">
-            <Building2 className="w-4 h-4 mr-2" />
-            Company
-          </TabsTrigger>
-          <TabsTrigger value="location" data-testid="tab-location">
-            <MapPin className="w-4 h-4 mr-2" />
-            Office Location
-          </TabsTrigger>
-          <TabsTrigger value="reports" data-testid="tab-reports">
-            <FileText className="w-4 h-4 mr-2" />
-            Reports
-          </TabsTrigger>
-          <TabsTrigger value="notifications" data-testid="tab-notifications">
-            <Bell className="w-4 h-4 mr-2" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="privacy" data-testid="tab-privacy">
-            <Shield className="w-4 h-4 mr-2" />
-            Privacy & Compliance
-          </TabsTrigger>
-          <TabsTrigger value="quotes" data-testid="tab-quotes">
-            <FileCheck2 className="w-4 h-4 mr-2" />
-            Quotes
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="company" className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-max sm:w-auto gap-1">
+            <TabsTrigger value="company" className="text-xs sm:text-sm gap-1 sm:gap-2" data-testid="tab-company">
+              <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Company</span>
+            </TabsTrigger>
+            <TabsTrigger value="location" className="text-xs sm:text-sm gap-1 sm:gap-2" data-testid="tab-location">
+              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Office</span>
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="text-xs sm:text-sm gap-1 sm:gap-2" data-testid="tab-reports">
+              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Reports</span>
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="text-xs sm:text-sm gap-1 sm:gap-2" data-testid="tab-notifications">
+              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Alerts</span>
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="text-xs sm:text-sm gap-1 sm:gap-2" data-testid="tab-privacy">
+              <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Privacy</span>
+            </TabsTrigger>
+            <TabsTrigger value="quotes" className="text-xs sm:text-sm gap-1 sm:gap-2" data-testid="tab-quotes">
+              <FileCheck2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Quotes</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="company">
           <Card>

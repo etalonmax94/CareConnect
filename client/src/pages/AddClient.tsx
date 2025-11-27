@@ -36,17 +36,17 @@ export default function AddClient() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      <div className="flex items-center gap-3 sm:gap-4">
         <Link href="/clients">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold">Add New Client</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Create a new client record with all necessary information
+          <h1 className="text-lg sm:text-2xl font-semibold">Add New Client</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Create a new client record
           </p>
         </div>
       </div>

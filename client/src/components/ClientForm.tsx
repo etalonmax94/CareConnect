@@ -93,15 +93,17 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit, onFormError)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit, onFormError)} className="space-y-4 sm:space-y-6">
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="program">Program</TabsTrigger>
-            <TabsTrigger value="team">Care Team</TabsTrigger>
-            <TabsTrigger value="clinical">Clinical</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex w-max sm:grid sm:w-full sm:grid-cols-5">
+              <TabsTrigger value="basic" className="text-xs sm:text-sm">Basic</TabsTrigger>
+              <TabsTrigger value="program" className="text-xs sm:text-sm">Program</TabsTrigger>
+              <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
+              <TabsTrigger value="clinical" className="text-xs sm:text-sm">Clinical</TabsTrigger>
+              <TabsTrigger value="documents" className="text-xs sm:text-sm">Docs</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="basic" className="space-y-6 mt-6">
             <Card>

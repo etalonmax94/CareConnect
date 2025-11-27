@@ -1,5 +1,6 @@
 import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -87,10 +88,26 @@ const menuCategories: MenuCategory[] = [
 
 export function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
-  const { state } = useSidebar();
+  const { state, setOpen } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile screen
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Auto-close sidebar on mobile after navigation
+  const handleMenuClick = () => {
+    if (isMobile) {
+      setOpen(false);
+    }
+  };
   
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     console.log('[Auth] Sign out initiated from sidebar');
     
     // Clear JWT token from localStorage first
@@ -101,17 +118,24 @@ export function AppSidebar({ user }: AppSidebarProps) {
     queryClient.clear();
     console.log('[Auth] Query cache cleared');
     
-    // Call logout API asynchronously but don't wait for it
-    fetch("/api/auth/logout", { 
-      method: "POST",
-      credentials: "include"
-    }).catch(() => {
-      // Ignore errors - logout API is optional
-    });
+    try {
+      // Call logout API and wait for it to complete
+      const response = await fetch("/api/auth/logout", { 
+        method: "POST",
+        credentials: "include"
+      });
+      if (response.ok) {
+        console.log('[Auth] Server logout successful');
+      } else {
+        console.log('[Auth] Server returned error, but continuing with client-side logout');
+      }
+    } catch (error) {
+      console.log('[Auth] Server logout failed, continuing with client-side redirect');
+    }
     
-    // Force full page redirect to login immediately
+    // Force full page reload to login - use replace to prevent back button issues
     console.log('[Auth] Redirecting to /login');
-    window.location.href = "/login";
+    window.location.replace("/login");
   };
 
   const displayName = user?.firstName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
@@ -127,7 +151,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const renderMenuItem = (item: MenuItem) => {
     const isActive = location === item.url;
     const menuContent = (
-      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <Link href={item.url} onClick={handleMenuClick} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
         <div className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
           isCollapsed ? "justify-center" : "",

@@ -412,30 +412,30 @@ export default function Dashboard() {
           onClick={() => setActiveModal("budgetAlerts")}
           data-testid="card-budget-alerts"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold opacity-90 mb-3">Budget Alerts</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-budget-alerts">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-base font-semibold opacity-90 mb-1 sm:mb-3">Budget Alerts</p>
+                <p className="text-2xl sm:text-5xl font-bold mb-1 sm:mb-3" data-testid="text-stat-budget-alerts">
                   {budgetAlerts?.totalAlerts || 0}
                 </p>
                 <div className="flex items-center gap-1 opacity-90">
                   {(budgetAlerts?.overspentCount || 0) > 0 ? (
-                    <span className="text-sm font-semibold">
-                      {budgetAlerts?.overspentCount} overspent, {budgetAlerts?.lowCount} low
+                    <span className="text-[10px] sm:text-sm font-semibold truncate">
+                      {budgetAlerts?.overspentCount} over, {budgetAlerts?.lowCount} low
                     </span>
                   ) : (budgetAlerts?.totalAlerts || 0) > 0 ? (
-                    <span className="text-sm font-semibold">{budgetAlerts?.lowCount} budgets at 80%+</span>
+                    <span className="text-[10px] sm:text-sm font-semibold truncate">{budgetAlerts?.lowCount} at 80%+</span>
                   ) : (
-                    <span className="text-sm font-semibold">All budgets healthy</span>
+                    <span className="text-[10px] sm:text-sm font-semibold">All healthy</span>
                   )}
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <DollarSign className="w-7 h-7" />
+              <div className="p-2 sm:p-3 rounded-lg bg-white/20">
+                <DollarSign className="w-4 h-4 sm:w-7 sm:h-7" />
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
+            <div className="hidden sm:flex items-center gap-1 mt-2 opacity-80 text-sm">
               <span>Click to view details</span>
               <ChevronRight className="w-4 h-4" />
             </div>
