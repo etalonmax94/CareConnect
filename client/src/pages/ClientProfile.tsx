@@ -1268,10 +1268,10 @@ export default function ClientProfile() {
                     </div>
                   </div>
                 ) : (
-                  <Popover>
-                    <PopoverTrigger asChild>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <div 
-                        className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                        className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-1.5 cursor-default"
                         data-testid="chip-onboarding"
                       >
                         <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -1282,23 +1282,16 @@ export default function ClientProfile() {
                           </p>
                         </div>
                       </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64" align="start">
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-sm">Onboarding Details</h4>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="w-4 h-4" />
-                            <span>Date: {client.onboardedAt ? new Date(client.onboardedAt).toLocaleDateString() : 'Unknown'}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <User className="w-4 h-4" />
-                            <span>By: {client.onboardedBy || 'Unknown staff member'}</span>
-                          </div>
-                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <div className="space-y-1">
+                        <p className="font-medium">Onboarded by {client.onboardedBy || 'Unknown'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {client.onboardedAt ? new Date(client.onboardedAt).toLocaleString() : 'Unknown date'}
+                        </p>
                       </div>
-                    </PopoverContent>
-                  </Popover>
+                    </TooltipContent>
+                  </Tooltip>
                 )
               )}
             </div>

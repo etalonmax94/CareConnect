@@ -3803,7 +3803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const client = await storage.updateClient(req.params.id, {
         isOnboarded: "yes",
-        onboardedAt: new Date().toISOString(),
+        onboardedAt: new Date(),
         onboardedBy: staffName
       });
       
