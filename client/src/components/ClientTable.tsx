@@ -317,6 +317,27 @@ export default function ClientTable({
                                 New
                               </Badge>
                             )}
+                            {/* Client Status Badge */}
+                            {client.isArchived === "yes" ? (
+                              <Badge 
+                                className="text-xs text-white border-0 bg-slate-500"
+                                data-testid={`badge-status-${client.id}`}
+                              >
+                                Archived
+                              </Badge>
+                            ) : (
+                              <Badge 
+                                className={`text-xs text-white border-0 ${
+                                  client.status === "Hospital" ? "bg-orange-500" :
+                                  client.status === "Paused" ? "bg-amber-500" :
+                                  client.status === "Discharged" ? "bg-red-500" :
+                                  "bg-emerald-500"
+                                }`}
+                                data-testid={`badge-status-${client.id}`}
+                              >
+                                {client.status || "Active"}
+                              </Badge>
+                            )}
                             {client.advancedCareDirective === "NFR" && (
                               <Badge 
                                 variant="outline" 

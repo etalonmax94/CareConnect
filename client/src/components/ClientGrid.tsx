@@ -168,6 +168,23 @@ export default function ClientGrid({ clients, onViewClient, density = "standard"
                 </div>
 
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  {/* Client Status Badge */}
+                  {client.isArchived === "yes" ? (
+                    <Badge className="text-xs text-white border-0 bg-slate-500">
+                      Archived
+                    </Badge>
+                  ) : (
+                    <Badge 
+                      className={`text-xs text-white border-0 ${
+                        client.status === "Hospital" ? "bg-orange-500" :
+                        client.status === "Paused" ? "bg-amber-500" :
+                        client.status === "Discharged" ? "bg-red-500" :
+                        "bg-emerald-500"
+                      }`}
+                    >
+                      {client.status || "Active"}
+                    </Badge>
+                  )}
                   <CategoryBadge category={client.category} abbreviated />
                   {fundingType && <FundingTypeBadge fundingType={fundingType} />}
                   {client.advancedCareDirective === "NFR" && (
