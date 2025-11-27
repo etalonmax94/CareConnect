@@ -17,14 +17,14 @@ import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
 import { ServiceScheduleModal } from "@/components/ServiceScheduleModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download, ChevronRight, HeartPulse } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download, ChevronRight, HeartPulse, Star, Ban } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator, ClientStaffPreference, ClientStaffRestriction } from "@shared/schema";
 import { calculateAge, formatClientNumber } from "@shared/schema";
 import ClientLocationMap from "@/components/ClientLocationMap";
 import CarePlanTab from "@/components/CarePlanTab";
@@ -158,6 +158,18 @@ export default function ClientProfile() {
   const [assignmentStaffId, setAssignmentStaffId] = useState("");
   const [assignmentType, setAssignmentType] = useState<"primary_support" | "secondary_support" | "care_manager" | "clinical_nurse">("primary_support");
 
+  // Staff preferences (preferred staff) state
+  const [addPreferenceOpen, setAddPreferenceOpen] = useState(false);
+  const [preferenceStaffId, setPreferenceStaffId] = useState("");
+  const [preferenceLevel, setPreferenceLevel] = useState<"primary" | "secondary" | "backup">("primary");
+  const [preferenceNotes, setPreferenceNotes] = useState("");
+
+  // Staff restrictions (blacklist) state
+  const [addRestrictionOpen, setAddRestrictionOpen] = useState(false);
+  const [restrictionStaffId, setRestrictionStaffId] = useState("");
+  const [restrictionReason, setRestrictionReason] = useState("");
+  const [restrictionSeverity, setRestrictionSeverity] = useState<"warning" | "soft_block" | "hard_block">("hard_block");
+
   const addAssignmentMutation = useMutation({
     mutationFn: async (data: { staffId: string; assignmentType: string }) => {
       return apiRequest("POST", `/api/clients/${params?.id}/assignments`, data);
@@ -176,6 +188,56 @@ export default function ClientProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "assignments"] });
+    },
+  });
+
+  // Staff preference mutations
+  const addPreferenceMutation = useMutation({
+    mutationFn: async (data: { staffId: string; preferenceLevel: string; notes?: string }) => {
+      return apiRequest("POST", `/api/clients/${params?.id}/staff-preferences`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "staff-preferences"] });
+      setAddPreferenceOpen(false);
+      setPreferenceStaffId("");
+      setPreferenceLevel("primary");
+      setPreferenceNotes("");
+      toast({ title: "Preferred staff added successfully" });
+    },
+  });
+
+  const removePreferenceMutation = useMutation({
+    mutationFn: async (preferenceId: string) => {
+      return apiRequest("DELETE", `/api/staff-preferences/${preferenceId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "staff-preferences"] });
+      toast({ title: "Preferred staff removed" });
+    },
+  });
+
+  // Staff restriction mutations
+  const addRestrictionMutation = useMutation({
+    mutationFn: async (data: { staffId: string; reason: string; severity: string }) => {
+      return apiRequest("POST", `/api/clients/${params?.id}/staff-restrictions`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "staff-restrictions"] });
+      setAddRestrictionOpen(false);
+      setRestrictionStaffId("");
+      setRestrictionReason("");
+      setRestrictionSeverity("hard_block");
+      toast({ title: "Staff restriction added" });
+    },
+  });
+
+  const removeRestrictionMutation = useMutation({
+    mutationFn: async (restrictionId: string) => {
+      return apiRequest("DELETE", `/api/staff-restrictions/${restrictionId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "staff-restrictions"] });
+      toast({ title: "Staff restriction removed" });
     },
   });
 
@@ -218,6 +280,18 @@ export default function ClientProfile() {
   // Fetch client contacts (NOK, emergency contacts, etc.)
   const { data: clientContacts = [] } = useQuery<ClientContact[]>({
     queryKey: ["/api/clients", params?.id, "contacts"],
+    enabled: !!params?.id,
+  });
+
+  // Fetch staff preferences (preferred staff)
+  const { data: staffPreferences = [] } = useQuery<ClientStaffPreference[]>({
+    queryKey: ["/api/clients", params?.id, "staff-preferences"],
+    enabled: !!params?.id,
+  });
+
+  // Fetch staff restrictions (blacklisted staff)
+  const { data: staffRestrictions = [] } = useQuery<ClientStaffRestriction[]>({
+    queryKey: ["/api/clients", params?.id, "staff-restrictions"],
     enabled: !!params?.id,
   });
 
@@ -2625,53 +2699,105 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
 
+            {/* Support Coordinator - Interactive Card matching Overview tile */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Support Coordinator</CardTitle>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <UserCog className="w-4 h-4" />
+                    Support Coordinator
+                  </CardTitle>
+                  {!isArchived && editingField !== "supportCoordinator" && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => startEditing("supportCoordinator")}
+                      data-testid="button-edit-support-coordinator-team"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {client.careTeam?.supportCoordinator && (
+                {editingField === "supportCoordinator" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select Support Coordinator</Label>
+                      <Select value={editSupportCoordinatorId} onValueChange={setEditSupportCoordinatorId}>
+                        <SelectTrigger data-testid="select-support-coordinator-team">
+                          <SelectValue placeholder="Select a Support Coordinator..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No Coordinator</SelectItem>
+                          {supportCoordinatorsList.map((sc) => (
+                            <SelectItem key={sc.id} value={sc.id}>{sc.name} - {sc.organisation}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveField("supportCoordinator")} disabled={updateFieldMutation.isPending} data-testid="button-save-support-coordinator-team">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-support-coordinator-team">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : supportCoordinatorDetails ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback>{supportCoordinatorDetails.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">{supportCoordinatorDetails.name}</p>
+                        <p className="text-xs text-muted-foreground">{supportCoordinatorDetails.organisation}</p>
+                      </div>
+                      <Link 
+                        href={`/support-coordinators?highlight=${supportCoordinatorDetails.id}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-support-coordinator-team"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    {supportCoordinatorDetails.phoneNumber && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <a href={`tel:${supportCoordinatorDetails.phoneNumber}`} className="text-primary hover:underline">{supportCoordinatorDetails.phoneNumber}</a>
+                      </div>
+                    )}
+                    {supportCoordinatorDetails.email && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <a href={`mailto:${supportCoordinatorDetails.email}`} className="text-primary hover:underline">{supportCoordinatorDetails.email}</a>
+                      </div>
+                    )}
+                  </div>
+                ) : client.careTeam?.supportCoordinator ? (
                   <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                     <Avatar className="w-10 h-10">
                       <AvatarFallback>{client.careTeam.supportCoordinator.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{client.careTeam.supportCoordinator}</p>
-                      <p className="text-xs text-muted-foreground">Support Coordinator</p>
+                      <p className="text-xs text-muted-foreground">Contact details not available</p>
                     </div>
-                    {client.careTeam?.supportCoordinatorId && (
-                      <Link 
-                        href={`/support-coordinators?highlight=${client.careTeam.supportCoordinatorId}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-support-coordinator"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <UserCog className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No support coordinator assigned</p>
+                    {!isArchived && (
+                      <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("supportCoordinator")} data-testid="button-assign-coordinator-team">
+                        <Plus className="w-3 h-3 mr-1" /> Assign Coordinator
+                      </Button>
                     )}
                   </div>
-                )}
-                {client.careTeam?.planManager && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback>{client.careTeam.planManager.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{client.careTeam.planManager}</p>
-                      <p className="text-xs text-muted-foreground">Plan Manager</p>
-                    </div>
-                    {client.careTeam?.planManagerId && (
-                      <Link 
-                        href={`/plan-managers?highlight=${client.careTeam.planManagerId}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-plan-manager"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    )}
-                  </div>
-                )}
-                {!client.careTeam?.supportCoordinator && !client.careTeam?.planManager && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No support coordination assigned</p>
                 )}
               </CardContent>
             </Card>
@@ -2794,6 +2920,267 @@ export default function ClientProfile() {
                               className="h-8 w-8 text-destructive"
                               onClick={() => removeAssignmentMutation.mutate(assignment.id)}
                               data-testid={`button-remove-assignment-${assignment.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Preferred Staff Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Preferred Staff
+                  </CardTitle>
+                  {!isArchived && (
+                    <Dialog open={addPreferenceOpen} onOpenChange={setAddPreferenceOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" data-testid="button-add-preferred-staff">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Preferred
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Preferred Staff Member</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Staff Member</Label>
+                            <Select value={preferenceStaffId} onValueChange={setPreferenceStaffId}>
+                              <SelectTrigger data-testid="select-preference-staff">
+                                <SelectValue placeholder="Select staff member..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {staffList.filter(s => !staffPreferences.some(p => p.staffId === s.id && p.isActive === "yes")).map(staff => (
+                                  <SelectItem key={staff.id} value={staff.id}>
+                                    {staff.name} ({(staff.role || "staff").replace("_", " ")})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Preference Level</Label>
+                            <Select value={preferenceLevel} onValueChange={(v) => setPreferenceLevel(v as typeof preferenceLevel)}>
+                              <SelectTrigger data-testid="select-preference-level">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="primary">Primary (First Choice)</SelectItem>
+                                <SelectItem value="secondary">Secondary</SelectItem>
+                                <SelectItem value="backup">Backup</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Notes (Optional)</Label>
+                            <Textarea 
+                              placeholder="Any notes about this preference..."
+                              value={preferenceNotes}
+                              onChange={(e) => setPreferenceNotes(e.target.value)}
+                              rows={2}
+                              data-testid="input-preference-notes"
+                            />
+                          </div>
+                          <Button 
+                            onClick={() => addPreferenceMutation.mutate({ 
+                              staffId: preferenceStaffId, 
+                              preferenceLevel, 
+                              notes: preferenceNotes || undefined 
+                            })}
+                            disabled={!preferenceStaffId || addPreferenceMutation.isPending}
+                            className="w-full"
+                            data-testid="button-submit-preference"
+                          >
+                            {addPreferenceMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Add Preferred Staff
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {staffPreferences.filter(p => p.isActive === "yes").length === 0 ? (
+                  <div className="text-center py-4">
+                    <Star className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No preferred staff members set</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {staffPreferences.filter(p => p.isActive === "yes").map(preference => {
+                      const staff = staffList.find(s => s.id === preference.staffId);
+                      const levelLabels: Record<string, { label: string; color: string }> = {
+                        primary: { label: "Primary", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200" },
+                        secondary: { label: "Secondary", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200" },
+                        backup: { label: "Backup", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-200" },
+                      };
+                      const level = levelLabels[preference.preferenceLevel || "primary"];
+                      return (
+                        <div key={preference.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg" data-testid={`preference-${preference.id}`}>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback>{staff?.name?.charAt(0) || "?"}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Link href={`/staff/${preference.staffId}`}>
+                                  <p className="text-sm font-medium hover:underline cursor-pointer">{staff?.name || "Unknown"}</p>
+                                </Link>
+                                <Badge className={`text-xs ${level.color}`}>{level.label}</Badge>
+                              </div>
+                              {preference.notes && (
+                                <p className="text-xs text-muted-foreground">{preference.notes}</p>
+                              )}
+                            </div>
+                          </div>
+                          {!isArchived && (
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => removePreferenceMutation.mutate(preference.id)}
+                              data-testid={`button-remove-preference-${preference.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Blacklisted Staff Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Ban className="w-4 h-4 text-red-500" />
+                    Restricted Staff
+                  </CardTitle>
+                  {!isArchived && (
+                    <Dialog open={addRestrictionOpen} onOpenChange={setAddRestrictionOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground" data-testid="button-add-restriction">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Restriction
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Staff Restriction</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Staff Member</Label>
+                            <Select value={restrictionStaffId} onValueChange={setRestrictionStaffId}>
+                              <SelectTrigger data-testid="select-restriction-staff">
+                                <SelectValue placeholder="Select staff member..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {staffList.filter(s => !staffRestrictions.some(r => r.staffId === s.id && r.isActive === "yes")).map(staff => (
+                                  <SelectItem key={staff.id} value={staff.id}>
+                                    {staff.name} ({(staff.role || "staff").replace("_", " ")})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Restriction Severity</Label>
+                            <Select value={restrictionSeverity} onValueChange={(v) => setRestrictionSeverity(v as typeof restrictionSeverity)}>
+                              <SelectTrigger data-testid="select-restriction-severity">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="warning">Warning (Notify Only)</SelectItem>
+                                <SelectItem value="soft_block">Soft Block (Requires Override)</SelectItem>
+                                <SelectItem value="hard_block">Hard Block (Cannot Assign)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Reason *</Label>
+                            <Textarea 
+                              placeholder="Explain why this staff should not work with this client..."
+                              value={restrictionReason}
+                              onChange={(e) => setRestrictionReason(e.target.value)}
+                              rows={3}
+                              data-testid="input-restriction-reason"
+                            />
+                          </div>
+                          <Button 
+                            onClick={() => addRestrictionMutation.mutate({ 
+                              staffId: restrictionStaffId, 
+                              reason: restrictionReason,
+                              severity: restrictionSeverity 
+                            })}
+                            disabled={!restrictionStaffId || !restrictionReason.trim() || addRestrictionMutation.isPending}
+                            className="w-full"
+                            variant="destructive"
+                            data-testid="button-submit-restriction"
+                          >
+                            {addRestrictionMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Add Restriction
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {staffRestrictions.filter(r => r.isActive === "yes").length === 0 ? (
+                  <div className="text-center py-4">
+                    <Ban className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No staff restrictions set</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {staffRestrictions.filter(r => r.isActive === "yes").map(restriction => {
+                      const staff = staffList.find(s => s.id === restriction.staffId);
+                      const severityLabels: Record<string, { label: string; color: string }> = {
+                        warning: { label: "Warning", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200" },
+                        soft_block: { label: "Soft Block", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200" },
+                        hard_block: { label: "Hard Block", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200" },
+                      };
+                      const severity = severityLabels[restriction.severity || "hard_block"];
+                      return (
+                        <div key={restriction.id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800" data-testid={`restriction-${restriction.id}`}>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback>{staff?.name?.charAt(0) || "?"}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Link href={`/staff/${restriction.staffId}`}>
+                                  <p className="text-sm font-medium hover:underline cursor-pointer">{staff?.name || "Unknown"}</p>
+                                </Link>
+                                <Badge className={`text-xs ${severity.color}`}>{severity.label}</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{restriction.reason}</p>
+                            </div>
+                          </div>
+                          {!isArchived && (
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => removeRestrictionMutation.mutate(restriction.id)}
+                              data-testid={`button-remove-restriction-${restriction.id}`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
