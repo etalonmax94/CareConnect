@@ -3799,8 +3799,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Authentication required" });
       }
       
+      const staffName = req.session.user.name || req.session.user.email || "Unknown";
+      
       const client = await storage.updateClient(req.params.id, {
-        isOnboarded: "yes"
+        isOnboarded: "yes",
+        onboardedAt: new Date().toISOString(),
+        onboardedBy: staffName
       });
       
       if (!client) {
@@ -3811,7 +3815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.logActivity({
         clientId: req.params.id,
         action: "client_onboarded",
-        description: `Client was marked as onboarded`,
+        description: `Client was marked as onboarded by ${staffName}`,
         performedBy: req.session.user.email || "System"
       });
       

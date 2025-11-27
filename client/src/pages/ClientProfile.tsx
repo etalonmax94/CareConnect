@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
@@ -1341,22 +1342,56 @@ export default function ClientProfile() {
         </Alert>
       )}
 
-      {client.isOnboarded !== "yes" && !isArchived && (
+      {/* Onboarding Status - Adaptive display */}
+      {!isArchived && (
         <div className="mx-3 sm:mx-6 mt-2 sm:mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-card">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-            <span className="text-xs sm:text-sm"><strong>New Client</strong> - Not yet onboarded</span>
-          </div>
-          <Button 
-            size="sm" 
-            className="h-7 sm:h-8 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto"
-            onClick={() => onboardMutation.mutate()}
-            disabled={onboardMutation.isPending}
-            data-testid="button-onboard-client"
-          >
-            {onboardMutation.isPending ? <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />}
-            Mark as Onboarded
-          </Button>
+          {client.isOnboarded !== "yes" ? (
+            <>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                <span className="text-xs sm:text-sm"><strong>New Client</strong> - Not yet onboarded</span>
+              </div>
+              <Button 
+                size="sm" 
+                className="h-7 sm:h-8 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto"
+                onClick={() => onboardMutation.mutate()}
+                disabled={onboardMutation.isPending}
+                data-testid="button-onboard-client"
+              >
+                {onboardMutation.isPending ? <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />}
+                Mark as Onboarded
+              </Button>
+            </>
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button 
+                  className="flex items-center gap-2 hover:bg-muted/50 rounded-md px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer w-full sm:w-auto"
+                  data-testid="button-onboarding-details"
+                >
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">
+                    Onboarding completed on {client.onboardedAt ? new Date(client.onboardedAt).toLocaleDateString() : 'Unknown date'}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64" align="start">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Onboarding Details</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      <span>Date: {client.onboardedAt ? new Date(client.onboardedAt).toLocaleDateString() : 'Unknown'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <User className="w-4 h-4" />
+                      <span>By: {client.onboardedBy || 'Unknown staff member'}</span>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       )}
 
