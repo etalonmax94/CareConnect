@@ -24,7 +24,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator } from "@shared/schema";
 import { calculateAge, formatClientNumber } from "@shared/schema";
 import ClientLocationMap from "@/components/ClientLocationMap";
 import CarePlanTab from "@/components/CarePlanTab";
@@ -194,6 +194,25 @@ export default function ClientProfile() {
   const { data: pharmacyDetails } = useQuery<Pharmacy>({
     queryKey: ["/api/pharmacies", client?.pharmacyId],
     enabled: !!client?.pharmacyId,
+  });
+
+  // Fetch Support Coordinator details if client has one assigned
+  const { data: supportCoordinatorDetails } = useQuery<SupportCoordinator>({
+    queryKey: ["/api/support-coordinators", client?.careTeam?.supportCoordinatorId],
+    enabled: !!client?.careTeam?.supportCoordinatorId,
+  });
+
+  // Fetch lists for entity selectors
+  const { data: gpsList = [] } = useQuery<GP[]>({
+    queryKey: ["/api/gps"],
+  });
+
+  const { data: pharmaciesList = [] } = useQuery<Pharmacy[]>({
+    queryKey: ["/api/pharmacies"],
+  });
+
+  const { data: supportCoordinatorsList = [] } = useQuery<SupportCoordinator[]>({
+    queryKey: ["/api/support-coordinators"],
   });
 
   // Fetch client contacts (NOK, emergency contacts, etc.)
@@ -533,6 +552,17 @@ export default function ClientProfile() {
   const [editPhone, setEditPhone] = useState<string>("");
   const [editEmail, setEditEmail] = useState<string>("");
   const [editMainDiagnosis, setEditMainDiagnosis] = useState<string>("");
+  const [editDob, setEditDob] = useState<string>("");
+  const [editStreetAddress, setEditStreetAddress] = useState<string>("");
+  const [editSuburb, setEditSuburb] = useState<string>("");
+  const [editState, setEditState] = useState<string>("");
+  const [editPostcode, setEditPostcode] = useState<string>("");
+  const [editParkingInstructions, setEditParkingInstructions] = useState<string>("");
+  const [editGpId, setEditGpId] = useState<string>("");
+  const [editPharmacyId, setEditPharmacyId] = useState<string>("");
+  const [editSupportCoordinatorId, setEditSupportCoordinatorId] = useState<string>("");
+  const [editNokEpoa, setEditNokEpoa] = useState<string>("");
+  const [editMedicareNumber, setEditMedicareNumber] = useState<string>("");
   
   // Inline field update mutation
   const updateFieldMutation = useMutation({
@@ -569,6 +599,39 @@ export default function ClientProfile() {
       case "mainDiagnosis":
         setEditMainDiagnosis(client?.mainDiagnosis || "");
         break;
+      case "dob":
+        setEditDob(client?.dateOfBirth || "");
+        break;
+      case "streetAddress":
+        setEditStreetAddress(client?.streetAddress || "");
+        break;
+      case "suburb":
+        setEditSuburb(client?.suburb || "");
+        break;
+      case "state":
+        setEditState(client?.state || "");
+        break;
+      case "postcode":
+        setEditPostcode(client?.postcode || "");
+        break;
+      case "parkingInstructions":
+        setEditParkingInstructions(client?.parkingInstructions || "");
+        break;
+      case "gp":
+        setEditGpId(client?.generalPractitionerId || "");
+        break;
+      case "pharmacy":
+        setEditPharmacyId(client?.pharmacyId || "");
+        break;
+      case "supportCoordinator":
+        setEditSupportCoordinatorId(client?.careTeam?.supportCoordinatorId || "");
+        break;
+      case "nokEpoa":
+        setEditNokEpoa(client?.nokEpoa || "");
+        break;
+      case "medicareNumber":
+        setEditMedicareNumber(client?.medicareNumber || "");
+        break;
     }
   };
 
@@ -588,6 +651,46 @@ export default function ClientProfile() {
         break;
       case "mainDiagnosis":
         updateFieldMutation.mutate({ mainDiagnosis: editMainDiagnosis });
+        break;
+      case "dob":
+        updateFieldMutation.mutate({ dateOfBirth: editDob });
+        break;
+      case "streetAddress":
+        updateFieldMutation.mutate({ streetAddress: editStreetAddress });
+        break;
+      case "suburb":
+        updateFieldMutation.mutate({ suburb: editSuburb });
+        break;
+      case "state":
+        updateFieldMutation.mutate({ state: editState });
+        break;
+      case "postcode":
+        updateFieldMutation.mutate({ postcode: editPostcode });
+        break;
+      case "parkingInstructions":
+        updateFieldMutation.mutate({ parkingInstructions: editParkingInstructions });
+        break;
+      case "gp":
+        updateFieldMutation.mutate({ generalPractitionerId: editGpId || null });
+        break;
+      case "pharmacy":
+        updateFieldMutation.mutate({ pharmacyId: editPharmacyId || null });
+        break;
+      case "supportCoordinator":
+        // Update careTeam JSON with the new support coordinator ID
+        const currentCareTeam = client?.careTeam || {};
+        updateFieldMutation.mutate({ 
+          careTeam: { 
+            ...currentCareTeam, 
+            supportCoordinatorId: editSupportCoordinatorId || undefined 
+          } as any 
+        });
+        break;
+      case "nokEpoa":
+        updateFieldMutation.mutate({ nokEpoa: editNokEpoa });
+        break;
+      case "medicareNumber":
+        updateFieldMutation.mutate({ medicareNumber: editMedicareNumber });
         break;
     }
   };
@@ -797,16 +900,16 @@ export default function ClientProfile() {
             <DialogTrigger asChild>
               <div className="relative group cursor-pointer flex-shrink-0 flex items-center justify-center">
                 <div 
-                  className="w-16 h-20 sm:w-24 sm:h-32 border-2 border-border rounded-lg overflow-hidden bg-muted flex items-center justify-center"
+                  className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 border-2 border-border rounded-full overflow-hidden bg-muted flex items-center justify-center"
                   data-testid="avatar-client"
                 >
                   {client.photo ? (
                     <img src={client.photo} alt={client.participantName} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-lg sm:text-2xl text-foreground font-bold">{getInitials(client.participantName)}</span>
+                    <span className="text-lg sm:text-xl md:text-2xl text-foreground font-bold">{getInitials(client.participantName)}</span>
                   )}
                 </div>
-                <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   {isUploadingPhoto ? (
                     <Loader2 className="w-4 h-4 sm:w-6 sm:h-6 text-white animate-spin" />
                   ) : (
@@ -820,7 +923,7 @@ export default function ClientProfile() {
                 <DialogTitle>Client Photo</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col items-center gap-4 py-4">
-                <div className="w-48 h-64 rounded-lg overflow-hidden border-2 border-border bg-muted flex items-center justify-center">
+                <div className="w-48 h-48 rounded-full overflow-hidden border-2 border-border bg-muted flex items-center justify-center">
                   {client.photo ? (
                     <img src={client.photo} alt={client.participantName} className="w-full h-full object-cover" />
                   ) : (
@@ -1471,119 +1574,99 @@ export default function ClientProfile() {
                     </CardContent>
                   </Card>
 
-                  {/* Location Map */}
-                  <ClientLocationMap
-                    latitude={client.latitude}
-                    longitude={client.longitude}
-                    address={client.streetAddress ? `${client.streetAddress}, ${[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}` : client.homeAddress}
-                    clientName={client.participantName}
-                  />
-
-                  {/* GP & Pharmacy Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* GP Information */}
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Stethoscope className="w-4 h-4" />
-                          General Practitioner
-                          {gpDetails && client.generalPractitionerId && (
-                            <Link 
-                              href={`/gps?highlight=${client.generalPractitionerId}`}
-                              className="ml-auto inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
-                              data-testid="link-gp-card"
-                            >
-                              <ChevronRight className="w-4 h-4" />
-                            </Link>
-                          )}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {gpDetails ? (
-                          <div className="space-y-2">
-                            <p className="font-semibold">{gpDetails.name}</p>
-                            {gpDetails.practiceName && (
-                              <p className="text-sm text-muted-foreground">{gpDetails.practiceName}</p>
-                            )}
-                            {gpDetails.phoneNumber && (
-                              <div className="flex items-center gap-2 text-sm">
-                                <Phone className="w-3 h-3 text-muted-foreground" />
-                                <a href={`tel:${gpDetails.phoneNumber}`} className="hover:text-primary">{gpDetails.phoneNumber}</a>
-                              </div>
-                            )}
-                            {gpDetails.faxNumber && (
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="text-xs text-muted-foreground">Fax:</span>
-                                <span>{gpDetails.faxNumber}</span>
-                              </div>
-                            )}
-                            {gpDetails.address && (
-                              <p className="text-sm text-muted-foreground">{gpDetails.address}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center py-4">
-                            <Stethoscope className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                            <p className="text-sm text-muted-foreground">No GP assigned</p>
-                          </div>
+                  {/* GP Information - Inline Editable */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Stethoscope className="w-4 h-4" />
+                        General Practitioner
+                        {!isArchived && editingField !== "gp" && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="ml-auto h-6 w-6" 
+                            onClick={() => startEditing("gp")}
+                            data-testid="button-edit-gp"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
                         )}
-                      </CardContent>
-                    </Card>
-
-                    {/* Pharmacy Information */}
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Pill className="w-4 h-4" />
-                          Pharmacy
-                          {pharmacyDetails && client.pharmacyId && (
-                            <Link 
-                              href={`/pharmacies?highlight=${client.pharmacyId}`}
-                              className="ml-auto inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
-                              data-testid="link-pharmacy-card"
-                            >
-                              <ChevronRight className="w-4 h-4" />
-                            </Link>
-                          )}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {pharmacyDetails ? (
-                          <div className="space-y-2">
-                            <p className="font-semibold">{pharmacyDetails.name}</p>
-                            {pharmacyDetails.phoneNumber && (
-                              <div className="flex items-center gap-2 text-sm">
-                                <Phone className="w-3 h-3 text-muted-foreground" />
-                                <a href={`tel:${pharmacyDetails.phoneNumber}`} className="hover:text-primary">{pharmacyDetails.phoneNumber}</a>
-                              </div>
-                            )}
-                            {pharmacyDetails.faxNumber && (
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="text-xs text-muted-foreground">Fax:</span>
-                                <span>{pharmacyDetails.faxNumber}</span>
-                              </div>
-                            )}
-                            {pharmacyDetails.address && (
-                              <p className="text-sm text-muted-foreground">{pharmacyDetails.address}</p>
-                            )}
-                            {pharmacyDetails.deliveryAvailable === "yes" && (
-                              <Badge variant="secondary" className="mt-1">Delivery Available</Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center py-4">
-                            <Pill className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                            <p className="text-sm text-muted-foreground">No pharmacy assigned</p>
-                          </div>
+                        {gpDetails && client.generalPractitionerId && editingField !== "gp" && (
+                          <Link 
+                            href={`/gps?highlight=${client.generalPractitionerId}`}
+                            className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
+                            data-testid="link-gp-card"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
                         )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {editingField === "gp" ? (
+                        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                          <Select value={editGpId} onValueChange={setEditGpId}>
+                            <SelectTrigger className="w-full" data-testid="select-gp-inline">
+                              <SelectValue placeholder="Select a GP..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No GP assigned</SelectItem>
+                              {gpsList.map((gp) => (
+                                <SelectItem key={gp.id} value={gp.id}>
+                                  {gp.name} {gp.practiceName && `(${gp.practiceName})`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-1">
+                            <Button size="sm" className="h-7 text-xs flex-1" onClick={() => {
+                              if (editGpId === "none") setEditGpId("");
+                              saveField("gp");
+                            }} disabled={updateFieldMutation.isPending}>
+                              {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={cancelEditing}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : gpDetails ? (
+                        <div className="space-y-2">
+                          <p className="font-semibold">{gpDetails.name}</p>
+                          {gpDetails.practiceName && (
+                            <p className="text-sm text-muted-foreground">{gpDetails.practiceName}</p>
+                          )}
+                          {gpDetails.phoneNumber && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-3 h-3 text-muted-foreground" />
+                              <a href={`tel:${gpDetails.phoneNumber}`} className="hover:text-primary">{gpDetails.phoneNumber}</a>
+                            </div>
+                          )}
+                          {gpDetails.faxNumber && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-xs text-muted-foreground">Fax:</span>
+                              <span>{gpDetails.faxNumber}</span>
+                            </div>
+                          )}
+                          {gpDetails.address && (
+                            <p className="text-sm text-muted-foreground">{gpDetails.address}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <Stethoscope className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                          <p className="text-sm text-muted-foreground">No GP assigned</p>
+                          {!isArchived && (
+                            <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("gp")}>
+                              <Plus className="w-3 h-3 mr-1" /> Assign GP
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                {/* Right Column - Key Contacts & Program Info */}
-                <div className="space-y-6">
-                  {/* Next of Kin / Emergency Contact */}
+                  {/* Emergency Contact - Below GP */}
                   <Card className="border-l-4 border-l-red-500">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
@@ -1627,6 +1710,203 @@ export default function ClientProfile() {
                       )}
                     </CardContent>
                   </Card>
+                </div>
+
+                {/* Right Column - Support Coordinator, Pharmacy, Map & Program Info */}
+                <div className="space-y-6">
+                  {/* Support Coordinator - Inline Editable */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <UserCog className="w-4 h-4" />
+                        Support Coordinator
+                        {!isArchived && editingField !== "supportCoordinator" && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="ml-auto h-6 w-6" 
+                            onClick={() => startEditing("supportCoordinator")}
+                            data-testid="button-edit-support-coordinator"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                        )}
+                        {supportCoordinatorDetails && client.careTeam?.supportCoordinatorId && editingField !== "supportCoordinator" && (
+                          <Link 
+                            href={`/support-coordinators?highlight=${client.careTeam.supportCoordinatorId}`}
+                            className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
+                            data-testid="link-support-coordinator-card"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {editingField === "supportCoordinator" ? (
+                        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                          <Select value={editSupportCoordinatorId} onValueChange={setEditSupportCoordinatorId}>
+                            <SelectTrigger className="w-full" data-testid="select-support-coordinator-inline">
+                              <SelectValue placeholder="Select a Support Coordinator..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No coordinator assigned</SelectItem>
+                              {supportCoordinatorsList.map((sc) => (
+                                <SelectItem key={sc.id} value={sc.id}>
+                                  {sc.name} {sc.organisation && `(${sc.organisation})`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-1">
+                            <Button size="sm" className="h-7 text-xs flex-1" onClick={() => {
+                              if (editSupportCoordinatorId === "none") setEditSupportCoordinatorId("");
+                              saveField("supportCoordinator");
+                            }} disabled={updateFieldMutation.isPending}>
+                              {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={cancelEditing}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : supportCoordinatorDetails ? (
+                        <div className="space-y-2">
+                          <p className="font-semibold">{supportCoordinatorDetails.name}</p>
+                          {supportCoordinatorDetails.organisation && (
+                            <p className="text-sm text-muted-foreground">{supportCoordinatorDetails.organisation}</p>
+                          )}
+                          {supportCoordinatorDetails.phoneNumber && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-3 h-3 text-muted-foreground" />
+                              <a href={`tel:${supportCoordinatorDetails.phoneNumber}`} className="hover:text-primary">{supportCoordinatorDetails.phoneNumber}</a>
+                            </div>
+                          )}
+                          {supportCoordinatorDetails.email && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Mail className="w-3 h-3 text-muted-foreground" />
+                              <a href={`mailto:${supportCoordinatorDetails.email}`} className="hover:text-primary truncate">{supportCoordinatorDetails.email}</a>
+                            </div>
+                          )}
+                        </div>
+                      ) : client.careTeam?.supportCoordinator ? (
+                        <div className="space-y-2">
+                          <p className="font-semibold">{client.careTeam.supportCoordinator}</p>
+                          <p className="text-sm text-muted-foreground">Contact details not available</p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <UserCog className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                          <p className="text-sm text-muted-foreground">No support coordinator assigned</p>
+                          {!isArchived && (
+                            <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("supportCoordinator")}>
+                              <Plus className="w-3 h-3 mr-1" /> Assign Coordinator
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Pharmacy Information - Inline Editable */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Pill className="w-4 h-4" />
+                        Pharmacy
+                        {!isArchived && editingField !== "pharmacy" && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="ml-auto h-6 w-6" 
+                            onClick={() => startEditing("pharmacy")}
+                            data-testid="button-edit-pharmacy"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                        )}
+                        {pharmacyDetails && client.pharmacyId && editingField !== "pharmacy" && (
+                          <Link 
+                            href={`/pharmacies?highlight=${client.pharmacyId}`}
+                            className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
+                            data-testid="link-pharmacy-card"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {editingField === "pharmacy" ? (
+                        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                          <Select value={editPharmacyId} onValueChange={setEditPharmacyId}>
+                            <SelectTrigger className="w-full" data-testid="select-pharmacy-inline">
+                              <SelectValue placeholder="Select a Pharmacy..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No pharmacy assigned</SelectItem>
+                              {pharmaciesList.map((pharmacy) => (
+                                <SelectItem key={pharmacy.id} value={pharmacy.id}>
+                                  {pharmacy.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-1">
+                            <Button size="sm" className="h-7 text-xs flex-1" onClick={() => {
+                              if (editPharmacyId === "none") setEditPharmacyId("");
+                              saveField("pharmacy");
+                            }} disabled={updateFieldMutation.isPending}>
+                              {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={cancelEditing}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : pharmacyDetails ? (
+                        <div className="space-y-2">
+                          <p className="font-semibold">{pharmacyDetails.name}</p>
+                          {pharmacyDetails.phoneNumber && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-3 h-3 text-muted-foreground" />
+                              <a href={`tel:${pharmacyDetails.phoneNumber}`} className="hover:text-primary">{pharmacyDetails.phoneNumber}</a>
+                            </div>
+                          )}
+                          {pharmacyDetails.faxNumber && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-xs text-muted-foreground">Fax:</span>
+                              <span>{pharmacyDetails.faxNumber}</span>
+                            </div>
+                          )}
+                          {pharmacyDetails.address && (
+                            <p className="text-sm text-muted-foreground">{pharmacyDetails.address}</p>
+                          )}
+                          {pharmacyDetails.deliveryAvailable === "yes" && (
+                            <Badge variant="secondary" className="mt-1">Delivery Available</Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <Pill className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                          <p className="text-sm text-muted-foreground">No pharmacy assigned</p>
+                          {!isArchived && (
+                            <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("pharmacy")}>
+                              <Plus className="w-3 h-3 mr-1" /> Assign Pharmacy
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Location Map - Moved to right column */}
+                  <ClientLocationMap
+                    latitude={client.latitude}
+                    longitude={client.longitude}
+                    address={client.streetAddress ? `${client.streetAddress}, ${[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}` : client.homeAddress}
+                    clientName={client.participantName}
+                  />
 
                   {/* Program Info Summary */}
                   <Card>
@@ -1731,22 +2011,117 @@ export default function ClientProfile() {
                       <User className="w-4 h-4 text-primary" />
                       Identity & Demographics
                     </CardTitle>
+                    <p className="text-xs text-muted-foreground">Click fields to edit</p>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date of Birth</p>
-                        <p className="text-sm mt-1 font-medium">{client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString('en-AU') : "Not provided"}</p>
+                      {/* Date of Birth - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "dob" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "dob" && startEditing("dob")}
+                        data-testid="field-dob"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date of Birth</p>
+                          {!isArchived && editingField !== "dob" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "dob" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              type="date"
+                              value={editDob}
+                              onChange={(e) => setEditDob(e.target.value)}
+                              className="h-8 text-sm"
+                              data-testid="input-dob-inline"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("dob")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString('en-AU') : "Click to add"}</p>
+                        )}
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Medicare Number</p>
-                        <p className="text-sm mt-1 font-mono">{client.medicareNumber || "Not provided"}</p>
+                      
+                      {/* Medicare Number - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "medicareNumber" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "medicareNumber" && startEditing("medicareNumber")}
+                        data-testid="field-medicare-number"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Medicare Number</p>
+                          {!isArchived && editingField !== "medicareNumber" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "medicareNumber" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editMedicareNumber}
+                              onChange={(e) => setEditMedicareNumber(e.target.value)}
+                              placeholder="Enter Medicare number..."
+                              className="h-8 text-sm font-mono"
+                              data-testid="input-medicare-number-inline"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("medicareNumber")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-mono">{client.medicareNumber || "Click to add"}</p>
+                        )}
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Next of Kin / EPOA</p>
-                        <p className="text-sm mt-1 font-medium">{client.nokEpoa || "Not provided"}</p>
+                      
+                      {/* NOK / EPOA - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "nokEpoa" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "nokEpoa" && startEditing("nokEpoa")}
+                        data-testid="field-nok-epoa"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Next of Kin / EPOA</p>
+                          {!isArchived && editingField !== "nokEpoa" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "nokEpoa" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editNokEpoa}
+                              onChange={(e) => setEditNokEpoa(e.target.value)}
+                              placeholder="Enter NOK/EPOA..."
+                              className="h-8 text-sm"
+                              data-testid="input-nok-epoa-inline"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("nokEpoa")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.nokEpoa || "Click to add"}</p>
+                        )}
                       </div>
-                      <div>
+                      
+                      {/* Category - Display only */}
+                      <div className="p-3 -m-3">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</p>
                         <div className="mt-1">
                           <CategoryBadge category={client.category} />
