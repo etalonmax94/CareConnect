@@ -1033,13 +1033,56 @@ export default function ClientProfile() {
 
   const assignedStaffCount = staffAssignments?.filter(a => !a.endDate || new Date(a.endDate) > new Date()).length || 0;
 
-  const sidebarItems: { id: ProfileSection; label: string; icon: any; badge?: string; badgeColor?: string }[] = [
+  // Calculate document compliance status for sidebar indicator
+  const getDocumentsStatus = (): "green" | "orange" | "red" | null => {
+    const docs = client.clinicalDocuments;
+    if (!docs) return null;
+    
+    const documentDates = [
+      docs.serviceAgreementDate,
+      docs.consentFormDate,
+      docs.riskAssessmentDate,
+      docs.selfAssessmentMedxDate,
+      docs.medicationConsentDate,
+      docs.personalEmergencyPlanDate,
+      docs.carePlanDate,
+      docs.healthSummaryDate,
+      docs.woundCarePlanDate,
+    ].filter(Boolean) as string[];
+    
+    if (documentDates.length === 0) return null;
+    
+    const now = new Date();
+    let hasExpired = false;
+    let hasExpiringSoon = false;
+    
+    for (const dateString of documentDates) {
+      const date = new Date(dateString);
+      const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 0) {
+        hasExpired = true;
+        break; // Red takes priority
+      }
+      if (diffDays <= 30) {
+        hasExpiringSoon = true;
+      }
+    }
+    
+    if (hasExpired) return "red";
+    if (hasExpiringSoon) return "orange";
+    return "green";
+  };
+  
+  const documentsStatus = getDocumentsStatus();
+
+  const sidebarItems: { id: ProfileSection; label: string; icon: any; badge?: string; badgeColor?: string; statusDot?: "green" | "orange" | "red" | null }[] = [
     { id: "overview", label: "Overview", icon: User },
     { id: "details", label: "Personal Details", icon: UserCircle },
     { id: "program", label: "Program Info", icon: ClipboardCheck },
     { id: "team", label: "Care Team", icon: Users },
     { id: "goals", label: "Goals", icon: Target },
-    { id: "documents", label: "Documents", icon: FileText },
+    { id: "documents", label: "Documents", icon: FileText, statusDot: documentsStatus },
     { id: "clinical", label: "Clinical Notes", icon: Stethoscope },
     { id: "careplan", label: "Care Plan", icon: HeartPulse },
     { id: "services", label: "Services", icon: Clock },
@@ -1344,6 +1387,20 @@ export default function ClientProfile() {
             >
               <item.icon className="w-3.5 h-3.5" />
               {item.label}
+              {item.statusDot && (
+                <span 
+                  className={`w-2 h-2 rounded-full ${
+                    item.statusDot === 'green' ? 'bg-emerald-500' :
+                    item.statusDot === 'orange' ? 'bg-amber-500' :
+                    'bg-red-500'
+                  }`}
+                  title={
+                    item.statusDot === 'green' ? 'All documents current' :
+                    item.statusDot === 'orange' ? 'Documents expiring soon' :
+                    'Documents expired'
+                  }
+                />
+              )}
               {item.badge && (
                 <span className={`ml-1 text-[10px] ${item.badgeColor || ''}`}>{item.badge}</span>
               )}
@@ -1375,6 +1432,20 @@ export default function ClientProfile() {
                 >
                   <item.icon className="w-4 h-4 flex-shrink-0" />
                   <span className="flex-1 truncate">{item.label}</span>
+                  {item.statusDot && (
+                    <span 
+                      className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                        item.statusDot === 'green' ? 'bg-emerald-500' :
+                        item.statusDot === 'orange' ? 'bg-amber-500' :
+                        'bg-red-500'
+                      }`}
+                      title={
+                        item.statusDot === 'green' ? 'All documents current' :
+                        item.statusDot === 'orange' ? 'Documents expiring soon' :
+                        'Documents expired'
+                      }
+                    />
+                  )}
                   {item.badge && (
                     <span className={`text-xs ${item.badgeColor || 'text-muted-foreground'}`}>{item.badge}</span>
                   )}
