@@ -1092,3 +1092,746 @@ export const insertLeadershipMeetingNoteSchema = createInsertSchema(leadershipMe
 
 export type InsertLeadershipMeetingNote = z.infer<typeof insertLeadershipMeetingNoteSchema>;
 export type LeadershipMeetingNote = typeof leadershipMeetingNotes.$inferSelect;
+
+// ============================================
+// APPOINTMENTS & SCHEDULING SYSTEM
+// ============================================
+
+// Appointment Status and Types
+export type AppointmentStatus = "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show";
+export type AppointmentType = "home_visit" | "community_access" | "transport" | "nursing" | "assessment" | "review" | "other";
+export type AssignmentRole = "lead" | "support" | "trainee" | "observer";
+export type AssignmentStatus = "pending" | "accepted" | "declined" | "reassigned";
+
+// Appointments
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  appointmentType: text("appointment_type").$type<AppointmentType>().default("home_visit"),
+  status: text("status").$type<AppointmentStatus>().default("scheduled"),
+  
+  // Scheduling
+  scheduledStart: timestamp("scheduled_start").notNull(),
+  scheduledEnd: timestamp("scheduled_end").notNull(),
+  actualStart: timestamp("actual_start"),
+  actualEnd: timestamp("actual_end"),
+  
+  // Location - can use client address or custom
+  useClientAddress: text("use_client_address").default("yes").$type<"yes" | "no">(),
+  customAddress: text("custom_address"),
+  customLatitude: text("custom_latitude"),
+  customLongitude: text("custom_longitude"),
+  
+  // Travel buffer (minutes before/after)
+  bufferBefore: text("buffer_before").default("15"),
+  bufferAfter: text("buffer_after").default("15"),
+  
+  // Recurrence (null for one-time appointments)
+  isRecurring: text("is_recurring").default("no").$type<"yes" | "no">(),
+  recurrenceRule: text("recurrence_rule"), // RRULE format
+  recurrenceParentId: varchar("recurrence_parent_id"), // Links to parent appointment for series
+  
+  // Service details
+  serviceType: text("service_type"),
+  ndisServiceCode: text("ndis_service_code"),
+  estimatedDuration: text("estimated_duration"), // in minutes
+  
+  // Notes
+  notes: text("notes"),
+  cancellationReason: text("cancellation_reason"),
+  
+  // Audit
+  createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAppointmentSchema = createInsertSchema(appointments, {
+  appointmentType: z.enum(["home_visit", "community_access", "transport", "nursing", "assessment", "review", "other"]).optional(),
+  status: z.enum(["scheduled", "confirmed", "in_progress", "completed", "cancelled", "no_show"]).optional(),
+  useClientAddress: z.enum(["yes", "no"]).optional(),
+  isRecurring: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;
+
+// Appointment Assignments - Staff assigned to appointments
+export const appointmentAssignments = pgTable("appointment_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  role: text("role").$type<AssignmentRole>().default("lead"),
+  status: text("status").$type<AssignmentStatus>().default("pending"),
+  
+  // Response tracking
+  respondedAt: timestamp("responded_at"),
+  responseNote: text("response_note"),
+  declineReason: text("decline_reason"),
+  
+  // Assignment audit
+  assignedById: varchar("assigned_by_id").references(() => users.id, { onDelete: "set null" }),
+  assignedByName: text("assigned_by_name"),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAppointmentAssignmentSchema = createInsertSchema(appointmentAssignments, {
+  role: z.enum(["lead", "support", "trainee", "observer"]).optional(),
+  status: z.enum(["pending", "accepted", "declined", "reassigned"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  assignedAt: true,
+});
+
+export type InsertAppointmentAssignment = z.infer<typeof insertAppointmentAssignmentSchema>;
+export type AppointmentAssignment = typeof appointmentAssignments.$inferSelect;
+
+// Appointment Check-ins - GPS tracking for visits
+export const appointmentCheckins = pgTable("appointment_checkins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  
+  checkType: text("check_type").$type<"check_in" | "check_out">().notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  
+  // GPS location
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  accuracy: text("accuracy"), // GPS accuracy in meters
+  
+  // Distance from expected location
+  distanceFromClient: text("distance_from_client"), // in meters
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAppointmentCheckinSchema = createInsertSchema(appointmentCheckins, {
+  checkType: z.enum(["check_in", "check_out"]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAppointmentCheckin = z.infer<typeof insertAppointmentCheckinSchema>;
+export type AppointmentCheckin = typeof appointmentCheckins.$inferSelect;
+
+// ============================================
+// STAFF ALLOCATION & PREFERENCES
+// ============================================
+
+// Staff Preference Levels
+export type PreferenceLevel = "primary" | "secondary" | "backup";
+
+// Client Staff Preferences - Preferred workers for each client
+export const clientStaffPreferences = pgTable("client_staff_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  preferenceLevel: text("preference_level").$type<PreferenceLevel>().default("primary"),
+  notes: text("notes"),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  
+  createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientStaffPreferenceSchema = createInsertSchema(clientStaffPreferences, {
+  preferenceLevel: z.enum(["primary", "secondary", "backup"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientStaffPreference = z.infer<typeof insertClientStaffPreferenceSchema>;
+export type ClientStaffPreference = typeof clientStaffPreferences.$inferSelect;
+
+// Client Staff Restrictions (Blacklist) - Staff who should NOT work with client
+export const clientStaffRestrictions = pgTable("client_staff_restrictions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  reason: text("reason").notNull(),
+  severity: text("severity").$type<"warning" | "soft_block" | "hard_block">().default("hard_block"),
+  
+  // Effective period
+  effectiveFrom: timestamp("effective_from").defaultNow().notNull(),
+  effectiveTo: timestamp("effective_to"), // null = permanent
+  
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  
+  createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientStaffRestrictionSchema = createInsertSchema(clientStaffRestrictions, {
+  severity: z.enum(["warning", "soft_block", "hard_block"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientStaffRestriction = z.infer<typeof insertClientStaffRestrictionSchema>;
+export type ClientStaffRestriction = typeof clientStaffRestrictions.$inferSelect;
+
+// Staff Availability Windows - Regular working hours
+export const staffAvailabilityWindows = pgTable("staff_availability_windows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  
+  // Day of week (0 = Sunday, 6 = Saturday)
+  dayOfWeek: text("day_of_week").$type<"0" | "1" | "2" | "3" | "4" | "5" | "6">().notNull(),
+  startTime: text("start_time").notNull(), // HH:MM format
+  endTime: text("end_time").notNull(), // HH:MM format
+  
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffAvailabilityWindowSchema = createInsertSchema(staffAvailabilityWindows, {
+  dayOfWeek: z.enum(["0", "1", "2", "3", "4", "5", "6"]),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffAvailabilityWindow = z.infer<typeof insertStaffAvailabilityWindowSchema>;
+export type StaffAvailabilityWindow = typeof staffAvailabilityWindows.$inferSelect;
+
+// Staff Unavailability Periods - Leave, sick days, etc.
+export type UnavailabilityType = "annual_leave" | "sick_leave" | "personal_leave" | "training" | "unavailable" | "other";
+
+export const staffUnavailabilityPeriods = pgTable("staff_unavailability_periods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  
+  unavailabilityType: text("unavailability_type").$type<UnavailabilityType>().default("unavailable"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  
+  reason: text("reason"),
+  isAllDay: text("is_all_day").default("yes").$type<"yes" | "no">(),
+  
+  // Approval tracking
+  status: text("status").$type<"pending" | "approved" | "rejected">().default("approved"),
+  approvedById: varchar("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+  approvedByName: text("approved_by_name"),
+  approvedAt: timestamp("approved_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffUnavailabilityPeriodSchema = createInsertSchema(staffUnavailabilityPeriods, {
+  unavailabilityType: z.enum(["annual_leave", "sick_leave", "personal_leave", "training", "unavailable", "other"]).optional(),
+  isAllDay: z.enum(["yes", "no"]).optional(),
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffUnavailabilityPeriod = z.infer<typeof insertStaffUnavailabilityPeriodSchema>;
+export type StaffUnavailabilityPeriod = typeof staffUnavailabilityPeriods.$inferSelect;
+
+// Staff Status Logs - Real-time tracking of staff status
+export type StaffStatusType = "available" | "on_road" | "with_client" | "on_break" | "off_duty";
+
+export const staffStatusLogs = pgTable("staff_status_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  
+  status: text("status").$type<StaffStatusType>().notNull(),
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }),
+  
+  // Location at status change
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  
+  notes: text("notes"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStaffStatusLogSchema = createInsertSchema(staffStatusLogs, {
+  status: z.enum(["available", "on_road", "with_client", "on_break", "off_duty"]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStaffStatusLog = z.infer<typeof insertStaffStatusLogSchema>;
+export type StaffStatusLog = typeof staffStatusLogs.$inferSelect;
+
+// ============================================
+// CARE PLANS SYSTEM
+// ============================================
+
+// Care Plan Status
+export type CarePlanStatus = "draft" | "active" | "archived" | "superseded";
+
+// Care Plans - Versioned care plans per client
+export const carePlans = pgTable("care_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  
+  version: text("version").notNull().default("1"),
+  status: text("status").$type<CarePlanStatus>().default("draft"),
+  
+  // Summary
+  title: text("title").default("Care Plan"),
+  summary: text("summary"),
+  
+  // Review tracking
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
+  lastReviewedAt: timestamp("last_reviewed_at"),
+  lastReviewedById: varchar("last_reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+  lastReviewedByName: text("last_reviewed_by_name"),
+  nextReviewDue: date("next_review_due"),
+  reviewNotes: text("review_notes"),
+  
+  // Archive info
+  archivedAt: timestamp("archived_at"),
+  archivedById: varchar("archived_by_id").references(() => users.id, { onDelete: "set null" }),
+  archivedByName: text("archived_by_name"),
+  archiveReason: text("archive_reason"),
+  
+  // Links to previous/next versions
+  previousVersionId: varchar("previous_version_id"),
+  
+  // Audit
+  createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCarePlanSchema = createInsertSchema(carePlans, {
+  status: z.enum(["draft", "active", "archived", "superseded"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCarePlan = z.infer<typeof insertCarePlanSchema>;
+export type CarePlan = typeof carePlans.$inferSelect;
+
+// Care Plan Health Matters - Conditions, medications, allergies, care needs
+export type HealthMatterType = "condition" | "medication" | "allergy" | "care_need" | "equipment" | "other";
+
+export const carePlanHealthMatters = pgTable("care_plan_health_matters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  carePlanId: varchar("care_plan_id").notNull().references(() => carePlans.id, { onDelete: "cascade" }),
+  
+  type: text("type").$type<HealthMatterType>().notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  
+  // For medications
+  dosage: text("dosage"),
+  frequency: text("frequency"),
+  route: text("route"), // oral, topical, etc.
+  prescribedBy: text("prescribed_by"),
+  
+  // For allergies
+  severity: text("severity").$type<"mild" | "moderate" | "severe" | "life_threatening">(),
+  reaction: text("reaction"),
+  
+  // For care needs
+  frequency_of_care: text("frequency_of_care"),
+  instructions: text("instructions"),
+  
+  // General
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  notes: text("notes"),
+  
+  order: text("order").default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCarePlanHealthMatterSchema = createInsertSchema(carePlanHealthMatters, {
+  type: z.enum(["condition", "medication", "allergy", "care_need", "equipment", "other"]),
+  severity: z.enum(["mild", "moderate", "severe", "life_threatening"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCarePlanHealthMatter = z.infer<typeof insertCarePlanHealthMatterSchema>;
+export type CarePlanHealthMatter = typeof carePlanHealthMatters.$inferSelect;
+
+// Care Plan Diagnoses - Detailed diagnosis tracking
+export type DiagnosisSeverity = "mild" | "moderate" | "severe" | "critical";
+export type DiagnosisStatus = "active" | "resolved" | "managed" | "monitoring";
+
+export const carePlanDiagnoses = pgTable("care_plan_diagnoses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  carePlanId: varchar("care_plan_id").notNull().references(() => carePlans.id, { onDelete: "cascade" }),
+  
+  name: text("name").notNull(),
+  code: text("code"), // ICD-10 or similar code
+  description: text("description"),
+  
+  diagnosedDate: date("diagnosed_date"),
+  diagnosedBy: text("diagnosed_by"),
+  
+  severity: text("severity").$type<DiagnosisSeverity>(),
+  status: text("status").$type<DiagnosisStatus>().default("active"),
+  
+  treatmentPlan: text("treatment_plan"),
+  prognosis: text("prognosis"),
+  notes: text("notes"),
+  
+  isPrimary: text("is_primary").default("no").$type<"yes" | "no">(),
+  order: text("order").default("0"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCarePlanDiagnosisSchema = createInsertSchema(carePlanDiagnoses, {
+  severity: z.enum(["mild", "moderate", "severe", "critical"]).optional(),
+  status: z.enum(["active", "resolved", "managed", "monitoring"]).optional(),
+  isPrimary: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCarePlanDiagnosis = z.infer<typeof insertCarePlanDiagnosisSchema>;
+export type CarePlanDiagnosis = typeof carePlanDiagnoses.$inferSelect;
+
+// Care Plan Emergency Contacts and Procedures
+export const carePlanEmergencyContacts = pgTable("care_plan_emergency_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  carePlanId: varchar("care_plan_id").notNull().references(() => carePlans.id, { onDelete: "cascade" }),
+  
+  // Contact details
+  name: text("name").notNull(),
+  relationship: text("relationship"),
+  phoneNumber: text("phone_number"),
+  alternatePhone: text("alternate_phone"),
+  email: text("email"),
+  address: text("address"),
+  
+  // Role
+  isPrimaryContact: text("is_primary_contact").default("no").$type<"yes" | "no">(),
+  isNextOfKin: text("is_next_of_kin").default("no").$type<"yes" | "no">(),
+  hasPowerOfAttorney: text("has_power_of_attorney").default("no").$type<"yes" | "no">(),
+  isGuardian: text("is_guardian").default("no").$type<"yes" | "no">(),
+  
+  priority: text("priority").default("1"), // 1 = first to call
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCarePlanEmergencyContactSchema = createInsertSchema(carePlanEmergencyContacts, {
+  isPrimaryContact: z.enum(["yes", "no"]).optional(),
+  isNextOfKin: z.enum(["yes", "no"]).optional(),
+  hasPowerOfAttorney: z.enum(["yes", "no"]).optional(),
+  isGuardian: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCarePlanEmergencyContact = z.infer<typeof insertCarePlanEmergencyContactSchema>;
+export type CarePlanEmergencyContact = typeof carePlanEmergencyContacts.$inferSelect;
+
+// Care Plan Emergency Procedures
+export const carePlanEmergencyProcedures = pgTable("care_plan_emergency_procedures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  carePlanId: varchar("care_plan_id").notNull().references(() => carePlans.id, { onDelete: "cascade" }),
+  
+  title: text("title").notNull(),
+  scenario: text("scenario"), // What triggers this procedure
+  steps: text("steps").notNull(), // Step-by-step instructions
+  
+  // Hospital preferences
+  preferredHospital: text("preferred_hospital"),
+  hospitalAddress: text("hospital_address"),
+  hospitalPhone: text("hospital_phone"),
+  
+  // Advance care directives
+  hasAdvancedCareDirective: text("has_advanced_care_directive").default("no").$type<"yes" | "no">(),
+  advancedCareDirectiveType: text("advanced_care_directive_type").$type<"NFR" | "For Resus" | "Other">(),
+  advancedCareDirectiveNotes: text("advanced_care_directive_notes"),
+  
+  order: text("order").default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCarePlanEmergencyProcedureSchema = createInsertSchema(carePlanEmergencyProcedures, {
+  hasAdvancedCareDirective: z.enum(["yes", "no"]).optional(),
+  advancedCareDirectiveType: z.enum(["NFR", "For Resus", "Other"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCarePlanEmergencyProcedure = z.infer<typeof insertCarePlanEmergencyProcedureSchema>;
+export type CarePlanEmergencyProcedure = typeof carePlanEmergencyProcedures.$inferSelect;
+
+// ============================================
+// CUSTOMIZABLE FORMS SYSTEM
+// ============================================
+
+// Form Template Status
+export type FormTemplateStatus = "draft" | "active" | "archived";
+export type FormFieldType = "text" | "textarea" | "number" | "date" | "time" | "datetime" | "checkbox" | "radio" | "select" | "multiselect" | "signature" | "file" | "section_header" | "paragraph";
+export type FormSubmissionStatus = "draft" | "submitted" | "voided";
+
+// Form Templates - Reusable form definitions
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").$type<"consent" | "assessment" | "intake" | "review" | "incident" | "checklist" | "other">().default("other"),
+  
+  status: text("status").$type<FormTemplateStatus>().default("draft"),
+  version: text("version").default("1"),
+  
+  // Settings
+  requiresSignature: text("requires_signature").default("no").$type<"yes" | "no">(),
+  allowDraft: text("allow_draft").default("yes").$type<"yes" | "no">(),
+  
+  // Audit
+  createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFormTemplateSchema = createInsertSchema(formTemplates, {
+  category: z.enum(["consent", "assessment", "intake", "review", "incident", "checklist", "other"]).optional(),
+  status: z.enum(["draft", "active", "archived"]).optional(),
+  requiresSignature: z.enum(["yes", "no"]).optional(),
+  allowDraft: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+export type FormTemplate = typeof formTemplates.$inferSelect;
+
+// Form Template Fields - Field definitions within templates
+export const formTemplateFields = pgTable("form_template_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => formTemplates.id, { onDelete: "cascade" }),
+  
+  fieldKey: text("field_key").notNull(), // Unique key within template
+  label: text("label").notNull(),
+  description: text("description"),
+  placeholder: text("placeholder"),
+  
+  fieldType: text("field_type").$type<FormFieldType>().notNull(),
+  
+  // Validation
+  isRequired: text("is_required").default("no").$type<"yes" | "no">(),
+  minLength: text("min_length"),
+  maxLength: text("max_length"),
+  minValue: text("min_value"),
+  maxValue: text("max_value"),
+  pattern: text("pattern"), // Regex pattern
+  
+  // For select/radio/checkbox options
+  options: json("options").$type<{ value: string; label: string }[]>(),
+  
+  // For file uploads
+  acceptedFileTypes: text("accepted_file_types"), // e.g., ".pdf,.jpg,.png"
+  maxFileSize: text("max_file_size"), // in MB
+  
+  // Layout
+  section: text("section"),
+  order: text("order").default("0"),
+  width: text("width").$type<"full" | "half" | "third">().default("full"),
+  
+  // Conditional display
+  conditionalOn: text("conditional_on"), // fieldKey to depend on
+  conditionalValue: text("conditional_value"), // value that triggers display
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFormTemplateFieldSchema = createInsertSchema(formTemplateFields, {
+  fieldType: z.enum(["text", "textarea", "number", "date", "time", "datetime", "checkbox", "radio", "select", "multiselect", "signature", "file", "section_header", "paragraph"]),
+  isRequired: z.enum(["yes", "no"]).optional(),
+  width: z.enum(["full", "half", "third"]).optional(),
+  options: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFormTemplateField = z.infer<typeof insertFormTemplateFieldSchema>;
+export type FormTemplateField = typeof formTemplateFields.$inferSelect;
+
+// Form Submissions - Completed forms for clients
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => formTemplates.id, { onDelete: "restrict" }),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  
+  status: text("status").$type<FormSubmissionStatus>().default("draft"),
+  
+  // Submitter info
+  submittedById: varchar("submitted_by_id").references(() => users.id, { onDelete: "set null" }),
+  submittedByName: text("submitted_by_name"),
+  submittedAt: timestamp("submitted_at"),
+  
+  // Void info
+  voidedById: varchar("voided_by_id").references(() => users.id, { onDelete: "set null" }),
+  voidedByName: text("voided_by_name"),
+  voidedAt: timestamp("voided_at"),
+  voidReason: text("void_reason"),
+  
+  // Link to appointment if applicable
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions, {
+  status: z.enum(["draft", "submitted", "voided"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+// Form Submission Values - Field values for submissions
+export const formSubmissionValues = pgTable("form_submission_values", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  submissionId: varchar("submission_id").notNull().references(() => formSubmissions.id, { onDelete: "cascade" }),
+  fieldId: varchar("field_id").notNull().references(() => formTemplateFields.id, { onDelete: "cascade" }),
+  
+  // Value stored as JSON to support all field types
+  value: json("value").$type<unknown>(),
+  
+  // For file uploads
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFormSubmissionValueSchema = createInsertSchema(formSubmissionValues, {
+  value: z.unknown().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFormSubmissionValue = z.infer<typeof insertFormSubmissionValueSchema>;
+export type FormSubmissionValue = typeof formSubmissionValues.$inferSelect;
+
+// Form Signatures - Digital signatures for submissions
+export const formSignatures = pgTable("form_signatures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  submissionId: varchar("submission_id").notNull().references(() => formSubmissions.id, { onDelete: "cascade" }),
+  
+  // Signer info
+  signerName: text("signer_name").notNull(),
+  signerRole: text("signer_role"), // e.g., "Client", "Guardian", "Witness", "Staff"
+  signerRelationship: text("signer_relationship"), // e.g., "Self", "Parent", "Legal Guardian"
+  
+  // Signature data
+  signatureData: text("signature_data"), // Base64 encoded image or SVG path
+  signatureUrl: text("signature_url"), // URL if stored as file
+  
+  // Verification
+  signedAt: timestamp("signed_at").notNull().defaultNow(),
+  ipAddress: text("ip_address"),
+  
+  // Hash for tamper detection
+  signatureHash: text("signature_hash"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFormSignatureSchema = createInsertSchema(formSignatures).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFormSignature = z.infer<typeof insertFormSignatureSchema>;
+export type FormSignature = typeof formSignatures.$inferSelect;
+
+// Appointment Type Required Forms - Link form templates to appointment types
+export const appointmentTypeRequiredForms = pgTable("appointment_type_required_forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  appointmentType: text("appointment_type").$type<AppointmentType>().notNull(),
+  templateId: varchar("template_id").notNull().references(() => formTemplates.id, { onDelete: "cascade" }),
+  
+  timing: text("timing").$type<"before" | "during" | "after">().default("during"),
+  isRequired: text("is_required").default("yes").$type<"yes" | "no">(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAppointmentTypeRequiredFormSchema = createInsertSchema(appointmentTypeRequiredForms, {
+  appointmentType: z.enum(["home_visit", "community_access", "transport", "nursing", "assessment", "review", "other"]),
+  timing: z.enum(["before", "during", "after"]).optional(),
+  isRequired: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAppointmentTypeRequiredForm = z.infer<typeof insertAppointmentTypeRequiredFormSchema>;
+export type AppointmentTypeRequiredForm = typeof appointmentTypeRequiredForms.$inferSelect;

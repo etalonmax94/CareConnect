@@ -31,10 +31,39 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 - **Privacy & Compliance**: Tracks privacy consent, maintains activity audit logs, and enforces data retention.
 
 ### System Design Choices
-- **Database Schema**: PostgreSQL with Drizzle ORM, including tables for clients, goals, notes, incidents, documents, staff assignments, service deliveries, budgets, invoices, quotes, and NDIS price guide items.
+- **Database Schema**: PostgreSQL with Drizzle ORM, including tables for clients, goals, notes, incidents, documents, staff assignments, service deliveries, budgets, invoices, quotes, NDIS price guide items, appointments, care plans, and customizable forms.
 - **API Integration**: Express.js backend with React Query frontend for data fetching and caching, using Zod schemas for validation.
 - **Date Handling**: Robust date formatting and validation, supporting over 40 compliance form dates.
 - **Distance Calculation**: Uses the Haversine formula for distance calculations.
+
+### New Feature Expansions (November 2025)
+
+#### Appointments & Scheduling System
+- **Appointments Table**: Full scheduling with status tracking (Scheduled, In Progress, Completed, Cancelled, Missed), recurrence patterns (RRULE format), travel buffers, and location support.
+- **Appointment Assignments**: Multi-staff assignment with roles (Primary, Secondary, Shadow), acceptance workflow (Pending, Accepted, Declined, Reassigned), and notification tracking.
+- **Check-in/Check-out**: GPS-enabled location verification with timestamp tracking for accountability.
+- **API Endpoints**: Full CRUD for appointments, assignments, and check-ins with date range queries.
+
+#### Staff Allocation & Team Tracking
+- **Client-Staff Preferences**: Three-tier preference system (Primary, Secondary, Backup) with notes, service type specificity, and effective dates.
+- **Staff Restrictions (Blacklist)**: Time-bounded restrictions with reasons, created-by tracking, and active/inactive status.
+- **Availability Windows**: Weekly recurring availability slots per staff member with service location preferences.
+- **Unavailability Periods**: Leave/holiday tracking with status (Pending, Approved, Rejected) and approval workflow.
+- **Staff Status Logs**: Real-time status tracking (Available, On Shift, Break, Travel, Unavailable, Off Duty) with GPS location.
+
+#### Versioned Care Plans
+- **Care Plans**: Immutable versioning system with status (Draft, Active, Archived), version numbers, and full audit trail.
+- **Health Matters**: Categorized health information (Medical Condition, Allergy, Medication, etc.) with management instructions.
+- **Diagnoses**: Primary/secondary diagnosis tracking with severity, status, onset dates, and ICD-10 codes.
+- **Emergency Contacts**: Priority-ordered contacts with relationship, availability windows, and notification preferences.
+- **Emergency Procedures**: Step-by-step emergency protocols with scenarios and review dates.
+
+#### Customizable Forms System
+- **Form Templates**: Category-based templates (Intake, Assessment, Care Plan, Incident, Progress Note, Consent, Custom) with versioning and active/draft/archived status.
+- **Dynamic Fields**: 12 field types (Text, Textarea, Number, Date, Time, Checkbox, Radio, Select, Multi-select, Signature, File Upload, Section Header) with validation rules, conditional logic, and placeholder support.
+- **Form Submissions**: Complete submission tracking with status (Draft, Submitted, Under Review, Approved, Rejected) and locked state for signed forms.
+- **Digital Signatures**: Tamper-proof signatures with SHA-256 integrity hash, IP address, and signature role tracking.
+- **Appointment-Form Linking**: Required forms configuration per appointment type.
 
 ## Developer Access (Development Only)
 In development mode (`NODE_ENV=development`), a "Developer Access" panel appears on the login page below the Zoho login button. This allows developers to:

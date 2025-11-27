@@ -9,6 +9,14 @@ import {
   insertGPSchema, insertPharmacySchema, insertAlliedHealthProfessionalSchema, insertDocumentSchema, insertClientStaffAssignmentSchema,
   insertServiceDeliverySchema, insertClientGoalSchema,
   insertClientContactSchema, insertClientBehaviorSchema, insertLeadershipMeetingNoteSchema,
+  // New schemas for scheduling and care plans
+  insertAppointmentSchema, insertAppointmentAssignmentSchema, insertAppointmentCheckinSchema,
+  insertClientStaffPreferenceSchema, insertClientStaffRestrictionSchema,
+  insertStaffAvailabilityWindowSchema, insertStaffUnavailabilityPeriodSchema, insertStaffStatusLogSchema,
+  insertCarePlanSchema, insertCarePlanHealthMatterSchema, insertCarePlanDiagnosisSchema,
+  insertCarePlanEmergencyContactSchema, insertCarePlanEmergencyProcedureSchema,
+  insertFormTemplateSchema, insertFormTemplateFieldSchema, insertFormSubmissionSchema,
+  insertFormSubmissionValueSchema, insertFormSignatureSchema, insertAppointmentTypeRequiredFormSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -4440,6 +4448,1241 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting meeting note:", error);
       res.status(500).json({ error: "Failed to delete meeting note" });
+    }
+  });
+
+  // ==================== APPOINTMENTS ROUTES ====================
+
+  // Get all appointments
+  app.get("/api/appointments", async (req, res) => {
+    try {
+      const appointments = await storage.getAllAppointments();
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
+
+  // Get upcoming appointments
+  app.get("/api/appointments/upcoming", async (req, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days as string) : 7;
+      const appointments = await storage.getUpcomingAppointments(days);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching upcoming appointments:", error);
+      res.status(500).json({ error: "Failed to fetch upcoming appointments" });
+    }
+  });
+
+  // Get appointments by date range
+  app.get("/api/appointments/range", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      const appointments = await storage.getAppointmentsByDateRange(
+        new Date(startDate as string),
+        new Date(endDate as string)
+      );
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching appointments by date range:", error);
+      res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
+
+  // Get appointment by ID
+  app.get("/api/appointments/:id", async (req, res) => {
+    try {
+      const appointment = await storage.getAppointmentById(req.params.id);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      res.json(appointment);
+    } catch (error) {
+      console.error("Error fetching appointment:", error);
+      res.status(500).json({ error: "Failed to fetch appointment" });
+    }
+  });
+
+  // Get appointments by client
+  app.get("/api/clients/:clientId/appointments", async (req, res) => {
+    try {
+      const appointments = await storage.getAppointmentsByClient(req.params.clientId);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching client appointments:", error);
+      res.status(500).json({ error: "Failed to fetch client appointments" });
+    }
+  });
+
+  // Get appointments by staff
+  app.get("/api/staff/:staffId/appointments", async (req, res) => {
+    try {
+      const appointments = await storage.getAppointmentsByStaff(req.params.staffId);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching staff appointments:", error);
+      res.status(500).json({ error: "Failed to fetch staff appointments" });
+    }
+  });
+
+  // Create appointment
+  app.post("/api/appointments", async (req, res) => {
+    try {
+      const validationResult = insertAppointmentSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const appointment = await storage.createAppointment(validationResult.data);
+      res.status(201).json(appointment);
+    } catch (error) {
+      console.error("Error creating appointment:", error);
+      res.status(500).json({ error: "Failed to create appointment" });
+    }
+  });
+
+  // Update appointment
+  app.patch("/api/appointments/:id", async (req, res) => {
+    try {
+      const appointment = await storage.updateAppointment(req.params.id, req.body);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      res.json(appointment);
+    } catch (error) {
+      console.error("Error updating appointment:", error);
+      res.status(500).json({ error: "Failed to update appointment" });
+    }
+  });
+
+  // Delete appointment
+  app.delete("/api/appointments/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAppointment(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      res.status(500).json({ error: "Failed to delete appointment" });
+    }
+  });
+
+  // ==================== APPOINTMENT ASSIGNMENTS ROUTES ====================
+
+  // Get assignments by appointment
+  app.get("/api/appointments/:appointmentId/assignments", async (req, res) => {
+    try {
+      const assignments = await storage.getAssignmentsByAppointment(req.params.appointmentId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching appointment assignments:", error);
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  // Get appointments assignments by staff
+  app.get("/api/staff/:staffId/appointment-assignments", async (req, res) => {
+    try {
+      const assignments = await storage.getAppointmentAssignmentsByStaff(req.params.staffId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching staff appointment assignments:", error);
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  // Create appointment assignment
+  app.post("/api/appointments/:appointmentId/assignments", async (req, res) => {
+    try {
+      const validationResult = insertAppointmentAssignmentSchema.safeParse({
+        ...req.body,
+        appointmentId: req.params.appointmentId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const assignment = await storage.createAppointmentAssignment(validationResult.data);
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating appointment assignment:", error);
+      res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  // Update appointment assignment
+  app.patch("/api/appointment-assignments/:id", async (req, res) => {
+    try {
+      const assignment = await storage.updateAppointmentAssignment(req.params.id, req.body);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error updating appointment assignment:", error);
+      res.status(500).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  // Delete appointment assignment
+  app.delete("/api/appointment-assignments/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAppointmentAssignment(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting appointment assignment:", error);
+      res.status(500).json({ error: "Failed to delete assignment" });
+    }
+  });
+
+  // ==================== APPOINTMENT CHECK-INS ROUTES ====================
+
+  // Get check-ins by appointment
+  app.get("/api/appointments/:appointmentId/checkins", async (req, res) => {
+    try {
+      const checkins = await storage.getCheckinsByAppointment(req.params.appointmentId);
+      res.json(checkins);
+    } catch (error) {
+      console.error("Error fetching appointment check-ins:", error);
+      res.status(500).json({ error: "Failed to fetch check-ins" });
+    }
+  });
+
+  // Create appointment check-in
+  app.post("/api/appointments/:appointmentId/checkins", async (req, res) => {
+    try {
+      const validationResult = insertAppointmentCheckinSchema.safeParse({
+        ...req.body,
+        appointmentId: req.params.appointmentId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const checkin = await storage.createAppointmentCheckin(validationResult.data);
+      res.status(201).json(checkin);
+    } catch (error) {
+      console.error("Error creating appointment check-in:", error);
+      res.status(500).json({ error: "Failed to create check-in" });
+    }
+  });
+
+  // ==================== CLIENT STAFF PREFERENCES ROUTES ====================
+
+  // Get preferences by client
+  app.get("/api/clients/:clientId/staff-preferences", async (req, res) => {
+    try {
+      const preferences = await storage.getPreferencesByClient(req.params.clientId);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error fetching client staff preferences:", error);
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  // Get preferences by staff
+  app.get("/api/staff/:staffId/client-preferences", async (req, res) => {
+    try {
+      const preferences = await storage.getPreferencesByStaff(req.params.staffId);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error fetching staff client preferences:", error);
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  // Create staff preference
+  app.post("/api/clients/:clientId/staff-preferences", async (req, res) => {
+    try {
+      const validationResult = insertClientStaffPreferenceSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const preference = await storage.createStaffPreference(validationResult.data);
+      res.status(201).json(preference);
+    } catch (error) {
+      console.error("Error creating staff preference:", error);
+      res.status(500).json({ error: "Failed to create preference" });
+    }
+  });
+
+  // Update staff preference
+  app.patch("/api/staff-preferences/:id", async (req, res) => {
+    try {
+      const preference = await storage.updateStaffPreference(req.params.id, req.body);
+      if (!preference) {
+        return res.status(404).json({ error: "Preference not found" });
+      }
+      res.json(preference);
+    } catch (error) {
+      console.error("Error updating staff preference:", error);
+      res.status(500).json({ error: "Failed to update preference" });
+    }
+  });
+
+  // Delete staff preference
+  app.delete("/api/staff-preferences/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteStaffPreference(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Preference not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting staff preference:", error);
+      res.status(500).json({ error: "Failed to delete preference" });
+    }
+  });
+
+  // ==================== CLIENT STAFF RESTRICTIONS (BLACKLIST) ROUTES ====================
+
+  // Get restrictions by client
+  app.get("/api/clients/:clientId/staff-restrictions", async (req, res) => {
+    try {
+      const restrictions = await storage.getRestrictionsByClient(req.params.clientId);
+      res.json(restrictions);
+    } catch (error) {
+      console.error("Error fetching client staff restrictions:", error);
+      res.status(500).json({ error: "Failed to fetch restrictions" });
+    }
+  });
+
+  // Get restrictions by staff
+  app.get("/api/staff/:staffId/client-restrictions", async (req, res) => {
+    try {
+      const restrictions = await storage.getRestrictionsByStaff(req.params.staffId);
+      res.json(restrictions);
+    } catch (error) {
+      console.error("Error fetching staff client restrictions:", error);
+      res.status(500).json({ error: "Failed to fetch restrictions" });
+    }
+  });
+
+  // Check if staff is restricted for client
+  app.get("/api/clients/:clientId/staff/:staffId/is-restricted", async (req, res) => {
+    try {
+      const isRestricted = await storage.isStaffRestricted(req.params.clientId, req.params.staffId);
+      res.json({ isRestricted });
+    } catch (error) {
+      console.error("Error checking staff restriction:", error);
+      res.status(500).json({ error: "Failed to check restriction" });
+    }
+  });
+
+  // Create staff restriction
+  app.post("/api/clients/:clientId/staff-restrictions", async (req, res) => {
+    try {
+      const validationResult = insertClientStaffRestrictionSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const restriction = await storage.createStaffRestriction(validationResult.data);
+      res.status(201).json(restriction);
+    } catch (error) {
+      console.error("Error creating staff restriction:", error);
+      res.status(500).json({ error: "Failed to create restriction" });
+    }
+  });
+
+  // Update staff restriction
+  app.patch("/api/staff-restrictions/:id", async (req, res) => {
+    try {
+      const restriction = await storage.updateStaffRestriction(req.params.id, req.body);
+      if (!restriction) {
+        return res.status(404).json({ error: "Restriction not found" });
+      }
+      res.json(restriction);
+    } catch (error) {
+      console.error("Error updating staff restriction:", error);
+      res.status(500).json({ error: "Failed to update restriction" });
+    }
+  });
+
+  // Delete staff restriction
+  app.delete("/api/staff-restrictions/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteStaffRestriction(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Restriction not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting staff restriction:", error);
+      res.status(500).json({ error: "Failed to delete restriction" });
+    }
+  });
+
+  // ==================== STAFF AVAILABILITY ROUTES ====================
+
+  // Get availability by staff
+  app.get("/api/staff/:staffId/availability", async (req, res) => {
+    try {
+      const availability = await storage.getAvailabilityByStaff(req.params.staffId);
+      res.json(availability);
+    } catch (error) {
+      console.error("Error fetching staff availability:", error);
+      res.status(500).json({ error: "Failed to fetch availability" });
+    }
+  });
+
+  // Create availability window
+  app.post("/api/staff/:staffId/availability", async (req, res) => {
+    try {
+      const validationResult = insertStaffAvailabilityWindowSchema.safeParse({
+        ...req.body,
+        staffId: req.params.staffId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const window = await storage.createAvailabilityWindow(validationResult.data);
+      res.status(201).json(window);
+    } catch (error) {
+      console.error("Error creating availability window:", error);
+      res.status(500).json({ error: "Failed to create availability window" });
+    }
+  });
+
+  // Update availability window
+  app.patch("/api/availability-windows/:id", async (req, res) => {
+    try {
+      const window = await storage.updateAvailabilityWindow(req.params.id, req.body);
+      if (!window) {
+        return res.status(404).json({ error: "Availability window not found" });
+      }
+      res.json(window);
+    } catch (error) {
+      console.error("Error updating availability window:", error);
+      res.status(500).json({ error: "Failed to update availability window" });
+    }
+  });
+
+  // Delete availability window
+  app.delete("/api/availability-windows/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAvailabilityWindow(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Availability window not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting availability window:", error);
+      res.status(500).json({ error: "Failed to delete availability window" });
+    }
+  });
+
+  // ==================== STAFF UNAVAILABILITY ROUTES ====================
+
+  // Get unavailability by staff
+  app.get("/api/staff/:staffId/unavailability", async (req, res) => {
+    try {
+      const unavailability = await storage.getUnavailabilityByStaff(req.params.staffId);
+      res.json(unavailability);
+    } catch (error) {
+      console.error("Error fetching staff unavailability:", error);
+      res.status(500).json({ error: "Failed to fetch unavailability" });
+    }
+  });
+
+  // Get unavailability by date range
+  app.get("/api/unavailability/range", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      const unavailability = await storage.getUnavailabilityByDateRange(
+        new Date(startDate as string),
+        new Date(endDate as string)
+      );
+      res.json(unavailability);
+    } catch (error) {
+      console.error("Error fetching unavailability by date range:", error);
+      res.status(500).json({ error: "Failed to fetch unavailability" });
+    }
+  });
+
+  // Create unavailability period
+  app.post("/api/staff/:staffId/unavailability", async (req, res) => {
+    try {
+      const validationResult = insertStaffUnavailabilityPeriodSchema.safeParse({
+        ...req.body,
+        staffId: req.params.staffId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const period = await storage.createUnavailabilityPeriod(validationResult.data);
+      res.status(201).json(period);
+    } catch (error) {
+      console.error("Error creating unavailability period:", error);
+      res.status(500).json({ error: "Failed to create unavailability period" });
+    }
+  });
+
+  // Update unavailability period
+  app.patch("/api/unavailability-periods/:id", async (req, res) => {
+    try {
+      const period = await storage.updateUnavailabilityPeriod(req.params.id, req.body);
+      if (!period) {
+        return res.status(404).json({ error: "Unavailability period not found" });
+      }
+      res.json(period);
+    } catch (error) {
+      console.error("Error updating unavailability period:", error);
+      res.status(500).json({ error: "Failed to update unavailability period" });
+    }
+  });
+
+  // Delete unavailability period
+  app.delete("/api/unavailability-periods/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteUnavailabilityPeriod(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Unavailability period not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting unavailability period:", error);
+      res.status(500).json({ error: "Failed to delete unavailability period" });
+    }
+  });
+
+  // ==================== STAFF STATUS LOGS ROUTES ====================
+
+  // Get current status for all staff
+  app.get("/api/staff-statuses", async (req, res) => {
+    try {
+      const statuses = await storage.getAllCurrentStaffStatuses();
+      res.json(statuses);
+    } catch (error) {
+      console.error("Error fetching staff statuses:", error);
+      res.status(500).json({ error: "Failed to fetch staff statuses" });
+    }
+  });
+
+  // Get current status for staff
+  app.get("/api/staff/:staffId/status", async (req, res) => {
+    try {
+      const status = await storage.getCurrentStaffStatus(req.params.staffId);
+      res.json(status || null);
+    } catch (error) {
+      console.error("Error fetching staff status:", error);
+      res.status(500).json({ error: "Failed to fetch staff status" });
+    }
+  });
+
+  // Get status history for staff
+  app.get("/api/staff/:staffId/status-history", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const history = await storage.getStaffStatusHistory(req.params.staffId, limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching staff status history:", error);
+      res.status(500).json({ error: "Failed to fetch status history" });
+    }
+  });
+
+  // Create staff status log (check in/out)
+  app.post("/api/staff/:staffId/status", async (req, res) => {
+    try {
+      const validationResult = insertStaffStatusLogSchema.safeParse({
+        ...req.body,
+        staffId: req.params.staffId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const log = await storage.createStaffStatusLog(validationResult.data);
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("Error creating staff status log:", error);
+      res.status(500).json({ error: "Failed to create status log" });
+    }
+  });
+
+  // ==================== CARE PLANS ROUTES ====================
+
+  // Get care plans by client
+  app.get("/api/clients/:clientId/care-plans", async (req, res) => {
+    try {
+      const carePlans = await storage.getCarePlansByClient(req.params.clientId);
+      res.json(carePlans);
+    } catch (error) {
+      console.error("Error fetching care plans:", error);
+      res.status(500).json({ error: "Failed to fetch care plans" });
+    }
+  });
+
+  // Get active care plan by client
+  app.get("/api/clients/:clientId/care-plans/active", async (req, res) => {
+    try {
+      const carePlan = await storage.getActiveCarePlanByClient(req.params.clientId);
+      res.json(carePlan || null);
+    } catch (error) {
+      console.error("Error fetching active care plan:", error);
+      res.status(500).json({ error: "Failed to fetch active care plan" });
+    }
+  });
+
+  // Get care plan by ID
+  app.get("/api/care-plans/:id", async (req, res) => {
+    try {
+      const carePlan = await storage.getCarePlanById(req.params.id);
+      if (!carePlan) {
+        return res.status(404).json({ error: "Care plan not found" });
+      }
+      res.json(carePlan);
+    } catch (error) {
+      console.error("Error fetching care plan:", error);
+      res.status(500).json({ error: "Failed to fetch care plan" });
+    }
+  });
+
+  // Create care plan
+  app.post("/api/clients/:clientId/care-plans", async (req, res) => {
+    try {
+      const validationResult = insertCarePlanSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const carePlan = await storage.createCarePlan(validationResult.data);
+      res.status(201).json(carePlan);
+    } catch (error) {
+      console.error("Error creating care plan:", error);
+      res.status(500).json({ error: "Failed to create care plan" });
+    }
+  });
+
+  // Update care plan
+  app.patch("/api/care-plans/:id", async (req, res) => {
+    try {
+      const carePlan = await storage.updateCarePlan(req.params.id, req.body);
+      if (!carePlan) {
+        return res.status(404).json({ error: "Care plan not found" });
+      }
+      res.json(carePlan);
+    } catch (error) {
+      console.error("Error updating care plan:", error);
+      res.status(500).json({ error: "Failed to update care plan" });
+    }
+  });
+
+  // Archive care plan
+  app.post("/api/care-plans/:id/archive", async (req, res) => {
+    try {
+      const { userId, userName, reason } = req.body;
+      if (!userId || !userName) {
+        return res.status(400).json({ error: "userId and userName are required" });
+      }
+      const carePlan = await storage.archiveCarePlan(req.params.id, userId, userName, reason);
+      if (!carePlan) {
+        return res.status(404).json({ error: "Care plan not found" });
+      }
+      res.json(carePlan);
+    } catch (error) {
+      console.error("Error archiving care plan:", error);
+      res.status(500).json({ error: "Failed to archive care plan" });
+    }
+  });
+
+  // ==================== CARE PLAN HEALTH MATTERS ROUTES ====================
+
+  // Get health matters by care plan
+  app.get("/api/care-plans/:carePlanId/health-matters", async (req, res) => {
+    try {
+      const healthMatters = await storage.getHealthMattersByCarePlan(req.params.carePlanId);
+      res.json(healthMatters);
+    } catch (error) {
+      console.error("Error fetching health matters:", error);
+      res.status(500).json({ error: "Failed to fetch health matters" });
+    }
+  });
+
+  // Create health matter
+  app.post("/api/care-plans/:carePlanId/health-matters", async (req, res) => {
+    try {
+      const validationResult = insertCarePlanHealthMatterSchema.safeParse({
+        ...req.body,
+        carePlanId: req.params.carePlanId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const healthMatter = await storage.createHealthMatter(validationResult.data);
+      res.status(201).json(healthMatter);
+    } catch (error) {
+      console.error("Error creating health matter:", error);
+      res.status(500).json({ error: "Failed to create health matter" });
+    }
+  });
+
+  // Update health matter
+  app.patch("/api/health-matters/:id", async (req, res) => {
+    try {
+      const healthMatter = await storage.updateHealthMatter(req.params.id, req.body);
+      if (!healthMatter) {
+        return res.status(404).json({ error: "Health matter not found" });
+      }
+      res.json(healthMatter);
+    } catch (error) {
+      console.error("Error updating health matter:", error);
+      res.status(500).json({ error: "Failed to update health matter" });
+    }
+  });
+
+  // Delete health matter
+  app.delete("/api/health-matters/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteHealthMatter(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Health matter not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting health matter:", error);
+      res.status(500).json({ error: "Failed to delete health matter" });
+    }
+  });
+
+  // ==================== CARE PLAN DIAGNOSES ROUTES ====================
+
+  // Get diagnoses by care plan
+  app.get("/api/care-plans/:carePlanId/diagnoses", async (req, res) => {
+    try {
+      const diagnoses = await storage.getDiagnosesByCarePlan(req.params.carePlanId);
+      res.json(diagnoses);
+    } catch (error) {
+      console.error("Error fetching diagnoses:", error);
+      res.status(500).json({ error: "Failed to fetch diagnoses" });
+    }
+  });
+
+  // Create diagnosis
+  app.post("/api/care-plans/:carePlanId/diagnoses", async (req, res) => {
+    try {
+      const validationResult = insertCarePlanDiagnosisSchema.safeParse({
+        ...req.body,
+        carePlanId: req.params.carePlanId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const diagnosis = await storage.createCarePlanDiagnosis(validationResult.data);
+      res.status(201).json(diagnosis);
+    } catch (error) {
+      console.error("Error creating diagnosis:", error);
+      res.status(500).json({ error: "Failed to create diagnosis" });
+    }
+  });
+
+  // Update diagnosis
+  app.patch("/api/care-plan-diagnoses/:id", async (req, res) => {
+    try {
+      const diagnosis = await storage.updateCarePlanDiagnosis(req.params.id, req.body);
+      if (!diagnosis) {
+        return res.status(404).json({ error: "Diagnosis not found" });
+      }
+      res.json(diagnosis);
+    } catch (error) {
+      console.error("Error updating diagnosis:", error);
+      res.status(500).json({ error: "Failed to update diagnosis" });
+    }
+  });
+
+  // Delete diagnosis
+  app.delete("/api/care-plan-diagnoses/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCarePlanDiagnosis(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Diagnosis not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting diagnosis:", error);
+      res.status(500).json({ error: "Failed to delete diagnosis" });
+    }
+  });
+
+  // ==================== CARE PLAN EMERGENCY CONTACTS ROUTES ====================
+
+  // Get emergency contacts by care plan
+  app.get("/api/care-plans/:carePlanId/emergency-contacts", async (req, res) => {
+    try {
+      const contacts = await storage.getEmergencyContactsByCarePlan(req.params.carePlanId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching emergency contacts:", error);
+      res.status(500).json({ error: "Failed to fetch emergency contacts" });
+    }
+  });
+
+  // Create emergency contact
+  app.post("/api/care-plans/:carePlanId/emergency-contacts", async (req, res) => {
+    try {
+      const validationResult = insertCarePlanEmergencyContactSchema.safeParse({
+        ...req.body,
+        carePlanId: req.params.carePlanId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const contact = await storage.createCarePlanEmergencyContact(validationResult.data);
+      res.status(201).json(contact);
+    } catch (error) {
+      console.error("Error creating emergency contact:", error);
+      res.status(500).json({ error: "Failed to create emergency contact" });
+    }
+  });
+
+  // Update emergency contact
+  app.patch("/api/care-plan-emergency-contacts/:id", async (req, res) => {
+    try {
+      const contact = await storage.updateCarePlanEmergencyContact(req.params.id, req.body);
+      if (!contact) {
+        return res.status(404).json({ error: "Emergency contact not found" });
+      }
+      res.json(contact);
+    } catch (error) {
+      console.error("Error updating emergency contact:", error);
+      res.status(500).json({ error: "Failed to update emergency contact" });
+    }
+  });
+
+  // Delete emergency contact
+  app.delete("/api/care-plan-emergency-contacts/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCarePlanEmergencyContact(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Emergency contact not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting emergency contact:", error);
+      res.status(500).json({ error: "Failed to delete emergency contact" });
+    }
+  });
+
+  // ==================== CARE PLAN EMERGENCY PROCEDURES ROUTES ====================
+
+  // Get emergency procedures by care plan
+  app.get("/api/care-plans/:carePlanId/emergency-procedures", async (req, res) => {
+    try {
+      const procedures = await storage.getEmergencyProceduresByCarePlan(req.params.carePlanId);
+      res.json(procedures);
+    } catch (error) {
+      console.error("Error fetching emergency procedures:", error);
+      res.status(500).json({ error: "Failed to fetch emergency procedures" });
+    }
+  });
+
+  // Create emergency procedure
+  app.post("/api/care-plans/:carePlanId/emergency-procedures", async (req, res) => {
+    try {
+      const validationResult = insertCarePlanEmergencyProcedureSchema.safeParse({
+        ...req.body,
+        carePlanId: req.params.carePlanId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const procedure = await storage.createCarePlanEmergencyProcedure(validationResult.data);
+      res.status(201).json(procedure);
+    } catch (error) {
+      console.error("Error creating emergency procedure:", error);
+      res.status(500).json({ error: "Failed to create emergency procedure" });
+    }
+  });
+
+  // Update emergency procedure
+  app.patch("/api/care-plan-emergency-procedures/:id", async (req, res) => {
+    try {
+      const procedure = await storage.updateCarePlanEmergencyProcedure(req.params.id, req.body);
+      if (!procedure) {
+        return res.status(404).json({ error: "Emergency procedure not found" });
+      }
+      res.json(procedure);
+    } catch (error) {
+      console.error("Error updating emergency procedure:", error);
+      res.status(500).json({ error: "Failed to update emergency procedure" });
+    }
+  });
+
+  // Delete emergency procedure
+  app.delete("/api/care-plan-emergency-procedures/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCarePlanEmergencyProcedure(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Emergency procedure not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting emergency procedure:", error);
+      res.status(500).json({ error: "Failed to delete emergency procedure" });
+    }
+  });
+
+  // ==================== FORM TEMPLATES ROUTES ====================
+
+  // Get all form templates
+  app.get("/api/form-templates", async (req, res) => {
+    try {
+      const templates = await storage.getAllFormTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching form templates:", error);
+      res.status(500).json({ error: "Failed to fetch form templates" });
+    }
+  });
+
+  // Get active form templates
+  app.get("/api/form-templates/active", async (req, res) => {
+    try {
+      const templates = await storage.getActiveFormTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching active form templates:", error);
+      res.status(500).json({ error: "Failed to fetch active form templates" });
+    }
+  });
+
+  // Get form templates by category
+  app.get("/api/form-templates/category/:category", async (req, res) => {
+    try {
+      const templates = await storage.getFormTemplatesByCategory(req.params.category);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching form templates by category:", error);
+      res.status(500).json({ error: "Failed to fetch form templates" });
+    }
+  });
+
+  // Get form template by ID
+  app.get("/api/form-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getFormTemplateById(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Form template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching form template:", error);
+      res.status(500).json({ error: "Failed to fetch form template" });
+    }
+  });
+
+  // Create form template
+  app.post("/api/form-templates", async (req, res) => {
+    try {
+      const validationResult = insertFormTemplateSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const template = await storage.createFormTemplate(validationResult.data);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating form template:", error);
+      res.status(500).json({ error: "Failed to create form template" });
+    }
+  });
+
+  // Update form template
+  app.patch("/api/form-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.updateFormTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Form template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating form template:", error);
+      res.status(500).json({ error: "Failed to update form template" });
+    }
+  });
+
+  // Delete form template
+  app.delete("/api/form-templates/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteFormTemplate(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Form template not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting form template:", error);
+      res.status(500).json({ error: "Failed to delete form template" });
+    }
+  });
+
+  // ==================== FORM TEMPLATE FIELDS ROUTES ====================
+
+  // Get fields by template
+  app.get("/api/form-templates/:templateId/fields", async (req, res) => {
+    try {
+      const fields = await storage.getFieldsByTemplate(req.params.templateId);
+      res.json(fields);
+    } catch (error) {
+      console.error("Error fetching template fields:", error);
+      res.status(500).json({ error: "Failed to fetch template fields" });
+    }
+  });
+
+  // Create template field
+  app.post("/api/form-templates/:templateId/fields", async (req, res) => {
+    try {
+      const validationResult = insertFormTemplateFieldSchema.safeParse({
+        ...req.body,
+        templateId: req.params.templateId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const field = await storage.createTemplateField(validationResult.data);
+      res.status(201).json(field);
+    } catch (error) {
+      console.error("Error creating template field:", error);
+      res.status(500).json({ error: "Failed to create template field" });
+    }
+  });
+
+  // Update template field
+  app.patch("/api/template-fields/:id", async (req, res) => {
+    try {
+      const field = await storage.updateTemplateField(req.params.id, req.body);
+      if (!field) {
+        return res.status(404).json({ error: "Template field not found" });
+      }
+      res.json(field);
+    } catch (error) {
+      console.error("Error updating template field:", error);
+      res.status(500).json({ error: "Failed to update template field" });
+    }
+  });
+
+  // Delete template field
+  app.delete("/api/template-fields/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteTemplateField(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Template field not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting template field:", error);
+      res.status(500).json({ error: "Failed to delete template field" });
+    }
+  });
+
+  // Delete all fields by template
+  app.delete("/api/form-templates/:templateId/fields", async (req, res) => {
+    try {
+      await storage.deleteFieldsByTemplate(req.params.templateId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting template fields:", error);
+      res.status(500).json({ error: "Failed to delete template fields" });
+    }
+  });
+
+  // ==================== FORM SUBMISSIONS ROUTES ====================
+
+  // Get submissions by client
+  app.get("/api/clients/:clientId/form-submissions", async (req, res) => {
+    try {
+      const submissions = await storage.getSubmissionsByClient(req.params.clientId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching form submissions:", error);
+      res.status(500).json({ error: "Failed to fetch form submissions" });
+    }
+  });
+
+  // Get submissions by template
+  app.get("/api/form-templates/:templateId/submissions", async (req, res) => {
+    try {
+      const submissions = await storage.getSubmissionsByTemplate(req.params.templateId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching form submissions:", error);
+      res.status(500).json({ error: "Failed to fetch form submissions" });
+    }
+  });
+
+  // Get submission by ID
+  app.get("/api/form-submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.getSubmissionById(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: "Form submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      console.error("Error fetching form submission:", error);
+      res.status(500).json({ error: "Failed to fetch form submission" });
+    }
+  });
+
+  // Create form submission
+  app.post("/api/form-submissions", async (req, res) => {
+    try {
+      const validationResult = insertFormSubmissionSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const submission = await storage.createFormSubmission(validationResult.data);
+      res.status(201).json(submission);
+    } catch (error) {
+      console.error("Error creating form submission:", error);
+      res.status(500).json({ error: "Failed to create form submission" });
+    }
+  });
+
+  // Update form submission
+  app.patch("/api/form-submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.updateFormSubmission(req.params.id, req.body);
+      if (!submission) {
+        return res.status(404).json({ error: "Form submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      console.error("Error updating form submission:", error);
+      res.status(500).json({ error: "Failed to update form submission" });
+    }
+  });
+
+  // ==================== FORM SUBMISSION VALUES ROUTES ====================
+
+  // Get values by submission
+  app.get("/api/form-submissions/:submissionId/values", async (req, res) => {
+    try {
+      const values = await storage.getValuesBySubmission(req.params.submissionId);
+      res.json(values);
+    } catch (error) {
+      console.error("Error fetching submission values:", error);
+      res.status(500).json({ error: "Failed to fetch submission values" });
+    }
+  });
+
+  // Create submission value
+  app.post("/api/form-submissions/:submissionId/values", async (req, res) => {
+    try {
+      const validationResult = insertFormSubmissionValueSchema.safeParse({
+        ...req.body,
+        submissionId: req.params.submissionId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const value = await storage.createSubmissionValue(validationResult.data);
+      res.status(201).json(value);
+    } catch (error) {
+      console.error("Error creating submission value:", error);
+      res.status(500).json({ error: "Failed to create submission value" });
+    }
+  });
+
+  // Update submission value
+  app.patch("/api/submission-values/:id", async (req, res) => {
+    try {
+      const value = await storage.updateSubmissionValue(req.params.id, req.body);
+      if (!value) {
+        return res.status(404).json({ error: "Submission value not found" });
+      }
+      res.json(value);
+    } catch (error) {
+      console.error("Error updating submission value:", error);
+      res.status(500).json({ error: "Failed to update submission value" });
+    }
+  });
+
+  // ==================== FORM SIGNATURES ROUTES ====================
+
+  // Get signatures by submission
+  app.get("/api/form-submissions/:submissionId/signatures", async (req, res) => {
+    try {
+      const signatures = await storage.getSignaturesBySubmission(req.params.submissionId);
+      res.json(signatures);
+    } catch (error) {
+      console.error("Error fetching form signatures:", error);
+      res.status(500).json({ error: "Failed to fetch form signatures" });
+    }
+  });
+
+  // Create form signature
+  app.post("/api/form-submissions/:submissionId/signatures", async (req, res) => {
+    try {
+      const validationResult = insertFormSignatureSchema.safeParse({
+        ...req.body,
+        submissionId: req.params.submissionId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const signature = await storage.createFormSignature(validationResult.data);
+      res.status(201).json(signature);
+    } catch (error) {
+      console.error("Error creating form signature:", error);
+      res.status(500).json({ error: "Failed to create form signature" });
+    }
+  });
+
+  // ==================== APPOINTMENT TYPE REQUIRED FORMS ROUTES ====================
+
+  // Get required forms by appointment type
+  app.get("/api/appointment-types/:appointmentType/required-forms", async (req, res) => {
+    try {
+      const requiredForms = await storage.getRequiredFormsByAppointmentType(req.params.appointmentType);
+      res.json(requiredForms);
+    } catch (error) {
+      console.error("Error fetching required forms:", error);
+      res.status(500).json({ error: "Failed to fetch required forms" });
+    }
+  });
+
+  // Create appointment type required form
+  app.post("/api/appointment-types/required-forms", async (req, res) => {
+    try {
+      const validationResult = insertAppointmentTypeRequiredFormSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const requiredForm = await storage.createAppointmentTypeRequiredForm(validationResult.data);
+      res.status(201).json(requiredForm);
+    } catch (error) {
+      console.error("Error creating required form:", error);
+      res.status(500).json({ error: "Failed to create required form" });
+    }
+  });
+
+  // Delete appointment type required form
+  app.delete("/api/appointment-type-required-forms/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAppointmentTypeRequiredForm(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Required form not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting required form:", error);
+      res.status(500).json({ error: "Failed to delete required form" });
     }
   });
 

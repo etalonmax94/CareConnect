@@ -6,6 +6,13 @@ import {
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
   clientContacts, clientBehaviors, leadershipMeetingNotes,
+  // New scheduling and care plan tables
+  appointments, appointmentAssignments, appointmentCheckins,
+  clientStaffPreferences, clientStaffRestrictions,
+  staffAvailabilityWindows, staffUnavailabilityPeriods, staffStatusLogs,
+  carePlans, carePlanHealthMatters, carePlanDiagnoses, carePlanEmergencyContacts, carePlanEmergencyProcedures,
+  formTemplates, formTemplateFields, formSubmissions, formSubmissionValues, formSignatures,
+  appointmentTypeRequiredForms,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -27,7 +34,27 @@ import {
   type InsertQuoteSendHistory, type QuoteSendHistory,
   type InsertClientContact, type ClientContact,
   type InsertClientBehavior, type ClientBehavior,
-  type InsertLeadershipMeetingNote, type LeadershipMeetingNote
+  type InsertLeadershipMeetingNote, type LeadershipMeetingNote,
+  // New types for scheduling and care plans
+  type InsertAppointment, type Appointment,
+  type InsertAppointmentAssignment, type AppointmentAssignment,
+  type InsertAppointmentCheckin, type AppointmentCheckin,
+  type InsertClientStaffPreference, type ClientStaffPreference,
+  type InsertClientStaffRestriction, type ClientStaffRestriction,
+  type InsertStaffAvailabilityWindow, type StaffAvailabilityWindow,
+  type InsertStaffUnavailabilityPeriod, type StaffUnavailabilityPeriod,
+  type InsertStaffStatusLog, type StaffStatusLog,
+  type InsertCarePlan, type CarePlan,
+  type InsertCarePlanHealthMatter, type CarePlanHealthMatter,
+  type InsertCarePlanDiagnosis, type CarePlanDiagnosis,
+  type InsertCarePlanEmergencyContact, type CarePlanEmergencyContact,
+  type InsertCarePlanEmergencyProcedure, type CarePlanEmergencyProcedure,
+  type InsertFormTemplate, type FormTemplate,
+  type InsertFormTemplateField, type FormTemplateField,
+  type InsertFormSubmission, type FormSubmission,
+  type InsertFormSubmissionValue, type FormSubmissionValue,
+  type InsertFormSignature, type FormSignature,
+  type InsertAppointmentTypeRequiredForm, type AppointmentTypeRequiredForm
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
@@ -250,6 +277,148 @@ export interface IStorage {
   createMeetingNote(note: InsertLeadershipMeetingNote): Promise<LeadershipMeetingNote>;
   updateMeetingNote(id: string, note: Partial<InsertLeadershipMeetingNote>): Promise<LeadershipMeetingNote | undefined>;
   deleteMeetingNote(id: string): Promise<boolean>;
+  
+  // ============================================
+  // APPOINTMENTS & SCHEDULING
+  // ============================================
+  
+  // Appointments
+  getAllAppointments(): Promise<Appointment[]>;
+  getAppointmentById(id: string): Promise<Appointment | undefined>;
+  getAppointmentsByClient(clientId: string): Promise<Appointment[]>;
+  getAppointmentsByStaff(staffId: string): Promise<Appointment[]>;
+  getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<Appointment[]>;
+  getUpcomingAppointments(days?: number): Promise<Appointment[]>;
+  createAppointment(appointment: InsertAppointment): Promise<Appointment>;
+  updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined>;
+  deleteAppointment(id: string): Promise<boolean>;
+  
+  // Appointment Assignments
+  getAssignmentsByAppointment(appointmentId: string): Promise<AppointmentAssignment[]>;
+  getAppointmentAssignmentsByStaff(staffId: string): Promise<AppointmentAssignment[]>;
+  createAppointmentAssignment(assignment: InsertAppointmentAssignment): Promise<AppointmentAssignment>;
+  updateAppointmentAssignment(id: string, assignment: Partial<InsertAppointmentAssignment>): Promise<AppointmentAssignment | undefined>;
+  deleteAppointmentAssignment(id: string): Promise<boolean>;
+  
+  // Appointment Check-ins
+  getCheckinsByAppointment(appointmentId: string): Promise<AppointmentCheckin[]>;
+  createAppointmentCheckin(checkin: InsertAppointmentCheckin): Promise<AppointmentCheckin>;
+  
+  // ============================================
+  // STAFF ALLOCATION & PREFERENCES
+  // ============================================
+  
+  // Client Staff Preferences
+  getPreferencesByClient(clientId: string): Promise<ClientStaffPreference[]>;
+  getPreferencesByStaff(staffId: string): Promise<ClientStaffPreference[]>;
+  createStaffPreference(preference: InsertClientStaffPreference): Promise<ClientStaffPreference>;
+  updateStaffPreference(id: string, preference: Partial<InsertClientStaffPreference>): Promise<ClientStaffPreference | undefined>;
+  deleteStaffPreference(id: string): Promise<boolean>;
+  
+  // Client Staff Restrictions (Blacklist)
+  getRestrictionsByClient(clientId: string): Promise<ClientStaffRestriction[]>;
+  getRestrictionsByStaff(staffId: string): Promise<ClientStaffRestriction[]>;
+  createStaffRestriction(restriction: InsertClientStaffRestriction): Promise<ClientStaffRestriction>;
+  updateStaffRestriction(id: string, restriction: Partial<InsertClientStaffRestriction>): Promise<ClientStaffRestriction | undefined>;
+  deleteStaffRestriction(id: string): Promise<boolean>;
+  isStaffRestricted(clientId: string, staffId: string): Promise<boolean>;
+  
+  // Staff Availability Windows
+  getAvailabilityByStaff(staffId: string): Promise<StaffAvailabilityWindow[]>;
+  createAvailabilityWindow(window: InsertStaffAvailabilityWindow): Promise<StaffAvailabilityWindow>;
+  updateAvailabilityWindow(id: string, window: Partial<InsertStaffAvailabilityWindow>): Promise<StaffAvailabilityWindow | undefined>;
+  deleteAvailabilityWindow(id: string): Promise<boolean>;
+  
+  // Staff Unavailability Periods
+  getUnavailabilityByStaff(staffId: string): Promise<StaffUnavailabilityPeriod[]>;
+  getUnavailabilityByDateRange(startDate: Date, endDate: Date): Promise<StaffUnavailabilityPeriod[]>;
+  createUnavailabilityPeriod(period: InsertStaffUnavailabilityPeriod): Promise<StaffUnavailabilityPeriod>;
+  updateUnavailabilityPeriod(id: string, period: Partial<InsertStaffUnavailabilityPeriod>): Promise<StaffUnavailabilityPeriod | undefined>;
+  deleteUnavailabilityPeriod(id: string): Promise<boolean>;
+  
+  // Staff Status Logs
+  getCurrentStaffStatus(staffId: string): Promise<StaffStatusLog | undefined>;
+  getStaffStatusHistory(staffId: string, limit?: number): Promise<StaffStatusLog[]>;
+  getAllCurrentStaffStatuses(): Promise<StaffStatusLog[]>;
+  createStaffStatusLog(log: InsertStaffStatusLog): Promise<StaffStatusLog>;
+  
+  // ============================================
+  // CARE PLANS
+  // ============================================
+  
+  // Care Plans
+  getCarePlansByClient(clientId: string): Promise<CarePlan[]>;
+  getActiveCarePlanByClient(clientId: string): Promise<CarePlan | undefined>;
+  getCarePlanById(id: string): Promise<CarePlan | undefined>;
+  createCarePlan(carePlan: InsertCarePlan): Promise<CarePlan>;
+  updateCarePlan(id: string, carePlan: Partial<InsertCarePlan>): Promise<CarePlan | undefined>;
+  archiveCarePlan(id: string, userId: string, userName: string, reason?: string): Promise<CarePlan | undefined>;
+  
+  // Care Plan Health Matters
+  getHealthMattersByCarePlan(carePlanId: string): Promise<CarePlanHealthMatter[]>;
+  createHealthMatter(matter: InsertCarePlanHealthMatter): Promise<CarePlanHealthMatter>;
+  updateHealthMatter(id: string, matter: Partial<InsertCarePlanHealthMatter>): Promise<CarePlanHealthMatter | undefined>;
+  deleteHealthMatter(id: string): Promise<boolean>;
+  
+  // Care Plan Diagnoses
+  getDiagnosesByCarePlan(carePlanId: string): Promise<CarePlanDiagnosis[]>;
+  createCarePlanDiagnosis(diagnosis: InsertCarePlanDiagnosis): Promise<CarePlanDiagnosis>;
+  updateCarePlanDiagnosis(id: string, diagnosis: Partial<InsertCarePlanDiagnosis>): Promise<CarePlanDiagnosis | undefined>;
+  deleteCarePlanDiagnosis(id: string): Promise<boolean>;
+  
+  // Care Plan Emergency Contacts
+  getEmergencyContactsByCarePlan(carePlanId: string): Promise<CarePlanEmergencyContact[]>;
+  createCarePlanEmergencyContact(contact: InsertCarePlanEmergencyContact): Promise<CarePlanEmergencyContact>;
+  updateCarePlanEmergencyContact(id: string, contact: Partial<InsertCarePlanEmergencyContact>): Promise<CarePlanEmergencyContact | undefined>;
+  deleteCarePlanEmergencyContact(id: string): Promise<boolean>;
+  
+  // Care Plan Emergency Procedures
+  getEmergencyProceduresByCarePlan(carePlanId: string): Promise<CarePlanEmergencyProcedure[]>;
+  createCarePlanEmergencyProcedure(procedure: InsertCarePlanEmergencyProcedure): Promise<CarePlanEmergencyProcedure>;
+  updateCarePlanEmergencyProcedure(id: string, procedure: Partial<InsertCarePlanEmergencyProcedure>): Promise<CarePlanEmergencyProcedure | undefined>;
+  deleteCarePlanEmergencyProcedure(id: string): Promise<boolean>;
+  
+  // ============================================
+  // FORMS SYSTEM
+  // ============================================
+  
+  // Form Templates
+  getAllFormTemplates(): Promise<FormTemplate[]>;
+  getActiveFormTemplates(): Promise<FormTemplate[]>;
+  getFormTemplateById(id: string): Promise<FormTemplate | undefined>;
+  getFormTemplatesByCategory(category: string): Promise<FormTemplate[]>;
+  createFormTemplate(template: InsertFormTemplate): Promise<FormTemplate>;
+  updateFormTemplate(id: string, template: Partial<InsertFormTemplate>): Promise<FormTemplate | undefined>;
+  deleteFormTemplate(id: string): Promise<boolean>;
+  
+  // Form Template Fields
+  getFieldsByTemplate(templateId: string): Promise<FormTemplateField[]>;
+  createTemplateField(field: InsertFormTemplateField): Promise<FormTemplateField>;
+  updateTemplateField(id: string, field: Partial<InsertFormTemplateField>): Promise<FormTemplateField | undefined>;
+  deleteTemplateField(id: string): Promise<boolean>;
+  deleteFieldsByTemplate(templateId: string): Promise<boolean>;
+  
+  // Form Submissions
+  getSubmissionsByClient(clientId: string): Promise<FormSubmission[]>;
+  getSubmissionsByTemplate(templateId: string): Promise<FormSubmission[]>;
+  getSubmissionById(id: string): Promise<FormSubmission | undefined>;
+  createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+  updateFormSubmission(id: string, submission: Partial<InsertFormSubmission>): Promise<FormSubmission | undefined>;
+  
+  // Form Submission Values
+  getValuesBySubmission(submissionId: string): Promise<FormSubmissionValue[]>;
+  createSubmissionValue(value: InsertFormSubmissionValue): Promise<FormSubmissionValue>;
+  updateSubmissionValue(id: string, value: Partial<InsertFormSubmissionValue>): Promise<FormSubmissionValue | undefined>;
+  deleteValuesBySubmission(submissionId: string): Promise<boolean>;
+  
+  // Form Signatures
+  getSignaturesBySubmission(submissionId: string): Promise<FormSignature[]>;
+  createFormSignature(signature: InsertFormSignature): Promise<FormSignature>;
+  
+  // Appointment Type Required Forms
+  getRequiredFormsByAppointmentType(appointmentType: string): Promise<AppointmentTypeRequiredForm[]>;
+  createAppointmentTypeRequiredForm(form: InsertAppointmentTypeRequiredForm): Promise<AppointmentTypeRequiredForm>;
+  deleteAppointmentTypeRequiredForm(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -1420,6 +1589,631 @@ export class DbStorage implements IStorage {
 
   async deleteMeetingNote(id: string): Promise<boolean> {
     const result = await db.delete(leadershipMeetingNotes).where(eq(leadershipMeetingNotes.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ============================================
+  // APPOINTMENTS & SCHEDULING
+  // ============================================
+
+  // Appointments
+  async getAllAppointments(): Promise<Appointment[]> {
+    return await db.select().from(appointments).orderBy(desc(appointments.scheduledStart));
+  }
+
+  async getAppointmentById(id: string): Promise<Appointment | undefined> {
+    const result = await db.select().from(appointments).where(eq(appointments.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAppointmentsByClient(clientId: string): Promise<Appointment[]> {
+    return await db.select().from(appointments)
+      .where(eq(appointments.clientId, clientId))
+      .orderBy(desc(appointments.scheduledStart));
+  }
+
+  async getAppointmentsByStaff(staffId: string): Promise<Appointment[]> {
+    const assignmentResults = await db.select().from(appointmentAssignments)
+      .where(eq(appointmentAssignments.staffId, staffId));
+    
+    const appointmentIds = assignmentResults.map(a => a.appointmentId);
+    if (appointmentIds.length === 0) return [];
+    
+    return await db.select().from(appointments)
+      .where(sql`${appointments.id} IN (${sql.join(appointmentIds.map(id => sql`${id}`), sql`, `)})`)
+      .orderBy(desc(appointments.scheduledStart));
+  }
+
+  async getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<Appointment[]> {
+    return await db.select().from(appointments)
+      .where(and(
+        gte(appointments.scheduledStart, startDate),
+        lte(appointments.scheduledEnd, endDate)
+      ))
+      .orderBy(appointments.scheduledStart);
+  }
+
+  async getUpcomingAppointments(days: number = 7): Promise<Appointment[]> {
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + days);
+    
+    return await db.select().from(appointments)
+      .where(and(
+        gte(appointments.scheduledStart, now),
+        lte(appointments.scheduledStart, futureDate),
+        sql`${appointments.status} NOT IN ('cancelled', 'completed')`
+      ))
+      .orderBy(appointments.scheduledStart);
+  }
+
+  async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
+    const result = await db.insert(appointments).values(appointment).returning();
+    return result[0];
+  }
+
+  async updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+    const result = await db.update(appointments)
+      .set({ ...appointment as any, updatedAt: new Date() })
+      .where(eq(appointments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAppointment(id: string): Promise<boolean> {
+    const result = await db.delete(appointments).where(eq(appointments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Appointment Assignments
+  async getAssignmentsByAppointment(appointmentId: string): Promise<AppointmentAssignment[]> {
+    return await db.select().from(appointmentAssignments)
+      .where(eq(appointmentAssignments.appointmentId, appointmentId))
+      .orderBy(appointmentAssignments.role);
+  }
+
+  async getAppointmentAssignmentsByStaff(staffId: string): Promise<AppointmentAssignment[]> {
+    return await db.select().from(appointmentAssignments)
+      .where(eq(appointmentAssignments.staffId, staffId))
+      .orderBy(desc(appointmentAssignments.assignedAt));
+  }
+
+  async createAppointmentAssignment(assignment: InsertAppointmentAssignment): Promise<AppointmentAssignment> {
+    const result = await db.insert(appointmentAssignments).values(assignment).returning();
+    return result[0];
+  }
+
+  async updateAppointmentAssignment(id: string, assignment: Partial<InsertAppointmentAssignment>): Promise<AppointmentAssignment | undefined> {
+    const result = await db.update(appointmentAssignments)
+      .set({ ...assignment as any, updatedAt: new Date() })
+      .where(eq(appointmentAssignments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAppointmentAssignment(id: string): Promise<boolean> {
+    const result = await db.delete(appointmentAssignments).where(eq(appointmentAssignments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Appointment Check-ins
+  async getCheckinsByAppointment(appointmentId: string): Promise<AppointmentCheckin[]> {
+    return await db.select().from(appointmentCheckins)
+      .where(eq(appointmentCheckins.appointmentId, appointmentId))
+      .orderBy(appointmentCheckins.timestamp);
+  }
+
+  async createAppointmentCheckin(checkin: InsertAppointmentCheckin): Promise<AppointmentCheckin> {
+    const result = await db.insert(appointmentCheckins).values(checkin).returning();
+    return result[0];
+  }
+
+  // ============================================
+  // STAFF ALLOCATION & PREFERENCES
+  // ============================================
+
+  // Client Staff Preferences
+  async getPreferencesByClient(clientId: string): Promise<ClientStaffPreference[]> {
+    return await db.select().from(clientStaffPreferences)
+      .where(and(
+        eq(clientStaffPreferences.clientId, clientId),
+        eq(clientStaffPreferences.isActive, "yes")
+      ))
+      .orderBy(clientStaffPreferences.preferenceLevel);
+  }
+
+  async getPreferencesByStaff(staffId: string): Promise<ClientStaffPreference[]> {
+    return await db.select().from(clientStaffPreferences)
+      .where(and(
+        eq(clientStaffPreferences.staffId, staffId),
+        eq(clientStaffPreferences.isActive, "yes")
+      ));
+  }
+
+  async createStaffPreference(preference: InsertClientStaffPreference): Promise<ClientStaffPreference> {
+    const result = await db.insert(clientStaffPreferences).values(preference).returning();
+    return result[0];
+  }
+
+  async updateStaffPreference(id: string, preference: Partial<InsertClientStaffPreference>): Promise<ClientStaffPreference | undefined> {
+    const result = await db.update(clientStaffPreferences)
+      .set({ ...preference as any, updatedAt: new Date() })
+      .where(eq(clientStaffPreferences.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffPreference(id: string): Promise<boolean> {
+    const result = await db.delete(clientStaffPreferences).where(eq(clientStaffPreferences.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Client Staff Restrictions (Blacklist)
+  async getRestrictionsByClient(clientId: string): Promise<ClientStaffRestriction[]> {
+    return await db.select().from(clientStaffRestrictions)
+      .where(and(
+        eq(clientStaffRestrictions.clientId, clientId),
+        eq(clientStaffRestrictions.isActive, "yes")
+      ))
+      .orderBy(desc(clientStaffRestrictions.createdAt));
+  }
+
+  async getRestrictionsByStaff(staffId: string): Promise<ClientStaffRestriction[]> {
+    return await db.select().from(clientStaffRestrictions)
+      .where(and(
+        eq(clientStaffRestrictions.staffId, staffId),
+        eq(clientStaffRestrictions.isActive, "yes")
+      ));
+  }
+
+  async createStaffRestriction(restriction: InsertClientStaffRestriction): Promise<ClientStaffRestriction> {
+    const result = await db.insert(clientStaffRestrictions).values(restriction).returning();
+    return result[0];
+  }
+
+  async updateStaffRestriction(id: string, restriction: Partial<InsertClientStaffRestriction>): Promise<ClientStaffRestriction | undefined> {
+    const result = await db.update(clientStaffRestrictions)
+      .set({ ...restriction as any, updatedAt: new Date() })
+      .where(eq(clientStaffRestrictions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffRestriction(id: string): Promise<boolean> {
+    const result = await db.delete(clientStaffRestrictions).where(eq(clientStaffRestrictions.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async isStaffRestricted(clientId: string, staffId: string): Promise<boolean> {
+    const now = new Date();
+    const result = await db.select().from(clientStaffRestrictions)
+      .where(and(
+        eq(clientStaffRestrictions.clientId, clientId),
+        eq(clientStaffRestrictions.staffId, staffId),
+        eq(clientStaffRestrictions.isActive, "yes"),
+        lte(clientStaffRestrictions.effectiveFrom, now),
+        or(
+          sql`${clientStaffRestrictions.effectiveTo} IS NULL`,
+          gte(clientStaffRestrictions.effectiveTo, now)
+        )
+      ))
+      .limit(1);
+    return result.length > 0;
+  }
+
+  // Staff Availability Windows
+  async getAvailabilityByStaff(staffId: string): Promise<StaffAvailabilityWindow[]> {
+    return await db.select().from(staffAvailabilityWindows)
+      .where(and(
+        eq(staffAvailabilityWindows.staffId, staffId),
+        eq(staffAvailabilityWindows.isActive, "yes")
+      ))
+      .orderBy(staffAvailabilityWindows.dayOfWeek, staffAvailabilityWindows.startTime);
+  }
+
+  async createAvailabilityWindow(window: InsertStaffAvailabilityWindow): Promise<StaffAvailabilityWindow> {
+    const result = await db.insert(staffAvailabilityWindows).values(window).returning();
+    return result[0];
+  }
+
+  async updateAvailabilityWindow(id: string, window: Partial<InsertStaffAvailabilityWindow>): Promise<StaffAvailabilityWindow | undefined> {
+    const result = await db.update(staffAvailabilityWindows)
+      .set({ ...window as any, updatedAt: new Date() })
+      .where(eq(staffAvailabilityWindows.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAvailabilityWindow(id: string): Promise<boolean> {
+    const result = await db.delete(staffAvailabilityWindows).where(eq(staffAvailabilityWindows.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Staff Unavailability Periods
+  async getUnavailabilityByStaff(staffId: string): Promise<StaffUnavailabilityPeriod[]> {
+    return await db.select().from(staffUnavailabilityPeriods)
+      .where(eq(staffUnavailabilityPeriods.staffId, staffId))
+      .orderBy(desc(staffUnavailabilityPeriods.startDate));
+  }
+
+  async getUnavailabilityByDateRange(startDate: Date, endDate: Date): Promise<StaffUnavailabilityPeriod[]> {
+    return await db.select().from(staffUnavailabilityPeriods)
+      .where(and(
+        lte(staffUnavailabilityPeriods.startDate, endDate),
+        gte(staffUnavailabilityPeriods.endDate, startDate)
+      ))
+      .orderBy(staffUnavailabilityPeriods.startDate);
+  }
+
+  async createUnavailabilityPeriod(period: InsertStaffUnavailabilityPeriod): Promise<StaffUnavailabilityPeriod> {
+    const result = await db.insert(staffUnavailabilityPeriods).values(period).returning();
+    return result[0];
+  }
+
+  async updateUnavailabilityPeriod(id: string, period: Partial<InsertStaffUnavailabilityPeriod>): Promise<StaffUnavailabilityPeriod | undefined> {
+    const result = await db.update(staffUnavailabilityPeriods)
+      .set({ ...period as any, updatedAt: new Date() })
+      .where(eq(staffUnavailabilityPeriods.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteUnavailabilityPeriod(id: string): Promise<boolean> {
+    const result = await db.delete(staffUnavailabilityPeriods).where(eq(staffUnavailabilityPeriods.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Staff Status Logs
+  async getCurrentStaffStatus(staffId: string): Promise<StaffStatusLog | undefined> {
+    const result = await db.select().from(staffStatusLogs)
+      .where(eq(staffStatusLogs.staffId, staffId))
+      .orderBy(desc(staffStatusLogs.timestamp))
+      .limit(1);
+    return result[0];
+  }
+
+  async getStaffStatusHistory(staffId: string, limit: number = 50): Promise<StaffStatusLog[]> {
+    return await db.select().from(staffStatusLogs)
+      .where(eq(staffStatusLogs.staffId, staffId))
+      .orderBy(desc(staffStatusLogs.timestamp))
+      .limit(limit);
+  }
+
+  async getAllCurrentStaffStatuses(): Promise<StaffStatusLog[]> {
+    // Get the most recent status for each staff member
+    const subquery = db
+      .select({
+        staffId: staffStatusLogs.staffId,
+        maxTimestamp: sql<Date>`MAX(${staffStatusLogs.timestamp})`.as('max_timestamp')
+      })
+      .from(staffStatusLogs)
+      .groupBy(staffStatusLogs.staffId)
+      .as('latest');
+
+    return await db.select().from(staffStatusLogs)
+      .innerJoin(subquery, and(
+        eq(staffStatusLogs.staffId, subquery.staffId),
+        eq(staffStatusLogs.timestamp, subquery.maxTimestamp)
+      ));
+  }
+
+  async createStaffStatusLog(log: InsertStaffStatusLog): Promise<StaffStatusLog> {
+    const result = await db.insert(staffStatusLogs).values(log).returning();
+    return result[0];
+  }
+
+  // ============================================
+  // CARE PLANS
+  // ============================================
+
+  // Care Plans
+  async getCarePlansByClient(clientId: string): Promise<CarePlan[]> {
+    return await db.select().from(carePlans)
+      .where(eq(carePlans.clientId, clientId))
+      .orderBy(desc(carePlans.createdAt));
+  }
+
+  async getActiveCarePlanByClient(clientId: string): Promise<CarePlan | undefined> {
+    const result = await db.select().from(carePlans)
+      .where(and(
+        eq(carePlans.clientId, clientId),
+        eq(carePlans.status, "active")
+      ))
+      .orderBy(desc(carePlans.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async getCarePlanById(id: string): Promise<CarePlan | undefined> {
+    const result = await db.select().from(carePlans).where(eq(carePlans.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createCarePlan(carePlan: InsertCarePlan): Promise<CarePlan> {
+    const result = await db.insert(carePlans).values(carePlan).returning();
+    return result[0];
+  }
+
+  async updateCarePlan(id: string, carePlan: Partial<InsertCarePlan>): Promise<CarePlan | undefined> {
+    const result = await db.update(carePlans)
+      .set({ ...carePlan as any, updatedAt: new Date() })
+      .where(eq(carePlans.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async archiveCarePlan(id: string, userId: string, userName: string, reason?: string): Promise<CarePlan | undefined> {
+    const result = await db.update(carePlans)
+      .set({
+        status: "archived",
+        archivedAt: new Date(),
+        archivedById: userId,
+        archivedByName: userName,
+        archiveReason: reason,
+        updatedAt: new Date()
+      })
+      .where(eq(carePlans.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Care Plan Health Matters
+  async getHealthMattersByCarePlan(carePlanId: string): Promise<CarePlanHealthMatter[]> {
+    return await db.select().from(carePlanHealthMatters)
+      .where(eq(carePlanHealthMatters.carePlanId, carePlanId))
+      .orderBy(carePlanHealthMatters.type, carePlanHealthMatters.order);
+  }
+
+  async createHealthMatter(matter: InsertCarePlanHealthMatter): Promise<CarePlanHealthMatter> {
+    const result = await db.insert(carePlanHealthMatters).values(matter).returning();
+    return result[0];
+  }
+
+  async updateHealthMatter(id: string, matter: Partial<InsertCarePlanHealthMatter>): Promise<CarePlanHealthMatter | undefined> {
+    const result = await db.update(carePlanHealthMatters)
+      .set({ ...matter as any, updatedAt: new Date() })
+      .where(eq(carePlanHealthMatters.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteHealthMatter(id: string): Promise<boolean> {
+    const result = await db.delete(carePlanHealthMatters).where(eq(carePlanHealthMatters.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Care Plan Diagnoses
+  async getDiagnosesByCarePlan(carePlanId: string): Promise<CarePlanDiagnosis[]> {
+    return await db.select().from(carePlanDiagnoses)
+      .where(eq(carePlanDiagnoses.carePlanId, carePlanId))
+      .orderBy(desc(carePlanDiagnoses.isPrimary), carePlanDiagnoses.order);
+  }
+
+  async createCarePlanDiagnosis(diagnosis: InsertCarePlanDiagnosis): Promise<CarePlanDiagnosis> {
+    const result = await db.insert(carePlanDiagnoses).values(diagnosis).returning();
+    return result[0];
+  }
+
+  async updateCarePlanDiagnosis(id: string, diagnosis: Partial<InsertCarePlanDiagnosis>): Promise<CarePlanDiagnosis | undefined> {
+    const result = await db.update(carePlanDiagnoses)
+      .set({ ...diagnosis as any, updatedAt: new Date() })
+      .where(eq(carePlanDiagnoses.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCarePlanDiagnosis(id: string): Promise<boolean> {
+    const result = await db.delete(carePlanDiagnoses).where(eq(carePlanDiagnoses.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Care Plan Emergency Contacts
+  async getEmergencyContactsByCarePlan(carePlanId: string): Promise<CarePlanEmergencyContact[]> {
+    return await db.select().from(carePlanEmergencyContacts)
+      .where(eq(carePlanEmergencyContacts.carePlanId, carePlanId))
+      .orderBy(carePlanEmergencyContacts.priority);
+  }
+
+  async createCarePlanEmergencyContact(contact: InsertCarePlanEmergencyContact): Promise<CarePlanEmergencyContact> {
+    const result = await db.insert(carePlanEmergencyContacts).values(contact).returning();
+    return result[0];
+  }
+
+  async updateCarePlanEmergencyContact(id: string, contact: Partial<InsertCarePlanEmergencyContact>): Promise<CarePlanEmergencyContact | undefined> {
+    const result = await db.update(carePlanEmergencyContacts)
+      .set({ ...contact as any, updatedAt: new Date() })
+      .where(eq(carePlanEmergencyContacts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCarePlanEmergencyContact(id: string): Promise<boolean> {
+    const result = await db.delete(carePlanEmergencyContacts).where(eq(carePlanEmergencyContacts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Care Plan Emergency Procedures
+  async getEmergencyProceduresByCarePlan(carePlanId: string): Promise<CarePlanEmergencyProcedure[]> {
+    return await db.select().from(carePlanEmergencyProcedures)
+      .where(eq(carePlanEmergencyProcedures.carePlanId, carePlanId))
+      .orderBy(carePlanEmergencyProcedures.order);
+  }
+
+  async createCarePlanEmergencyProcedure(procedure: InsertCarePlanEmergencyProcedure): Promise<CarePlanEmergencyProcedure> {
+    const result = await db.insert(carePlanEmergencyProcedures).values(procedure).returning();
+    return result[0];
+  }
+
+  async updateCarePlanEmergencyProcedure(id: string, procedure: Partial<InsertCarePlanEmergencyProcedure>): Promise<CarePlanEmergencyProcedure | undefined> {
+    const result = await db.update(carePlanEmergencyProcedures)
+      .set({ ...procedure as any, updatedAt: new Date() })
+      .where(eq(carePlanEmergencyProcedures.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCarePlanEmergencyProcedure(id: string): Promise<boolean> {
+    const result = await db.delete(carePlanEmergencyProcedures).where(eq(carePlanEmergencyProcedures.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ============================================
+  // FORMS SYSTEM
+  // ============================================
+
+  // Form Templates
+  async getAllFormTemplates(): Promise<FormTemplate[]> {
+    return await db.select().from(formTemplates).orderBy(formTemplates.name);
+  }
+
+  async getActiveFormTemplates(): Promise<FormTemplate[]> {
+    return await db.select().from(formTemplates)
+      .where(eq(formTemplates.status, "active"))
+      .orderBy(formTemplates.name);
+  }
+
+  async getFormTemplateById(id: string): Promise<FormTemplate | undefined> {
+    const result = await db.select().from(formTemplates).where(eq(formTemplates.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getFormTemplatesByCategory(category: string): Promise<FormTemplate[]> {
+    return await db.select().from(formTemplates)
+      .where(and(
+        eq(formTemplates.category, category as any),
+        eq(formTemplates.status, "active")
+      ))
+      .orderBy(formTemplates.name);
+  }
+
+  async createFormTemplate(template: InsertFormTemplate): Promise<FormTemplate> {
+    const result = await db.insert(formTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateFormTemplate(id: string, template: Partial<InsertFormTemplate>): Promise<FormTemplate | undefined> {
+    const result = await db.update(formTemplates)
+      .set({ ...template as any, updatedAt: new Date() })
+      .where(eq(formTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteFormTemplate(id: string): Promise<boolean> {
+    const result = await db.delete(formTemplates).where(eq(formTemplates.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Form Template Fields
+  async getFieldsByTemplate(templateId: string): Promise<FormTemplateField[]> {
+    return await db.select().from(formTemplateFields)
+      .where(eq(formTemplateFields.templateId, templateId))
+      .orderBy(formTemplateFields.section, formTemplateFields.order);
+  }
+
+  async createTemplateField(field: InsertFormTemplateField): Promise<FormTemplateField> {
+    const result = await db.insert(formTemplateFields).values(field).returning();
+    return result[0];
+  }
+
+  async updateTemplateField(id: string, field: Partial<InsertFormTemplateField>): Promise<FormTemplateField | undefined> {
+    const result = await db.update(formTemplateFields)
+      .set({ ...field as any, updatedAt: new Date() })
+      .where(eq(formTemplateFields.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTemplateField(id: string): Promise<boolean> {
+    const result = await db.delete(formTemplateFields).where(eq(formTemplateFields.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deleteFieldsByTemplate(templateId: string): Promise<boolean> {
+    const result = await db.delete(formTemplateFields).where(eq(formTemplateFields.templateId, templateId)).returning();
+    return result.length >= 0;
+  }
+
+  // Form Submissions
+  async getSubmissionsByClient(clientId: string): Promise<FormSubmission[]> {
+    return await db.select().from(formSubmissions)
+      .where(eq(formSubmissions.clientId, clientId))
+      .orderBy(desc(formSubmissions.createdAt));
+  }
+
+  async getSubmissionsByTemplate(templateId: string): Promise<FormSubmission[]> {
+    return await db.select().from(formSubmissions)
+      .where(eq(formSubmissions.templateId, templateId))
+      .orderBy(desc(formSubmissions.createdAt));
+  }
+
+  async getSubmissionById(id: string): Promise<FormSubmission | undefined> {
+    const result = await db.select().from(formSubmissions).where(eq(formSubmissions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission> {
+    const result = await db.insert(formSubmissions).values(submission).returning();
+    return result[0];
+  }
+
+  async updateFormSubmission(id: string, submission: Partial<InsertFormSubmission>): Promise<FormSubmission | undefined> {
+    const result = await db.update(formSubmissions)
+      .set({ ...submission as any, updatedAt: new Date() })
+      .where(eq(formSubmissions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Form Submission Values
+  async getValuesBySubmission(submissionId: string): Promise<FormSubmissionValue[]> {
+    return await db.select().from(formSubmissionValues)
+      .where(eq(formSubmissionValues.submissionId, submissionId));
+  }
+
+  async createSubmissionValue(value: InsertFormSubmissionValue): Promise<FormSubmissionValue> {
+    const result = await db.insert(formSubmissionValues).values(value).returning();
+    return result[0];
+  }
+
+  async updateSubmissionValue(id: string, value: Partial<InsertFormSubmissionValue>): Promise<FormSubmissionValue | undefined> {
+    const result = await db.update(formSubmissionValues)
+      .set({ ...value as any, updatedAt: new Date() })
+      .where(eq(formSubmissionValues.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteValuesBySubmission(submissionId: string): Promise<boolean> {
+    const result = await db.delete(formSubmissionValues).where(eq(formSubmissionValues.submissionId, submissionId)).returning();
+    return result.length >= 0;
+  }
+
+  // Form Signatures
+  async getSignaturesBySubmission(submissionId: string): Promise<FormSignature[]> {
+    return await db.select().from(formSignatures)
+      .where(eq(formSignatures.submissionId, submissionId))
+      .orderBy(formSignatures.signedAt);
+  }
+
+  async createFormSignature(signature: InsertFormSignature): Promise<FormSignature> {
+    const result = await db.insert(formSignatures).values(signature).returning();
+    return result[0];
+  }
+
+  // Appointment Type Required Forms
+  async getRequiredFormsByAppointmentType(appointmentType: string): Promise<AppointmentTypeRequiredForm[]> {
+    return await db.select().from(appointmentTypeRequiredForms)
+      .where(eq(appointmentTypeRequiredForms.appointmentType, appointmentType as any));
+  }
+
+  async createAppointmentTypeRequiredForm(form: InsertAppointmentTypeRequiredForm): Promise<AppointmentTypeRequiredForm> {
+    const result = await db.insert(appointmentTypeRequiredForms).values(form).returning();
+    return result[0];
+  }
+
+  async deleteAppointmentTypeRequiredForm(id: string): Promise<boolean> {
+    const result = await db.delete(appointmentTypeRequiredForms).where(eq(appointmentTypeRequiredForms.id, id)).returning();
     return result.length > 0;
   }
 }
