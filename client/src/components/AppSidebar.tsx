@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { removeAuthToken } from "@/lib/auth";
 import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 import { cn } from "@/lib/utils";
 
@@ -92,25 +93,30 @@ export function AppSidebar({ user }: AppSidebarProps) {
   
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      console.log('[Auth] Sign out initiated from sidebar');
       // Clear JWT token from localStorage first
-      localStorage.removeItem('empowerlink_auth_token');
+      removeAuthToken();
+      console.log('[Auth] Token removed from localStorage');
       
       // Try to call logout API (for session-based auth)
       try {
         await apiRequest("POST", "/api/auth/logout", {});
+        console.log('[Auth] Logout API called successfully');
       } catch {
-        // Ignore API errors - token is already cleared
+        console.log('[Auth] Logout API call failed (expected if using JWT only)');
       }
     },
     onSuccess: () => {
       queryClient.clear();
-      window.location.href = "/login";
+      console.log('[Auth] Query cache cleared, redirecting to /login');
+      window.location.replace("/login");
     },
     onError: () => {
       // Force redirect even on error
-      localStorage.removeItem('empowerlink_auth_token');
+      removeAuthToken();
       queryClient.clear();
-      window.location.href = "/login";
+      console.log('[Auth] Error during logout, forcing redirect to /login');
+      window.location.replace("/login");
     },
   });
 

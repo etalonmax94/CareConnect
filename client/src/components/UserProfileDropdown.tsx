@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Moon, Sun, Monitor, Settings, LogOut, ChevronDown } from "lucide-react";
+import { removeAuthToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -60,27 +61,32 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
   };
 
   const handleSignOut = async () => {
+    console.log('[Auth] Sign out initiated');
     try {
       // Clear JWT token from localStorage first
-      localStorage.removeItem('empowerlink_auth_token');
+      removeAuthToken();
+      console.log('[Auth] Token removed from localStorage');
       
       // Try to call logout API (for session-based auth)
       try {
         await apiRequest("POST", "/api/auth/logout");
+        console.log('[Auth] Logout API called successfully');
       } catch {
-        // Ignore API errors - token is already cleared
+        console.log('[Auth] Logout API call failed (expected if using JWT only)');
       }
       
       // Clear query cache
       queryClient.clear();
+      console.log('[Auth] Query cache cleared');
       
       // Force full page redirect to login
-      window.location.href = "/login";
+      console.log('[Auth] Redirecting to /login');
+      window.location.replace("/login");
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error("[Auth] Logout failed:", error);
       // Force redirect even on error
-      localStorage.removeItem('empowerlink_auth_token');
-      window.location.href = "/login";
+      removeAuthToken();
+      window.location.replace("/login");
     }
   };
 
