@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Eye, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Phone, Mail, Building2, Users, Loader2, Eye, ChevronRight } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -13,18 +11,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -34,14 +21,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import CategoryBadge from "@/components/CategoryBadge";
 import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
+import { AddProviderDialog } from "@/components/AddProviderDialog";
+import { EditProviderDialog } from "@/components/EditProviderDialog";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import type { SupportCoordinator, Client } from "@shared/schema";
 
 export default function SupportCoordinatorsPage() {
-  const { toast } = useToast();
   const searchString = useSearch();
   const highlightId = new URLSearchParams(searchString).get("highlight");
   const [highlightedId, setHighlightedId] = useState<string | null>(highlightId);
@@ -53,7 +40,6 @@ export default function SupportCoordinatorsPage() {
   const [viewingClients, setViewingClients] = useState<SupportCoordinator | null>(null);
   const [selectedCoordinator, setSelectedCoordinator] = useState<SupportCoordinator | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: "", phoneNumber: "", email: "", organisation: "" });
 
   const { data: coordinators = [], isLoading } = useQuery<SupportCoordinator[]>({
     queryKey: ["/api/support-coordinators"],
@@ -71,76 +57,6 @@ export default function SupportCoordinatorsPage() {
     queryKey: ["/api/support-coordinators", viewingClients?.id, "clients"],
     enabled: !!viewingClients,
   });
-
-  const createMutation = useMutation({
-    mutationFn: (data: typeof formData) => apiRequest("POST", "/api/support-coordinators", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/support-coordinators"] });
-      setIsAddDialogOpen(false);
-      setFormData({ name: "", phoneNumber: "", email: "", organisation: "" });
-      toast({ title: "Support coordinator added successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to add support coordinator", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: { id: string } & typeof formData) => 
-      apiRequest("PATCH", `/api/support-coordinators/${data.id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/support-coordinators"] });
-      setEditingCoordinator(null);
-      setFormData({ name: "", phoneNumber: "", email: "", organisation: "" });
-      toast({ title: "Support coordinator updated successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to update support coordinator", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/support-coordinators/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/support-coordinators"] });
-      setDeleteCoordinator(null);
-      toast({ title: "Support coordinator deleted successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to delete support coordinator", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
-      return;
-    }
-    if (editingCoordinator) {
-      updateMutation.mutate({ id: editingCoordinator.id, ...formData });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-  
-  const isFormValid = formData.name.trim() !== "";
-
-  const openEditDialog = (coordinator: SupportCoordinator) => {
-    setEditingCoordinator(coordinator);
-    setFormData({
-      name: coordinator.name,
-      phoneNumber: coordinator.phoneNumber || "",
-      email: coordinator.email || "",
-      organisation: coordinator.organisation || "",
-    });
-  };
-
-  const closeDialog = () => {
-    setIsAddDialogOpen(false);
-    setEditingCoordinator(null);
-    setFormData({ name: "", phoneNumber: "", email: "", organisation: "" });
-  };
 
   const getInitials = (name: string) => {
     return name
@@ -168,73 +84,15 @@ export default function SupportCoordinatorsPage() {
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage support coordinators and view their clients</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="w-full sm:w-auto" data-testid="button-add-coordinator">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Coordinator
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Support Coordinator</DialogTitle>
-              <DialogDescription>Add a new support coordinator to the system.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter full name"
-                  required
-                  data-testid="input-coordinator-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={formData.phoneNumber}
-                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  placeholder="Enter phone number"
-                  data-testid="input-coordinator-phone"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email"
-                  data-testid="input-coordinator-email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="organisation">Organisation</Label>
-                <Input
-                  id="organisation"
-                  value={formData.organisation}
-                  onChange={(e) => setFormData({ ...formData, organisation: e.target.value })}
-                  placeholder="Enter organisation name"
-                  data-testid="input-coordinator-organisation"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={closeDialog}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending || !isFormValid} data-testid="button-submit-coordinator">
-                  {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Add Coordinator
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          size="sm" 
+          className="w-full sm:w-auto" 
+          data-testid="button-add-coordinator"
+          onClick={() => setIsAddDialogOpen(true)}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Coordinator
+        </Button>
       </div>
 
       <Card>
@@ -327,28 +185,20 @@ export default function SupportCoordinatorsPage() {
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditDialog(coordinator);
-                          }}
-                          data-testid={`button-edit-coordinator-${coordinator.id}`}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteCoordinator(coordinator);
-                          }}
-                          data-testid={`button-delete-coordinator-${coordinator.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                        <EditProviderDialog
+                          providerType="supportCoordinator"
+                          provider={coordinator}
+                          showTrigger={true}
+                          triggerVariant="ghost"
+                          triggerSize="icon"
+                        />
+                        <DeleteConfirmationDialog
+                          providerType="supportCoordinator"
+                          provider={coordinator}
+                          showTrigger={true}
+                          triggerVariant="ghost"
+                          triggerSize="icon"
+                        />
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </TableCell>
@@ -360,70 +210,33 @@ export default function SupportCoordinatorsPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingCoordinator} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Support Coordinator</DialogTitle>
-            <DialogDescription>Update support coordinator information.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Full Name *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter full name"
-                required
-                data-testid="input-edit-coordinator-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone Number</Label>
-              <Input
-                id="edit-phone"
-                value={formData.phoneNumber}
-                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                placeholder="Enter phone number"
-                data-testid="input-edit-coordinator-phone"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="Enter email"
-                data-testid="input-edit-coordinator-email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-organisation">Organisation</Label>
-              <Input
-                id="edit-organisation"
-                value={formData.organisation}
-                onChange={(e) => setFormData({ ...formData, organisation: e.target.value })}
-                placeholder="Enter organisation name"
-                data-testid="input-edit-coordinator-organisation"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={closeDialog}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={updateMutation.isPending || !isFormValid} data-testid="button-update-coordinator">
-                {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Update Coordinator
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <AddProviderDialog
+        providerType="supportCoordinator"
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        showTrigger={false}
+      />
 
-      {/* View Clients Dialog */}
+      {editingCoordinator && (
+        <EditProviderDialog
+          providerType="supportCoordinator"
+          provider={editingCoordinator}
+          open={!!editingCoordinator}
+          onOpenChange={(open) => !open && setEditingCoordinator(null)}
+          showTrigger={false}
+        />
+      )}
+
+      {deleteCoordinator && (
+        <DeleteConfirmationDialog
+          providerType="supportCoordinator"
+          provider={deleteCoordinator}
+          open={!!deleteCoordinator}
+          onOpenChange={(open) => !open && setDeleteCoordinator(null)}
+          showTrigger={false}
+        />
+      )}
+
       <Dialog open={!!viewingClients} onOpenChange={(open) => !open && setViewingClients(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -466,30 +279,6 @@ export default function SupportCoordinatorsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteCoordinator} onOpenChange={(open) => !open && setDeleteCoordinator(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Support Coordinator</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {deleteCoordinator?.name}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteCoordinator && deleteMutation.mutate(deleteCoordinator.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete-coordinator"
-            >
-              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Support Coordinator Detail Drawer */}
       <EntityDetailDrawer
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}

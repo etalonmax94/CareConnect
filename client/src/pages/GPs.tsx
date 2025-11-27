@@ -1,30 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Stethoscope, MapPin, FileText, ChevronRight } from "lucide-react";
-import { Link, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Pencil, Trash2, Phone, Building2, Loader2, Stethoscope, MapPin, FileText, ChevronRight } from "lucide-react";
+import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -34,13 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
+import { AddProviderDialog } from "@/components/AddProviderDialog";
+import { EditProviderDialog } from "@/components/EditProviderDialog";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import type { GP } from "@shared/schema";
 
 export default function GPsPage() {
-  const { toast } = useToast();
   const searchString = useSearch();
   const highlightId = new URLSearchParams(searchString).get("highlight");
   const [highlightedId, setHighlightedId] = useState<string | null>(highlightId);
@@ -51,15 +30,6 @@ export default function GPsPage() {
   const [deleteGP, setDeleteGP] = useState<GP | null>(null);
   const [selectedGP, setSelectedGP] = useState<GP | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [formData, setFormData] = useState({ 
-    name: "", 
-    practiceName: "", 
-    phoneNumber: "", 
-    faxNumber: "",
-    email: "", 
-    address: "",
-    notes: ""
-  });
 
   const { data: gps = [], isLoading } = useQuery<GP[]>({
     queryKey: ["/api/gps"],
@@ -72,79 +42,6 @@ export default function GPsPage() {
       return () => clearTimeout(timer);
     }
   }, [highlightId, gps]);
-
-  const createMutation = useMutation({
-    mutationFn: (data: typeof formData) => apiRequest("POST", "/api/gps", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/gps"] });
-      setIsAddDialogOpen(false);
-      setFormData({ name: "", practiceName: "", phoneNumber: "", faxNumber: "", email: "", address: "", notes: "" });
-      toast({ title: "GP added successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to add GP", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: { id: string } & typeof formData) => 
-      apiRequest("PATCH", `/api/gps/${data.id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/gps"] });
-      setEditingGP(null);
-      setFormData({ name: "", practiceName: "", phoneNumber: "", faxNumber: "", email: "", address: "", notes: "" });
-      toast({ title: "GP updated successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to update GP", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/gps/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/gps"] });
-      setDeleteGP(null);
-      toast({ title: "GP deleted successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to delete GP", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
-      return;
-    }
-    if (editingGP) {
-      updateMutation.mutate({ id: editingGP.id, ...formData });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-  
-  const isFormValid = formData.name.trim() !== "";
-
-  const openEditDialog = (gp: GP) => {
-    setEditingGP(gp);
-    setFormData({
-      name: gp.name,
-      practiceName: gp.practiceName || "",
-      phoneNumber: gp.phoneNumber || "",
-      faxNumber: gp.faxNumber || "",
-      email: gp.email || "",
-      address: gp.address || "",
-      notes: gp.notes || "",
-    });
-  };
-
-  const closeDialog = () => {
-    setIsAddDialogOpen(false);
-    setEditingGP(null);
-    setFormData({ name: "", practiceName: "", phoneNumber: "", faxNumber: "", email: "", address: "", notes: "" });
-  };
 
   const getInitials = (name: string) => {
     return name
@@ -163,101 +60,6 @@ export default function GPsPage() {
     );
   }
 
-  const GPForm = ({ isEdit = false }: { isEdit?: boolean }) => (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit-name" : "name"}>Doctor Name *</Label>
-          <Input
-            id={isEdit ? "edit-name" : "name"}
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="Dr. John Smith"
-            required
-            data-testid={isEdit ? "input-edit-gp-name" : "input-gp-name"}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit-practice" : "practice"}>Practice Name</Label>
-          <Input
-            id={isEdit ? "edit-practice" : "practice"}
-            value={formData.practiceName}
-            onChange={(e) => setFormData({ ...formData, practiceName: e.target.value })}
-            placeholder="Medical Centre Name"
-            data-testid={isEdit ? "input-edit-gp-practice" : "input-gp-practice"}
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit-phone" : "phone"}>Phone Number</Label>
-          <Input
-            id={isEdit ? "edit-phone" : "phone"}
-            value={formData.phoneNumber}
-            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-            placeholder="Enter phone number"
-            data-testid={isEdit ? "input-edit-gp-phone" : "input-gp-phone"}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={isEdit ? "edit-fax" : "fax"}>Fax Number</Label>
-          <Input
-            id={isEdit ? "edit-fax" : "fax"}
-            value={formData.faxNumber}
-            onChange={(e) => setFormData({ ...formData, faxNumber: e.target.value })}
-            placeholder="Enter fax number"
-            data-testid={isEdit ? "input-edit-gp-fax" : "input-gp-fax"}
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit-email" : "email"}>Email</Label>
-        <Input
-          id={isEdit ? "edit-email" : "email"}
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          placeholder="Enter email"
-          data-testid={isEdit ? "input-edit-gp-email" : "input-gp-email"}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit-address" : "address"}>Address</Label>
-        <Input
-          id={isEdit ? "edit-address" : "address"}
-          value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          placeholder="Enter full address"
-          data-testid={isEdit ? "input-edit-gp-address" : "input-gp-address"}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={isEdit ? "edit-notes" : "notes"}>Notes</Label>
-        <Textarea
-          id={isEdit ? "edit-notes" : "notes"}
-          value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          placeholder="Additional notes about this GP"
-          rows={3}
-          data-testid={isEdit ? "input-edit-gp-notes" : "input-gp-notes"}
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={closeDialog}>
-          Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={(isEdit ? updateMutation.isPending : createMutation.isPending) || !isFormValid} 
-          data-testid={isEdit ? "button-update-gp" : "button-submit-gp"}
-        >
-          {(isEdit ? updateMutation.isPending : createMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          {isEdit ? "Update GP" : "Add GP"}
-        </Button>
-      </div>
-    </form>
-  );
-
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -267,21 +69,10 @@ export default function GPsPage() {
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage GP database for client referrals</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="w-full sm:w-auto" data-testid="button-add-gp">
-              <Plus className="w-4 h-4 mr-2" />
-              Add GP
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Add General Practitioner</DialogTitle>
-              <DialogDescription>Add a new GP to the database for client assignments.</DialogDescription>
-            </DialogHeader>
-            <GPForm />
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" className="w-full sm:w-auto" data-testid="button-add-gp" onClick={() => setIsAddDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add GP
+        </Button>
       </div>
 
       <Card>
@@ -379,7 +170,7 @@ export default function GPsPage() {
                           size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openEditDialog(gp);
+                            setEditingGP(gp);
                           }}
                           data-testid={`button-edit-gp-${gp.id}`}
                         >
@@ -407,41 +198,33 @@ export default function GPsPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingGP} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit General Practitioner</DialogTitle>
-            <DialogDescription>Update GP information.</DialogDescription>
-          </DialogHeader>
-          <GPForm isEdit />
-        </DialogContent>
-      </Dialog>
+      <AddProviderDialog
+        providerType="gp"
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        showTrigger={false}
+      />
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteGP} onOpenChange={(open) => !open && setDeleteGP(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete GP</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {deleteGP?.name}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteGP && deleteMutation.mutate(deleteGP.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete-gp"
-            >
-              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {editingGP && (
+        <EditProviderDialog
+          providerType="gp"
+          provider={editingGP}
+          open={!!editingGP}
+          onOpenChange={(open) => !open && setEditingGP(null)}
+          showTrigger={false}
+        />
+      )}
 
-      {/* GP Detail Drawer */}
+      {deleteGP && (
+        <DeleteConfirmationDialog
+          providerType="gp"
+          provider={deleteGP}
+          open={!!deleteGP}
+          onOpenChange={(open) => !open && setDeleteGP(null)}
+          showTrigger={false}
+        />
+      )}
+
       <EntityDetailDrawer
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}

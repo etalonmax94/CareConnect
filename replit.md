@@ -115,6 +115,11 @@ The document management system is now a comprehensive, interactive storage hub s
 - **Quick Links**: Fast access buttons to add new providers from the Care Team directory.
 
 ### Recent Updates (November 2025)
+- **Shared Provider Dialog Components**: Consolidated all provider dialogs (Add, Edit, Delete) across the CRM into three shared components for consistency and maintainability:
+  - `AddProviderDialog`: Config-driven creation dialog supporting GP, Pharmacy, Plan Manager, Support Coordinator, Allied Health, and Staff with controlled open state
+  - `EditProviderDialog`: Config-driven editing dialog matching AddProviderDialog patterns
+  - `DeleteConfirmationDialog`: Consistent delete confirmation with proper error handling
+  - Updated pages: GPs.tsx, Pharmacies.tsx, PlanManagers.tsx, SupportCoordinators.tsx, AlliedHealthProfessionals.tsx, Staff.tsx, ClientProfile.tsx, NewClientWizard.tsx
 - **Care Team Directory**: Added centralized Care Team page with tiles for all provider types and care team indicators on client cards.
 - **Document Management Restructure**: Reorganized document management into 10 folder categories with collapsible UI, tracked documents with compliance status, and multi-document collection folders.
 - **HCP to Support at Home Renaming**: All HCP (Home Care Package) references have been renamed to Support at Home (SaH). Field names updated from `hcpNumber`/`hcpFundingLevel` to `sahNumber`/`sahFundingLevel`.

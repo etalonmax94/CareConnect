@@ -1,37 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, User, Loader2, ChevronRight } from "lucide-react";
-import { Link, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Phone, User, Loader2, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -41,13 +14,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
+import { AddProviderDialog } from "@/components/AddProviderDialog";
+import { EditProviderDialog } from "@/components/EditProviderDialog";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import type { Staff } from "@shared/schema";
 
 export default function StaffPage() {
-  const { toast } = useToast();
   const searchString = useSearch();
   const highlightId = new URLSearchParams(searchString).get("highlight");
   const [highlightedId, setHighlightedId] = useState<string | null>(highlightId);
@@ -56,7 +29,6 @@ export default function StaffPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [deleteStaff, setDeleteStaff] = useState<Staff | null>(null);
-  const [formData, setFormData] = useState({ name: "", phoneNumber: "", email: "", role: "" });
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -71,80 +43,6 @@ export default function StaffPage() {
       return () => clearTimeout(timer);
     }
   }, [highlightId, staffList]);
-
-  const createMutation = useMutation({
-    mutationFn: (data: typeof formData) => apiRequest("POST", "/api/staff", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-      setIsAddDialogOpen(false);
-      setFormData({ name: "", phoneNumber: "", email: "", role: "" });
-      toast({ title: "Staff member added successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to add staff member", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: { id: string } & typeof formData) => 
-      apiRequest("PATCH", `/api/staff/${data.id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-      setEditingStaff(null);
-      setFormData({ name: "", phoneNumber: "", email: "", role: "" });
-      toast({ title: "Staff member updated successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to update staff member", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/staff/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-      setDeleteStaff(null);
-      toast({ title: "Staff member deleted successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to delete staff member", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
-      return;
-    }
-    if (!formData.role) {
-      toast({ title: "Role is required", variant: "destructive" });
-      return;
-    }
-    if (editingStaff) {
-      updateMutation.mutate({ id: editingStaff.id, ...formData });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-  
-  const isFormValid = formData.name.trim() !== "" && formData.role !== "";
-
-  const openEditDialog = (staff: Staff) => {
-    setEditingStaff(staff);
-    setFormData({
-      name: staff.name,
-      phoneNumber: staff.phoneNumber || "",
-      email: staff.email || "",
-      role: staff.role || "",
-    });
-  };
-
-  const closeDialog = () => {
-    setIsAddDialogOpen(false);
-    setEditingStaff(null);
-    setFormData({ name: "", phoneNumber: "", email: "", role: "" });
-  };
 
   const getInitials = (name: string) => {
     return name
@@ -172,80 +70,15 @@ export default function StaffPage() {
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage team members and their assignments</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="w-full sm:w-auto" data-testid="button-add-staff">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Staff Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Staff Member</DialogTitle>
-              <DialogDescription>Add a new team member to the system.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter full name"
-                  required
-                  data-testid="input-staff-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={formData.phoneNumber}
-                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  placeholder="Enter phone number"
-                  data-testid="input-staff-phone"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email"
-                  data-testid="input-staff-email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role *</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => setFormData({ ...formData, role: value })}
-                >
-                  <SelectTrigger data-testid="input-staff-role">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="support_worker">Support Worker</SelectItem>
-                    <SelectItem value="nurse">Nurse</SelectItem>
-                    <SelectItem value="care_manager">Care Manager</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={closeDialog}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending || !isFormValid} data-testid="button-submit-staff">
-                  {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Add Staff
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          size="sm" 
+          className="w-full sm:w-auto" 
+          data-testid="button-add-staff"
+          onClick={() => setIsAddDialogOpen(true)}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Staff Member
+        </Button>
       </div>
 
       <Card>
@@ -325,7 +158,7 @@ export default function StaffPage() {
                           size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openEditDialog(staff);
+                            setEditingStaff(staff);
                           }}
                           data-testid={`button-edit-staff-${staff.id}`}
                         >
@@ -353,100 +186,33 @@ export default function StaffPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingStaff} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Staff Member</DialogTitle>
-            <DialogDescription>Update staff member information.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Full Name *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter full name"
-                required
-                data-testid="input-edit-staff-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone Number</Label>
-              <Input
-                id="edit-phone"
-                value={formData.phoneNumber}
-                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                placeholder="Enter phone number"
-                data-testid="input-edit-staff-phone"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="Enter email"
-                data-testid="input-edit-staff-email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Role *</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value })}
-              >
-                <SelectTrigger data-testid="input-edit-staff-role">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="support_worker">Support Worker</SelectItem>
-                  <SelectItem value="nurse">Nurse</SelectItem>
-                  <SelectItem value="care_manager">Care Manager</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={closeDialog}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={updateMutation.isPending || !isFormValid} data-testid="button-update-staff">
-                {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Update Staff
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <AddProviderDialog
+        providerType="staff"
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        showTrigger={false}
+      />
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteStaff} onOpenChange={(open) => !open && setDeleteStaff(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Staff Member</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {deleteStaff?.name}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteStaff && deleteMutation.mutate(deleteStaff.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete-staff"
-            >
-              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {editingStaff && (
+        <EditProviderDialog
+          providerType="staff"
+          provider={editingStaff}
+          open={!!editingStaff}
+          onOpenChange={(open) => !open && setEditingStaff(null)}
+          showTrigger={false}
+        />
+      )}
 
-      {/* Staff Detail Drawer */}
+      {deleteStaff && (
+        <DeleteConfirmationDialog
+          providerType="staff"
+          provider={deleteStaff}
+          open={!!deleteStaff}
+          onOpenChange={(open) => !open && setDeleteStaff(null)}
+          showTrigger={false}
+        />
+      )}
+
       <EntityDetailDrawer
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}

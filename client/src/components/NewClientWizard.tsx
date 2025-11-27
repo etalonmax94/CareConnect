@@ -1,10 +1,10 @@
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { insertClientSchema, type InsertClient, type ClientCategory, type SupportCoordinator, type PlanManager, type Staff, type GP, type Pharmacy, type AlliedHealthProfessional } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { AddProviderDialog } from "@/components/AddProviderDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Loader2, Upload, X, Camera, ArrowLeft, ArrowRight, Check, Plus,
   User, Phone, Heart, Settings, Briefcase, Users, Target, FileCheck,
@@ -54,26 +53,21 @@ const RELATIONSHIP_OPTIONS = [
   "Aunt", "Uncle", "Cousin", "Friend", "Neighbour", "Carer", "Guardian", "Other"
 ];
 
-type ProviderType = "gp" | "pharmacy" | "supportCoordinator" | "planManager" | "alliedHealth";
-
 export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [direction, setDirection] = useState(0);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
 
-  const [addProviderDialogOpen, setAddProviderDialogOpen] = useState(false);
-  const [addingProviderType, setAddingProviderType] = useState<ProviderType | null>(null);
-  const [newProviderName, setNewProviderName] = useState("");
-  const [newProviderOrg, setNewProviderOrg] = useState("");
-  const [newProviderPhone, setNewProviderPhone] = useState("");
-  const [newProviderEmail, setNewProviderEmail] = useState("");
-  const [newProviderAddress, setNewProviderAddress] = useState("");
+  const [addGpOpen, setAddGpOpen] = useState(false);
+  const [addPharmacyOpen, setAddPharmacyOpen] = useState(false);
+  const [addScOpen, setAddScOpen] = useState(false);
+  const [addPmOpen, setAddPmOpen] = useState(false);
+  const [addAhOpen, setAddAhOpen] = useState(false);
 
   const { data: allStaff = [] } = useQuery<Staff[]>({ queryKey: ["/api/staff"] });
   const { data: supportCoordinators = [] } = useQuery<SupportCoordinator[]>({ queryKey: ["/api/support-coordinators"] });
@@ -127,99 +121,6 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     setPhotoFile(null);
     setPhotoPreview(null);
     if (photoInputRef.current) photoInputRef.current.value = "";
-  };
-
-  const createProviderMutation = useMutation({
-    mutationFn: async ({ type, data }: { type: ProviderType; data: any }) => {
-      const endpoints: Record<ProviderType, string> = {
-        gp: "/api/gps",
-        pharmacy: "/api/pharmacies",
-        supportCoordinator: "/api/support-coordinators",
-        planManager: "/api/plan-managers",
-        alliedHealth: "/api/allied-health-professionals",
-      };
-      const response = await apiRequest("POST", endpoints[type], data);
-      return await response.json();
-    },
-    onSuccess: async (newProvider, { type }) => {
-      const queryKeyMap: Record<ProviderType, string> = {
-        gp: "/api/gps",
-        pharmacy: "/api/pharmacies",
-        supportCoordinator: "/api/support-coordinators",
-        planManager: "/api/plan-managers",
-        alliedHealth: "/api/allied-health-professionals",
-      };
-      await queryClient.invalidateQueries({ queryKey: [queryKeyMap[type]] });
-      
-      if (type === "gp") form.setValue("generalPractitionerId", newProvider.id);
-      else if (type === "pharmacy") form.setValue("pharmacyId", newProvider.id);
-      else if (type === "supportCoordinator") form.setValue("careTeam.supportCoordinatorId", newProvider.id);
-      else if (type === "planManager") form.setValue("careTeam.planManagerId", newProvider.id);
-      else if (type === "alliedHealth") form.setValue("careTeam.alliedHealthProfessionalId", newProvider.id);
-      
-      toast({ title: "Provider Added", description: `${newProvider.name} has been added and selected.` });
-      closeAddProviderDialog();
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const openAddProviderDialog = (type: ProviderType) => {
-    setAddingProviderType(type);
-    setNewProviderName("");
-    setNewProviderOrg("");
-    setNewProviderPhone("");
-    setNewProviderEmail("");
-    setNewProviderAddress("");
-    setAddProviderDialogOpen(true);
-  };
-
-  const closeAddProviderDialog = () => {
-    setAddProviderDialogOpen(false);
-    setAddingProviderType(null);
-  };
-
-  const handleAddProvider = () => {
-    if (!addingProviderType || !newProviderName.trim()) return;
-    
-    let data: any = { name: newProviderName.trim() };
-    
-    if (addingProviderType === "gp") {
-      data = { name: newProviderName, practiceName: newProviderOrg, phone: newProviderPhone, email: newProviderEmail, address: newProviderAddress };
-    } else if (addingProviderType === "pharmacy") {
-      data = { name: newProviderName, phone: newProviderPhone, email: newProviderEmail, address: newProviderAddress };
-    } else if (addingProviderType === "supportCoordinator") {
-      data = { name: newProviderName, organisation: newProviderOrg, phone: newProviderPhone, email: newProviderEmail };
-    } else if (addingProviderType === "planManager") {
-      data = { name: newProviderName, organisation: newProviderOrg, phone: newProviderPhone, email: newProviderEmail };
-    } else if (addingProviderType === "alliedHealth") {
-      data = { name: newProviderName, specialty: newProviderOrg, phone: newProviderPhone, email: newProviderEmail, address: newProviderAddress };
-    }
-    
-    createProviderMutation.mutate({ type: addingProviderType, data });
-  };
-
-  const getProviderDialogTitle = (): string => {
-    const titles: Record<ProviderType, string> = {
-      gp: "Add New GP",
-      pharmacy: "Add New Pharmacy",
-      supportCoordinator: "Add New Support Coordinator",
-      planManager: "Add New Plan Manager",
-      alliedHealth: "Add New Allied Health Professional",
-    };
-    return addingProviderType ? titles[addingProviderType] : "";
-  };
-
-  const getOrgLabel = (): string => {
-    const labels: Record<ProviderType, string> = {
-      gp: "Practice Name",
-      pharmacy: "",
-      supportCoordinator: "Organisation",
-      planManager: "Organisation",
-      alliedHealth: "Specialty",
-    };
-    return addingProviderType ? labels[addingProviderType] : "";
   };
 
   const goNext = async () => {
@@ -1174,7 +1075,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 <FormItem>
                   <FormLabel className="flex items-center justify-between">
                     <span className="flex items-center gap-2"><UserCog className="w-4 h-4" /> Support Coordinator</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("supportCoordinator")}>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddScOpen(true)}>
                       <Plus className="w-3 h-3 mr-1" /> Add New
                     </Button>
                   </FormLabel>
@@ -1203,7 +1104,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 <FormItem>
                   <FormLabel className="flex items-center justify-between">
                     <span className="flex items-center gap-2"><Stethoscope className="w-4 h-4" /> General Practitioner</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("gp")}>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddGpOpen(true)}>
                       <Plus className="w-3 h-3 mr-1" /> Add New
                     </Button>
                   </FormLabel>
@@ -1232,7 +1133,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 <FormItem>
                   <FormLabel className="flex items-center justify-between">
                     <span className="flex items-center gap-2"><Pill className="w-4 h-4" /> Pharmacy</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("pharmacy")}>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddPharmacyOpen(true)}>
                       <Plus className="w-3 h-3 mr-1" /> Add New
                     </Button>
                   </FormLabel>
@@ -1261,7 +1162,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 <FormItem>
                   <FormLabel className="flex items-center justify-between">
                     <span className="flex items-center gap-2"><Heart className="w-4 h-4" /> Allied Health Professional</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("alliedHealth")}>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddAhOpen(true)}>
                       <Plus className="w-3 h-3 mr-1" /> Add New
                     </Button>
                   </FormLabel>
@@ -1291,7 +1192,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   <FormItem>
                     <FormLabel className="flex items-center justify-between">
                       <span className="flex items-center gap-2"><Briefcase className="w-4 h-4" /> Plan Manager</span>
-                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("planManager")}>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddPmOpen(true)}>
                         <Plus className="w-3 h-3 mr-1" /> Add New
                       </Button>
                     </FormLabel>
@@ -1543,82 +1444,51 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
         </div>
       </Form>
 
-      <Dialog open={addProviderDialogOpen} onOpenChange={setAddProviderDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{getProviderDialogTitle()}</DialogTitle>
-            <DialogDescription>
-              Add a new provider to the system. They will be automatically selected for this client.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Name *</Label>
-              <Input 
-                value={newProviderName} 
-                onChange={(e) => setNewProviderName(e.target.value)} 
-                placeholder="Provider name"
-                data-testid="input-new-provider-name"
-              />
-            </div>
-            {getOrgLabel() && (
-              <div className="space-y-2">
-                <Label>{getOrgLabel()}</Label>
-                <Input 
-                  value={newProviderOrg} 
-                  onChange={(e) => setNewProviderOrg(e.target.value)} 
-                  placeholder={getOrgLabel()}
-                  data-testid="input-new-provider-org"
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input 
-                value={newProviderPhone} 
-                onChange={(e) => setNewProviderPhone(e.target.value)} 
-                placeholder="Phone number"
-                data-testid="input-new-provider-phone"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input 
-                value={newProviderEmail} 
-                onChange={(e) => setNewProviderEmail(e.target.value)} 
-                placeholder="Email address"
-                type="email"
-                data-testid="input-new-provider-email"
-              />
-            </div>
-            {(addingProviderType === "gp" || addingProviderType === "pharmacy" || addingProviderType === "alliedHealth") && (
-              <div className="space-y-2">
-                <Label>Address</Label>
-                <Input 
-                  value={newProviderAddress} 
-                  onChange={(e) => setNewProviderAddress(e.target.value)} 
-                  placeholder="Address"
-                  data-testid="input-new-provider-address"
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeAddProviderDialog}>Cancel</Button>
-            <Button 
-              onClick={handleAddProvider} 
-              disabled={!newProviderName.trim() || createProviderMutation.isPending}
-              data-testid="button-save-provider"
-            >
-              {createProviderMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding...</>
-              ) : (
-                "Add Provider"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddProviderDialog
+        providerType="gp"
+        open={addGpOpen}
+        onOpenChange={setAddGpOpen}
+        showTrigger={false}
+        onSuccess={(newGp) => {
+          form.setValue("generalPractitionerId", newGp.id);
+        }}
+      />
+      <AddProviderDialog
+        providerType="pharmacy"
+        open={addPharmacyOpen}
+        onOpenChange={setAddPharmacyOpen}
+        showTrigger={false}
+        onSuccess={(newPharmacy) => {
+          form.setValue("pharmacyId", newPharmacy.id);
+        }}
+      />
+      <AddProviderDialog
+        providerType="supportCoordinator"
+        open={addScOpen}
+        onOpenChange={setAddScOpen}
+        showTrigger={false}
+        onSuccess={(newSc) => {
+          form.setValue("careTeam.supportCoordinatorId", newSc.id);
+        }}
+      />
+      <AddProviderDialog
+        providerType="planManager"
+        open={addPmOpen}
+        onOpenChange={setAddPmOpen}
+        showTrigger={false}
+        onSuccess={(newPm) => {
+          form.setValue("careTeam.planManagerId", newPm.id);
+        }}
+      />
+      <AddProviderDialog
+        providerType="alliedHealth"
+        open={addAhOpen}
+        onOpenChange={setAddAhOpen}
+        showTrigger={false}
+        onSuccess={(newAh) => {
+          form.setValue("careTeam.alliedHealthProfessionalId", newAh.id);
+        }}
+      />
     </>
   );
 }
