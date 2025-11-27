@@ -77,7 +77,7 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 - **Clinical Tab Integration**: Diagnoses selector component for the Clinical Tab in client profiles.
 
 #### Document Management System (Folder-Based Organization)
-The document management system now uses a folder-based organization with 10 main categories:
+The document management system is now a comprehensive, interactive storage hub similar to Zoho WorkDrive with per-client folder organization. It uses a folder-based organization with 10 main categories:
 
 1. **Service Agreement** - Contains the tracked Service Agreement document (annual renewal)
 2. **Participant Assessment and Support Plan** - Parent folder with three sub-folders:
@@ -98,6 +98,15 @@ The document management system now uses a folder-based organization with 10 main
 - Multi-document folders are collections of historical records without expiry tracking - intentional for documents like Progress Notes
 - Collapsible folder UI using Shadcn Collapsible components
 - Each folder shows either compliance status (for tracked docs) or file count (for collections)
+
+**New Interactive Features (November 2025):**
+- **Per-Client Folder Customization**: Rename or hide/show folders per client via settings dialog (database table: `client_document_folders`)
+- **Not Required Override**: Mark any tracked document as "Not Required" with reason for clients where a specific document doesn't apply (database table: `client_document_compliance`)
+- **Archive Workflow**: Move documents to Archive folder while maintaining original folder reference; unarchive to restore
+- **Custom Document Titles**: Add extra documents with custom titles to any folder beyond tracked compliance documents
+- **Action Dropdown Menus**: View, Edit Details, Archive/Unarchive, Delete options on every document
+- **Global Search Integration**: Search documents by filename, document type, and folder name in the global search
+- **Visual Compliance Indicators**: Missing tracked documents show as "Missing - Non-Compliant"; Not Required shows with strikethrough and badge
 
 ### Recent Updates (November 2025)
 - **Document Management Restructure**: Reorganized document management into 10 folder categories with collapsible UI, tracked documents with compliance status, and multi-document collection folders.
