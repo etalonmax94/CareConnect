@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Search, User, Users, Briefcase, Building2, Phone, X } from "lucide-react";
+import { Search, User, Users, Briefcase, Building2, Phone, X, FileText, Folder } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,9 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import type { Client, Staff, SupportCoordinator, PlanManager } from "@shared/schema";
+import type { Client, Staff, SupportCoordinator, PlanManager, Document } from "@shared/schema";
 
-type SearchResultType = "client" | "staff" | "support_coordinator" | "plan_manager";
+type SearchResultType = "client" | "staff" | "support_coordinator" | "plan_manager" | "document";
 
 interface SearchResult {
   id: string;
@@ -24,6 +24,7 @@ interface SearchResult {
   phone?: string;
   badge?: string;
   badgeColor?: string;
+  clientId?: string;
 }
 
 export default function GlobalSearch() {
@@ -45,6 +46,11 @@ export default function GlobalSearch() {
 
   const { data: planManagers = [] } = useQuery<PlanManager[]>({
     queryKey: ["/api/plan-managers"],
+  });
+
+  const { data: documents = [] } = useQuery<Document[]>({
+    queryKey: ["/api/documents/search", search],
+    enabled: search.trim().length >= 2,
   });
 
   const getCategoryColor = (category: string) => {
@@ -84,11 +90,11 @@ export default function GlobalSearch() {
 
     clients.forEach((client) => {
       const ndisNumber = client.ndisDetails?.ndisNumber;
-      const hcpNumber = client.supportAtHomeDetails?.hcpNumber;
+      const sahNumber = client.supportAtHomeDetails?.sahNumber;
       const matches =
         client.participantName?.toLowerCase().includes(searchLower) ||
         ndisNumber?.toLowerCase().includes(searchLower) ||
-        hcpNumber?.toLowerCase().includes(searchLower) ||
+        sahNumber?.toLowerCase().includes(searchLower) ||
         client.email?.toLowerCase().includes(searchLower) ||
         client.phoneNumber?.includes(search);
 
@@ -97,7 +103,7 @@ export default function GlobalSearch() {
           id: client.id,
           type: "client",
           name: client.participantName,
-          subtitle: ndisNumber || hcpNumber || client.email || "",
+          subtitle: ndisNumber || sahNumber || client.email || "",
           phone: client.phoneNumber ?? undefined,
           badge: client.category,
           badgeColor: getCategoryColor(client.category),
@@ -164,6 +170,19 @@ export default function GlobalSearch() {
       }
     });
 
+    documents.forEach((doc) => {
+      const clientForDoc = clients.find(c => c.id === doc.clientId);
+      results.push({
+        id: doc.id,
+        type: "document",
+        name: doc.customTitle || doc.fileName,
+        subtitle: `${doc.documentType} • ${clientForDoc?.participantName || "Unknown Client"}`,
+        badge: doc.folderId || doc.documentType,
+        badgeColor: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+        clientId: doc.clientId,
+      });
+    });
+
     return results;
   })();
 
@@ -194,6 +213,11 @@ export default function GlobalSearch() {
       case "plan_manager":
         setLocation(`/plan-managers?highlight=${result.id}`);
         break;
+      case "document":
+        if (result.clientId) {
+          setLocation(`/clients/${result.clientId}?tab=documents`);
+        }
+        break;
     }
   };
 
@@ -207,6 +231,8 @@ export default function GlobalSearch() {
         return <Briefcase className="w-4 h-4 text-teal-500" />;
       case "plan_manager":
         return <Building2 className="w-4 h-4 text-indigo-500" />;
+      case "document":
+        return <FileText className="w-4 h-4 text-slate-500" />;
     }
   };
 
@@ -220,6 +246,8 @@ export default function GlobalSearch() {
         return "Support Coordinator";
       case "plan_manager":
         return "Plan Manager";
+      case "document":
+        return "Document";
     }
   };
 
@@ -228,6 +256,7 @@ export default function GlobalSearch() {
     staff: searchResults.filter((r) => r.type === "staff"),
     support_coordinator: searchResults.filter((r) => r.type === "support_coordinator"),
     plan_manager: searchResults.filter((r) => r.type === "plan_manager"),
+    document: searchResults.filter((r) => r.type === "document"),
   };
 
   const hasResults = searchResults.length > 0;
@@ -260,7 +289,7 @@ export default function GlobalSearch() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search clients, staff, coordinators, phone numbers..."
+                placeholder="Search clients, staff, coordinators, documents..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 pr-9"
@@ -284,7 +313,7 @@ export default function GlobalSearch() {
               {search.trim() === "" ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
                   <p>Search across the entire system</p>
-                  <p className="text-xs mt-2">Clients, Staff, Support Coordinators, Plan Managers</p>
+                  <p className="text-xs mt-2">Clients, Staff, Coordinators, Plan Managers, Documents</p>
                 </div>
               ) : !hasResults ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
@@ -292,7 +321,7 @@ export default function GlobalSearch() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {(["client", "staff", "support_coordinator", "plan_manager"] as SearchResultType[]).map((type) => {
+                  {(["client", "staff", "support_coordinator", "plan_manager", "document"] as SearchResultType[]).map((type) => {
                     const results = groupedResults[type];
                     if (results.length === 0) return null;
 
