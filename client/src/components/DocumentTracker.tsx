@@ -274,8 +274,8 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Status:</span>
                   <ComplianceIndicator status={status} />
                 </div>
                 {uploadedDoc && (
