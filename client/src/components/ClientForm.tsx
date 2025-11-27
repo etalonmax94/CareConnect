@@ -93,9 +93,24 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
     console.error("Form validation errors:", errors);
   };
 
+  const formErrors = form.formState.errors;
+  const hasErrors = Object.keys(formErrors).length > 0;
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit, onFormError)} className="space-y-4 sm:space-y-6">
+        {hasErrors && (
+          <div className="bg-destructive/10 border border-destructive rounded-md p-4 mb-4">
+            <p className="text-destructive font-medium text-sm">Please fix the following errors:</p>
+            <ul className="list-disc list-inside text-destructive text-sm mt-2">
+              {formErrors.participantName && <li>Participant Name is required</li>}
+              {formErrors.category && <li>Client Category is required</li>}
+              {Object.entries(formErrors).filter(([key]) => !['participantName', 'category'].includes(key)).map(([key, error]) => (
+                <li key={key}>{key}: {(error as any)?.message || 'Invalid value'}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Tabs defaultValue="basic" className="w-full">
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
             <TabsList className="inline-flex w-max sm:grid sm:w-full sm:grid-cols-5">

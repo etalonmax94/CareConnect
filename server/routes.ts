@@ -1302,7 +1302,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(clientWithAge);
     } catch (error) {
       console.error("Error creating client:", error);
-      res.status(500).json({ error: "Failed to create client" });
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Error details:", errorMessage);
+      res.status(500).json({ error: "Failed to create client", details: errorMessage });
     }
   });
 
