@@ -16,6 +16,7 @@ import {
   appointmentTypeRequiredForms,
   nonFaceToFaceServiceLogs, diagnoses, clientDiagnoses,
   clientStatusLogs,
+  silHouses, silHouseAuditLog,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -65,7 +66,9 @@ import {
   type InsertNonFaceToFaceServiceLog, type NonFaceToFaceServiceLog,
   type InsertDiagnosis, type Diagnosis,
   type InsertClientDiagnosis, type ClientDiagnosis,
-  type InsertClientStatusLog, type ClientStatusLog
+  type InsertClientStatusLog, type ClientStatusLog,
+  type InsertSilHouse, type SilHouse,
+  type InsertSilHouseAuditLog, type SilHouseAuditLog
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
@@ -477,6 +480,32 @@ export interface IStorage {
   addDiagnosisToClient(clientDiagnosis: InsertClientDiagnosis): Promise<ClientDiagnosis>;
   updateClientDiagnosis(id: string, diagnosis: Partial<InsertClientDiagnosis>): Promise<ClientDiagnosis | undefined>;
   removeDiagnosisFromClient(id: string): Promise<boolean>;
+
+  // ============================================
+  // SIL HOUSES
+  // ============================================
+  
+  getAllSilHouses(): Promise<SilHouse[]>;
+  getActiveSilHouses(): Promise<SilHouse[]>;
+  getSilHouseById(id: string): Promise<SilHouse | undefined>;
+  searchSilHouses(searchTerm: string, status?: string, propertyType?: string): Promise<SilHouse[]>;
+  createSilHouse(house: InsertSilHouse): Promise<SilHouse>;
+  updateSilHouse(id: string, house: Partial<InsertSilHouse>): Promise<SilHouse | undefined>;
+  deleteSilHouse(id: string): Promise<boolean>;
+  getSilHouseStats(): Promise<{
+    totalHouses: number;
+    activeHouses: number;
+    totalResidents: number;
+    totalCapacity: number;
+    occupancyRate: number;
+    availableBeds: number;
+    propertyTypes: number;
+    complianceRate: number;
+  }>;
+  
+  // SIL House Audit Log
+  getSilHouseAuditLogs(houseId?: string): Promise<SilHouseAuditLog[]>;
+  createSilHouseAuditLog(log: InsertSilHouseAuditLog): Promise<SilHouseAuditLog>;
 }
 
 export class DbStorage implements IStorage {
@@ -2646,6 +2675,134 @@ export class DbStorage implements IStorage {
     const result = await db.delete(clientDiagnoses)
       .where(eq(clientDiagnoses.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ============================================
+  // SIL HOUSES
+  // ============================================
+
+  async getAllSilHouses(): Promise<SilHouse[]> {
+    return await db.select().from(silHouses).orderBy(silHouses.houseName);
+  }
+
+  async getActiveSilHouses(): Promise<SilHouse[]> {
+    return await db.select().from(silHouses)
+      .where(eq(silHouses.status, "Active"))
+      .orderBy(silHouses.houseName);
+  }
+
+  async getSilHouseById(id: string): Promise<SilHouse | undefined> {
+    const result = await db.select().from(silHouses)
+      .where(eq(silHouses.id, id)).limit(1);
+    return result[0];
+  }
+
+  async searchSilHouses(searchTerm: string, status?: string, propertyType?: string): Promise<SilHouse[]> {
+    const conditions = [];
+    
+    if (searchTerm) {
+      conditions.push(
+        or(
+          ilike(silHouses.houseName, `%${searchTerm}%`),
+          ilike(silHouses.streetAddress, `%${searchTerm}%`),
+          ilike(silHouses.suburb, `%${searchTerm}%`)
+        )
+      );
+    }
+    
+    if (status && status !== "All") {
+      conditions.push(eq(silHouses.status, status as any));
+    }
+    
+    if (propertyType && propertyType !== "All") {
+      conditions.push(eq(silHouses.propertyType, propertyType as any));
+    }
+    
+    if (conditions.length === 0) {
+      return await db.select().from(silHouses).orderBy(silHouses.houseName);
+    }
+    
+    return await db.select().from(silHouses)
+      .where(and(...conditions))
+      .orderBy(silHouses.houseName);
+  }
+
+  async createSilHouse(house: InsertSilHouse): Promise<SilHouse> {
+    const result = await db.insert(silHouses).values(house).returning();
+    return result[0];
+  }
+
+  async updateSilHouse(id: string, house: Partial<InsertSilHouse>): Promise<SilHouse | undefined> {
+    const result = await db.update(silHouses)
+      .set({ ...house as any, updatedAt: new Date() })
+      .where(eq(silHouses.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSilHouse(id: string): Promise<boolean> {
+    const result = await db.delete(silHouses)
+      .where(eq(silHouses.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getSilHouseStats(): Promise<{
+    totalHouses: number;
+    activeHouses: number;
+    totalResidents: number;
+    totalCapacity: number;
+    occupancyRate: number;
+    availableBeds: number;
+    propertyTypes: number;
+    complianceRate: number;
+  }> {
+    const houses = await db.select().from(silHouses);
+    const today = new Date().toISOString().split('T')[0];
+    
+    const totalHouses = houses.length;
+    const activeHouses = houses.filter(h => h.status === "Active").length;
+    const totalResidents = houses.reduce((sum, h) => sum + (h.currentResidents || 0), 0);
+    const totalCapacity = houses.reduce((sum, h) => sum + (h.maxResidents || 0), 0);
+    const occupancyRate = totalCapacity > 0 ? (totalResidents / totalCapacity) * 100 : 0;
+    const availableBeds = totalCapacity - totalResidents;
+    const propertyTypes = new Set(houses.map(h => h.propertyType)).size;
+    
+    // Calculate compliance rate based on valid certificates
+    const compliantHouses = houses.filter(h => {
+      const safetyValid = h.safetyCertificateExpiry && h.safetyCertificateExpiry >= today;
+      const fireValid = h.fireSafetyCheckDate !== null;
+      const buildingValid = h.buildingInspectionDate !== null;
+      return safetyValid && fireValid && buildingValid;
+    }).length;
+    const complianceRate = totalHouses > 0 ? (compliantHouses / totalHouses) * 100 : 0;
+    
+    return {
+      totalHouses,
+      activeHouses,
+      totalResidents,
+      totalCapacity,
+      occupancyRate: Math.round(occupancyRate * 10) / 10,
+      availableBeds,
+      propertyTypes,
+      complianceRate: Math.round(complianceRate * 10) / 10
+    };
+  }
+
+  // SIL House Audit Log
+  async getSilHouseAuditLogs(houseId?: string): Promise<SilHouseAuditLog[]> {
+    if (houseId) {
+      return await db.select().from(silHouseAuditLog)
+        .where(eq(silHouseAuditLog.silHouseId, houseId))
+        .orderBy(desc(silHouseAuditLog.createdAt));
+    }
+    return await db.select().from(silHouseAuditLog)
+      .orderBy(desc(silHouseAuditLog.createdAt))
+      .limit(100);
+  }
+
+  async createSilHouseAuditLog(log: InsertSilHouseAuditLog): Promise<SilHouseAuditLog> {
+    const result = await db.insert(silHouseAuditLog).values(log).returning();
+    return result[0];
   }
 }
 

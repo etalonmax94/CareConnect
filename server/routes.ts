@@ -18,6 +18,7 @@ import {
   insertFormTemplateSchema, insertFormTemplateFieldSchema, insertFormSubmissionSchema,
   insertFormSubmissionValueSchema, insertFormSignatureSchema, insertAppointmentTypeRequiredFormSchema,
   insertNonFaceToFaceServiceLogSchema, insertDiagnosisSchema, insertClientDiagnosisSchema,
+  insertSilHouseSchema, insertSilHouseAuditLogSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -6553,6 +6554,245 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing diagnosis from client:", error);
       res.status(500).json({ error: "Failed to remove diagnosis" });
+    }
+  });
+
+  // ==================== SIL HOUSES ROUTES ====================
+
+  // Get all SIL houses
+  app.get("/api/sil-houses", async (req, res) => {
+    try {
+      const { search, status, propertyType } = req.query;
+      
+      if (search || status || propertyType) {
+        const houses = await storage.searchSilHouses(
+          search as string || "",
+          status as string,
+          propertyType as string
+        );
+        return res.json(houses);
+      }
+      
+      const houses = await storage.getAllSilHouses();
+      res.json(houses);
+    } catch (error) {
+      console.error("Error fetching SIL houses:", error);
+      res.status(500).json({ error: "Failed to fetch SIL houses" });
+    }
+  });
+
+  // Get SIL houses statistics
+  app.get("/api/sil-houses/stats", async (req, res) => {
+    try {
+      const stats = await storage.getSilHouseStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching SIL house stats:", error);
+      res.status(500).json({ error: "Failed to fetch SIL house statistics" });
+    }
+  });
+
+  // Get single SIL house
+  app.get("/api/sil-houses/:id", async (req, res) => {
+    try {
+      const house = await storage.getSilHouseById(req.params.id);
+      if (!house) {
+        return res.status(404).json({ error: "SIL house not found" });
+      }
+      
+      // Log view action for audit
+      const user = (req as any).session?.user;
+      if (user) {
+        await storage.createSilHouseAuditLog({
+          silHouseId: house.id,
+          silHouseName: house.houseName,
+          action: "view",
+          userId: user.id,
+          userName: user.displayName,
+          details: { viewedAt: new Date().toISOString() }
+        });
+      }
+      
+      res.json(house);
+    } catch (error) {
+      console.error("Error fetching SIL house:", error);
+      res.status(500).json({ error: "Failed to fetch SIL house" });
+    }
+  });
+
+  // Create SIL house
+  app.post("/api/sil-houses", async (req, res) => {
+    try {
+      const validationResult = insertSilHouseSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      
+      const user = (req as any).session?.user;
+      const houseData = {
+        ...validationResult.data,
+        lastModifiedBy: user?.id,
+        lastModifiedByName: user?.displayName
+      };
+      
+      const house = await storage.createSilHouse(houseData);
+      
+      // Log create action for audit
+      if (user) {
+        await storage.createSilHouseAuditLog({
+          silHouseId: house.id,
+          silHouseName: house.houseName,
+          action: "create",
+          userId: user.id,
+          userName: user.displayName,
+          details: houseData
+        });
+      }
+      
+      res.status(201).json(house);
+    } catch (error) {
+      console.error("Error creating SIL house:", error);
+      res.status(500).json({ error: "Failed to create SIL house" });
+    }
+  });
+
+  // Update SIL house
+  app.patch("/api/sil-houses/:id", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      const existingHouse = await storage.getSilHouseById(req.params.id);
+      if (!existingHouse) {
+        return res.status(404).json({ error: "SIL house not found" });
+      }
+      
+      const updateData = {
+        ...req.body,
+        lastModifiedBy: user?.id,
+        lastModifiedByName: user?.displayName
+      };
+      
+      const house = await storage.updateSilHouse(req.params.id, updateData);
+      if (!house) {
+        return res.status(404).json({ error: "SIL house not found" });
+      }
+      
+      // Log update action for audit
+      if (user) {
+        await storage.createSilHouseAuditLog({
+          silHouseId: house.id,
+          silHouseName: house.houseName,
+          action: "update",
+          userId: user.id,
+          userName: user.displayName,
+          details: { 
+            before: existingHouse, 
+            after: house,
+            changes: req.body 
+          }
+        });
+      }
+      
+      res.json(house);
+    } catch (error) {
+      console.error("Error updating SIL house:", error);
+      res.status(500).json({ error: "Failed to update SIL house" });
+    }
+  });
+
+  // Delete SIL house
+  app.delete("/api/sil-houses/:id", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      const { reason } = req.body;
+      
+      const existingHouse = await storage.getSilHouseById(req.params.id);
+      if (!existingHouse) {
+        return res.status(404).json({ error: "SIL house not found" });
+      }
+      
+      // Log delete action BEFORE deletion for audit trail
+      if (user) {
+        await storage.createSilHouseAuditLog({
+          silHouseId: existingHouse.id,
+          silHouseName: existingHouse.houseName,
+          action: "delete",
+          userId: user.id,
+          userName: user.displayName,
+          deleteReason: reason || "No reason provided",
+          details: existingHouse
+        });
+      }
+      
+      const deleted = await storage.deleteSilHouse(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "SIL house not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting SIL house:", error);
+      res.status(500).json({ error: "Failed to delete SIL house" });
+    }
+  });
+
+  // Get SIL house audit logs
+  app.get("/api/sil-houses/:id/audit-log", async (req, res) => {
+    try {
+      const logs = await storage.getSilHouseAuditLogs(req.params.id);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching SIL house audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Get all SIL house audit logs (for export)
+  app.get("/api/sil-houses-audit-log", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      
+      // Log export action
+      if (user) {
+        await storage.createSilHouseAuditLog({
+          action: "export",
+          userId: user.id,
+          userName: user.displayName,
+          details: { exportType: "audit_log", exportedAt: new Date().toISOString() }
+        });
+      }
+      
+      const logs = await storage.getSilHouseAuditLogs();
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching all SIL house audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Export SIL houses data (logs export action)
+  app.get("/api/sil-houses/export/data", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      const houses = await storage.getAllSilHouses();
+      
+      // Log export action
+      if (user) {
+        await storage.createSilHouseAuditLog({
+          action: "export",
+          userId: user.id,
+          userName: user.displayName,
+          details: { 
+            exportType: "houses_data", 
+            exportedAt: new Date().toISOString(),
+            housesCount: houses.length
+          }
+        });
+      }
+      
+      res.json(houses);
+    } catch (error) {
+      console.error("Error exporting SIL houses:", error);
+      res.status(500).json({ error: "Failed to export SIL houses" });
     }
   });
 

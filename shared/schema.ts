@@ -2117,3 +2117,121 @@ export const insertClientDiagnosisSchema = createInsertSchema(clientDiagnoses, {
 
 export type InsertClientDiagnosis = z.infer<typeof insertClientDiagnosisSchema>;
 export type ClientDiagnosis = typeof clientDiagnoses.$inferSelect;
+
+// ============================================
+// SIL HOUSES (Supported Independent Living)
+// ============================================
+
+export type SilHouseStatus = "Active" | "Inactive" | "Under Maintenance";
+export type SilHousePropertyType = "Apartment" | "House" | "Unit" | "Villa" | "Other";
+export type RentFrequency = "Weekly" | "Fortnightly" | "Monthly";
+export type NdisFundingCategory = "Core Supports" | "Capital Supports";
+
+export const silHouses = pgTable("sil_houses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Basic Info
+  houseName: text("house_name").notNull(),
+  streetAddress: text("street_address").notNull(),
+  suburb: text("suburb").notNull(),
+  postcode: text("postcode").notNull(),
+  state: text("state").notNull().default("NSW"),
+  propertyType: text("property_type").$type<SilHousePropertyType>().notNull().default("House"),
+  status: text("status").$type<SilHouseStatus>().notNull().default("Active"),
+  
+  // Details
+  maxResidents: integer("max_residents").notNull().default(1),
+  currentResidents: integer("current_residents").notNull().default(0),
+  bedrooms: integer("bedrooms"),
+  bathrooms: integer("bathrooms"),
+  wheelchairAccessible: text("wheelchair_accessible").default("no").$type<"yes" | "no">(),
+  
+  // Management & Contact
+  houseManagerId: varchar("house_manager_id"),
+  houseManagerName: text("house_manager_name"),
+  contactName: text("contact_name"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  notes: text("notes"),
+  
+  // NDIS-specific
+  silProviderNumber: text("sil_provider_number"),
+  ndisFundingCategory: text("ndis_funding_category").$type<NdisFundingCategory>(),
+  
+  // Financial
+  leaseStartDate: date("lease_start_date"),
+  leaseEndDate: date("lease_end_date"),
+  rentAmount: integer("rent_amount"),
+  rentFrequency: text("rent_frequency").$type<RentFrequency>().default("Weekly"),
+  
+  // Compliance (required for NDIS)
+  safetyCertificateExpiry: date("safety_certificate_expiry"),
+  fireSafetyCheckDate: date("fire_safety_check_date"),
+  buildingInspectionDate: date("building_inspection_date"),
+  incidentReportingLog: text("incident_reporting_log"),
+  privacyConsentObtained: text("privacy_consent_obtained").default("no").$type<"yes" | "no">(),
+  
+  // Audit
+  lastModifiedBy: varchar("last_modified_by"),
+  lastModifiedByName: text("last_modified_by_name"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSilHouseSchema = createInsertSchema(silHouses, {
+  houseName: z.string().min(1, "House name is required"),
+  streetAddress: z.string().min(1, "Street address is required"),
+  suburb: z.string().min(1, "Suburb is required"),
+  postcode: z.string().length(4, "Postcode must be 4 digits").regex(/^\d{4}$/, "Invalid postcode"),
+  state: z.enum(["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"]),
+  propertyType: z.enum(["Apartment", "House", "Unit", "Villa", "Other"]),
+  status: z.enum(["Active", "Inactive", "Under Maintenance"]),
+  maxResidents: z.number().int().min(1, "Must have at least 1 resident capacity"),
+  currentResidents: z.number().int().min(0).optional(),
+  bedrooms: z.number().int().min(0).optional().nullable(),
+  bathrooms: z.number().int().min(0).optional().nullable(),
+  wheelchairAccessible: z.enum(["yes", "no"]).optional(),
+  rentAmount: z.number().int().min(0).optional().nullable(),
+  rentFrequency: z.enum(["Weekly", "Fortnightly", "Monthly"]).optional(),
+  ndisFundingCategory: z.enum(["Core Supports", "Capital Supports"]).optional().nullable(),
+  privacyConsentObtained: z.enum(["yes", "no"]).optional(),
+  contactPhone: z.string().optional().nullable(),
+  contactEmail: z.string().email().optional().nullable().or(z.literal("")),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSilHouse = z.infer<typeof insertSilHouseSchema>;
+export type SilHouse = typeof silHouses.$inferSelect;
+
+// SIL House Audit Log for NDIS compliance
+export type SilHouseAuditAction = "create" | "update" | "delete" | "view" | "export";
+
+export const silHouseAuditLog = pgTable("sil_house_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  silHouseId: varchar("sil_house_id"),
+  silHouseName: text("sil_house_name"),
+  
+  action: text("action").$type<SilHouseAuditAction>().notNull(),
+  userId: varchar("user_id"),
+  userName: text("user_name"),
+  
+  details: json("details").$type<Record<string, any>>(),
+  deleteReason: text("delete_reason"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSilHouseAuditLogSchema = createInsertSchema(silHouseAuditLog, {
+  action: z.enum(["create", "update", "delete", "view", "export"]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSilHouseAuditLog = z.infer<typeof insertSilHouseAuditLogSchema>;
+export type SilHouseAuditLog = typeof silHouseAuditLog.$inferSelect;
