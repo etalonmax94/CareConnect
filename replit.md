@@ -65,6 +65,21 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 - **Digital Signatures**: Tamper-proof signatures with SHA-256 integrity hash, IP address, and signature role tracking.
 - **Appointment-Form Linking**: Required forms configuration per appointment type.
 
+#### Non-Face-to-Face Service Logging
+- **Service Log Table**: Tracks non-face-to-face client interactions with method selection (phone, email, video_call, plan_review, document_review), date/time, duration, location/context, and summary.
+- **Client Profile Integration**: New "Non-F2F Services" tab in client profiles for viewing and logging non-face-to-face service interactions.
+- **Full CRUD Operations**: Create, view, and delete functionality for service logs with React Query cache invalidation.
+- **Staff Tracking**: Records who created each log entry and when.
+
+#### Diagnoses Management System
+- **Reusable Diagnoses List**: Global diagnoses library with ICD-10 codes, categories, and description support.
+- **Client Diagnoses Association**: Link diagnoses to clients with primary/secondary designation, onset dates, severity, and status tracking.
+- **Clinical Tab Integration**: Diagnoses selector component for the Clinical Tab in client profiles.
+
+### Recent Updates (November 2025)
+- **HCP to Support at Home Renaming**: All HCP (Home Care Package) references have been renamed to Support at Home (SaH). Field names updated from `hcpNumber`/`hcpFundingLevel` to `sahNumber`/`sahFundingLevel`.
+- **Leadership Field Removal**: The `leadership` field has been removed from the careTeam JSON structure per schema cleanup.
+
 ## Developer Access (Development Only)
 In development mode (`NODE_ENV=development`), a "Developer Access" panel appears on the login page below the Zoho login button. This allows developers to:
 - Enter a custom display name

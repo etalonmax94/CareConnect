@@ -24,7 +24,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog } from "@shared/schema";
 import { calculateAge, formatClientNumber } from "@shared/schema";
 import ClientLocationMap from "@/components/ClientLocationMap";
 import CarePlanTab from "@/components/CarePlanTab";
@@ -114,7 +114,7 @@ interface DistanceData {
   officeAddress: string;
 }
 
-type ProfileSection = "overview" | "details" | "program" | "team" | "goals" | "documents" | "clinical" | "services" | "budget" | "careplan";
+type ProfileSection = "overview" | "details" | "program" | "team" | "goals" | "documents" | "clinical" | "services" | "budget" | "careplan" | "nonfacetoface";
 
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
@@ -221,6 +221,59 @@ export default function ClientProfile() {
     queryKey: ["/api/clients", params?.id, "service-deliveries"],
     enabled: !!params?.id,
   });
+
+  // Non-face-to-face service logs
+  const { data: nonFaceToFaceLogs = [] } = useQuery<NonFaceToFaceServiceLog[]>({
+    queryKey: ["/api/clients", params?.id, "non-face-to-face-logs"],
+    enabled: !!params?.id,
+  });
+
+  // Non-face-to-face log state
+  const [addNonF2FOpen, setAddNonF2FOpen] = useState(false);
+  const [nonF2FMethod, setNonF2FMethod] = useState<"email" | "phone" | "video_call" | "plan_review" | "document_review">("phone");
+  const [nonF2FDateTime, setNonF2FDateTime] = useState(new Date().toISOString().slice(0, 16));
+  const [nonF2FDuration, setNonF2FDuration] = useState("");
+  const [nonF2FLocation, setNonF2FLocation] = useState("");
+  const [nonF2FSummary, setNonF2FSummary] = useState("");
+
+  const addNonF2FMutation = useMutation({
+    mutationFn: async (data: { 
+      method: string; 
+      contactDateTime: string;
+      durationMinutes?: number;
+      location?: string;
+      summary: string;
+    }) => {
+      return apiRequest("POST", `/api/clients/${params?.id}/non-face-to-face-logs`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "non-face-to-face-logs"] });
+      setAddNonF2FOpen(false);
+      resetNonF2FForm();
+      toast({ title: "Non-face-to-face service logged successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to log service", description: error?.message, variant: "destructive" });
+    }
+  });
+
+  const deleteNonF2FMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/non-face-to-face-logs/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "non-face-to-face-logs"] });
+      toast({ title: "Log deleted" });
+    },
+  });
+
+  const resetNonF2FForm = () => {
+    setNonF2FMethod("phone");
+    setNonF2FDateTime(new Date().toISOString().slice(0, 16));
+    setNonF2FDuration("");
+    setNonF2FLocation("");
+    setNonF2FSummary("");
+  };
 
   // Service delivery management state
   const [addServiceOpen, setAddServiceOpen] = useState(false);
@@ -627,7 +680,7 @@ export default function ClientProfile() {
   };
 
   const getNdisNumber = () => client.ndisDetails?.ndisNumber;
-  const getHcpNumber = () => client.supportAtHomeDetails?.hcpNumber;
+  const getSahNumber = () => client.supportAtHomeDetails?.sahNumber;
   const getSupportLevel = () => {
     const level = (client.ndisDetails as any)?.supportLevel;
     if (level) return level;
@@ -646,6 +699,7 @@ export default function ClientProfile() {
     { id: "clinical", label: "Clinical Notes", icon: Stethoscope },
     { id: "careplan", label: "Care Plan", icon: HeartPulse },
     { id: "services", label: "Services", icon: Clock },
+    { id: "nonfacetoface", label: "Non-F2F Services", icon: PhoneCall },
     { id: "budget", label: "Budget Details", icon: DollarSign, badge: totalBudget === 0 ? "Setup" : undefined, badgeColor: "text-amber-600" },
   ];
 
@@ -787,16 +841,16 @@ export default function ClientProfile() {
                 </div>
               )}
               
-              {client.category === "Support at Home" && getHcpNumber() && (
+              {client.category === "Support at Home" && getSahNumber() && (
                 <div 
                   className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
                   onClick={() => setActiveSection("program")}
-                  data-testid="chip-hcp"
+                  data-testid="chip-sah"
                 >
                   <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                   <div>
-                    <p className="text-[10px] uppercase text-muted-foreground font-medium">HCP</p>
-                    <p className="text-sm font-semibold font-mono text-foreground">{getHcpNumber()}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground font-medium">SaH</p>
+                    <p className="text-sm font-semibold font-mono text-foreground">{getSahNumber()}</p>
                   </div>
                 </div>
               )}
@@ -1439,12 +1493,12 @@ export default function ClientProfile() {
                       {client.category === "Support at Home" && (
                         <>
                           <div className="p-3 bg-muted/30 rounded-lg">
-                            <p className="text-xs text-muted-foreground">HCP Number</p>
-                            <p className="text-sm font-semibold font-mono">{getHcpNumber() || 'Not provided'}</p>
+                            <p className="text-xs text-muted-foreground">SaH Number</p>
+                            <p className="text-sm font-semibold font-mono">{getSahNumber() || 'Not provided'}</p>
                           </div>
                           <div className="p-3 bg-muted/30 rounded-lg">
                             <p className="text-xs text-muted-foreground">Funding Level</p>
-                            <p className="text-sm font-semibold">{client.supportAtHomeDetails?.hcpFundingLevel || 'Not specified'}</p>
+                            <p className="text-sm font-semibold">{client.supportAtHomeDetails?.sahFundingLevel || 'Not specified'}</p>
                           </div>
                         </>
                       )}
@@ -1500,6 +1554,7 @@ export default function ClientProfile() {
                 <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
                 <TabsTrigger value="careplan" data-testid="tab-careplan">Care Plan</TabsTrigger>
                 <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
+                <TabsTrigger value="nonfacetoface" data-testid="tab-nonfacetoface">Non-F2F</TabsTrigger>
                 <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
               </TabsList>
 
@@ -1683,16 +1738,16 @@ export default function ClientProfile() {
           {client.category === "Support at Home" && client.supportAtHomeDetails && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Support at Home (HCP) Details</CardTitle>
+                <CardTitle className="text-base">Support at Home Details</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">HCP Number</p>
-                  <p className="text-sm mt-1 font-mono">{client.supportAtHomeDetails.hcpNumber || "Not provided"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">SaH Number</p>
+                  <p className="text-sm mt-1 font-mono">{client.supportAtHomeDetails.sahNumber || "Not provided"}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">HCP Funding Level</p>
-                  <p className="text-sm mt-1">{client.supportAtHomeDetails.hcpFundingLevel || "Not specified"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">SaH Funding Level</p>
+                  <p className="text-sm mt-1">{client.supportAtHomeDetails.sahFundingLevel || "Not specified"}</p>
                 </div>
                 <div className="md:col-span-2">
                   <p className="text-sm font-medium text-muted-foreground">Schedule of Supports</p>
@@ -1763,17 +1818,6 @@ export default function ClientProfile() {
                     )}
                   </div>
                 )}
-                {client.careTeam?.leadership && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback>{client.careTeam.leadership.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{client.careTeam.leadership}</p>
-                      <p className="text-xs text-muted-foreground">Leadership</p>
-                    </div>
-                  </div>
-                )}
                 {client.careTeam?.generalPractitioner && (
                   <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                     <Avatar className="w-10 h-10">
@@ -1794,7 +1838,7 @@ export default function ClientProfile() {
                     )}
                   </div>
                 )}
-                {!client.careTeam?.careManager && !client.careTeam?.leadership && !client.careTeam?.generalPractitioner && (
+                {!client.careTeam?.careManager && !client.careTeam?.generalPractitioner && (
                   <p className="text-sm text-muted-foreground text-center py-4">No primary care team assigned</p>
                 )}
               </CardContent>
@@ -2720,6 +2764,177 @@ export default function ClientProfile() {
                   <p className="text-sm text-muted-foreground">No service deliveries recorded</p>
                   {!isArchived && (
                     <p className="text-xs text-muted-foreground mt-1">Click "Record Service" to add service delivery records</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Non-Face-to-Face Services Tab */}
+        <TabsContent value="nonfacetoface" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <PhoneCall className="w-4 h-4" />
+                  Non-Face-to-Face Service Logs
+                </CardTitle>
+                {!isArchived && (
+                  <Dialog open={addNonF2FOpen} onOpenChange={setAddNonF2FOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" data-testid="button-add-nonf2f">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Log Service
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Log Non-Face-to-Face Service</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Method *</Label>
+                          <Select value={nonF2FMethod} onValueChange={(v: "email" | "phone" | "video_call" | "plan_review" | "document_review") => setNonF2FMethod(v)}>
+                            <SelectTrigger data-testid="select-nonf2f-method">
+                              <SelectValue placeholder="Select method..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="phone">Phone Call</SelectItem>
+                              <SelectItem value="email">Email</SelectItem>
+                              <SelectItem value="video_call">Video Call</SelectItem>
+                              <SelectItem value="plan_review">Plan Review</SelectItem>
+                              <SelectItem value="document_review">Document Review</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Date & Time *</Label>
+                          <Input 
+                            type="datetime-local" 
+                            value={nonF2FDateTime}
+                            onChange={(e) => setNonF2FDateTime(e.target.value)}
+                            data-testid="input-nonf2f-datetime"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Duration (minutes)</Label>
+                          <Input 
+                            type="number" 
+                            placeholder="e.g., 15"
+                            value={nonF2FDuration}
+                            onChange={(e) => setNonF2FDuration(e.target.value)}
+                            data-testid="input-nonf2f-duration"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Location/Context</Label>
+                          <Input 
+                            placeholder="e.g., From office, Remote"
+                            value={nonF2FLocation}
+                            onChange={(e) => setNonF2FLocation(e.target.value)}
+                            data-testid="input-nonf2f-location"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Summary *</Label>
+                          <Textarea 
+                            placeholder="Brief summary of the service provided..."
+                            value={nonF2FSummary}
+                            onChange={(e) => setNonF2FSummary(e.target.value)}
+                            rows={3}
+                            data-testid="textarea-nonf2f-summary"
+                          />
+                        </div>
+                        <Button 
+                          className="w-full" 
+                          disabled={!nonF2FMethod || !nonF2FDateTime || !nonF2FSummary.trim() || addNonF2FMutation.isPending}
+                          onClick={() => {
+                            addNonF2FMutation.mutate({
+                              method: nonF2FMethod,
+                              contactDateTime: nonF2FDateTime,
+                              durationMinutes: nonF2FDuration ? parseInt(nonF2FDuration) : undefined,
+                              location: nonF2FLocation || undefined,
+                              summary: nonF2FSummary.trim()
+                            });
+                          }}
+                          data-testid="button-submit-nonf2f"
+                        >
+                          {addNonF2FMutation.isPending ? "Saving..." : "Save Log"}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Track non-face-to-face client interactions (calls, emails, reviews)</p>
+            </CardHeader>
+            <CardContent>
+              {nonFaceToFaceLogs.length > 0 ? (
+                <div className="space-y-3">
+                  {nonFaceToFaceLogs.map((log) => {
+                    const methodLabels: Record<string, { label: string; icon: JSX.Element }> = {
+                      phone: { label: "Phone Call", icon: <Phone className="w-4 h-4" /> },
+                      email: { label: "Email", icon: <Mail className="w-4 h-4" /> },
+                      video_call: { label: "Video Call", icon: <Activity className="w-4 h-4" /> },
+                      plan_review: { label: "Plan Review", icon: <FileText className="w-4 h-4" /> },
+                      document_review: { label: "Document Review", icon: <FileCheck className="w-4 h-4" /> },
+                    };
+                    const methodInfo = methodLabels[log.method] || { label: log.method, icon: <PhoneCall className="w-4 h-4" /> };
+                    return (
+                      <div 
+                        key={log.id} 
+                        className="p-4 border rounded-lg bg-muted/30"
+                        data-testid={`nonf2f-log-${log.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              {methodInfo.icon}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="secondary">{methodInfo.label}</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(log.contactDateTime).toLocaleDateString('en-AU')} at {new Date(log.contactDateTime).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {log.durationMinutes && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({log.durationMinutes} min)
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm mt-2">{log.summary}</p>
+                              {log.location && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  <MapPin className="w-3 h-3 inline mr-1" />
+                                  {log.location}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {!isArchived && (
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => deleteNonF2FMutation.mutate(log.id)}
+                              data-testid={`button-delete-nonf2f-${log.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <PhoneCall className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No non-face-to-face services logged</p>
+                  {!isArchived && (
+                    <p className="text-xs text-muted-foreground mt-1">Click "Log Service" to record phone calls, emails, or reviews</p>
                   )}
                 </div>
               )}

@@ -785,12 +785,12 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="supportAtHomeDetails.hcpNumber"
+                    name="supportAtHomeDetails.sahNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>HCP Number</FormLabel>
+                        <FormLabel>SaH Number</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} data-testid="input-hcp-number" />
+                          <Input {...field} value={field.value || ""} data-testid="input-sah-number" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -799,12 +799,12 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                   <FormField
                     control={form.control}
-                    name="supportAtHomeDetails.hcpFundingLevel"
+                    name="supportAtHomeDetails.sahFundingLevel"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>HCP Funding Level</FormLabel>
+                        <FormLabel>SaH Funding Level</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="Level 1-4" data-testid="input-hcp-level" />
+                          <Input {...field} value={field.value || ""} placeholder="Level 1-4" data-testid="input-sah-level" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

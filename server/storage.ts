@@ -13,6 +13,7 @@ import {
   carePlans, carePlanHealthMatters, carePlanDiagnoses, carePlanEmergencyContacts, carePlanEmergencyProcedures,
   formTemplates, formTemplateFields, formSubmissions, formSubmissionValues, formSignatures,
   appointmentTypeRequiredForms,
+  nonFaceToFaceServiceLogs, diagnoses, clientDiagnoses,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -54,7 +55,10 @@ import {
   type InsertFormSubmission, type FormSubmission,
   type InsertFormSubmissionValue, type FormSubmissionValue,
   type InsertFormSignature, type FormSignature,
-  type InsertAppointmentTypeRequiredForm, type AppointmentTypeRequiredForm
+  type InsertAppointmentTypeRequiredForm, type AppointmentTypeRequiredForm,
+  type InsertNonFaceToFaceServiceLog, type NonFaceToFaceServiceLog,
+  type InsertDiagnosis, type Diagnosis,
+  type InsertClientDiagnosis, type ClientDiagnosis
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
@@ -419,6 +423,33 @@ export interface IStorage {
   getRequiredFormsByAppointmentType(appointmentType: string): Promise<AppointmentTypeRequiredForm[]>;
   createAppointmentTypeRequiredForm(form: InsertAppointmentTypeRequiredForm): Promise<AppointmentTypeRequiredForm>;
   deleteAppointmentTypeRequiredForm(id: string): Promise<boolean>;
+  
+  // ============================================
+  // NON-FACE-TO-FACE SERVICE LOGS
+  // ============================================
+  
+  getNonFaceToFaceLogsByClient(clientId: string): Promise<NonFaceToFaceServiceLog[]>;
+  getNonFaceToFaceLogById(id: string): Promise<NonFaceToFaceServiceLog | undefined>;
+  createNonFaceToFaceLog(log: InsertNonFaceToFaceServiceLog): Promise<NonFaceToFaceServiceLog>;
+  updateNonFaceToFaceLog(id: string, log: Partial<InsertNonFaceToFaceServiceLog>): Promise<NonFaceToFaceServiceLog | undefined>;
+  deleteNonFaceToFaceLog(id: string): Promise<boolean>;
+  
+  // ============================================
+  // DIAGNOSES
+  // ============================================
+  
+  getAllDiagnoses(): Promise<Diagnosis[]>;
+  getDiagnosisById(id: string): Promise<Diagnosis | undefined>;
+  searchDiagnoses(searchTerm: string): Promise<Diagnosis[]>;
+  createDiagnosis(diagnosis: InsertDiagnosis): Promise<Diagnosis>;
+  updateDiagnosis(id: string, diagnosis: Partial<InsertDiagnosis>): Promise<Diagnosis | undefined>;
+  deleteDiagnosis(id: string): Promise<boolean>;
+  
+  // Client Diagnoses
+  getDiagnosesByClient(clientId: string): Promise<ClientDiagnosis[]>;
+  addDiagnosisToClient(clientDiagnosis: InsertClientDiagnosis): Promise<ClientDiagnosis>;
+  updateClientDiagnosis(id: string, diagnosis: Partial<InsertClientDiagnosis>): Promise<ClientDiagnosis | undefined>;
+  removeDiagnosisFromClient(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -2214,6 +2245,117 @@ export class DbStorage implements IStorage {
 
   async deleteAppointmentTypeRequiredForm(id: string): Promise<boolean> {
     const result = await db.delete(appointmentTypeRequiredForms).where(eq(appointmentTypeRequiredForms.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ============================================
+  // NON-FACE-TO-FACE SERVICE LOGS
+  // ============================================
+
+  async getNonFaceToFaceLogsByClient(clientId: string): Promise<NonFaceToFaceServiceLog[]> {
+    return await db.select().from(nonFaceToFaceServiceLogs)
+      .where(eq(nonFaceToFaceServiceLogs.clientId, clientId))
+      .orderBy(desc(nonFaceToFaceServiceLogs.contactDateTime));
+  }
+
+  async getNonFaceToFaceLogById(id: string): Promise<NonFaceToFaceServiceLog | undefined> {
+    const result = await db.select().from(nonFaceToFaceServiceLogs)
+      .where(eq(nonFaceToFaceServiceLogs.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createNonFaceToFaceLog(log: InsertNonFaceToFaceServiceLog): Promise<NonFaceToFaceServiceLog> {
+    const result = await db.insert(nonFaceToFaceServiceLogs).values(log).returning();
+    return result[0];
+  }
+
+  async updateNonFaceToFaceLog(id: string, log: Partial<InsertNonFaceToFaceServiceLog>): Promise<NonFaceToFaceServiceLog | undefined> {
+    const result = await db.update(nonFaceToFaceServiceLogs)
+      .set({ ...log as any, updatedAt: new Date() })
+      .where(eq(nonFaceToFaceServiceLogs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteNonFaceToFaceLog(id: string): Promise<boolean> {
+    const result = await db.delete(nonFaceToFaceServiceLogs)
+      .where(eq(nonFaceToFaceServiceLogs.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ============================================
+  // DIAGNOSES
+  // ============================================
+
+  async getAllDiagnoses(): Promise<Diagnosis[]> {
+    return await db.select().from(diagnoses)
+      .where(eq(diagnoses.isActive, "yes"))
+      .orderBy(diagnoses.name);
+  }
+
+  async getDiagnosisById(id: string): Promise<Diagnosis | undefined> {
+    const result = await db.select().from(diagnoses)
+      .where(eq(diagnoses.id, id)).limit(1);
+    return result[0];
+  }
+
+  async searchDiagnoses(searchTerm: string): Promise<Diagnosis[]> {
+    return await db.select().from(diagnoses)
+      .where(and(
+        eq(diagnoses.isActive, "yes"),
+        or(
+          ilike(diagnoses.name, `%${searchTerm}%`),
+          ilike(diagnoses.icdCode, `%${searchTerm}%`),
+          ilike(diagnoses.category, `%${searchTerm}%`)
+        )
+      ))
+      .orderBy(diagnoses.name);
+  }
+
+  async createDiagnosis(diagnosis: InsertDiagnosis): Promise<Diagnosis> {
+    const result = await db.insert(diagnoses).values(diagnosis).returning();
+    return result[0];
+  }
+
+  async updateDiagnosis(id: string, diagnosis: Partial<InsertDiagnosis>): Promise<Diagnosis | undefined> {
+    const result = await db.update(diagnoses)
+      .set({ ...diagnosis as any, updatedAt: new Date() })
+      .where(eq(diagnoses.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDiagnosis(id: string): Promise<boolean> {
+    const result = await db.update(diagnoses)
+      .set({ isActive: "no" })
+      .where(eq(diagnoses.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Client Diagnoses
+  async getDiagnosesByClient(clientId: string): Promise<ClientDiagnosis[]> {
+    return await db.select().from(clientDiagnoses)
+      .where(eq(clientDiagnoses.clientId, clientId))
+      .orderBy(desc(clientDiagnoses.isPrimary), clientDiagnoses.createdAt);
+  }
+
+  async addDiagnosisToClient(clientDiagnosis: InsertClientDiagnosis): Promise<ClientDiagnosis> {
+    const result = await db.insert(clientDiagnoses).values(clientDiagnosis).returning();
+    return result[0];
+  }
+
+  async updateClientDiagnosis(id: string, diagnosis: Partial<InsertClientDiagnosis>): Promise<ClientDiagnosis | undefined> {
+    const result = await db.update(clientDiagnoses)
+      .set(diagnosis as any)
+      .where(eq(clientDiagnoses.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async removeDiagnosisFromClient(id: string): Promise<boolean> {
+    const result = await db.delete(clientDiagnoses)
+      .where(eq(clientDiagnoses.id, id)).returning();
     return result.length > 0;
   }
 }

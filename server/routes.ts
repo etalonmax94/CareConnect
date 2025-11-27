@@ -17,6 +17,7 @@ import {
   insertCarePlanEmergencyContactSchema, insertCarePlanEmergencyProcedureSchema,
   insertFormTemplateSchema, insertFormTemplateFieldSchema, insertFormSubmissionSchema,
   insertFormSubmissionValueSchema, insertFormSignatureSchema, insertAppointmentTypeRequiredFormSchema,
+  insertNonFaceToFaceServiceLogSchema, insertDiagnosisSchema, insertClientDiagnosisSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -5683,6 +5684,214 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting required form:", error);
       res.status(500).json({ error: "Failed to delete required form" });
+    }
+  });
+
+  // ==================== NON-FACE-TO-FACE SERVICE LOGS ROUTES ====================
+
+  // Get non-face-to-face logs by client
+  app.get("/api/clients/:clientId/non-face-to-face-logs", async (req, res) => {
+    try {
+      const logs = await storage.getNonFaceToFaceLogsByClient(req.params.clientId);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching non-face-to-face logs:", error);
+      res.status(500).json({ error: "Failed to fetch logs" });
+    }
+  });
+
+  // Get non-face-to-face log by ID
+  app.get("/api/non-face-to-face-logs/:id", async (req, res) => {
+    try {
+      const log = await storage.getNonFaceToFaceLogById(req.params.id);
+      if (!log) {
+        return res.status(404).json({ error: "Log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Error fetching non-face-to-face log:", error);
+      res.status(500).json({ error: "Failed to fetch log" });
+    }
+  });
+
+  // Create non-face-to-face log
+  app.post("/api/clients/:clientId/non-face-to-face-logs", async (req, res) => {
+    try {
+      const validationResult = insertNonFaceToFaceServiceLogSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const log = await storage.createNonFaceToFaceLog(validationResult.data);
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("Error creating non-face-to-face log:", error);
+      res.status(500).json({ error: "Failed to create log" });
+    }
+  });
+
+  // Update non-face-to-face log
+  app.patch("/api/non-face-to-face-logs/:id", async (req, res) => {
+    try {
+      const log = await storage.updateNonFaceToFaceLog(req.params.id, req.body);
+      if (!log) {
+        return res.status(404).json({ error: "Log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Error updating non-face-to-face log:", error);
+      res.status(500).json({ error: "Failed to update log" });
+    }
+  });
+
+  // Delete non-face-to-face log
+  app.delete("/api/non-face-to-face-logs/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteNonFaceToFaceLog(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Log not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting non-face-to-face log:", error);
+      res.status(500).json({ error: "Failed to delete log" });
+    }
+  });
+
+  // ==================== DIAGNOSES ROUTES ====================
+
+  // Get all diagnoses
+  app.get("/api/diagnoses", async (req, res) => {
+    try {
+      const { search } = req.query;
+      let result;
+      if (search && typeof search === "string") {
+        result = await storage.searchDiagnoses(search);
+      } else {
+        result = await storage.getAllDiagnoses();
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching diagnoses:", error);
+      res.status(500).json({ error: "Failed to fetch diagnoses" });
+    }
+  });
+
+  // Get diagnosis by ID
+  app.get("/api/diagnoses/:id", async (req, res) => {
+    try {
+      const diagnosis = await storage.getDiagnosisById(req.params.id);
+      if (!diagnosis) {
+        return res.status(404).json({ error: "Diagnosis not found" });
+      }
+      res.json(diagnosis);
+    } catch (error) {
+      console.error("Error fetching diagnosis:", error);
+      res.status(500).json({ error: "Failed to fetch diagnosis" });
+    }
+  });
+
+  // Create diagnosis
+  app.post("/api/diagnoses", async (req, res) => {
+    try {
+      const validationResult = insertDiagnosisSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const diagnosis = await storage.createDiagnosis(validationResult.data);
+      res.status(201).json(diagnosis);
+    } catch (error) {
+      console.error("Error creating diagnosis:", error);
+      res.status(500).json({ error: "Failed to create diagnosis" });
+    }
+  });
+
+  // Update diagnosis
+  app.patch("/api/diagnoses/:id", async (req, res) => {
+    try {
+      const diagnosis = await storage.updateDiagnosis(req.params.id, req.body);
+      if (!diagnosis) {
+        return res.status(404).json({ error: "Diagnosis not found" });
+      }
+      res.json(diagnosis);
+    } catch (error) {
+      console.error("Error updating diagnosis:", error);
+      res.status(500).json({ error: "Failed to update diagnosis" });
+    }
+  });
+
+  // Delete diagnosis (soft delete)
+  app.delete("/api/diagnoses/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteDiagnosis(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Diagnosis not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting diagnosis:", error);
+      res.status(500).json({ error: "Failed to delete diagnosis" });
+    }
+  });
+
+  // ==================== CLIENT DIAGNOSES ROUTES ====================
+
+  // Get diagnoses by client
+  app.get("/api/clients/:clientId/diagnoses", async (req, res) => {
+    try {
+      const diagnoses = await storage.getDiagnosesByClient(req.params.clientId);
+      res.json(diagnoses);
+    } catch (error) {
+      console.error("Error fetching client diagnoses:", error);
+      res.status(500).json({ error: "Failed to fetch client diagnoses" });
+    }
+  });
+
+  // Add diagnosis to client
+  app.post("/api/clients/:clientId/diagnoses", async (req, res) => {
+    try {
+      const validationResult = insertClientDiagnosisSchema.safeParse({
+        ...req.body,
+        clientId: req.params.clientId
+      });
+      if (!validationResult.success) {
+        return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
+      }
+      const clientDiagnosis = await storage.addDiagnosisToClient(validationResult.data);
+      res.status(201).json(clientDiagnosis);
+    } catch (error) {
+      console.error("Error adding diagnosis to client:", error);
+      res.status(500).json({ error: "Failed to add diagnosis" });
+    }
+  });
+
+  // Update client diagnosis
+  app.patch("/api/client-diagnoses/:id", async (req, res) => {
+    try {
+      const diagnosis = await storage.updateClientDiagnosis(req.params.id, req.body);
+      if (!diagnosis) {
+        return res.status(404).json({ error: "Client diagnosis not found" });
+      }
+      res.json(diagnosis);
+    } catch (error) {
+      console.error("Error updating client diagnosis:", error);
+      res.status(500).json({ error: "Failed to update client diagnosis" });
+    }
+  });
+
+  // Remove diagnosis from client
+  app.delete("/api/client-diagnoses/:id", async (req, res) => {
+    try {
+      const deleted = await storage.removeDiagnosisFromClient(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Client diagnosis not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing diagnosis from client:", error);
+      res.status(500).json({ error: "Failed to remove diagnosis" });
     }
   });
 

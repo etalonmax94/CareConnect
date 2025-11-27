@@ -172,7 +172,6 @@ export const clients = pgTable("clients", {
   careTeam: json("care_team").$type<{
     careManager?: string;
     careManagerId?: string;
-    leadership?: string;
     generalPractitioner?: string;
     pharmacy?: string;
     supportCoordinator?: string;
@@ -199,8 +198,8 @@ export const clients = pgTable("clients", {
   
   // Support at Home Details - stored as JSON
   supportAtHomeDetails: json("support_at_home_details").$type<{
-    hcpNumber?: string;
-    hcpFundingLevel?: string;
+    sahNumber?: string;
+    sahFundingLevel?: string;
     scheduleOfSupports?: string;
   }>(),
   
@@ -1839,3 +1838,100 @@ export const insertAppointmentTypeRequiredFormSchema = createInsertSchema(appoin
 
 export type InsertAppointmentTypeRequiredForm = z.infer<typeof insertAppointmentTypeRequiredFormSchema>;
 export type AppointmentTypeRequiredForm = typeof appointmentTypeRequiredForms.$inferSelect;
+
+// ============================================
+// NON-FACE-TO-FACE SERVICE LOGS
+// ============================================
+
+export type NonFaceToFaceMethod = "email" | "phone" | "video_call" | "plan_review" | "document_review";
+
+export const nonFaceToFaceServiceLogs = pgTable("non_face_to_face_service_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  
+  // Contact details
+  contactDateTime: timestamp("contact_date_time").notNull(),
+  method: text("method").$type<NonFaceToFaceMethod>().notNull(),
+  durationMinutes: text("duration_minutes"),
+  
+  // Who and where
+  contactedBy: text("contacted_by").notNull(),
+  contactedById: varchar("contacted_by_id"),
+  location: text("location"), // Where the call/email was made from
+  recipientName: text("recipient_name"), // Who was contacted
+  recipientRole: text("recipient_role"), // e.g., "Client", "Family Member", "Support Coordinator"
+  
+  // Notes
+  summary: text("summary").notNull(),
+  outcome: text("outcome"),
+  followUpRequired: text("follow_up_required").default("no").$type<"yes" | "no">(),
+  followUpDate: date("follow_up_date"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertNonFaceToFaceServiceLogSchema = createInsertSchema(nonFaceToFaceServiceLogs, {
+  method: z.enum(["email", "phone", "video_call", "plan_review", "document_review"]),
+  contactDateTime: z.coerce.date(),
+  followUpRequired: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertNonFaceToFaceServiceLog = z.infer<typeof insertNonFaceToFaceServiceLogSchema>;
+export type NonFaceToFaceServiceLog = typeof nonFaceToFaceServiceLogs.$inferSelect;
+
+// ============================================
+// REUSABLE DIAGNOSES DATABASE
+// ============================================
+
+export const diagnoses = pgTable("diagnoses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  name: text("name").notNull(),
+  icdCode: text("icd_code"), // ICD-10 code if applicable
+  category: text("category"), // e.g., "Neurological", "Cardiovascular", "Mental Health"
+  description: text("description"),
+  
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDiagnosisSchema = createInsertSchema(diagnoses, {
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDiagnosis = z.infer<typeof insertDiagnosisSchema>;
+export type Diagnosis = typeof diagnoses.$inferSelect;
+
+// Client Diagnoses - links clients to diagnoses
+export const clientDiagnoses = pgTable("client_diagnoses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  diagnosisId: varchar("diagnosis_id").notNull().references(() => diagnoses.id, { onDelete: "cascade" }),
+  
+  isPrimary: text("is_primary").default("no").$type<"yes" | "no">(),
+  diagnosedDate: date("diagnosed_date"),
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertClientDiagnosisSchema = createInsertSchema(clientDiagnoses, {
+  isPrimary: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertClientDiagnosis = z.infer<typeof insertClientDiagnosisSchema>;
+export type ClientDiagnosis = typeof clientDiagnoses.$inferSelect;
