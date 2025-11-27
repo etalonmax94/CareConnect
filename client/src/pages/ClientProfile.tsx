@@ -3088,7 +3088,10 @@ export default function ClientProfile() {
                                 <SelectValue placeholder="Select staff member..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {staffList.filter(s => !staffPreferences.some(p => p.staffId === s.id && p.isActive === "yes")).map(staff => (
+                                {staffList
+                                  .filter(s => !staffPreferences.some(p => p.staffId === s.id && p.isActive === "yes"))
+                                  .filter(s => !staffRestrictions.some(r => r.staffId === s.id && r.isActive === "yes"))
+                                  .map(staff => (
                                   <SelectItem key={staff.id} value={staff.id}>
                                     {staff.name} ({(staff.role || "staff").replace("_", " ")})
                                   </SelectItem>
@@ -3219,7 +3222,10 @@ export default function ClientProfile() {
                                 <SelectValue placeholder="Select staff member..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {staffList.filter(s => !staffRestrictions.some(r => r.staffId === s.id && r.isActive === "yes")).map(staff => (
+                                {staffList
+                                  .filter(s => !staffRestrictions.some(r => r.staffId === s.id && r.isActive === "yes"))
+                                  .filter(s => !staffPreferences.some(p => p.staffId === s.id && p.isActive === "yes"))
+                                  .map(staff => (
                                   <SelectItem key={staff.id} value={staff.id}>
                                     {staff.name} ({(staff.role || "staff").replace("_", " ")})
                                   </SelectItem>
