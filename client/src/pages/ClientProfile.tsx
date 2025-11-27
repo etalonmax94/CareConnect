@@ -2687,12 +2687,12 @@ export default function ClientProfile() {
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <Label>Select Care Manager</Label>
-                      <Select value={editCareManagerId} onValueChange={setEditCareManagerId}>
+                      <Select value={editCareManagerId || "none"} onValueChange={(v) => setEditCareManagerId(v === "none" ? "" : v)}>
                         <SelectTrigger data-testid="select-care-manager-team">
                           <SelectValue placeholder="Select a Care Manager..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No Care Manager</SelectItem>
+                          <SelectItem value="none">No Care Manager</SelectItem>
                           {staffList.filter(s => s.role === "care_manager" || s.role === "admin").map((staff) => (
                             <SelectItem key={staff.id} value={staff.id}>{staff.name}</SelectItem>
                           ))}
@@ -2730,10 +2730,10 @@ export default function ClientProfile() {
                             <ChevronRight className="w-4 h-4" />
                           </Link>
                         </div>
-                        {careManagerStaff.phone && (
+                        {careManagerStaff.phoneNumber && (
                           <div className="flex items-center gap-2 text-sm">
                             <Phone className="w-4 h-4 text-muted-foreground" />
-                            <a href={`tel:${careManagerStaff.phone}`} className="text-primary hover:underline">{careManagerStaff.phone}</a>
+                            <a href={`tel:${careManagerStaff.phoneNumber}`} className="text-primary hover:underline">{careManagerStaff.phoneNumber}</a>
                           </div>
                         )}
                         {careManagerStaff.email && (
@@ -2799,12 +2799,12 @@ export default function ClientProfile() {
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <Label>Select Support Coordinator</Label>
-                      <Select value={editSupportCoordinatorId} onValueChange={setEditSupportCoordinatorId}>
+                      <Select value={editSupportCoordinatorId || "none"} onValueChange={(v) => setEditSupportCoordinatorId(v === "none" ? "" : v)}>
                         <SelectTrigger data-testid="select-support-coordinator-team">
                           <SelectValue placeholder="Select a Support Coordinator..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No Coordinator</SelectItem>
+                          <SelectItem value="none">No Coordinator</SelectItem>
                           {supportCoordinatorsList.map((sc) => (
                             <SelectItem key={sc.id} value={sc.id}>{sc.name} - {sc.organisation}</SelectItem>
                           ))}
