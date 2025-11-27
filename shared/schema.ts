@@ -152,8 +152,8 @@ export const clients = pgTable("clients", {
   onboardedAt: timestamp("onboarded_at"),
   onboardedBy: varchar("onboarded_by"),
   
-  // Risk assessment score (1-10) for clinical priority
-  riskAssessmentScore: text("risk_assessment_score").$type<"1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10">(),
+  // Risk assessment score (Level 1-5) for clinical priority
+  riskAssessmentScore: text("risk_assessment_score").$type<"Level 1" | "Level 2" | "Level 3" | "Level 4" | "Level 5">(),
   riskAssessmentDate: date("risk_assessment_date"),
   riskAssessmentNotes: text("risk_assessment_notes"),
   

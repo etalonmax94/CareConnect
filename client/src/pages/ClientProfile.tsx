@@ -526,6 +526,76 @@ export default function ClientProfile() {
     }
   };
 
+  // Inline editing state for quick edits directly on profile
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editRiskScore, setEditRiskScore] = useState<string>("");
+  const [editAllergies, setEditAllergies] = useState<string>("");
+  const [editPhone, setEditPhone] = useState<string>("");
+  const [editEmail, setEditEmail] = useState<string>("");
+  const [editMainDiagnosis, setEditMainDiagnosis] = useState<string>("");
+  
+  // Inline field update mutation
+  const updateFieldMutation = useMutation({
+    mutationFn: async (data: Partial<Client>) => {
+      return apiRequest("PATCH", `/api/clients/${params?.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      setEditingField(null);
+      toast({ title: "Updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  const startEditing = (field: string) => {
+    if (isArchived) return;
+    setEditingField(field);
+    switch (field) {
+      case "riskScore":
+        setEditRiskScore(client?.riskAssessmentScore || "");
+        break;
+      case "allergies":
+        setEditAllergies(client?.allergies || "");
+        break;
+      case "phone":
+        setEditPhone(client?.phoneNumber || "");
+        break;
+      case "email":
+        setEditEmail(client?.email || "");
+        break;
+      case "mainDiagnosis":
+        setEditMainDiagnosis(client?.mainDiagnosis || "");
+        break;
+    }
+  };
+
+  const saveField = (field: string) => {
+    switch (field) {
+      case "riskScore":
+        updateFieldMutation.mutate({ riskAssessmentScore: editRiskScore as any });
+        break;
+      case "allergies":
+        updateFieldMutation.mutate({ allergies: editAllergies });
+        break;
+      case "phone":
+        updateFieldMutation.mutate({ phoneNumber: editPhone });
+        break;
+      case "email":
+        updateFieldMutation.mutate({ email: editEmail });
+        break;
+      case "mainDiagnosis":
+        updateFieldMutation.mutate({ mainDiagnosis: editMainDiagnosis });
+        break;
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingField(null);
+  };
+
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [noteType, setNoteType] = useState<"progress" | "clinical" | "incident" | "complaint" | "feedback">("progress");
@@ -1171,30 +1241,56 @@ export default function ClientProfile() {
                 </Card>
                 <Card 
                   className="bg-card hover-elevate cursor-pointer"
-                  onClick={() => setActiveSection("details")}
+                  onClick={() => !editingField && startEditing("riskScore")}
                   data-testid="card-risk-score"
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                       <span className="text-xs text-muted-foreground font-medium">Risk Score</span>
+                      {!isArchived && !editingField && (
+                        <Pencil className="w-3 h-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                      )}
                     </div>
-                    {client.riskAssessmentScore ? (
+                    {editingField === "riskScore" ? (
+                      <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Select value={editRiskScore} onValueChange={setEditRiskScore}>
+                          <SelectTrigger className="h-8 text-xs" data-testid="select-risk-score-inline">
+                            <SelectValue placeholder="Select level..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Level 1">Level 1 (Lowest)</SelectItem>
+                            <SelectItem value="Level 2">Level 2</SelectItem>
+                            <SelectItem value="Level 3">Level 3</SelectItem>
+                            <SelectItem value="Level 4">Level 4</SelectItem>
+                            <SelectItem value="Level 5">Level 5 (Highest)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-1">
+                          <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("riskScore")} disabled={updateFieldMutation.isPending} data-testid="button-save-risk-score">
+                            {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing} data-testid="button-cancel-risk-score">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : client.riskAssessmentScore ? (
                       <div className="flex items-center gap-2">
                         <Badge className={`${
-                          parseInt(client.riskAssessmentScore) <= 3 ? 'bg-emerald-500' :
-                          parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
+                          client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'bg-emerald-500' :
+                          client.riskAssessmentScore === 'Level 3' ? 'bg-amber-500' :
                           'bg-red-500'
                         } text-white border-0 text-xs`}>
-                          {client.riskAssessmentScore}/10
+                          {client.riskAssessmentScore}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
-                          {parseInt(client.riskAssessmentScore) <= 3 ? 'Low' :
-                           parseInt(client.riskAssessmentScore) <= 6 ? 'Medium' : 'High'}
+                          {client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'Low Risk' :
+                           client.riskAssessmentScore === 'Level 3' ? 'Medium Risk' : 'High Risk'}
                         </span>
                       </div>
                     ) : (
-                      <p className="text-sm font-semibold">Not assessed</p>
+                      <p className="text-sm font-semibold text-muted-foreground">Click to assess</p>
                     )}
                   </CardContent>
                 </Card>
@@ -1224,37 +1320,104 @@ export default function ClientProfile() {
                         <Phone className="w-4 h-4" />
                         Contact Information
                       </CardTitle>
+                      <p className="text-xs text-muted-foreground">Click fields to edit</p>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {client.phoneNumber && (
-                          <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                            <Phone className="w-4 h-4 text-muted-foreground" />
-                            <div className="flex-1 min-w-0">
+                        {/* Phone - Inline Editable */}
+                        <div 
+                          className={`flex items-center gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "phone" ? "cursor-pointer hover-elevate" : ""}`}
+                          onClick={() => editingField !== "phone" && startEditing("phone")}
+                          data-testid="field-phone"
+                        >
+                          <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
                               <p className="text-xs text-muted-foreground">Phone</p>
-                              <a href={`tel:${client.phoneNumber}`} className="text-sm font-medium hover:text-primary">
+                              {!isArchived && editingField !== "phone" && (
+                                <Pencil className="w-3 h-3 text-muted-foreground" />
+                              )}
+                            </div>
+                            {editingField === "phone" ? (
+                              <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                  value={editPhone}
+                                  onChange={(e) => setEditPhone(e.target.value)}
+                                  placeholder="Enter phone number..."
+                                  className="h-8 text-sm"
+                                  data-testid="input-phone-inline"
+                                />
+                                <div className="flex gap-1">
+                                  <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("phone")} disabled={updateFieldMutation.isPending}>
+                                    {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : client.phoneNumber ? (
+                              <a href={`tel:${client.phoneNumber}`} className="text-sm font-medium hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                 {client.phoneNumber}
                               </a>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(client.phoneNumber!, 'Phone')}>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Click to add</p>
+                            )}
+                          </div>
+                          {client.phoneNumber && editingField !== "phone" && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); copyToClipboard(client.phoneNumber!, 'Phone'); }}>
                               <Copy className="w-3 h-3" />
                             </Button>
-                          </div>
-                        )}
-                        {client.email && (
-                          <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                            <Mail className="w-4 h-4 text-muted-foreground" />
-                            <div className="flex-1 min-w-0">
+                          )}
+                        </div>
+
+                        {/* Email - Inline Editable */}
+                        <div 
+                          className={`flex items-center gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "email" ? "cursor-pointer hover-elevate" : ""}`}
+                          onClick={() => editingField !== "email" && startEditing("email")}
+                          data-testid="field-email"
+                        >
+                          <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
                               <p className="text-xs text-muted-foreground">Email</p>
-                              <a href={`mailto:${client.email}`} className="text-sm font-medium hover:text-primary truncate block" data-testid="text-client-email">
+                              {!isArchived && editingField !== "email" && (
+                                <Pencil className="w-3 h-3 text-muted-foreground" />
+                              )}
+                            </div>
+                            {editingField === "email" ? (
+                              <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                  value={editEmail}
+                                  onChange={(e) => setEditEmail(e.target.value)}
+                                  placeholder="Enter email address..."
+                                  type="email"
+                                  className="h-8 text-sm"
+                                  data-testid="input-email-inline"
+                                />
+                                <div className="flex gap-1">
+                                  <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("email")} disabled={updateFieldMutation.isPending}>
+                                    {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : client.email ? (
+                              <a href={`mailto:${client.email}`} className="text-sm font-medium hover:text-primary truncate block" data-testid="text-client-email" onClick={(e) => e.stopPropagation()}>
                                 {client.email}
                               </a>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(client.email!, 'Email')}>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Click to add</p>
+                            )}
+                          </div>
+                          {client.email && editingField !== "email" && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); copyToClipboard(client.email!, 'Email'); }}>
                               <Copy className="w-3 h-3" />
                             </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                       
                       {/* Notification Preferences */}
@@ -1600,29 +1763,132 @@ export default function ClientProfile() {
                       <Stethoscope className="w-4 h-4 text-primary" />
                       Clinical Details
                     </CardTitle>
-                    <p className="text-xs text-muted-foreground">Critical info displayed in Overview alerts</p>
+                    <p className="text-xs text-muted-foreground">Critical info displayed in Overview alerts - click fields to edit</p>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Main Diagnosis</p>
-                        <p className="text-sm mt-1 font-medium">{client.mainDiagnosis || "Not provided"}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Risk Score</p>
-                        <div className="mt-1 flex items-center gap-2">
-                          {client.riskAssessmentScore ? (
-                            <Badge className={`${
-                              parseInt(client.riskAssessmentScore) <= 3 ? 'bg-emerald-500' :
-                              parseInt(client.riskAssessmentScore) <= 6 ? 'bg-amber-500' :
-                              'bg-red-500'
-                            } text-white border-0`}>
-                              {client.riskAssessmentScore}/10
-                            </Badge>
-                          ) : (
-                            <span className="text-sm font-semibold">Not assessed</span>
+                      {/* Main Diagnosis - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "mainDiagnosis" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "mainDiagnosis" && startEditing("mainDiagnosis")}
+                        data-testid="field-main-diagnosis"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Main Diagnosis</p>
+                          {!isArchived && editingField !== "mainDiagnosis" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
                           )}
                         </div>
+                        {editingField === "mainDiagnosis" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editMainDiagnosis}
+                              onChange={(e) => setEditMainDiagnosis(e.target.value)}
+                              placeholder="Enter diagnosis..."
+                              className="h-8 text-sm"
+                              data-testid="input-main-diagnosis-inline"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("mainDiagnosis")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.mainDiagnosis || "Click to add"}</p>
+                        )}
+                      </div>
+
+                      {/* Risk Score - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "riskScore" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "riskScore" && startEditing("riskScore")}
+                        data-testid="field-risk-score"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Risk Score</p>
+                          {!isArchived && editingField !== "riskScore" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "riskScore" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Select value={editRiskScore} onValueChange={setEditRiskScore}>
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue placeholder="Select level..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Level 1">Level 1 (Lowest)</SelectItem>
+                                <SelectItem value="Level 2">Level 2</SelectItem>
+                                <SelectItem value="Level 3">Level 3</SelectItem>
+                                <SelectItem value="Level 4">Level 4</SelectItem>
+                                <SelectItem value="Level 5">Level 5 (Highest)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("riskScore")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-1 flex items-center gap-2">
+                            {client.riskAssessmentScore ? (
+                              <Badge className={`${
+                                client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'bg-emerald-500' :
+                                client.riskAssessmentScore === 'Level 3' ? 'bg-amber-500' :
+                                'bg-red-500'
+                              } text-white border-0`}>
+                                {client.riskAssessmentScore}
+                              </Badge>
+                            ) : (
+                              <span className="text-sm font-medium text-muted-foreground">Click to assess</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Allergies - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors md:col-span-2 ${!isArchived && editingField !== "allergies" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "allergies" && startEditing("allergies")}
+                        data-testid="field-allergies"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">Allergies</p>
+                          {!isArchived && editingField !== "allergies" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "allergies" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editAllergies}
+                              onChange={(e) => setEditAllergies(e.target.value)}
+                              placeholder="List any known allergies..."
+                              className="h-8 text-sm border-red-200 dark:border-red-800"
+                              data-testid="input-allergies-inline"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("allergies")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : client.allergies ? (
+                          <p className="text-sm mt-1 font-medium text-red-600 dark:text-red-400">{client.allergies}</p>
+                        ) : (
+                          <p className="text-sm mt-1 text-muted-foreground">No known allergies (click to add)</p>
+                        )}
                       </div>
                     </div>
                   </CardContent>

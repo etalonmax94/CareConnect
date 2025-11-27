@@ -441,27 +441,6 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                 <FormField
                   control={form.control}
-                  name="allergies"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel className="text-red-600 dark:text-red-400 font-bold">Allergies</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value || ""}
-                          placeholder="List any known allergies..."
-                          className="border-red-200 dark:border-red-800 focus:border-red-400"
-                          data-testid="input-allergies"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-
-                <FormField
-                  control={form.control}
                   name="communicationNeeds"
                   render={({ field }) => (
                     <FormItem>
@@ -1139,6 +1118,59 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                 <CardTitle className="text-base">Clinical Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Allergies - Critical Clinical Info */}
+                <FormField
+                  control={form.control}
+                  name="allergies"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-red-600 dark:text-red-400 font-bold">Allergies</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          placeholder="List any known allergies..."
+                          className="border-red-200 dark:border-red-800 focus:border-red-400"
+                          data-testid="input-allergies"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Critical: This will be displayed prominently on the client's profile
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Risk Assessment Score */}
+                <FormField
+                  control={form.control}
+                  name="riskAssessmentScore"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-amber-600 dark:text-amber-400 font-bold">Risk Score</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger className="border-amber-200 dark:border-amber-800" data-testid="select-risk-score">
+                            <SelectValue placeholder="Select risk level..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Level 1">Level 1 (Lowest Risk)</SelectItem>
+                          <SelectItem value="Level 2">Level 2 (Low Risk)</SelectItem>
+                          <SelectItem value="Level 3">Level 3 (Medium Risk)</SelectItem>
+                          <SelectItem value="Level 4">Level 4 (High Risk)</SelectItem>
+                          <SelectItem value="Level 5">Level 5 (Highest Risk)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Clinical priority assessment for care planning
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="mainDiagnosis"
