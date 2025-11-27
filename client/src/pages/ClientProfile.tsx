@@ -1990,21 +1990,14 @@ export default function ClientProfile() {
                         )}
                       </div>
 
-                      {/* Emergency Contact and EPOA - share row when both have data */}
-                      {(() => {
-                        const emergencyContactsData = clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes");
-                        const hasEmergencyData = emergencyContactsData.length > 0 || client.nokEpoa;
-                        const hasEpoaData = client.epoa;
-                        const showBothInRow = hasEmergencyData && hasEpoaData;
-                        
-                        return (
-                          <div className={`grid gap-3 ${showBothInRow ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
-                            {/* Emergency Contact - Highlighted block - Inline Editable */}
-                            <div 
-                              className={`p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 ${!isArchived && editingField !== "emergencyContact" ? "cursor-pointer hover-elevate" : ""}`}
-                              onClick={() => editingField !== "emergencyContact" && startEditing("emergencyContact")}
-                              data-testid="field-emergency-contact"
-                            >
+                      {/* Emergency Contact and EPOA - always share row on medium+ screens */}
+                      <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                        {/* Emergency Contact - Highlighted block - Inline Editable */}
+                        <div 
+                          className={`p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 ${!isArchived && editingField !== "emergencyContact" ? "cursor-pointer hover-elevate" : ""}`}
+                          onClick={() => editingField !== "emergencyContact" && startEditing("emergencyContact")}
+                          data-testid="field-emergency-contact"
+                        >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                   <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -2054,7 +2047,8 @@ export default function ClientProfile() {
                                   </div>
                                 </div>
                               ) : (() => {
-                                if (emergencyContactsData.length > 0) {
+                          const emergencyContactsData = clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes");
+                          if (emergencyContactsData.length > 0) {
                                   return (
                                     <div className="space-y-2">
                                       {emergencyContactsData.slice(0, 2).map((contact) => (
@@ -2184,8 +2178,6 @@ export default function ClientProfile() {
                               )}
                             </div>
                           </div>
-                        );
-                      })()}
                     </CardContent>
                   </Card>
 
