@@ -294,6 +294,33 @@ export const selectClientSchema = createSelectSchema(clients);
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 
+// Client Status type
+export type ClientStatus = "Active" | "Hospital" | "Paused" | "Discharged";
+
+// Client Status Change Log - tracks all status changes with reasons
+export const clientStatusLogs = pgTable("client_status_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  previousStatus: text("previous_status").$type<ClientStatus | null>(),
+  newStatus: text("new_status").notNull().$type<ClientStatus>(),
+  reason: text("reason"),
+  changedBy: varchar("changed_by").notNull(), // User ID who made the change
+  changedByName: text("changed_by_name"), // User name for display
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertClientStatusLogSchema = createInsertSchema(clientStatusLogs, {
+  previousStatus: z.enum(["Active", "Hospital", "Paused", "Discharged"]).nullable().optional(),
+  newStatus: z.enum(["Active", "Hospital", "Paused", "Discharged"]),
+  reason: z.string().optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertClientStatusLog = z.infer<typeof insertClientStatusLogSchema>;
+export type ClientStatusLog = typeof clientStatusLogs.$inferSelect;
+
 // Helper function to format client number as "C-X"
 export function formatClientNumber(clientNumber?: number | null): string {
   if (!clientNumber) return "";

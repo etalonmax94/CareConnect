@@ -3826,6 +3826,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== CLIENT STATUS ROUTES ====================
+  
+  // Get client status history
+  app.get("/api/clients/:id/status-logs", async (req, res) => {
+    try {
+      const logs = await storage.getClientStatusLogs(req.params.id);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching status logs:", error);
+      res.status(500).json({ error: "Failed to fetch status logs" });
+    }
+  });
+
+  // Update client status with reason
+  app.post("/api/clients/:id/status", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const { status, reason } = req.body;
+      
+      if (!status || !["Active", "Hospital", "Paused", "Discharged"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status. Must be Active, Hospital, Paused, or Discharged" });
+      }
+      
+      const userId = req.session.user.id || "unknown";
+      const userName = req.session.user.name || req.session.user.email || "Unknown";
+      
+      const client = await storage.updateClientStatus(
+        req.params.id,
+        status,
+        reason || "",
+        userId,
+        userName
+      );
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      // Log activity
+      await storage.logActivity({
+        clientId: req.params.id,
+        action: "client_status_changed",
+        description: `Client status changed to ${status}${reason ? `: ${reason}` : ""} by ${userName}`,
+        performedBy: req.session.user.email || "System"
+      });
+      
+      res.json(client);
+    } catch (error) {
+      console.error("Error updating client status:", error);
+      res.status(500).json({ error: "Failed to update client status" });
+    }
+  });
+
   // ==================== NDIS PRICE GUIDE ROUTES ====================
   
   // Get all price guide items

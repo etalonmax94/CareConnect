@@ -25,7 +25,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator, ClientStaffPreference, ClientStaffRestriction } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator, ClientStaffPreference, ClientStaffRestriction, ClientStatusLog } from "@shared/schema";
 import { calculateAge, formatClientNumber } from "@shared/schema";
 import ClientLocationMap from "@/components/ClientLocationMap";
 import CarePlanTab from "@/components/CarePlanTab";
@@ -170,6 +170,41 @@ export default function ClientProfile() {
   const [restrictionStaffId, setRestrictionStaffId] = useState("");
   const [restrictionReason, setRestrictionReason] = useState("");
   const [restrictionSeverity, setRestrictionSeverity] = useState<"warning" | "soft_block" | "hard_block">("hard_block");
+
+  // Client status dialog state
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [newStatus, setNewStatus] = useState<string>("");
+  const [statusReason, setStatusReason] = useState("");
+
+  // Fetch status logs
+  const { data: statusLogs = [], isLoading: isLoadingStatusLogs } = useQuery<ClientStatusLog[]>({
+    queryKey: ["/api/clients", params?.id, "status-logs"],
+    enabled: !!params?.id && statusDialogOpen,
+  });
+
+  // Update client status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async (data: { status: string; reason: string }) => {
+      return apiRequest("POST", `/api/clients/${params?.id}/status`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", params?.id, "status-logs"] });
+      setNewStatus("");
+      setStatusReason("");
+      toast({
+        title: "Status Updated",
+        description: "Client status has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    },
+  });
 
   const addAssignmentMutation = useMutation({
     mutationFn: async (data: { staffId: string; assignmentType: string }) => {
@@ -1154,21 +1189,26 @@ export default function ClientProfile() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
               <h1 className="text-lg sm:text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
-              {/* Interactive Status Badge */}
+              {/* Interactive Status Badge - Click to view/change status */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge 
-                    className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs border-0 text-white cursor-default ${
-                      isArchived ? "bg-slate-500 hover:bg-slate-600" :
-                      client.status === "Hospital" ? "bg-orange-500 hover:bg-orange-600" :
-                      client.status === "Paused" ? "bg-amber-500 hover:bg-amber-600" :
-                      client.status === "Discharged" ? "bg-red-500 hover:bg-red-600" :
-                      "bg-emerald-500 hover:bg-emerald-600"
-                    }`}
+                  <span 
+                    className="inline-flex cursor-pointer"
+                    onClick={() => !isArchived && setStatusDialogOpen(true)}
                     data-testid="badge-client-status"
                   >
-                    {isArchived ? 'Archived' : (client.status || 'Active')}
-                  </Badge>
+                    <Badge 
+                      className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs border-0 text-white ${
+                        isArchived ? "bg-slate-500 hover:bg-slate-600" :
+                        client.status === "Hospital" ? "bg-orange-500 hover:bg-orange-600" :
+                        client.status === "Paused" ? "bg-amber-500 hover:bg-amber-600" :
+                        client.status === "Discharged" ? "bg-red-500 hover:bg-red-600" :
+                        "bg-emerald-500 hover:bg-emerald-600"
+                      }`}
+                    >
+                      {isArchived ? 'Archived' : (client.status || 'Active')}
+                    </Badge>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   <div className="space-y-1">
@@ -1178,13 +1218,8 @@ export default function ClientProfile() {
                         Changed on {new Date(client.statusChangedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </p>
                     )}
-                    {client.statusChangedBy && (
-                      <p className="text-xs text-muted-foreground">By: {client.statusChangedBy}</p>
-                    )}
-                    {!client.statusChangedAt && !isArchived && (
-                      <p className="text-xs text-muted-foreground">
-                        Since registration on {client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Unknown'}
-                      </p>
+                    {!isArchived && (
+                      <p className="text-xs text-muted-foreground font-medium mt-1">Click to view history & change status</p>
                     )}
                     {isArchived && client.archivedAt && (
                       <p className="text-xs text-muted-foreground">
@@ -4792,6 +4827,177 @@ export default function ClientProfile() {
           currentSchedule={client.serviceSchedule as any}
           currentFrequencyText={client.frequencyOfServices}
         />
+        
+        {/* Client Status Dialog */}
+        <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                Client Status
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {/* Current Status */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <span className="text-sm font-medium">Current Status</span>
+                <Badge 
+                  className={`text-white border-0 ${
+                    client.status === "Hospital" ? "bg-orange-500" :
+                    client.status === "Paused" ? "bg-amber-500" :
+                    client.status === "Discharged" ? "bg-red-500" :
+                    "bg-emerald-500"
+                  }`}
+                >
+                  {client.status || "Active"}
+                </Badge>
+              </div>
+
+              {/* Change Status Form */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Change Status</Label>
+                <Select value={newStatus} onValueChange={setNewStatus}>
+                  <SelectTrigger data-testid="select-new-status">
+                    <SelectValue placeholder="Select new status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">
+                      <span className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Active
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="Hospital">
+                      <span className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-orange-500" />
+                        Hospital
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="Paused">
+                      <span className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                        Paused
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="Discharged">
+                      <span className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                        Discharged
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {newStatus && (
+                  <>
+                    <Label className="text-sm font-medium">Reason for change</Label>
+                    <Textarea
+                      placeholder="Enter reason for status change..."
+                      value={statusReason}
+                      onChange={(e) => setStatusReason(e.target.value)}
+                      className="min-h-[80px]"
+                      data-testid="input-status-reason"
+                    />
+                    <Button
+                      onClick={() => {
+                        if (newStatus) {
+                          updateStatusMutation.mutate({ status: newStatus, reason: statusReason });
+                        }
+                      }}
+                      disabled={updateStatusMutation.isPending || newStatus === (client.status || "Active")}
+                      className="w-full"
+                      data-testid="button-update-status"
+                    >
+                      {updateStatusMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : null}
+                      Update Status
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Status History */}
+              <Separator />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Status History
+                </Label>
+                
+                <ScrollArea className="h-[200px] pr-4">
+                  {isLoadingStatusLogs ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  ) : statusLogs.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p>No status changes recorded</p>
+                      <p className="text-xs mt-1">
+                        Status has been {client.status || "Active"} since registration
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {statusLogs.map((log, index) => (
+                        <div 
+                          key={log.id} 
+                          className={`relative pl-4 pb-3 ${index !== statusLogs.length - 1 ? "border-l-2 border-muted" : ""}`}
+                        >
+                          <div className="absolute -left-1.5 top-1 w-3 h-3 rounded-full bg-background border-2 border-muted" />
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {log.previousStatus && (
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${
+                                    log.previousStatus === "Hospital" ? "border-orange-300 text-orange-600" :
+                                    log.previousStatus === "Paused" ? "border-amber-300 text-amber-600" :
+                                    log.previousStatus === "Discharged" ? "border-red-300 text-red-600" :
+                                    "border-emerald-300 text-emerald-600"
+                                  }`}
+                                >
+                                  {log.previousStatus}
+                                </Badge>
+                              )}
+                              <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                              <Badge 
+                                className={`text-xs text-white border-0 ${
+                                  log.newStatus === "Hospital" ? "bg-orange-500" :
+                                  log.newStatus === "Paused" ? "bg-amber-500" :
+                                  log.newStatus === "Discharged" ? "bg-red-500" :
+                                  "bg-emerald-500"
+                                }`}
+                              >
+                                {log.newStatus}
+                              </Badge>
+                            </div>
+                            {log.reason && (
+                              <p className="text-sm text-muted-foreground">{log.reason}</p>
+                            )}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{new Date(log.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                              <span>•</span>
+                              <span>{new Date(log.createdAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</span>
+                              {log.changedByName && (
+                                <>
+                                  <span>•</span>
+                                  <span>By {log.changedByName}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         </>
       )}
     </div>

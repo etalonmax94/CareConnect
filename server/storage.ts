@@ -14,6 +14,7 @@ import {
   formTemplates, formTemplateFields, formSubmissions, formSubmissionValues, formSignatures,
   appointmentTypeRequiredForms,
   nonFaceToFaceServiceLogs, diagnoses, clientDiagnoses,
+  clientStatusLogs,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -58,7 +59,8 @@ import {
   type InsertAppointmentTypeRequiredForm, type AppointmentTypeRequiredForm,
   type InsertNonFaceToFaceServiceLog, type NonFaceToFaceServiceLog,
   type InsertDiagnosis, type Diagnosis,
-  type InsertClientDiagnosis, type ClientDiagnosis
+  type InsertClientDiagnosis, type ClientDiagnosis,
+  type InsertClientStatusLog, type ClientStatusLog
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
@@ -78,6 +80,11 @@ export interface IStorage {
   restoreClient(id: string): Promise<Client | undefined>;
   getUpcomingBirthdays(days: number): Promise<Client[]>;
   getDistinctDiagnoses(search?: string): Promise<string[]>;
+  
+  // Client Status Logs
+  getClientStatusLogs(clientId: string): Promise<ClientStatusLog[]>;
+  createClientStatusLog(log: InsertClientStatusLog): Promise<ClientStatusLog>;
+  updateClientStatus(clientId: string, newStatus: string, reason: string, userId: string, userName: string): Promise<Client | undefined>;
   
   // Progress Notes
   getAllProgressNotes(): Promise<ProgressNote[]>;
@@ -671,6 +678,49 @@ export class DbStorage implements IStorage {
       .limit(50);
     
     return result.map(r => r.diagnosis).filter(Boolean) as string[];
+  }
+
+  // Client Status Logs
+  async getClientStatusLogs(clientId: string): Promise<ClientStatusLog[]> {
+    return await db.select().from(clientStatusLogs)
+      .where(eq(clientStatusLogs.clientId, clientId))
+      .orderBy(desc(clientStatusLogs.createdAt));
+  }
+
+  async createClientStatusLog(log: InsertClientStatusLog): Promise<ClientStatusLog> {
+    const result = await db.insert(clientStatusLogs).values(log).returning();
+    return result[0];
+  }
+
+  async updateClientStatus(clientId: string, newStatus: string, reason: string, userId: string, userName: string): Promise<Client | undefined> {
+    // Get current client to record previous status
+    const client = await this.getClientById(clientId);
+    if (!client) return undefined;
+
+    const previousStatus = client.status || "Active";
+
+    // Create status log entry
+    await this.createClientStatusLog({
+      clientId,
+      previousStatus: previousStatus as "Active" | "Hospital" | "Paused" | "Discharged",
+      newStatus: newStatus as "Active" | "Hospital" | "Paused" | "Discharged",
+      reason,
+      changedBy: userId,
+      changedByName: userName,
+    });
+
+    // Update client status
+    const result = await db.update(clients)
+      .set({
+        status: newStatus as "Active" | "Hospital" | "Paused" | "Discharged",
+        statusChangedAt: new Date(),
+        statusChangedBy: userName,
+        updatedAt: new Date(),
+      })
+      .where(eq(clients.id, clientId))
+      .returning();
+
+    return result[0];
   }
 
   // Progress Notes
