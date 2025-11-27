@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, json, date, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, json, date, serial, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -490,7 +490,8 @@ export type InsertClientDocumentCompliance = z.infer<typeof insertClientDocument
 export type ClientDocumentCompliance = typeof clientDocumentCompliance.$inferSelect;
 
 // Client Goals - Up to 5 goals per client
-export type GoalStatus = "not_started" | "in_progress" | "achieved" | "on_hold";
+export type GoalStatus = "not_started" | "in_progress" | "achieved" | "on_hold" | "archived";
+export type GoalCategory = "health" | "social" | "independence" | "safety" | "financial" | "other";
 
 export const clientGoals = pgTable("client_goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -500,14 +501,24 @@ export const clientGoals = pgTable("client_goals", {
   targetDate: date("target_date"),
   status: text("status").notNull().$type<GoalStatus>().default("not_started"),
   progress: text("progress"),
+  progressPercent: integer("progress_percent").default(0), // 0-100 percentage
+  category: text("category").$type<GoalCategory>().default("other"),
+  responsibleStaffId: varchar("responsible_staff_id").references(() => staff.id, { onDelete: "set null" }),
+  lastReviewDate: date("last_review_date"),
+  nextReviewDate: date("next_review_date"),
+  isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by"),
   order: text("order").default("1"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertClientGoalSchema = createInsertSchema(clientGoals, {
-  status: z.enum(["not_started", "in_progress", "achieved", "on_hold"]).optional(),
+  status: z.enum(["not_started", "in_progress", "achieved", "on_hold", "archived"]).optional(),
+  category: z.enum(["health", "social", "independence", "safety", "financial", "other"]).optional(),
   targetDate: z.string().optional().nullable(),
+  progressPercent: z.number().min(0).max(100).optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -516,6 +527,31 @@ export const insertClientGoalSchema = createInsertSchema(clientGoals, {
 
 export type InsertClientGoal = z.infer<typeof insertClientGoalSchema>;
 export type ClientGoal = typeof clientGoals.$inferSelect;
+
+// Goal Updates - Audit trail for goal changes and notes
+export type GoalUpdateType = "status_change" | "progress_update" | "note" | "review" | "created" | "edited" | "archived" | "unarchived";
+
+export const goalUpdates = pgTable("goal_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  goalId: varchar("goal_id").notNull().references(() => clientGoals.id, { onDelete: "cascade" }),
+  updateType: text("update_type").notNull().$type<GoalUpdateType>(),
+  previousValue: text("previous_value"), // For status/progress changes
+  newValue: text("new_value"), // For status/progress changes
+  note: text("note"), // Additional notes or comments
+  performedBy: varchar("performed_by"),
+  performedByName: text("performed_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGoalUpdateSchema = createInsertSchema(goalUpdates, {
+  updateType: z.enum(["status_change", "progress_update", "note", "review", "created", "edited", "archived", "unarchived"]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertGoalUpdate = z.infer<typeof insertGoalUpdateSchema>;
+export type GoalUpdate = typeof goalUpdates.$inferSelect;
 
 // Invoices
 export const invoices = pgTable("invoices", {

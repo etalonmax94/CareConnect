@@ -3,7 +3,7 @@ import {
   clients, progressNotes, invoices, budgets, settings, activityLog, auditLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   alliedHealthProfessionals,
-  documents, clientStaffAssignments, serviceDeliveries, clientGoals,
+  documents, clientStaffAssignments, serviceDeliveries, clientGoals, goalUpdates,
   clientDocumentFolders, clientDocumentCompliance,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
   clientContacts, clientBehaviors, leadershipMeetingNotes,
@@ -31,6 +31,7 @@ import {
   type InsertClientStaffAssignment, type ClientStaffAssignment,
   type InsertServiceDelivery, type ServiceDelivery,
   type InsertClientGoal, type ClientGoal,
+  type InsertGoalUpdate, type GoalUpdate,
   type InsertNdisPriceGuideItem, type NdisPriceGuideItem,
   type InsertQuote, type Quote, type InsertQuoteLineItem, type QuoteLineItem,
   type InsertQuoteStatusHistory, type QuoteStatusHistory,
@@ -234,6 +235,13 @@ export interface IStorage {
   createGoal(goal: InsertClientGoal): Promise<ClientGoal>;
   updateGoal(id: string, goal: Partial<InsertClientGoal>): Promise<ClientGoal | undefined>;
   deleteGoal(id: string): Promise<boolean>;
+  duplicateGoal(id: string): Promise<ClientGoal | undefined>;
+  archiveGoal(id: string, archivedBy?: string): Promise<ClientGoal | undefined>;
+  unarchiveGoal(id: string): Promise<ClientGoal | undefined>;
+  
+  // Goal Updates (Audit Trail)
+  getGoalUpdates(goalId: string): Promise<GoalUpdate[]>;
+  createGoalUpdate(update: InsertGoalUpdate): Promise<GoalUpdate>;
   
   // Budget Management
   deleteBudget(id: string): Promise<boolean>;
@@ -1550,6 +1558,64 @@ export class DbStorage implements IStorage {
   async deleteGoal(id: string): Promise<boolean> {
     const result = await db.delete(clientGoals).where(eq(clientGoals.id, id)).returning();
     return result.length > 0;
+  }
+
+  async duplicateGoal(id: string): Promise<ClientGoal | undefined> {
+    const original = await this.getGoalById(id);
+    if (!original) return undefined;
+    
+    const newGoal: InsertClientGoal = {
+      clientId: original.clientId,
+      title: `${original.title} (Copy)`,
+      description: original.description,
+      targetDate: original.targetDate,
+      status: "not_started",
+      progress: null,
+      progressPercent: 0,
+      category: original.category || undefined,
+      responsibleStaffId: original.responsibleStaffId,
+      order: original.order,
+    };
+    
+    return await this.createGoal(newGoal);
+  }
+
+  async archiveGoal(id: string, archivedBy?: string): Promise<ClientGoal | undefined> {
+    const result = await db.update(clientGoals)
+      .set({ 
+        isArchived: "yes",
+        archivedAt: new Date(),
+        archivedBy: archivedBy || null,
+        updatedAt: new Date()
+      })
+      .where(eq(clientGoals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async unarchiveGoal(id: string): Promise<ClientGoal | undefined> {
+    const result = await db.update(clientGoals)
+      .set({ 
+        isArchived: "no",
+        archivedAt: null,
+        archivedBy: null,
+        updatedAt: new Date()
+      })
+      .where(eq(clientGoals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Goal Updates (Audit Trail)
+  async getGoalUpdates(goalId: string): Promise<GoalUpdate[]> {
+    return await db.select().from(goalUpdates)
+      .where(eq(goalUpdates.goalId, goalId))
+      .orderBy(desc(goalUpdates.createdAt));
+  }
+
+  async createGoalUpdate(update: InsertGoalUpdate): Promise<GoalUpdate> {
+    const result = await db.insert(goalUpdates).values(update).returning();
+    return result[0];
   }
 
   // Budget Management

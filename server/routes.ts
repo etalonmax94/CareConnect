@@ -3987,6 +3987,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Duplicate goal
+  app.post("/api/goals/:id/duplicate", async (req, res) => {
+    try {
+      // Check goal count for the client first
+      const original = await storage.getGoalById(req.params.id);
+      if (!original) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      
+      const existingGoals = await storage.getGoalsByClient(original.clientId);
+      // Only count non-archived goals
+      const activeGoals = existingGoals.filter(g => g.isArchived !== "yes");
+      if (activeGoals.length >= 5) {
+        return res.status(400).json({ error: "Maximum of 5 active goals per client allowed" });
+      }
+      
+      const duplicated = await storage.duplicateGoal(req.params.id);
+      if (!duplicated) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      
+      // Create audit log entry
+      const performedByName = req.session?.user?.name || req.session?.user?.email || "System";
+      await storage.createGoalUpdate({
+        goalId: duplicated.id,
+        updateType: "created",
+        note: `Duplicated from goal "${original.title}"`,
+        performedBy: req.session?.user?.id || null,
+        performedByName
+      });
+      
+      res.status(201).json(duplicated);
+    } catch (error) {
+      console.error("Error duplicating goal:", error);
+      res.status(500).json({ error: "Failed to duplicate goal" });
+    }
+  });
+
+  // Archive goal
+  app.post("/api/goals/:id/archive", async (req, res) => {
+    try {
+      const goal = await storage.getGoalById(req.params.id);
+      if (!goal) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      
+      const archivedBy = req.session?.user?.name || req.session?.user?.email || "System";
+      const archived = await storage.archiveGoal(req.params.id, archivedBy);
+      
+      if (!archived) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      
+      // Create audit log entry
+      await storage.createGoalUpdate({
+        goalId: archived.id,
+        updateType: "archived",
+        previousValue: goal.status,
+        note: `Goal archived`,
+        performedBy: req.session?.user?.id || null,
+        performedByName: archivedBy
+      });
+      
+      res.json(archived);
+    } catch (error) {
+      console.error("Error archiving goal:", error);
+      res.status(500).json({ error: "Failed to archive goal" });
+    }
+  });
+
+  // Unarchive goal
+  app.post("/api/goals/:id/unarchive", async (req, res) => {
+    try {
+      const goal = await storage.getGoalById(req.params.id);
+      if (!goal) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      
+      // Check goal count for the client
+      const existingGoals = await storage.getGoalsByClient(goal.clientId);
+      const activeGoals = existingGoals.filter(g => g.isArchived !== "yes");
+      if (activeGoals.length >= 5) {
+        return res.status(400).json({ error: "Maximum of 5 active goals per client allowed. Archive an existing goal first." });
+      }
+      
+      const unarchived = await storage.unarchiveGoal(req.params.id);
+      
+      if (!unarchived) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      
+      // Create audit log entry
+      const performedByName = req.session?.user?.name || req.session?.user?.email || "System";
+      await storage.createGoalUpdate({
+        goalId: unarchived.id,
+        updateType: "unarchived",
+        note: `Goal restored from archive`,
+        performedBy: req.session?.user?.id || null,
+        performedByName
+      });
+      
+      res.json(unarchived);
+    } catch (error) {
+      console.error("Error unarchiving goal:", error);
+      res.status(500).json({ error: "Failed to unarchive goal" });
+    }
+  });
+
+  // Get goal updates (audit trail)
+  app.get("/api/goals/:id/updates", async (req, res) => {
+    try {
+      const updates = await storage.getGoalUpdates(req.params.id);
+      res.json(updates);
+    } catch (error) {
+      console.error("Error fetching goal updates:", error);
+      res.status(500).json({ error: "Failed to fetch goal updates" });
+    }
+  });
+
+  // Add a note/update to a goal
+  app.post("/api/goals/:id/updates", async (req, res) => {
+    try {
+      const { updateType, note, previousValue, newValue } = req.body;
+      
+      if (!updateType) {
+        return res.status(400).json({ error: "Update type is required" });
+      }
+      
+      const performedByName = req.session?.user?.name || req.session?.user?.email || "System";
+      const update = await storage.createGoalUpdate({
+        goalId: req.params.id,
+        updateType,
+        note,
+        previousValue,
+        newValue,
+        performedBy: req.session?.user?.id || null,
+        performedByName
+      });
+      
+      res.status(201).json(update);
+    } catch (error) {
+      console.error("Error creating goal update:", error);
+      res.status(500).json({ error: "Failed to create goal update" });
+    }
+  });
+
   // ==================== BUDGET MANAGEMENT ROUTES ====================
   
   // Delete budget
