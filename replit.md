@@ -76,7 +76,31 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 - **Client Diagnoses Association**: Link diagnoses to clients with primary/secondary designation, onset dates, severity, and status tracking.
 - **Clinical Tab Integration**: Diagnoses selector component for the Clinical Tab in client profiles.
 
+#### Document Management System (Folder-Based Organization)
+The document management system now uses a folder-based organization with 10 main categories:
+
+1. **Service Agreement** - Contains the tracked Service Agreement document (annual renewal)
+2. **Participant Assessment and Support Plan** - Parent folder with three sub-folders:
+   - *Care Plans*: Care Plan (6-monthly), Wound Care Plan (as-needed), Personal Emergency Plan (annual)
+   - *Health Summary*: Health Summary (6-monthly), Self Assessment/Medx Tool (annual)
+   - *Medication Consent*: Medication Consent form (annual)
+3. **Participant Consent Form** - Contains the tracked Consent Form document (annual)
+4. **Service Delivery Register** - Multi-document folder for service delivery records (no expiry tracking)
+5. **Risk Assessments** - Contains tracked Risk Assessment (annual) plus additional risk assessment documents
+6. **Progress Notes** - Multi-document folder for historical progress notes (no expiry tracking)
+7. **Progress Reports** - Multi-document folder for historical progress reports (no expiry tracking)
+8. **Complaints/Incidents** - Multi-document folder for incident documentation (no expiry tracking)
+9. **Archive** - Multi-document folder for archived documents (no expiry tracking)
+10. **BlueFolder** - Multi-document folder for external document storage (no expiry tracking)
+
+**Design Principles:**
+- Tracked documents have frequency-based expiry (annual/6-monthly) and show compliance status indicators
+- Multi-document folders are collections of historical records without expiry tracking - intentional for documents like Progress Notes
+- Collapsible folder UI using Shadcn Collapsible components
+- Each folder shows either compliance status (for tracked docs) or file count (for collections)
+
 ### Recent Updates (November 2025)
+- **Document Management Restructure**: Reorganized document management into 10 folder categories with collapsible UI, tracked documents with compliance status, and multi-document collection folders.
 - **HCP to Support at Home Renaming**: All HCP (Home Care Package) references have been renamed to Support at Home (SaH). Field names updated from `hcpNumber`/`hcpFundingLevel` to `sahNumber`/`sahFundingLevel`.
 - **Leadership Field Removal**: The `leadership` field has been removed from the careTeam JSON structure per schema cleanup.
 
