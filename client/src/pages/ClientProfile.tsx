@@ -1177,73 +1177,87 @@ export default function ClientProfile() {
             
             {/* Quick Info Chips - Interactive - Hidden on mobile, shown on tablet+ */}
             <div className="hidden sm:flex items-center gap-2 mt-3 flex-wrap">
+              {/* Age Chip - Purple theme */}
               {clientAge && (
-                <div 
-                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
-                  onClick={() => setActiveSection("details")}
-                  data-testid="chip-age"
-                >
-                  <CalendarDays className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Age</p>
-                    <p className="text-sm font-semibold text-foreground">{clientAge}</p>
-                  </div>
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div 
+                      className="flex items-center gap-2 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                      onClick={() => setActiveSection("details")}
+                      data-testid="chip-age"
+                    >
+                      <CalendarDays className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <div>
+                        <p className="text-[10px] uppercase text-purple-700 dark:text-purple-300 font-medium">Age</p>
+                        <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">{clientAge}</p>
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <div className="space-y-1">
+                      <p className="font-medium">Date of Birth</p>
+                      <p className="text-sm">{client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not set'}</p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
               )}
               
+              {/* Client # Chip - Blue theme */}
               {client.clientNumber && (
-                <div 
-                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
-                  onClick={() => setActiveSection("details")}
-                  data-testid="chip-client-number"
-                >
-                  <User className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Client #</p>
-                    <p className="text-sm font-semibold font-mono text-foreground">{formatClientNumber(client.clientNumber)}</p>
-                  </div>
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div 
+                      className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                      onClick={() => setActiveSection("details")}
+                      data-testid="chip-client-number"
+                    >
+                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <div>
+                        <p className="text-[10px] uppercase text-blue-700 dark:text-blue-300 font-medium">Client #</p>
+                        <p className="text-sm font-semibold font-mono text-blue-800 dark:text-blue-200">{formatClientNumber(client.clientNumber)}</p>
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <div className="space-y-1">
+                      <p className="font-medium">Registered on CRM</p>
+                      <p className="text-sm">{client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Unknown'}</p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
               )}
               
-              {client.category === "NDIS" && getNdisNumber() && (
-                <div 
-                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
-                  onClick={() => setActiveSection("program")}
-                  data-testid="chip-ndis"
-                >
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                  <div>
-                    <p className="text-[10px] uppercase text-muted-foreground font-medium">NDIS</p>
-                    <p className="text-sm font-semibold font-mono text-foreground">{getNdisNumber()}</p>
+              {/* Care Category Chip - Teal theme with program details */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="flex items-center gap-2 bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                    onClick={() => setActiveSection("program")}
+                    data-testid="chip-category"
+                  >
+                    <CreditCard className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    <div>
+                      <p className="text-[10px] uppercase text-teal-700 dark:text-teal-300 font-medium">Care Category</p>
+                      <p className="text-sm font-semibold text-teal-800 dark:text-teal-200">{client.category}</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              {client.category === "Support at Home" && getSahNumber() && (
-                <div 
-                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
-                  onClick={() => setActiveSection("program")}
-                  data-testid="chip-sah"
-                >
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                  <div>
-                    <p className="text-[10px] uppercase text-muted-foreground font-medium">SaH</p>
-                    <p className="text-sm font-semibold font-mono text-foreground">{getSahNumber()}</p>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <div className="space-y-1">
+                    <p className="font-medium">{client.category} Details</p>
+                    {client.category === "NDIS" && (
+                      <p className="text-sm">NDIS #: {getNdisNumber() || 'Not set'}</p>
+                    )}
+                    {client.category === "Support at Home" && (
+                      <p className="text-sm">SaH #: {getSahNumber() || 'Not set'}</p>
+                    )}
+                    {client.category === "Private" && (
+                      <p className="text-sm">Medicare #: {client.medicareNumber || 'Not set'}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Click to view program details</p>
                   </div>
-                </div>
-              )}
-              
-              <div 
-                className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
-                onClick={() => setActiveSection("program")}
-                data-testid="chip-category"
-              >
-                <CreditCard className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-[10px] uppercase text-muted-foreground font-medium">Care Category</p>
-                  <p className="text-sm font-semibold text-foreground">{client.category}</p>
-                </div>
-              </div>
+                </TooltipContent>
+              </Tooltip>
 
               {/* Onboarding Status Chip */}
               {!isArchived && (
