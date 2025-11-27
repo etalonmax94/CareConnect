@@ -8,7 +8,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import CategoryBadge from "./CategoryBadge";
 import FundingTypeBadge from "./FundingTypeBadge";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
-import { Phone, Mail, MoreVertical, Eye, Edit, UserPlus, Archive, Heart, HeartOff, Sparkles } from "lucide-react";
+import { Phone, Mail, MoreVertical, Eye, Edit, UserPlus, Archive, Heart, HeartOff, Sparkles, Stethoscope, Pill, Building2, Briefcase, HeartPulse, UserCog } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocation } from "wouter";
 
 type DensityMode = "compact" | "standard" | "expanded";
@@ -219,9 +220,64 @@ export default function ClientGrid({ clients, onViewClient, density = "standard"
                 )}
 
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {formatCareManagerName(client.careTeam?.careManager)}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      {formatCareManagerName(client.careTeam?.careManager)}
+                    </span>
+                    {/* Care Team Icons */}
+                    <div className="flex items-center gap-0.5 ml-2">
+                      {(client.generalPractitionerId || client.careTeam?.generalPractitioner) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="p-0.5 rounded bg-rose-100 dark:bg-rose-900/30">
+                              <Stethoscope className="w-3 h-3 text-rose-600" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">GP Assigned</TooltipContent>
+                        </Tooltip>
+                      )}
+                      {(client.pharmacyId || client.careTeam?.pharmacy) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="p-0.5 rounded bg-teal-100 dark:bg-teal-900/30">
+                              <Pill className="w-3 h-3 text-teal-600" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">Pharmacy Assigned</TooltipContent>
+                        </Tooltip>
+                      )}
+                      {client.careTeam?.supportCoordinatorId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="p-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30">
+                              <Building2 className="w-3 h-3 text-indigo-600" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">Support Coordinator</TooltipContent>
+                        </Tooltip>
+                      )}
+                      {client.careTeam?.planManagerId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="p-0.5 rounded bg-pink-100 dark:bg-pink-900/30">
+                              <Briefcase className="w-3 h-3 text-pink-600" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">Plan Manager</TooltipContent>
+                        </Tooltip>
+                      )}
+                      {client.careTeam?.alliedHealthProfessionalId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="p-0.5 rounded bg-violet-100 dark:bg-violet-900/30">
+                              <HeartPulse className="w-3 h-3 text-violet-600" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">Allied Health</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
                   <ComplianceIndicator status={complianceStatus} />
                 </div>
               </CardContent>
