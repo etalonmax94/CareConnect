@@ -628,10 +628,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (matchingStaff && user) {
           await storage.updateStaff(matchingStaff.id, { userId: user.id });
           console.log(`Auto-linked user ${userEmail} to staff member ${matchingStaff.name}`);
+        } else if (user) {
+          // Auto-create staff record for Zoho-authenticated user
+          const fullName = [firstName, lastName].filter(Boolean).join(' ') || displayName || userEmail.split('@')[0];
+          
+          // Map Zoho roles to staff roles (staff table has limited role types)
+          let staffRole: "support_worker" | "nurse" | "care_manager" | "admin" = "support_worker";
+          if (preApprovedRoles) {
+            if (preApprovedRoles.includes("director") || preApprovedRoles.includes("operations_manager") || preApprovedRoles.includes("admin")) {
+              staffRole = "admin";
+            } else if (preApprovedRoles.includes("care_manager") || preApprovedRoles.includes("clinical_manager")) {
+              staffRole = "care_manager";
+            } else if (preApprovedRoles.includes("registered_nurse") || preApprovedRoles.includes("enrolled_nurse")) {
+              staffRole = "nurse";
+            }
+          }
+          
+          const newStaff = await storage.createStaff({
+            name: fullName,
+            email: userEmail,
+            role: staffRole,
+            userId: user.id,
+            isActive: "yes"
+          });
+          
+          // Update user with staffId
+          await storage.updateUser(user.id, { staffId: newStaff.id });
+          console.log(`Auto-created staff record for Zoho user ${userEmail}: ${newStaff.id}`);
         }
       } else {
         // Update existing user tokens
         await storage.updateUserTokens(user.id, access_token, refresh_token, expiresAt);
+        
+        // Check if existing user needs a staff record
+        if (!user.staffId) {
+          const existingStaff = await storage.getStaffByEmail(userEmail);
+          if (existingStaff) {
+            // Link to existing staff record
+            await storage.updateUser(user.id, { staffId: existingStaff.id });
+            await storage.updateStaff(existingStaff.id, { userId: user.id });
+            console.log(`Linked existing user ${userEmail} to staff ${existingStaff.id}`);
+          } else {
+            // Create new staff record for existing user
+            const fullName = [firstName, lastName].filter(Boolean).join(' ') || displayName || userEmail.split('@')[0];
+            
+            // Use existing user roles for staff role (staff table has limited role types)
+            let staffRole: "support_worker" | "nurse" | "care_manager" | "admin" = "support_worker";
+            const userRoles = user.roles || [];
+            if (userRoles.includes("director") || userRoles.includes("operations_manager") || userRoles.includes("admin")) {
+              staffRole = "admin";
+            } else if (userRoles.includes("care_manager") || userRoles.includes("clinical_manager")) {
+              staffRole = "care_manager";
+            } else if (userRoles.includes("registered_nurse") || userRoles.includes("enrolled_nurse")) {
+              staffRole = "nurse";
+            }
+            
+            const newStaff = await storage.createStaff({
+              name: fullName,
+              email: userEmail,
+              role: staffRole,
+              userId: user.id,
+              isActive: "yes"
+            });
+            
+            await storage.updateUser(user.id, { staffId: newStaff.id });
+            console.log(`Auto-created staff record for existing user ${userEmail}: ${newStaff.id}`);
+          }
+        }
+        
         user = await storage.getUserById(user.id);
       }
       
