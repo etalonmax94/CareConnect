@@ -228,26 +228,39 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
 
   return (
     <div className="space-y-6">
-      {zohoWorkdriveLink && (
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                <span className="font-medium">Zoho WorkDrive Folder</span>
-              </div>
-              <Button variant="outline" size="sm" asChild>
-                <a href={zohoWorkdriveLink} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open in WorkDrive
-                </a>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {zohoWorkdriveLink && (
+          <Card className="border-blue-300 dark:border-blue-800" data-testid="card-zoho-workdrive">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  Zoho WorkDrive
+                </CardTitle>
+                <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                  Folder
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Status:</span>
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400">
+                  <ExternalLink className="w-3 h-3 mr-1" />
+                  Linked
+                </Badge>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button size="sm" variant="outline" className="flex-1" asChild>
+                  <a href={zohoWorkdriveLink} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-3 h-3 mr-1" />
+                    Open Folder
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {documentList.map((doc) => {
           const uploadedDoc = getUploadedDoc(doc.name);
           // Use uploaded document's auto-calculated expiry date for status
