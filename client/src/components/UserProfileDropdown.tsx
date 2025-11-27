@@ -60,34 +60,28 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
     applyTheme(newTheme);
   };
 
-  const handleSignOut = async () => {
-    console.log('[Auth] Sign out initiated');
-    try {
-      // Clear JWT token from localStorage first
-      removeAuthToken();
-      console.log('[Auth] Token removed from localStorage');
-      
-      // Try to call logout API (for session-based auth)
-      try {
-        await apiRequest("POST", "/api/auth/logout");
-        console.log('[Auth] Logout API called successfully');
-      } catch {
-        console.log('[Auth] Logout API call failed (expected if using JWT only)');
-      }
-      
-      // Clear query cache
-      queryClient.clear();
-      console.log('[Auth] Query cache cleared');
-      
-      // Force full page redirect to login
-      console.log('[Auth] Redirecting to /login');
-      window.location.replace("/login");
-    } catch (error) {
-      console.error("[Auth] Logout failed:", error);
-      // Force redirect even on error
-      removeAuthToken();
-      window.location.replace("/login");
-    }
+  const handleSignOut = () => {
+    console.log('[Auth] Sign out initiated from profile dropdown');
+    
+    // Clear JWT token from localStorage first
+    removeAuthToken();
+    console.log('[Auth] Token removed from localStorage');
+    
+    // Clear query cache
+    queryClient.clear();
+    console.log('[Auth] Query cache cleared');
+    
+    // Call logout API asynchronously but don't wait for it
+    fetch("/api/auth/logout", { 
+      method: "POST",
+      credentials: "include"
+    }).catch(() => {
+      // Ignore errors - logout API is optional
+    });
+    
+    // Force full page redirect to login immediately
+    console.log('[Auth] Redirecting to /login');
+    window.location.href = "/login";
   };
 
   const getInitials = () => {

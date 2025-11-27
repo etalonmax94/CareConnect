@@ -152,7 +152,7 @@ export default function Login() {
               <span className="text-2xl font-bold text-white">EmpowerLink</span>
             </div>
             <p className="text-white/80 text-lg max-w-md">
-              The comprehensive healthcare CRM designed for Australian care providers
+              Our own built and managed healthcare CRM
             </p>
           </div>
 
@@ -206,7 +206,7 @@ export default function Login() {
             </div>
 
             {/* Welcome Text */}
-            <div className="text-center lg:text-left">
+            <div className="text-center">
               <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back</h1>
               <p className="text-muted-foreground">
                 Sign in to access your healthcare CRM dashboard

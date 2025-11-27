@@ -1,6 +1,5 @@
 import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { removeAuthToken } from "@/lib/auth";
 import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 import { cn } from "@/lib/utils";
@@ -91,34 +90,29 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      console.log('[Auth] Sign out initiated from sidebar');
-      // Clear JWT token from localStorage first
-      removeAuthToken();
-      console.log('[Auth] Token removed from localStorage');
-      
-      // Try to call logout API (for session-based auth)
-      try {
-        await apiRequest("POST", "/api/auth/logout", {});
-        console.log('[Auth] Logout API called successfully');
-      } catch {
-        console.log('[Auth] Logout API call failed (expected if using JWT only)');
-      }
-    },
-    onSuccess: () => {
-      queryClient.clear();
-      console.log('[Auth] Query cache cleared, redirecting to /login');
-      window.location.replace("/login");
-    },
-    onError: () => {
-      // Force redirect even on error
-      removeAuthToken();
-      queryClient.clear();
-      console.log('[Auth] Error during logout, forcing redirect to /login');
-      window.location.replace("/login");
-    },
-  });
+  const handleSignOut = () => {
+    console.log('[Auth] Sign out initiated from sidebar');
+    
+    // Clear JWT token from localStorage first
+    removeAuthToken();
+    console.log('[Auth] Token removed from localStorage');
+    
+    // Clear query cache
+    queryClient.clear();
+    console.log('[Auth] Query cache cleared');
+    
+    // Call logout API asynchronously but don't wait for it
+    fetch("/api/auth/logout", { 
+      method: "POST",
+      credentials: "include"
+    }).catch(() => {
+      // Ignore errors - logout API is optional
+    });
+    
+    // Force full page redirect to login immediately
+    console.log('[Auth] Redirecting to /login');
+    window.location.href = "/login";
+  };
 
   const displayName = user?.firstName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
 
@@ -245,8 +239,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   variant="ghost" 
                   size="icon"
                   className="w-full text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  onClick={() => logoutMutation.mutate()}
-                  disabled={logoutMutation.isPending}
+                  onClick={handleSignOut}
                   data-testid="button-logout"
                 >
                   <LogOut className="w-5 h-5 text-red-500" />
@@ -260,12 +253,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
             <Button 
               variant="ghost" 
               className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent/50"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
+              onClick={handleSignOut}
               data-testid="button-logout"
             >
               <LogOut className="w-5 h-5 text-red-500" />
-              <span>{logoutMutation.isPending ? "Signing out..." : "Sign Out"}</span>
+              <span>Sign Out</span>
             </Button>
           )}
         </SidebarFooter>
