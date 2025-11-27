@@ -27,6 +27,7 @@ import { Progress } from "@/components/ui/progress";
 import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document } from "@shared/schema";
 import { calculateAge, formatClientNumber } from "@shared/schema";
 import ClientLocationMap from "@/components/ClientLocationMap";
+import CarePlanTab from "@/components/CarePlanTab";
 
 function NotificationBadge({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
@@ -113,7 +114,7 @@ interface DistanceData {
   officeAddress: string;
 }
 
-type ProfileSection = "overview" | "details" | "program" | "team" | "goals" | "documents" | "clinical" | "services" | "budget";
+type ProfileSection = "overview" | "details" | "program" | "team" | "goals" | "documents" | "clinical" | "services" | "budget" | "careplan";
 
 export default function ClientProfile() {
   const [, params] = useRoute("/clients/:id");
@@ -1496,6 +1497,7 @@ export default function ClientProfile() {
                 <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
                 <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
                 <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
+                <TabsTrigger value="careplan" data-testid="tab-careplan">Care Plan</TabsTrigger>
                 <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
                 <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
               </TabsList>
@@ -2469,6 +2471,16 @@ export default function ClientProfile() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="careplan" className="space-y-6">
+          {client && (
+            <CarePlanTab 
+              clientId={client.id} 
+              clientName={client.participantName || `${client.firstName} ${client.lastName}`}
+              isArchived={isArchived}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="services" className="space-y-6">
