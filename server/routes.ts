@@ -3322,6 +3322,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Archive document
+  app.post("/api/documents/:id/archive", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const existingDoc = await storage.getDocumentById(req.params.id);
+      if (!existingDoc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      const archivedDoc = await storage.archiveDocument(req.params.id, req.session.user.id || req.session.user.email);
+      
+      await storage.logActivity({
+        clientId: existingDoc.clientId,
+        action: "document_archived",
+        description: `Document ${existingDoc.fileName} was archived`,
+        performedBy: req.session.user.displayName || req.session.user.email || "System"
+      });
+      
+      res.json(archivedDoc);
+    } catch (error) {
+      console.error("Error archiving document:", error);
+      res.status(500).json({ error: "Failed to archive document" });
+    }
+  });
+
+  // Unarchive document
+  app.post("/api/documents/:id/unarchive", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const existingDoc = await storage.getDocumentById(req.params.id);
+      if (!existingDoc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      const unarchivedDoc = await storage.unarchiveDocument(req.params.id);
+      
+      await storage.logActivity({
+        clientId: existingDoc.clientId,
+        action: "document_unarchived",
+        description: `Document ${existingDoc.fileName} was restored from archive`,
+        performedBy: req.session.user.displayName || req.session.user.email || "System"
+      });
+      
+      res.json(unarchivedDoc);
+    } catch (error) {
+      console.error("Error unarchiving document:", error);
+      res.status(500).json({ error: "Failed to unarchive document" });
+    }
+  });
+
+  // Update document (full update including custom title, folder)
+  app.put("/api/documents/:id", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const existingDoc = await storage.getDocumentById(req.params.id);
+      if (!existingDoc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      const { customTitle, folderId, subFolderId, expiryDate, uploadDate } = req.body;
+      const updates: any = {};
+      
+      if (customTitle !== undefined) updates.customTitle = customTitle;
+      if (folderId !== undefined) updates.folderId = folderId;
+      if (subFolderId !== undefined) updates.subFolderId = subFolderId;
+      if (expiryDate !== undefined) updates.expiryDate = expiryDate;
+      if (uploadDate !== undefined) updates.uploadDate = new Date(uploadDate);
+      
+      const updatedDoc = await storage.updateDocumentFull(req.params.id, updates);
+      
+      await storage.logActivity({
+        clientId: existingDoc.clientId,
+        action: "document_updated",
+        description: `Document ${existingDoc.fileName} was updated`,
+        performedBy: req.session.user.displayName || req.session.user.email || "System"
+      });
+      
+      res.json(updatedDoc);
+    } catch (error) {
+      console.error("Error updating document:", error);
+      res.status(500).json({ error: "Failed to update document" });
+    }
+  });
+
+  // Search documents globally
+  app.get("/api/documents/search", async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: "Search term required" });
+      }
+      
+      const docs = await storage.searchDocuments(q);
+      res.json(docs);
+    } catch (error) {
+      console.error("Error searching documents:", error);
+      res.status(500).json({ error: "Failed to search documents" });
+    }
+  });
+
+  // Get client document folder overrides
+  app.get("/api/clients/:clientId/document-folders", async (req, res) => {
+    try {
+      const folders = await storage.getClientDocumentFolders(req.params.clientId);
+      res.json(folders);
+    } catch (error) {
+      console.error("Error fetching document folders:", error);
+      res.status(500).json({ error: "Failed to fetch document folders" });
+    }
+  });
+
+  // Create/Update client document folder override
+  app.post("/api/clients/:clientId/document-folders", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const { folderId, customName, isHidden, sortOrder } = req.body;
+      if (!folderId) {
+        return res.status(400).json({ error: "Folder ID is required" });
+      }
+      
+      const folder = await storage.upsertClientDocumentFolder({
+        clientId: req.params.clientId,
+        folderId,
+        customName,
+        isHidden,
+        sortOrder,
+      });
+      
+      res.json(folder);
+    } catch (error) {
+      console.error("Error saving document folder:", error);
+      res.status(500).json({ error: "Failed to save document folder" });
+    }
+  });
+
+  // Delete client document folder override
+  app.delete("/api/clients/:clientId/document-folders/:folderId", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const folder = await storage.getClientDocumentFolder(req.params.clientId, req.params.folderId);
+      if (!folder) {
+        return res.status(404).json({ error: "Folder override not found" });
+      }
+      
+      await storage.deleteClientDocumentFolder(folder.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting document folder:", error);
+      res.status(500).json({ error: "Failed to delete document folder" });
+    }
+  });
+
+  // Get client document compliance overrides
+  app.get("/api/clients/:clientId/document-compliance", async (req, res) => {
+    try {
+      const compliance = await storage.getClientDocumentCompliance(req.params.clientId);
+      res.json(compliance);
+    } catch (error) {
+      console.error("Error fetching document compliance:", error);
+      res.status(500).json({ error: "Failed to fetch document compliance" });
+    }
+  });
+
+  // Create/Update client document compliance override (mark as "Not Required")
+  app.post("/api/clients/:clientId/document-compliance", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const { documentType, isNotRequired, notRequiredReason } = req.body;
+      if (!documentType) {
+        return res.status(400).json({ error: "Document type is required" });
+      }
+      
+      const compliance = await storage.upsertClientDocumentCompliance({
+        clientId: req.params.clientId,
+        documentType,
+        isNotRequired: isNotRequired || "no",
+        notRequiredReason,
+        notRequiredBy: req.session.user.id || req.session.user.email,
+        notRequiredAt: isNotRequired === "yes" ? new Date() : undefined,
+      });
+      
+      await storage.logActivity({
+        clientId: req.params.clientId,
+        action: isNotRequired === "yes" ? "document_marked_not_required" : "document_requirement_restored",
+        description: `Document "${documentType}" ${isNotRequired === "yes" ? 'marked as not required' : 'requirement restored'}${notRequiredReason ? `: ${notRequiredReason}` : ''}`,
+        performedBy: req.session.user.displayName || req.session.user.email || "System"
+      });
+      
+      res.json(compliance);
+    } catch (error) {
+      console.error("Error saving document compliance:", error);
+      res.status(500).json({ error: "Failed to save document compliance" });
+    }
+  });
+
+  // Delete client document compliance override
+  app.delete("/api/clients/:clientId/document-compliance/:documentType", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const compliance = await storage.getClientDocumentComplianceByType(req.params.clientId, req.params.documentType);
+      if (!compliance) {
+        return res.status(404).json({ error: "Compliance override not found" });
+      }
+      
+      await storage.deleteClientDocumentCompliance(compliance.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting document compliance:", error);
+      res.status(500).json({ error: "Failed to delete document compliance" });
+    }
+  });
+
   // Upload document file (PDF)
   app.post("/api/clients/:clientId/documents/upload", (req, res, next) => {
     uploadPdf.single("file")(req, res, (err) => {
@@ -3348,22 +3581,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded. Please select a PDF file." });
       }
 
-      const { documentType, fileName } = req.body;
+      const { documentType, fileName, folderId, subFolderId, customTitle } = req.body;
       if (!documentType) {
         return res.status(400).json({ error: "Document type is required" });
       }
       
-      // Validate document type - includes all document types from the Documents section
-      const validDocumentTypes = [
-        "Service Agreement", "NDIS Plan", "Care Plan", "Risk Assessment",
-        "Medical Report", "Consent Form", "Progress Report", "Assessment",
-        "Referral", "Certificate", "Policy Document", "Other",
-        "Self Assessment (Medx Tool)", "Medication Consent", "Personal Emergency Plan",
-        "Health Summary", "Wound Care Plan"
-      ];
-      if (!validDocumentTypes.includes(documentType)) {
-        return res.status(400).json({ error: `Invalid document type: ${documentType}` });
-      }
+      // Accept any document type for comprehensive document storage
+      // Standard tracked document types will get automatic expiry calculation
 
       // Auto-calculate expiry date based on document type and upload date
       const uploadDate = new Date();
@@ -3379,6 +3603,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileName: fileName || req.file.originalname,
         fileUrl,
         expiryDate: autoExpiryDate,
+        folderId: folderId || null,
+        subFolderId: subFolderId || null,
+        customTitle: customTitle || null,
       });
 
       // Log activity with auto-calculated expiry info

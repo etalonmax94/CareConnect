@@ -420,10 +420,19 @@ export const documents = pgTable("documents", {
   expiryDate: date("expiry_date"),
   uploadDate: timestamp("upload_date").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // New fields for enhanced document management
+  folderId: text("folder_id"), // Reference to folder (e.g., "service-agreement", "progress-notes")
+  subFolderId: text("sub_folder_id"), // Reference to sub-folder if applicable
+  isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by"),
+  originalFolderId: text("original_folder_id"), // Track original folder when archived
+  customTitle: text("custom_title"), // Custom title for the document (optional override)
 });
 
 export const insertDocumentSchema = createInsertSchema(documents, {
   expiryDate: z.string().optional().nullable(),
+  isArchived: z.enum(["yes", "no"]).optional(),
 }).omit({
   id: true,
   uploadDate: true,
@@ -432,6 +441,53 @@ export const insertDocumentSchema = createInsertSchema(documents, {
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+// Client Document Folder Overrides - Per-client folder customization
+export const clientDocumentFolders = pgTable("client_document_folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  folderId: text("folder_id").notNull(), // Standard folder ID (e.g., "service-agreement")
+  customName: text("custom_name"), // Custom name override
+  isHidden: text("is_hidden").default("no").$type<"yes" | "no">(), // Hide folder for this client
+  sortOrder: text("sort_order"), // Custom sort order
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientDocumentFolderSchema = createInsertSchema(clientDocumentFolders, {
+  isHidden: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientDocumentFolder = z.infer<typeof insertClientDocumentFolderSchema>;
+export type ClientDocumentFolder = typeof clientDocumentFolders.$inferSelect;
+
+// Client Document Compliance Overrides - Mark tracked documents as "Not Required"
+export const clientDocumentCompliance = pgTable("client_document_compliance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(), // Standard document type name
+  isNotRequired: text("is_not_required").default("no").$type<"yes" | "no">(),
+  notRequiredReason: text("not_required_reason"), // Reason why document is not required
+  notRequiredBy: varchar("not_required_by"), // User who marked it as not required
+  notRequiredAt: timestamp("not_required_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientDocumentComplianceSchema = createInsertSchema(clientDocumentCompliance, {
+  isNotRequired: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientDocumentCompliance = z.infer<typeof insertClientDocumentComplianceSchema>;
+export type ClientDocumentCompliance = typeof clientDocumentCompliance.$inferSelect;
 
 // Client Goals - Up to 5 goals per client
 export type GoalStatus = "not_started" | "in_progress" | "achieved" | "on_hold";

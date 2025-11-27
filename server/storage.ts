@@ -4,6 +4,7 @@ import {
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
   alliedHealthProfessionals,
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
+  clientDocumentFolders, clientDocumentCompliance,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
   clientContacts, clientBehaviors, leadershipMeetingNotes,
   // New scheduling and care plan tables
@@ -37,6 +38,8 @@ import {
   type InsertClientContact, type ClientContact,
   type InsertClientBehavior, type ClientBehavior,
   type InsertLeadershipMeetingNote, type LeadershipMeetingNote,
+  type InsertClientDocumentFolder, type ClientDocumentFolder,
+  type InsertClientDocumentCompliance, type ClientDocumentCompliance,
   // New types for scheduling and care plans
   type InsertAppointment, type Appointment,
   type InsertAppointmentAssignment, type AppointmentAssignment,
@@ -1274,6 +1277,122 @@ export class DbStorage implements IStorage {
 
   async deleteDocument(id: string): Promise<boolean> {
     const result = await db.delete(documents).where(eq(documents.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async archiveDocument(id: string, userId: string): Promise<Document | undefined> {
+    const result = await db.update(documents)
+      .set({
+        isArchived: "yes",
+        archivedAt: new Date(),
+        archivedBy: userId,
+        originalFolderId: sql`COALESCE(folder_id, document_type)`,
+      } as any)
+      .where(eq(documents.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async unarchiveDocument(id: string): Promise<Document | undefined> {
+    const result = await db.update(documents)
+      .set({
+        isArchived: "no",
+        archivedAt: null,
+        archivedBy: null,
+      } as any)
+      .where(eq(documents.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateDocumentFull(id: string, updates: Partial<InsertDocument>): Promise<Document | undefined> {
+    const result = await db.update(documents)
+      .set(updates as any)
+      .where(eq(documents.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async searchDocuments(searchTerm: string): Promise<Document[]> {
+    return await db.select().from(documents)
+      .where(
+        or(
+          ilike(documents.fileName, `%${searchTerm}%`),
+          ilike(documents.documentType, `%${searchTerm}%`),
+          ilike(documents.customTitle, `%${searchTerm}%`)
+        )
+      )
+      .orderBy(desc(documents.uploadDate));
+  }
+
+  // Client Document Folder Overrides
+  async getClientDocumentFolders(clientId: string): Promise<ClientDocumentFolder[]> {
+    return await db.select().from(clientDocumentFolders)
+      .where(eq(clientDocumentFolders.clientId, clientId))
+      .orderBy(clientDocumentFolders.sortOrder);
+  }
+
+  async getClientDocumentFolder(clientId: string, folderId: string): Promise<ClientDocumentFolder | undefined> {
+    const result = await db.select().from(clientDocumentFolders)
+      .where(and(
+        eq(clientDocumentFolders.clientId, clientId),
+        eq(clientDocumentFolders.folderId, folderId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertClientDocumentFolder(folder: InsertClientDocumentFolder): Promise<ClientDocumentFolder> {
+    const existing = await this.getClientDocumentFolder(folder.clientId, folder.folderId);
+    if (existing) {
+      const result = await db.update(clientDocumentFolders)
+        .set({ ...folder, updatedAt: new Date() } as any)
+        .where(eq(clientDocumentFolders.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(clientDocumentFolders).values(folder).returning();
+      return result[0];
+    }
+  }
+
+  async deleteClientDocumentFolder(id: string): Promise<boolean> {
+    const result = await db.delete(clientDocumentFolders).where(eq(clientDocumentFolders.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Client Document Compliance
+  async getClientDocumentCompliance(clientId: string): Promise<ClientDocumentCompliance[]> {
+    return await db.select().from(clientDocumentCompliance)
+      .where(eq(clientDocumentCompliance.clientId, clientId));
+  }
+
+  async getClientDocumentComplianceByType(clientId: string, documentType: string): Promise<ClientDocumentCompliance | undefined> {
+    const result = await db.select().from(clientDocumentCompliance)
+      .where(and(
+        eq(clientDocumentCompliance.clientId, clientId),
+        eq(clientDocumentCompliance.documentType, documentType)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertClientDocumentCompliance(compliance: InsertClientDocumentCompliance): Promise<ClientDocumentCompliance> {
+    const existing = await this.getClientDocumentComplianceByType(compliance.clientId, compliance.documentType);
+    if (existing) {
+      const result = await db.update(clientDocumentCompliance)
+        .set({ ...compliance, updatedAt: new Date() } as any)
+        .where(eq(clientDocumentCompliance.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(clientDocumentCompliance).values(compliance).returning();
+      return result[0];
+    }
+  }
+
+  async deleteClientDocumentCompliance(id: string): Promise<boolean> {
+    const result = await db.delete(clientDocumentCompliance).where(eq(clientDocumentCompliance.id, id)).returning();
     return result.length > 0;
   }
 
