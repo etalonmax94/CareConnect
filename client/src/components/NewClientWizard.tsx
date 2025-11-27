@@ -1334,8 +1334,9 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   return (
     <>
       <Form {...form}>
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-6">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4">
+          {/* Progress bar and step indicators */}
+          <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">Step {currentStep + 1} of {WIZARD_STEPS.length}</span>
               <span className="text-sm text-muted-foreground">{Math.round(progress)}% complete</span>
@@ -1343,7 +1344,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
             <Progress value={progress} className="h-2" />
           </div>
 
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {/* Step indicator pills */}
+          <div className="flex gap-1.5 mb-4 overflow-x-auto pb-2 justify-center">
             {WIZARD_STEPS.map((step, index) => {
               const StepIcon = step.icon;
               const isComplete = index < currentStep;
@@ -1356,60 +1358,127 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   onClick={() => goToStep(index)}
                   disabled={index > currentStep}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors",
-                    isCurrent && "bg-primary text-primary-foreground",
-                    isComplete && "bg-primary/10 text-primary cursor-pointer",
-                    !isCurrent && !isComplete && "bg-muted text-muted-foreground cursor-not-allowed"
+                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs whitespace-nowrap transition-all",
+                    isCurrent && "bg-primary text-primary-foreground shadow-md",
+                    isComplete && "bg-primary/15 text-primary cursor-pointer hover:bg-primary/25",
+                    !isCurrent && !isComplete && "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
                   )}
                   data-testid={`step-${step.id}`}
                 >
                   {isComplete ? (
-                    <Check className="w-4 h-4" />
+                    <Check className="w-3.5 h-3.5" />
                   ) : (
-                    <StepIcon className="w-4 h-4" />
+                    <StepIcon className="w-3.5 h-3.5" />
                   )}
-                  <span className="hidden sm:inline">{step.title}</span>
+                  <span className="hidden md:inline">{step.title}</span>
                 </button>
               );
             })}
           </div>
 
-          <Card className="min-h-[400px]">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const StepIcon = WIZARD_STEPS[currentStep].icon;
-                  return <StepIcon className="w-6 h-6 text-primary" />;
-                })()}
-                <div>
-                  <CardTitle>{WIZARD_STEPS[currentStep].title}</CardTitle>
-                  <CardDescription>{WIZARD_STEPS[currentStep].description}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <AnimatePresence mode="wait" custom={direction}>
-                <motion.div
-                  key={currentStep}
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                >
-                  {renderStepContent()}
-                </motion.div>
-              </AnimatePresence>
-            </CardContent>
-          </Card>
+          {/* Main wizard layout with vertical side buttons */}
+          <div className="flex items-stretch gap-3">
+            {/* Left navigation button - Back/Cancel */}
+            <button
+              type="button"
+              onClick={currentStep === 0 ? onCancel : goBack}
+              className={cn(
+                "hidden sm:flex flex-col items-center justify-center gap-2 w-14 min-h-[480px] rounded-xl border-2 transition-all duration-200",
+                "bg-background hover:bg-muted/50 border-border hover:border-primary/30",
+                "text-muted-foreground hover:text-foreground",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              )}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="text-xs font-medium [writing-mode:vertical-rl] rotate-180">
+                {currentStep === 0 ? "Cancel" : "Back"}
+              </span>
+            </button>
 
-          <div className="flex justify-between mt-6">
+            {/* Center Card - Fixed height with scrollable content */}
+            <Card className="flex-1 flex flex-col h-[480px] overflow-hidden">
+              <CardHeader className="flex-shrink-0 pb-3 border-b">
+                <div className="flex items-center gap-3">
+                  {(() => {
+                    const StepIcon = WIZARD_STEPS[currentStep].icon;
+                    return (
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <StepIcon className="w-5 h-5 text-primary" />
+                      </div>
+                    );
+                  })()}
+                  <div>
+                    <CardTitle className="text-lg">{WIZARD_STEPS[currentStep].title}</CardTitle>
+                    <CardDescription className="text-xs">{WIZARD_STEPS[currentStep].description}</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-y-auto pt-4 pb-4">
+                <AnimatePresence mode="wait" custom={direction}>
+                  <motion.div
+                    key={currentStep}
+                    custom={direction}
+                    variants={slideVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    {renderStepContent()}
+                  </motion.div>
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+
+            {/* Right navigation button - Next/Create */}
+            {currentStep === WIZARD_STEPS.length - 1 ? (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className={cn(
+                  "hidden sm:flex flex-col items-center justify-center gap-2 w-14 min-h-[480px] rounded-xl border-2 transition-all duration-200",
+                  "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
+                  "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                  isSubmitting && "opacity-70 cursor-not-allowed"
+                )}
+                data-testid="button-create-client"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Check className="w-5 h-5" />
+                )}
+                <span className="text-xs font-medium [writing-mode:vertical-rl] rotate-180">
+                  {isSubmitting ? "Creating..." : "Create"}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={goNext}
+                className={cn(
+                  "hidden sm:flex flex-col items-center justify-center gap-2 w-14 min-h-[480px] rounded-xl border-2 transition-all duration-200",
+                  "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
+                  "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                )}
+                data-testid="button-next"
+              >
+                <ArrowRight className="w-5 h-5" />
+                <span className="text-xs font-medium [writing-mode:vertical-rl] rotate-180">Next</span>
+              </button>
+            )}
+          </div>
+
+          {/* Mobile navigation buttons - shown only on small screens */}
+          <div className="flex sm:hidden justify-between mt-4 gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={currentStep === 0 ? onCancel : goBack}
-              data-testid="button-back"
+              className="flex-1"
+              data-testid="button-back-mobile"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               {currentStep === 0 ? "Cancel" : "Back"}
@@ -1420,7 +1489,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                data-testid="button-create-client"
+                className="flex-1"
+                data-testid="button-create-client-mobile"
               >
                 {isSubmitting ? (
                   <>
@@ -1430,12 +1500,12 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 ) : (
                   <>
                     <Check className="w-4 h-4 mr-2" />
-                    Create Client
+                    Create
                   </>
                 )}
               </Button>
             ) : (
-              <Button type="button" onClick={goNext} data-testid="button-next">
+              <Button type="button" onClick={goNext} className="flex-1" data-testid="button-next-mobile">
                 Next
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
