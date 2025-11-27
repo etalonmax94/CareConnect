@@ -2072,6 +2072,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allIncidents = await storage.getAllIncidentReports();
       const allBudgets = await storage.getAllBudgets();
       
+      // Filter to only active (non-archived) clients for calculations
+      const activeClients = allClients.filter(c => c.isArchived !== "yes");
+      
       // Calculate compliance rates based on clinical documents
       let compliantCount = 0;
       let nonCompliantCount = 0;
@@ -2081,7 +2084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const today = new Date();
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       
-      allClients.forEach(client => {
+      activeClients.forEach(client => {
         const docs = client.clinicalDocuments || {};
         const requiredDocs = ['serviceAgreementDate', 'consentFormDate', 'riskAssessmentDate', 'carePlanDate'];
         const filledDocs = requiredDocs.filter(doc => docs[doc as keyof typeof docs]);
@@ -2092,25 +2095,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           nonCompliantCount++;
         }
         
-        // Check for due/overdue documents
+        // Check for due/overdue documents with correct renewal frequencies
+        // 6-monthly: carePlan, healthSummary
+        // Annual: serviceAgreement, consentForm, riskAssessment, selfAssessmentMedx, medicationConsent, personalEmergencyPlan
+        const sixMonthlyDocs = ['carePlanDate', 'healthSummaryDate'];
+        
         Object.entries(docs).forEach(([key, dateStr]) => {
           if (dateStr) {
             const date = new Date(dateStr);
             const reviewDate = new Date(date);
-            reviewDate.setFullYear(reviewDate.getFullYear() + 1);
+            
+            // Apply correct renewal period based on document type
+            if (sixMonthlyDocs.includes(key)) {
+              reviewDate.setMonth(reviewDate.getMonth() + 6);
+            } else {
+              reviewDate.setFullYear(reviewDate.getFullYear() + 1);
+            }
+            
+            const docName = key.replace(/Date$/, '').replace(/([A-Z])/g, ' $1').trim();
             
             if (reviewDate < today) {
               overdueItems.push({
                 clientId: client.id,
                 clientName: client.participantName,
-                documentType: key.replace(/Date$/, '').replace(/([A-Z])/g, ' $1').trim(),
+                documentType: docName,
                 dueDate: reviewDate.toISOString()
               });
             } else if (reviewDate <= endOfMonth) {
               dueThisMonth.push({
                 clientId: client.id,
                 clientName: client.participantName,
-                documentType: key.replace(/Date$/, '').replace(/([A-Z])/g, ' $1').trim(),
+                documentType: docName,
                 dueDate: reviewDate.toISOString()
               });
             }
@@ -2131,16 +2146,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: i.description
         }));
       
-      // Get unassigned clients (clients without a care_manager assignment)
-      const allAssignments = await Promise.all(
-        allClients.map(c => storage.getAssignmentsByClient(c.id))
-      );
-      
-      const unassignedClients = allClients
-        .filter((client, index) => {
-          if (client.isArchived === "yes") return false;
-          const assignments = allAssignments[index];
-          return !assignments.some(a => a.assignmentType === "care_manager" && (!a.endDate || new Date(a.endDate) > today));
+      // Get unassigned clients (clients without a care manager in careTeam.careManagerId)
+      const unassignedClients = activeClients
+        .filter((client) => {
+          // Check if careTeam exists and has a careManagerId
+          const careTeam = client.careTeam as { careManagerId?: string } | null;
+          return !careTeam?.careManagerId;
         })
         .map(c => ({
           id: c.id,
@@ -2151,12 +2162,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
       
       res.json({
-        totalClients: allClients.length,
+        totalClients: activeClients.length,
         newClients: newClientsCount,
         complianceRate: {
           compliant: compliantCount,
           nonCompliant: nonCompliantCount,
-          percentage: allClients.length > 0 ? Math.round((compliantCount / allClients.length) * 100) : 0
+          percentage: activeClients.length > 0 ? Math.round((compliantCount / activeClients.length) * 100) : 0
         },
         dueThisMonth: dueThisMonth.length,
         dueThisMonthItems: dueThisMonth,
