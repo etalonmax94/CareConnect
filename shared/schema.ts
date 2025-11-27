@@ -254,7 +254,7 @@ export const insertClientSchema = createInsertSchema(clients, {
   notificationPreferences: z.any().optional(),
   isPinned: z.enum(["yes", "no"]).optional(),
   isOnboarded: z.enum(["yes", "no"]).optional(),
-  riskAssessmentScore: z.enum(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]).optional().nullable(),
+  riskAssessmentScore: z.enum(["Level 1", "Level 2", "Level 3", "Level 4", "Level 5"]).optional().nullable(),
   riskAssessmentDate: z.string().optional().nullable(),
   riskAssessmentNotes: z.string().optional().nullable(),
   serviceType: z.enum(["Support Work", "Nursing", "Both"]).optional().nullable(),
