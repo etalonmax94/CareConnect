@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -190,34 +190,36 @@ const providerConfig = {
 
 type FormData = Record<string, string>;
 
-export function AddProviderDialog({ providerType, onSuccess, triggerClassName, defaultValues = {} }: AddProviderDialogProps) {
+export function AddProviderDialog({ providerType, onSuccess, triggerClassName, defaultValues }: AddProviderDialogProps) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const config = providerConfig[providerType];
+  const prevOpenRef = useRef(false);
   
-  const initialFormData: FormData = useMemo(() => config.fields.reduce((acc, field) => {
-    if (defaultValues[field]) acc[field] = defaultValues[field];
-    else if (field === "deliveryAvailable") acc[field] = "no";
-    else if (field === "isActive") acc[field] = "yes";
-    else if (field === "role") acc[field] = "support_worker";
-    else acc[field] = "";
-    return acc;
-  }, {} as FormData), [config.fields, defaultValues]);
+  const getInitialFormData = useCallback((): FormData => {
+    return config.fields.reduce((acc, field) => {
+      if (defaultValues?.[field]) acc[field] = defaultValues[field];
+      else if (field === "deliveryAvailable") acc[field] = "no";
+      else if (field === "isActive") acc[field] = "yes";
+      else if (field === "role") acc[field] = "support_worker";
+      else acc[field] = "";
+      return acc;
+    }, {} as FormData);
+  }, [config.fields, defaultValues]);
   
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [formData, setFormData] = useState<FormData>(() => getInitialFormData());
   
-  useEffect(() => {
-    if (isOpen) {
-      setFormData(initialFormData);
-    }
-  }, [isOpen, initialFormData]);
+  if (isOpen && !prevOpenRef.current) {
+    setFormData(getInitialFormData());
+  }
+  prevOpenRef.current = isOpen;
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => apiRequest("POST", config.endpoint, data),
     onSuccess: (newProvider) => {
       queryClient.invalidateQueries({ queryKey: [config.queryKey] });
       setIsOpen(false);
-      setFormData(initialFormData);
+      setFormData(getInitialFormData());
       toast({ title: `${config.title.replace("Add New ", "")} added successfully` });
       if (onSuccess) {
         onSuccess(newProvider);
@@ -250,7 +252,7 @@ export function AddProviderDialog({ providerType, onSuccess, triggerClassName, d
 
   const handleClose = () => {
     setIsOpen(false);
-    setFormData(initialFormData);
+    setFormData(getInitialFormData());
   };
 
   const renderField = (field: string) => {
