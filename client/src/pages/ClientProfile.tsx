@@ -568,6 +568,7 @@ export default function ClientProfile() {
   const [editEmergencyContactPhone, setEditEmergencyContactPhone] = useState<string>("");
   const [editEmergencyContactRelationship, setEditEmergencyContactRelationship] = useState<string>("");
   const [editServiceType, setEditServiceType] = useState<string>("");
+  const [editZohoWorkdriveLink, setEditZohoWorkdriveLink] = useState<string>("");
   
   // Inline field update mutation
   const updateFieldMutation = useMutation({
@@ -665,6 +666,9 @@ export default function ClientProfile() {
       case "serviceType":
         setEditServiceType(client?.serviceType || "");
         break;
+      case "zohoWorkdriveLink":
+        setEditZohoWorkdriveLink(client?.zohoWorkdriveLink || "");
+        break;
     }
   };
 
@@ -748,6 +752,9 @@ export default function ClientProfile() {
         break;
       case "serviceType":
         updateFieldMutation.mutate({ serviceType: editServiceType as any });
+        break;
+      case "zohoWorkdriveLink":
+        updateFieldMutation.mutate({ zohoWorkdriveLink: editZohoWorkdriveLink || null });
         break;
     }
   };
@@ -2990,7 +2997,83 @@ export default function ClientProfile() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="documents">
+        <TabsContent value="documents" className="space-y-6">
+          {/* Zoho WorkDrive Link - Inline Editable */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  Zoho WorkDrive
+                </CardTitle>
+                {!isArchived && editingField !== "zohoWorkdriveLink" && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => startEditing("zohoWorkdriveLink")}
+                    data-testid="button-edit-workdrive-link"
+                  >
+                    <Pencil className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {editingField === "zohoWorkdriveLink" ? (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="zoho-workdrive-link">WorkDrive Folder URL</Label>
+                    <Input
+                      id="zoho-workdrive-link"
+                      type="url"
+                      value={editZohoWorkdriveLink}
+                      onChange={(e) => setEditZohoWorkdriveLink(e.target.value)}
+                      placeholder="https://workdrive.zoho.com/..."
+                      className="font-mono text-sm"
+                      data-testid="input-zoho-workdrive-link"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Link to the client's document folder in Zoho WorkDrive
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => saveField("zohoWorkdriveLink")} disabled={updateFieldMutation.isPending} data-testid="button-save-workdrive-link">
+                      {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                      Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-workdrive-link">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : client.zohoWorkdriveLink ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm font-mono text-muted-foreground truncate">{client.zohoWorkdriveLink}</span>
+                  </div>
+                  <Button variant="outline" size="sm" asChild className="ml-4 flex-shrink-0">
+                    <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-open-workdrive">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open in WorkDrive
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <FileText className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                  <p className="text-sm text-muted-foreground">No WorkDrive folder linked</p>
+                  {!isArchived && (
+                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("zohoWorkdriveLink")} data-testid="button-add-workdrive-link">
+                      <Plus className="w-3 h-3 mr-1" /> Add WorkDrive Link
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <DocumentTracker 
             documents={client.clinicalDocuments} 
             clientId={client.id}
