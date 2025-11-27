@@ -659,10 +659,12 @@ export default function DocumentTracker({ documents, clientId }: DocumentTracker
             {isNotRequired && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    <EyeOff className="w-3 h-3" />
-                    Not Required
-                  </Badge>
+                  <span className="inline-flex">
+                    <Badge variant="secondary" className="text-xs gap-1">
+                      <EyeOff className="w-3 h-3" />
+                      Not Required
+                    </Badge>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{notRequiredReasonText || "Marked as not required for this client"}</p>
