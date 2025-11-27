@@ -108,7 +108,14 @@ The document management system is now a comprehensive, interactive storage hub s
 - **Global Search Integration**: Search documents by filename, document type, and folder name in the global search
 - **Visual Compliance Indicators**: Missing tracked documents show as "Missing - Non-Compliant"; Not Required shows with strikethrough and badge
 
+#### Care Team Directory
+- **Care Team Landing Page**: New `/care-team` page with tile-based navigation to all provider types (GPs, Pharmacies, Allied Health, Plan Managers, Support Coordinators, Staff).
+- **Provider Tiles**: Each tile shows count, recent entries, and quick access to full provider list.
+- **Client Care Team Indicators**: Client overview (grid and table views) now displays color-coded icons showing which care team members are assigned (GP, Pharmacy, Support Coordinator, Plan Manager, Allied Health) with tooltips.
+- **Quick Links**: Fast access buttons to add new providers from the Care Team directory.
+
 ### Recent Updates (November 2025)
+- **Care Team Directory**: Added centralized Care Team page with tiles for all provider types and care team indicators on client cards.
 - **Document Management Restructure**: Reorganized document management into 10 folder categories with collapsible UI, tracked documents with compliance status, and multi-document collection folders.
 - **HCP to Support at Home Renaming**: All HCP (Home Care Package) references have been renamed to Support at Home (SaH). Field names updated from `hcpNumber`/`hcpFundingLevel` to `sahNumber`/`sahFundingLevel`.
 - **Leadership Field Removal**: The `leadership` field has been removed from the careTeam JSON structure per schema cleanup.
