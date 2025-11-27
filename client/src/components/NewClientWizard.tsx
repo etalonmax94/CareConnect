@@ -416,6 +416,68 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                     </FormItem>
                   )}
                 />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="sex"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sex</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-sex">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="maritalStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Marital Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-marital-status">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Single">Single</SelectItem>
+                            <SelectItem value="Never married">Never married</SelectItem>
+                            <SelectItem value="Married">Married</SelectItem>
+                            <SelectItem value="Widowed">Widowed</SelectItem>
+                            <SelectItem value="Divorced">Divorced</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="medicareNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Medicare Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="XXXX XXXXX X" data-testid="input-medicare" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -671,19 +733,87 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="medicareNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Medicare Number</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value || ""} placeholder="XXXX XXXXX X" data-testid="input-medicare" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="fallsRiskScore"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Falls Risk Score (5-20)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        type="number" 
+                        min={5} 
+                        max={20} 
+                        value={field.value || ""} 
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder="5-20" 
+                        data-testid="input-falls-risk" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="substanceUseNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Substance Use Notes</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="Alcohol, drugs, smoking..." data-testid="input-substance-use" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator className="my-4" />
+            <h4 className="text-sm font-medium mb-3">Lifestyle Patterns</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="dietPatterns"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Diet</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} value={field.value || ""} placeholder="Dietary patterns, restrictions..." rows={2} data-testid="input-diet" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="exercisePatterns"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Exercise</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} value={field.value || ""} placeholder="Physical activity levels..." rows={2} data-testid="input-exercise" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="sleepPatterns"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sleep</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} value={field.value || ""} placeholder="Sleep patterns, issues..." rows={2} data-testid="input-sleep" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
@@ -808,6 +938,51 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 />
               </div>
             </div>
+
+            <Separator className="my-4" />
+            <h4 className="text-sm font-medium mb-3">Personal Preferences</h4>
+
+            <FormField
+              control={form.control}
+              name="culturalBackground"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cultural Background / Preferences</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="Religious, cultural, language preferences..." data-testid="input-cultural" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="hobbiesInterests"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hobbies & Interests</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value || ""} placeholder="Favorite food, shows, activities (list at least 4)..." rows={3} data-testid="input-hobbies" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="intakeComments"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Other Comments</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value || ""} placeholder="Any other relevant intake notes..." rows={3} data-testid="input-intake-comments" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
         );
 
