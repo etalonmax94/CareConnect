@@ -726,14 +726,19 @@ export default function ClientProfile() {
   const [newGpName, setNewGpName] = useState("");
   const [newGpPracticeName, setNewGpPracticeName] = useState("");
   const [newGpPhone, setNewGpPhone] = useState("");
+  const [newGpFax, setNewGpFax] = useState("");
   const [newGpEmail, setNewGpEmail] = useState("");
   const [newGpAddress, setNewGpAddress] = useState("");
+  const [newGpNotes, setNewGpNotes] = useState("");
   
   // New Pharmacy form state
   const [newPharmacyName, setNewPharmacyName] = useState("");
   const [newPharmacyPhone, setNewPharmacyPhone] = useState("");
+  const [newPharmacyFax, setNewPharmacyFax] = useState("");
+  const [newPharmacyEmail, setNewPharmacyEmail] = useState("");
   const [newPharmacyAddress, setNewPharmacyAddress] = useState("");
   const [newPharmacyDelivery, setNewPharmacyDelivery] = useState<"yes" | "no">("no");
+  const [newPharmacyNotes, setNewPharmacyNotes] = useState("");
   
   // New Plan Manager form state
   const [newPmName, setNewPmName] = useState("");
@@ -753,6 +758,8 @@ export default function ClientProfile() {
   const [newAhPracticeName, setNewAhPracticeName] = useState("");
   const [newAhPhone, setNewAhPhone] = useState("");
   const [newAhEmail, setNewAhEmail] = useState("");
+  const [newAhAddress, setNewAhAddress] = useState("");
+  const [newAhNotes, setNewAhNotes] = useState("");
   
   // Program Info state variables
   const [editCategory, setEditCategory] = useState<string>("");
@@ -794,7 +801,7 @@ export default function ClientProfile() {
 
   // Create new GP mutation
   const createGpMutation = useMutation({
-    mutationFn: async (data: { name: string; practiceName?: string; phoneNumber?: string; email?: string; address?: string }) => {
+    mutationFn: async (data: { name: string; practiceName?: string; phoneNumber?: string; faxNumber?: string; email?: string; address?: string; notes?: string }) => {
       const response = await apiRequest("POST", "/api/gps", data);
       return response.json();
     },
@@ -804,8 +811,10 @@ export default function ClientProfile() {
       setNewGpName("");
       setNewGpPracticeName("");
       setNewGpPhone("");
+      setNewGpFax("");
       setNewGpEmail("");
       setNewGpAddress("");
+      setNewGpNotes("");
       setEditGpId(newGp.id);
       toast({ title: "GP created successfully" });
     },
@@ -816,7 +825,7 @@ export default function ClientProfile() {
 
   // Create new Pharmacy mutation
   const createPharmacyMutation = useMutation({
-    mutationFn: async (data: { name: string; phoneNumber?: string; address?: string; deliveryAvailable?: "yes" | "no" }) => {
+    mutationFn: async (data: { name: string; phoneNumber?: string; faxNumber?: string; email?: string; address?: string; deliveryAvailable?: "yes" | "no"; notes?: string }) => {
       const response = await apiRequest("POST", "/api/pharmacies", data);
       return response.json();
     },
@@ -825,8 +834,11 @@ export default function ClientProfile() {
       setAddPharmacyOpen(false);
       setNewPharmacyName("");
       setNewPharmacyPhone("");
+      setNewPharmacyFax("");
+      setNewPharmacyEmail("");
       setNewPharmacyAddress("");
       setNewPharmacyDelivery("no");
+      setNewPharmacyNotes("");
       setEditPharmacyId(newPharmacy.id);
       toast({ title: "Pharmacy created successfully" });
     },
@@ -879,11 +891,11 @@ export default function ClientProfile() {
 
   // Create new Allied Health Professional mutation
   const createAlliedHealthMutation = useMutation({
-    mutationFn: async (data: { name: string; specialty: string; practiceName?: string; phoneNumber?: string; email?: string }) => {
+    mutationFn: async (data: { name: string; specialty: string; practiceName?: string; phoneNumber?: string; email?: string; address?: string; notes?: string }) => {
       const response = await apiRequest("POST", "/api/allied-health-professionals", data);
       return response.json();
     },
-    onSuccess: (newAh: AlliedHealth) => {
+    onSuccess: (newAh: AlliedHealthProfessional) => {
       queryClient.invalidateQueries({ queryKey: ["/api/allied-health-professionals"] });
       setAddAlliedHealthOpen(false);
       setNewAhName("");
@@ -891,6 +903,8 @@ export default function ClientProfile() {
       setNewAhPracticeName("");
       setNewAhPhone("");
       setNewAhEmail("");
+      setNewAhAddress("");
+      setNewAhNotes("");
       setEditAlliedHealthId(newAh.id);
       toast({ title: "Allied Health Professional created successfully" });
     },
@@ -6261,7 +6275,7 @@ export default function ClientProfile() {
 
         {/* Add New GP Modal */}
         <Dialog open={addGpOpen} onOpenChange={setAddGpOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Stethoscope className="w-5 h-5 text-rose-500" />
@@ -6269,35 +6283,49 @@ export default function ClientProfile() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-gp-name">Name *</Label>
-                <Input
-                  id="new-gp-name"
-                  value={newGpName}
-                  onChange={(e) => setNewGpName(e.target.value)}
-                  placeholder="Dr. John Smith"
-                  data-testid="input-new-gp-name"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-gp-name">Doctor Name *</Label>
+                  <Input
+                    id="new-gp-name"
+                    value={newGpName}
+                    onChange={(e) => setNewGpName(e.target.value)}
+                    placeholder="Dr. John Smith"
+                    data-testid="input-new-gp-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-gp-practice">Practice Name</Label>
+                  <Input
+                    id="new-gp-practice"
+                    value={newGpPracticeName}
+                    onChange={(e) => setNewGpPracticeName(e.target.value)}
+                    placeholder="Medical Centre Name"
+                    data-testid="input-new-gp-practice"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-gp-practice">Practice Name</Label>
-                <Input
-                  id="new-gp-practice"
-                  value={newGpPracticeName}
-                  onChange={(e) => setNewGpPracticeName(e.target.value)}
-                  placeholder="City Medical Centre"
-                  data-testid="input-new-gp-practice"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-gp-phone">Phone</Label>
-                <Input
-                  id="new-gp-phone"
-                  value={newGpPhone}
-                  onChange={(e) => setNewGpPhone(e.target.value)}
-                  placeholder="02 1234 5678"
-                  data-testid="input-new-gp-phone"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-gp-phone">Phone Number</Label>
+                  <Input
+                    id="new-gp-phone"
+                    value={newGpPhone}
+                    onChange={(e) => setNewGpPhone(e.target.value)}
+                    placeholder="Enter phone number"
+                    data-testid="input-new-gp-phone"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-gp-fax">Fax Number</Label>
+                  <Input
+                    id="new-gp-fax"
+                    value={newGpFax}
+                    onChange={(e) => setNewGpFax(e.target.value)}
+                    placeholder="Enter fax number"
+                    data-testid="input-new-gp-fax"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-gp-email">Email</Label>
@@ -6306,7 +6334,7 @@ export default function ClientProfile() {
                   type="email"
                   value={newGpEmail}
                   onChange={(e) => setNewGpEmail(e.target.value)}
-                  placeholder="doctor@practice.com.au"
+                  placeholder="Enter email"
                   data-testid="input-new-gp-email"
                 />
               </div>
@@ -6316,11 +6344,25 @@ export default function ClientProfile() {
                   id="new-gp-address"
                   value={newGpAddress}
                   onChange={(e) => setNewGpAddress(e.target.value)}
-                  placeholder="123 Medical St, Sydney NSW 2000"
+                  placeholder="Enter full address"
                   data-testid="input-new-gp-address"
                 />
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="new-gp-notes">Notes</Label>
+                <Textarea
+                  id="new-gp-notes"
+                  value={newGpNotes}
+                  onChange={(e) => setNewGpNotes(e.target.value)}
+                  placeholder="Any additional notes..."
+                  rows={3}
+                  data-testid="input-new-gp-notes"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setAddGpOpen(false)} data-testid="button-cancel-create-gp">
+                  Cancel
+                </Button>
                 <Button
                   onClick={() => {
                     if (!newGpName.trim()) {
@@ -6331,19 +6373,17 @@ export default function ClientProfile() {
                       name: newGpName.trim(),
                       practiceName: newGpPracticeName.trim() || undefined,
                       phoneNumber: newGpPhone.trim() || undefined,
+                      faxNumber: newGpFax.trim() || undefined,
                       email: newGpEmail.trim() || undefined,
                       address: newGpAddress.trim() || undefined,
+                      notes: newGpNotes.trim() || undefined,
                     });
                   }}
                   disabled={createGpMutation.isPending}
-                  className="flex-1"
                   data-testid="button-create-gp"
                 >
                   {createGpMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Create GP
-                </Button>
-                <Button variant="outline" onClick={() => setAddGpOpen(false)} data-testid="button-cancel-create-gp">
-                  Cancel
+                  Add GP
                 </Button>
               </div>
             </div>
@@ -6352,7 +6392,7 @@ export default function ClientProfile() {
 
         {/* Add New Pharmacy Modal */}
         <Dialog open={addPharmacyOpen} onOpenChange={setAddPharmacyOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Pill className="w-5 h-5 text-teal-500" />
@@ -6361,23 +6401,46 @@ export default function ClientProfile() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new-pharmacy-name">Name *</Label>
+                <Label htmlFor="new-pharmacy-name">Pharmacy Name *</Label>
                 <Input
                   id="new-pharmacy-name"
                   value={newPharmacyName}
                   onChange={(e) => setNewPharmacyName(e.target.value)}
-                  placeholder="City Pharmacy"
+                  placeholder="Pharmacy Name"
                   data-testid="input-new-pharmacy-name"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-pharmacy-phone">Phone Number</Label>
+                  <Input
+                    id="new-pharmacy-phone"
+                    value={newPharmacyPhone}
+                    onChange={(e) => setNewPharmacyPhone(e.target.value)}
+                    placeholder="Enter phone number"
+                    data-testid="input-new-pharmacy-phone"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-pharmacy-fax">Fax Number</Label>
+                  <Input
+                    id="new-pharmacy-fax"
+                    value={newPharmacyFax}
+                    onChange={(e) => setNewPharmacyFax(e.target.value)}
+                    placeholder="Enter fax number"
+                    data-testid="input-new-pharmacy-fax"
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="new-pharmacy-phone">Phone</Label>
+                <Label htmlFor="new-pharmacy-email">Email</Label>
                 <Input
-                  id="new-pharmacy-phone"
-                  value={newPharmacyPhone}
-                  onChange={(e) => setNewPharmacyPhone(e.target.value)}
-                  placeholder="02 1234 5678"
-                  data-testid="input-new-pharmacy-phone"
+                  id="new-pharmacy-email"
+                  type="email"
+                  value={newPharmacyEmail}
+                  onChange={(e) => setNewPharmacyEmail(e.target.value)}
+                  placeholder="Enter email"
+                  data-testid="input-new-pharmacy-email"
                 />
               </div>
               <div className="space-y-2">
@@ -6386,12 +6449,12 @@ export default function ClientProfile() {
                   id="new-pharmacy-address"
                   value={newPharmacyAddress}
                   onChange={(e) => setNewPharmacyAddress(e.target.value)}
-                  placeholder="123 Main St, Sydney NSW 2000"
+                  placeholder="Enter full address"
                   data-testid="input-new-pharmacy-address"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Delivery Available</Label>
+                <Label htmlFor="new-pharmacy-delivery">Delivery Available</Label>
                 <Select value={newPharmacyDelivery} onValueChange={(v) => setNewPharmacyDelivery(v as "yes" | "no")}>
                   <SelectTrigger data-testid="select-new-pharmacy-delivery">
                     <SelectValue />
@@ -6402,7 +6465,21 @@ export default function ClientProfile() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="new-pharmacy-notes">Notes</Label>
+                <Textarea
+                  id="new-pharmacy-notes"
+                  value={newPharmacyNotes}
+                  onChange={(e) => setNewPharmacyNotes(e.target.value)}
+                  placeholder="Any additional notes..."
+                  rows={3}
+                  data-testid="input-new-pharmacy-notes"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setAddPharmacyOpen(false)} data-testid="button-cancel-create-pharmacy">
+                  Cancel
+                </Button>
                 <Button
                   onClick={() => {
                     if (!newPharmacyName.trim()) {
@@ -6412,19 +6489,18 @@ export default function ClientProfile() {
                     createPharmacyMutation.mutate({
                       name: newPharmacyName.trim(),
                       phoneNumber: newPharmacyPhone.trim() || undefined,
+                      faxNumber: newPharmacyFax.trim() || undefined,
+                      email: newPharmacyEmail.trim() || undefined,
                       address: newPharmacyAddress.trim() || undefined,
                       deliveryAvailable: newPharmacyDelivery,
+                      notes: newPharmacyNotes.trim() || undefined,
                     });
                   }}
                   disabled={createPharmacyMutation.isPending}
-                  className="flex-1"
                   data-testid="button-create-pharmacy"
                 >
                   {createPharmacyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Create Pharmacy
-                </Button>
-                <Button variant="outline" onClick={() => setAddPharmacyOpen(false)} data-testid="button-cancel-create-pharmacy">
-                  Cancel
+                  Add Pharmacy
                 </Button>
               </div>
             </div>
@@ -6593,7 +6669,7 @@ export default function ClientProfile() {
 
         {/* Add New Allied Health Professional Modal */}
         <Dialog open={addAlliedHealthOpen} onOpenChange={setAddAlliedHealthOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <HeartPulse className="w-5 h-5 text-violet-500" />
@@ -6607,7 +6683,7 @@ export default function ClientProfile() {
                   id="new-ah-name"
                   value={newAhName}
                   onChange={(e) => setNewAhName(e.target.value)}
-                  placeholder="Dr. Emily Brown"
+                  placeholder="Full name"
                   data-testid="input-new-ah-name"
                 />
               </div>
@@ -6615,7 +6691,7 @@ export default function ClientProfile() {
                 <Label htmlFor="new-ah-specialty">Specialty *</Label>
                 <Select value={newAhSpecialty} onValueChange={setNewAhSpecialty}>
                   <SelectTrigger data-testid="select-new-ah-specialty">
-                    <SelectValue placeholder="Select specialty..." />
+                    <SelectValue placeholder="Select specialty" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Physiotherapist">Physiotherapist</SelectItem>
@@ -6638,32 +6714,58 @@ export default function ClientProfile() {
                   id="new-ah-practice"
                   value={newAhPracticeName}
                   onChange={(e) => setNewAhPracticeName(e.target.value)}
-                  placeholder="Allied Health Clinic"
+                  placeholder="Practice or clinic name"
                   data-testid="input-new-ah-practice"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-ah-phone">Phone Number</Label>
+                  <Input
+                    id="new-ah-phone"
+                    value={newAhPhone}
+                    onChange={(e) => setNewAhPhone(e.target.value)}
+                    placeholder="Enter phone number"
+                    data-testid="input-new-ah-phone"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-ah-email">Email</Label>
+                  <Input
+                    id="new-ah-email"
+                    type="email"
+                    value={newAhEmail}
+                    onChange={(e) => setNewAhEmail(e.target.value)}
+                    placeholder="Enter email"
+                    data-testid="input-new-ah-email"
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="new-ah-phone">Phone</Label>
+                <Label htmlFor="new-ah-address">Address</Label>
                 <Input
-                  id="new-ah-phone"
-                  value={newAhPhone}
-                  onChange={(e) => setNewAhPhone(e.target.value)}
-                  placeholder="02 1234 5678"
-                  data-testid="input-new-ah-phone"
+                  id="new-ah-address"
+                  value={newAhAddress}
+                  onChange={(e) => setNewAhAddress(e.target.value)}
+                  placeholder="Enter full address"
+                  data-testid="input-new-ah-address"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-ah-email">Email</Label>
-                <Input
-                  id="new-ah-email"
-                  type="email"
-                  value={newAhEmail}
-                  onChange={(e) => setNewAhEmail(e.target.value)}
-                  placeholder="therapist@clinic.com.au"
-                  data-testid="input-new-ah-email"
+                <Label htmlFor="new-ah-notes">Notes</Label>
+                <Textarea
+                  id="new-ah-notes"
+                  value={newAhNotes}
+                  onChange={(e) => setNewAhNotes(e.target.value)}
+                  placeholder="Any additional notes..."
+                  rows={3}
+                  data-testid="input-new-ah-notes"
                 />
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setAddAlliedHealthOpen(false)} data-testid="button-cancel-create-ah">
+                  Cancel
+                </Button>
                 <Button
                   onClick={() => {
                     if (!newAhName.trim()) {
@@ -6680,17 +6782,15 @@ export default function ClientProfile() {
                       practiceName: newAhPracticeName.trim() || undefined,
                       phoneNumber: newAhPhone.trim() || undefined,
                       email: newAhEmail.trim() || undefined,
+                      address: newAhAddress.trim() || undefined,
+                      notes: newAhNotes.trim() || undefined,
                     });
                   }}
                   disabled={createAlliedHealthMutation.isPending}
-                  className="flex-1"
                   data-testid="button-create-ah"
                 >
                   {createAlliedHealthMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Create Allied Health
-                </Button>
-                <Button variant="outline" onClick={() => setAddAlliedHealthOpen(false)} data-testid="button-cancel-create-ah">
-                  Cancel
+                  Add Allied Health
                 </Button>
               </div>
             </div>
