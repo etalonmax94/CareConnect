@@ -3226,7 +3226,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload document file (PDF)
-  app.post("/api/clients/:clientId/documents/upload", uploadPdf.single("file"), async (req, res) => {
+  app.post("/api/clients/:clientId/documents/upload", (req, res, next) => {
+    uploadPdf.single("file")(req, res, (err) => {
+      if (err) {
+        // Handle multer errors
+        if (err.message === 'Only PDF files are allowed') {
+          return res.status(400).json({ error: "Only PDF files are allowed. Please select a PDF document." });
+        }
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: "File is too large. Maximum size is 10MB." });
+        }
+        return res.status(400).json({ error: err.message || "File upload failed" });
+      }
+      next();
+    });
+  }, async (req, res) => {
     try {
       // Check if user is authenticated
       if (!req.session?.user) {
@@ -3234,7 +3248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
+        return res.status(400).json({ error: "No file uploaded. Please select a PDF file." });
       }
 
       const { documentType, fileName, expiryDate } = req.body;

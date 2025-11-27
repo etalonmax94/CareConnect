@@ -135,7 +135,8 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
       });
 
       if (!response.ok) {
-        throw new Error("Upload failed");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Upload failed");
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId, "documents"] });
@@ -151,10 +152,11 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
         title: "Document uploaded",
         description: "The document has been uploaded successfully",
       });
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload the document. Please try again.";
       toast({
         title: "Upload failed",
-        description: "Failed to upload the document. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
