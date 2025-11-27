@@ -127,6 +127,7 @@ export default function ClientProfile() {
   const { data: client, isLoading } = useQuery<Client>({
     queryKey: ["/api/clients", params?.id],
     enabled: !!params?.id,
+    refetchOnMount: "always",
   });
 
   const { data: budgets } = useQuery<Budget[]>({
@@ -724,15 +725,18 @@ export default function ClientProfile() {
               data-testid="input-photo-upload"
             />
             <DialogTrigger asChild>
-              <div className="relative group cursor-pointer flex-shrink-0">
-                <Avatar 
-                  className="w-14 h-14 sm:w-24 sm:h-24 border-2 border-border rounded-xl overflow-hidden"
+              <div className="relative group cursor-pointer flex-shrink-0 flex items-center justify-center">
+                <div 
+                  className="w-16 h-20 sm:w-24 sm:h-32 border-2 border-border rounded-lg overflow-hidden bg-muted flex items-center justify-center"
                   data-testid="avatar-client"
                 >
-                  <AvatarImage src={client.photo || undefined} alt={client.participantName} className="object-cover" />
-                  <AvatarFallback className="text-lg sm:text-2xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
-                </Avatar>
-                <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {client.photo ? (
+                    <img src={client.photo} alt={client.participantName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-lg sm:text-2xl text-foreground font-bold">{getInitials(client.participantName)}</span>
+                  )}
+                </div>
+                <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   {isUploadingPhoto ? (
                     <Loader2 className="w-4 h-4 sm:w-6 sm:h-6 text-white animate-spin" />
                   ) : (
@@ -746,10 +750,13 @@ export default function ClientProfile() {
                 <DialogTitle>Client Photo</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col items-center gap-4 py-4">
-                <Avatar className="w-48 h-48 rounded-xl overflow-hidden border-2 border-border">
-                  <AvatarImage src={client.photo || undefined} alt={client.participantName} className="object-cover" />
-                  <AvatarFallback className="text-5xl bg-muted text-foreground font-bold rounded-xl">{getInitials(client.participantName)}</AvatarFallback>
-                </Avatar>
+                <div className="w-48 h-64 rounded-lg overflow-hidden border-2 border-border bg-muted flex items-center justify-center">
+                  {client.photo ? (
+                    <img src={client.photo} alt={client.participantName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-5xl text-foreground font-bold">{getInitials(client.participantName)}</span>
+                  )}
+                </div>
                 <p className="text-lg font-semibold">{client.participantName}</p>
                 <Button 
                   onClick={() => photoInputRef.current?.click()}
@@ -770,11 +777,6 @@ export default function ClientProfile() {
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
-              {client.clientNumber && (
-                <Badge variant="secondary" className="font-mono text-xs sm:text-sm h-5 sm:h-6 px-1.5 sm:px-2.5" data-testid="badge-client-number">
-                  {formatClientNumber(client.clientNumber)}
-                </Badge>
-              )}
               <h1 className="text-lg sm:text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
               <Badge variant={isArchived ? "secondary" : "default"} className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs ${isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}`}>
                 {isArchived ? 'Archived' : 'Active'}

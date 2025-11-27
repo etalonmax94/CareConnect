@@ -441,76 +441,6 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
 
                 <FormField
                   control={form.control}
-                  name="mainDiagnosis"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Main Diagnosis</FormLabel>
-                      <Popover open={diagnosisOpen} onOpenChange={setDiagnosisOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className="w-full justify-between font-normal"
-                              data-testid="input-diagnosis"
-                            >
-                              {field.value || "Select or type a diagnosis..."}
-                              <span className="ml-2 text-muted-foreground">▼</span>
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0" align="start">
-                          <Command>
-                            <CommandInput
-                              placeholder="Search diagnoses..."
-                              value={diagnosisSearch}
-                              onValueChange={(value) => {
-                                setDiagnosisSearch(value);
-                                field.onChange(value);
-                              }}
-                            />
-                            <CommandList>
-                              <CommandEmpty>
-                                {diagnosisSearch ? (
-                                  <div
-                                    className="cursor-pointer p-2 hover:bg-accent"
-                                    onClick={() => {
-                                      field.onChange(diagnosisSearch);
-                                      setDiagnosisOpen(false);
-                                    }}
-                                  >
-                                    Create "{diagnosisSearch}"
-                                  </div>
-                                ) : (
-                                  "No diagnoses found"
-                                )}
-                              </CommandEmpty>
-                              <CommandGroup>
-                                {diagnoses.map((diagnosis) => (
-                                  <CommandItem
-                                    key={diagnosis}
-                                    value={diagnosis}
-                                    onSelect={() => {
-                                      field.onChange(diagnosis);
-                                      setDiagnosisSearch("");
-                                      setDiagnosisOpen(false);
-                                    }}
-                                  >
-                                    {diagnosis}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
                   name="allergies"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
@@ -529,45 +459,6 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="advancedCareDirective"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel className="text-purple-600 dark:text-purple-400 font-bold">Advanced Care Directive (ACD)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger className="border-purple-200 dark:border-purple-800" data-testid="select-acd">
-                            <SelectValue placeholder="Select directive status..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="NFR">NFR - Not For Resuscitation</SelectItem>
-                          <SelectItem value="For Resus">For Resus - For Resuscitation</SelectItem>
-                          <SelectItem value="None">None / Not Specified</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Document upload required for NFR or For Resus status
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="frequencyOfServices"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Frequency of Services</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="e.g., 3 times weekly" data-testid="input-frequency" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <FormField
                   control={form.control}
@@ -577,20 +468,6 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                       <FormLabel>Communication Needs</FormLabel>
                       <FormControl>
                         <Input {...field} value={field.value || ""} data-testid="input-communication" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="zohoWorkdriveLink"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Zoho Workdrive Link</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="https://workdrive.zoho.com/..." type="url" data-testid="input-zoho-link" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -689,6 +566,28 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
           </TabsContent>
 
           <TabsContent value="program" className="space-y-6 mt-6">
+            {/* Frequency of Services - applies to all client types */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Service Frequency</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="frequencyOfServices"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Frequency of Services</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="e.g., 3 times weekly" data-testid="input-frequency" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
             {selectedCategory === "NDIS" && (
               <Card>
                 <CardHeader>
@@ -925,19 +824,6 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="careTeam.leadership"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Leadership</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value || ""} data-testid="input-leadership" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <FormField
                   control={form.control}
@@ -1255,6 +1141,102 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
               <CardContent className="space-y-4">
                 <FormField
                   control={form.control}
+                  name="mainDiagnosis"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Main Diagnosis</FormLabel>
+                      <Popover open={diagnosisOpen} onOpenChange={setDiagnosisOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between font-normal"
+                              data-testid="input-diagnosis"
+                            >
+                              {field.value || "Select or type a diagnosis..."}
+                              <span className="ml-2 text-muted-foreground">▼</span>
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search diagnoses..."
+                              value={diagnosisSearch}
+                              onValueChange={(value) => {
+                                setDiagnosisSearch(value);
+                                field.onChange(value);
+                              }}
+                            />
+                            <CommandList>
+                              <CommandEmpty>
+                                {diagnosisSearch ? (
+                                  <div
+                                    className="cursor-pointer p-2 hover:bg-accent"
+                                    onClick={() => {
+                                      field.onChange(diagnosisSearch);
+                                      setDiagnosisOpen(false);
+                                    }}
+                                  >
+                                    Create "{diagnosisSearch}"
+                                  </div>
+                                ) : (
+                                  "No diagnoses found"
+                                )}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {diagnoses.map((diagnosis) => (
+                                  <CommandItem
+                                    key={diagnosis}
+                                    value={diagnosis}
+                                    onSelect={() => {
+                                      field.onChange(diagnosis);
+                                      setDiagnosisSearch("");
+                                      setDiagnosisOpen(false);
+                                    }}
+                                  >
+                                    {diagnosis}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="advancedCareDirective"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-purple-600 dark:text-purple-400 font-bold">Advanced Care Directive (ACD)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger className="border-purple-200 dark:border-purple-800" data-testid="select-acd">
+                            <SelectValue placeholder="Select directive status..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="NFR">NFR - Not For Resuscitation</SelectItem>
+                          <SelectItem value="For Resus">For Resus - For Resuscitation</SelectItem>
+                          <SelectItem value="None">None / Not Specified</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Document upload required for NFR or For Resus status
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="summaryOfServices"
                   render={({ field }) => (
                     <FormItem>
@@ -1285,6 +1267,31 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-6 mt-6">
+            {/* Zoho WorkDrive Link */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Document Storage</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="zohoWorkdriveLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zoho WorkDrive Link</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="https://workdrive.zoho.com/..." type="url" data-testid="input-zoho-link" />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Link to the client's document folder in Zoho WorkDrive
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Clinical Document Dates</CardTitle>
