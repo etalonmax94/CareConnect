@@ -1154,10 +1154,46 @@ export default function ClientProfile() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
               <h1 className="text-lg sm:text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
-              <Badge variant={isArchived ? "secondary" : "default"} className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs ${isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}`}>
-                {isArchived ? 'Archived' : 'Active'}
-              </Badge>
-              <CategoryBadge category={client.category} className="h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs" />
+              {/* Interactive Status Badge */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs border-0 text-white cursor-default ${
+                      isArchived ? "bg-slate-500 hover:bg-slate-600" :
+                      client.status === "Hospital" ? "bg-orange-500 hover:bg-orange-600" :
+                      client.status === "Paused" ? "bg-amber-500 hover:bg-amber-600" :
+                      client.status === "Discharged" ? "bg-red-500 hover:bg-red-600" :
+                      "bg-emerald-500 hover:bg-emerald-600"
+                    }`}
+                    data-testid="badge-client-status"
+                  >
+                    {isArchived ? 'Archived' : (client.status || 'Active')}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <div className="space-y-1">
+                    <p className="font-medium">Status: {isArchived ? 'Archived' : (client.status || 'Active')}</p>
+                    {client.statusChangedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Changed on {new Date(client.statusChangedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                    )}
+                    {client.statusChangedBy && (
+                      <p className="text-xs text-muted-foreground">By: {client.statusChangedBy}</p>
+                    )}
+                    {!client.statusChangedAt && !isArchived && (
+                      <p className="text-xs text-muted-foreground">
+                        Since registration on {client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Unknown'}
+                      </p>
+                    )}
+                    {isArchived && client.archivedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Archived on {new Date(client.archivedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
               {client.category === "NDIS" && client.ndisDetails?.ndisFundingType && (
                 <Badge 
                   className={`h-5 sm:h-6 px-1.5 sm:px-2.5 text-xs border-0 text-white hidden sm:inline-flex ${

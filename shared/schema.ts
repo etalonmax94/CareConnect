@@ -153,6 +153,11 @@ export const clients = pgTable("clients", {
   onboardedAt: timestamp("onboarded_at"),
   onboardedBy: varchar("onboarded_by"),
   
+  // Client status - Active, Hospital, Paused, Discharged (Archived is separate)
+  status: text("status").default("Active").$type<"Active" | "Hospital" | "Paused" | "Discharged">(),
+  statusChangedAt: timestamp("status_changed_at"),
+  statusChangedBy: varchar("status_changed_by"),
+  
   // Risk assessment score (Level 1-5) for clinical priority
   riskAssessmentScore: text("risk_assessment_score").$type<"Level 1" | "Level 2" | "Level 3" | "Level 4" | "Level 5">(),
   riskAssessmentDate: date("risk_assessment_date"),
@@ -255,6 +260,7 @@ export const insertClientSchema = createInsertSchema(clients, {
   notificationPreferences: z.any().optional(),
   isPinned: z.enum(["yes", "no"]).optional(),
   isOnboarded: z.enum(["yes", "no"]).optional(),
+  status: z.enum(["Active", "Hospital", "Paused", "Discharged"]).optional(),
   riskAssessmentScore: z.enum(["Level 1", "Level 2", "Level 3", "Level 4", "Level 5"]).optional().nullable(),
   riskAssessmentDate: z.string().optional().nullable(),
   riskAssessmentNotes: z.string().optional().nullable(),
