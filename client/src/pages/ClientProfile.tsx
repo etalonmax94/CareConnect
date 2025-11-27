@@ -708,6 +708,13 @@ export default function ClientProfile() {
   const [editZohoWorkdriveLink, setEditZohoWorkdriveLink] = useState<string>("");
   const [editCommunicationNeeds, setEditCommunicationNeeds] = useState<string>("");
   
+  // Personal Details editable fields
+  const [editSex, setEditSex] = useState<string>("");
+  const [editMaritalStatus, setEditMaritalStatus] = useState<string>("");
+  const [editCulturalBackground, setEditCulturalBackground] = useState<string>("");
+  const [editFallsRiskScore, setEditFallsRiskScore] = useState<string>("");
+  const [editSubstanceUseNotes, setEditSubstanceUseNotes] = useState<string>("");
+  
   // Program Info state variables
   const [editCategory, setEditCategory] = useState<string>("");
   // NDIS fields
@@ -889,6 +896,21 @@ export default function ClientProfile() {
         break;
       case "billingPreferences":
         setEditBillingPreferences(client?.privateClientDetails?.billingPreferences || "");
+        break;
+      case "sex":
+        setEditSex(client?.sex || "");
+        break;
+      case "maritalStatus":
+        setEditMaritalStatus(client?.maritalStatus || "");
+        break;
+      case "culturalBackground":
+        setEditCulturalBackground(client?.culturalBackground || "");
+        break;
+      case "fallsRiskScore":
+        setEditFallsRiskScore(client?.fallsRiskScore?.toString() || "");
+        break;
+      case "substanceUseNotes":
+        setEditSubstanceUseNotes(client?.substanceUseNotes || "");
         break;
     }
   };
@@ -1088,6 +1110,22 @@ export default function ClientProfile() {
         updateFieldMutation.mutate({ 
           privateClientDetails: { ...(client?.privateClientDetails || {}), billingPreferences: editBillingPreferences } as any 
         });
+        break;
+      case "sex":
+        updateFieldMutation.mutate({ sex: (editSex || null) as "Male" | "Female" | "Other" | null });
+        break;
+      case "maritalStatus":
+        updateFieldMutation.mutate({ maritalStatus: (editMaritalStatus || null) as "Single" | "Never married" | "Married" | "Widowed" | "Divorced" | null });
+        break;
+      case "culturalBackground":
+        updateFieldMutation.mutate({ culturalBackground: editCulturalBackground || null });
+        break;
+      case "fallsRiskScore":
+        const fallsScore = editFallsRiskScore ? parseInt(editFallsRiskScore, 10) : null;
+        updateFieldMutation.mutate({ fallsRiskScore: fallsScore });
+        break;
+      case "substanceUseNotes":
+        updateFieldMutation.mutate({ substanceUseNotes: editSubstanceUseNotes || null });
         break;
     }
   };
@@ -2914,22 +2952,117 @@ export default function ClientProfile() {
                         )}
                       </div>
 
-                      {/* Sex/Gender - Display */}
-                      <div className="p-3 -m-3" data-testid="field-sex">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sex</p>
-                        <p className="text-sm mt-1 font-medium">{client.sex || <span className="text-muted-foreground">Not specified</span>}</p>
+                      {/* Sex/Gender - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "sex" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "sex" && startEditing("sex")}
+                        data-testid="field-sex"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sex</p>
+                          {!isArchived && editingField !== "sex" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "sex" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Select value={editSex} onValueChange={setEditSex}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-sex">
+                                <SelectValue placeholder="Select..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Male">Male</SelectItem>
+                                <SelectItem value="Female">Female</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("sex")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.sex || <span className="text-muted-foreground">Click to add</span>}</p>
+                        )}
                       </div>
 
-                      {/* Marital Status - Display */}
-                      <div className="p-3 -m-3" data-testid="field-marital-status">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Marital Status</p>
-                        <p className="text-sm mt-1 font-medium">{client.maritalStatus || <span className="text-muted-foreground">Not specified</span>}</p>
+                      {/* Marital Status - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "maritalStatus" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "maritalStatus" && startEditing("maritalStatus")}
+                        data-testid="field-marital-status"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Marital Status</p>
+                          {!isArchived && editingField !== "maritalStatus" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "maritalStatus" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Select value={editMaritalStatus} onValueChange={setEditMaritalStatus}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-marital-status">
+                                <SelectValue placeholder="Select..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Single">Single</SelectItem>
+                                <SelectItem value="Never married">Never married</SelectItem>
+                                <SelectItem value="Married">Married</SelectItem>
+                                <SelectItem value="Widowed">Widowed</SelectItem>
+                                <SelectItem value="Divorced">Divorced</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("maritalStatus")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.maritalStatus || <span className="text-muted-foreground">Click to add</span>}</p>
+                        )}
                       </div>
 
-                      {/* Cultural Background - Display */}
-                      <div className="p-3 -m-3" data-testid="field-cultural-background">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cultural Background</p>
-                        <p className="text-sm mt-1 font-medium">{client.culturalBackground || <span className="text-muted-foreground">Not specified</span>}</p>
+                      {/* Cultural Background - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "culturalBackground" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "culturalBackground" && startEditing("culturalBackground")}
+                        data-testid="field-cultural-background"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cultural Background</p>
+                          {!isArchived && editingField !== "culturalBackground" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "culturalBackground" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editCulturalBackground}
+                              onChange={(e) => setEditCulturalBackground(e.target.value)}
+                              placeholder="Enter cultural/religious background..."
+                              className="h-8 text-sm"
+                              data-testid="input-cultural-background"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("culturalBackground")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.culturalBackground || <span className="text-muted-foreground">Click to add</span>}</p>
+                        )}
                       </div>
                       
                     </div>
@@ -3106,28 +3239,91 @@ export default function ClientProfile() {
                         )}
                       </div>
 
-                      {/* Falls Risk Score - Display */}
-                      <div className="p-3 -m-3" data-testid="field-falls-risk">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Falls Risk Score</p>
-                        <div className="mt-1 flex items-center gap-2">
-                          {client.fallsRiskScore ? (
-                            <Badge className={`${
-                              client.fallsRiskScore <= 10 ? 'bg-emerald-500' :
-                              client.fallsRiskScore <= 15 ? 'bg-amber-500' :
-                              'bg-red-500'
-                            } text-white border-0`}>
-                              {client.fallsRiskScore}/20
-                            </Badge>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Not assessed</span>
+                      {/* Falls Risk Score - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "fallsRiskScore" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "fallsRiskScore" && startEditing("fallsRiskScore")}
+                        data-testid="field-falls-risk"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Falls Risk Score</p>
+                          {!isArchived && editingField !== "fallsRiskScore" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
                           )}
                         </div>
+                        {editingField === "fallsRiskScore" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Select value={editFallsRiskScore} onValueChange={setEditFallsRiskScore}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-falls-risk">
+                                <SelectValue placeholder="Select score (5-20)..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 16 }, (_, i) => i + 5).map((score) => (
+                                  <SelectItem key={score} value={score.toString()}>
+                                    {score} - {score <= 10 ? 'Low Risk' : score <= 15 ? 'Medium Risk' : 'High Risk'}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("fallsRiskScore")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-1 flex items-center gap-2">
+                            {client.fallsRiskScore ? (
+                              <Badge className={`${
+                                client.fallsRiskScore <= 10 ? 'bg-emerald-500' :
+                                client.fallsRiskScore <= 15 ? 'bg-amber-500' :
+                                'bg-red-500'
+                              } text-white border-0`}>
+                                {client.fallsRiskScore}/20
+                              </Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Click to assess</span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Substance Use - Display */}
-                      <div className="p-3 -m-3" data-testid="field-substance-use">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Substance Use Notes</p>
-                        <p className="text-sm mt-1 font-medium">{client.substanceUseNotes || <span className="text-muted-foreground">None recorded</span>}</p>
+                      {/* Substance Use - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "substanceUseNotes" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "substanceUseNotes" && startEditing("substanceUseNotes")}
+                        data-testid="field-substance-use"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Substance Use Notes</p>
+                          {!isArchived && editingField !== "substanceUseNotes" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "substanceUseNotes" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editSubstanceUseNotes}
+                              onChange={(e) => setEditSubstanceUseNotes(e.target.value)}
+                              placeholder="Enter alcohol/drugs/smoking notes..."
+                              className="h-8 text-sm"
+                              data-testid="input-substance-use"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("substanceUseNotes")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.substanceUseNotes || <span className="text-muted-foreground">Click to add</span>}</p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
