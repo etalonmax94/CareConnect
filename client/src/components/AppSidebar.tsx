@@ -89,7 +89,8 @@ const menuCategories: MenuCategory[] = [
 export function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
-  const isCollapsed = state === "collapsed";
+  // On mobile, always show expanded menu with text labels (never collapsed icons-only view)
+  const isCollapsed = isMobile ? false : state === "collapsed";
 
   // Auto-close sidebar on mobile after navigation (watches location changes)
   useEffect(() => {
