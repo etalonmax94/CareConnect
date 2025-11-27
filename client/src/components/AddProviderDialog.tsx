@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -209,10 +209,12 @@ export function AddProviderDialog({ providerType, onSuccess, triggerClassName, d
   
   const [formData, setFormData] = useState<FormData>(() => getInitialFormData());
   
-  if (isOpen && !prevOpenRef.current) {
-    setFormData(getInitialFormData());
-  }
-  prevOpenRef.current = isOpen;
+  useEffect(() => {
+    if (isOpen && !prevOpenRef.current) {
+      setFormData(getInitialFormData());
+    }
+    prevOpenRef.current = isOpen;
+  }, [isOpen, getInitialFormData]);
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => apiRequest("POST", config.endpoint, data),
