@@ -18,7 +18,7 @@ import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
 import { ServiceScheduleModal } from "@/components/ServiceScheduleModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download, ChevronRight, HeartPulse, Star, Ban } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download, ChevronRight, HeartPulse, Star, Ban, Tag } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -703,6 +703,11 @@ export default function ClientProfile() {
   const [editServiceRates, setEditServiceRates] = useState<string>("");
   const [editBillingPreferences, setEditBillingPreferences] = useState<string>("");
   
+  // Computed active category - uses editCategory when editing, falls back to client.category
+  const activeProgramCategory = editingField === "category" 
+    ? (editCategory || client?.category || "") 
+    : (client?.category || "");
+  
   // Inline field update mutation
   const updateFieldMutation = useMutation({
     mutationFn: async (data: Partial<Client>) => {
@@ -967,14 +972,17 @@ export default function ClientProfile() {
         break;
       // Program Info fields
       case "category":
-        // When category changes, we need to update the category and initialize the appropriate details object
+        // When category changes, update category and initialize the appropriate details object
+        // Also clear details from other categories to prevent stale data issues
         const categoryUpdate: any = { category: editCategory as any };
-        if (editCategory === "NDIS" && !client?.ndisDetails) {
-          categoryUpdate.ndisDetails = {};
-        } else if (editCategory === "Support at Home" && !client?.supportAtHomeDetails) {
-          categoryUpdate.supportAtHomeDetails = {};
-        } else if (editCategory === "Private" && !client?.privateClientDetails) {
-          categoryUpdate.privateClientDetails = {};
+        // Initialize the new category's details if they don't exist
+        if (editCategory === "NDIS") {
+          if (!client?.ndisDetails) categoryUpdate.ndisDetails = {};
+          // Note: We don't clear old category data to preserve historical info
+        } else if (editCategory === "Support at Home") {
+          if (!client?.supportAtHomeDetails) categoryUpdate.supportAtHomeDetails = {};
+        } else if (editCategory === "Private") {
+          if (!client?.privateClientDetails) categoryUpdate.privateClientDetails = {};
         }
         updateFieldMutation.mutate(categoryUpdate);
         break;
@@ -3157,84 +3165,480 @@ export default function ClientProfile() {
               </TabsContent>
 
         <TabsContent value="program" className="space-y-6">
-          {client.category === "NDIS" && client.ndisDetails && (
+          {/* Category Selector */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Tag className="w-4 h-4" />
+                Program Type
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div 
+                className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "category" ? "cursor-pointer hover-elevate" : ""}`}
+                onClick={() => editingField !== "category" && startEditing("category")}
+                data-testid="field-category"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Client Category</p>
+                  {!isArchived && editingField !== "category" && (
+                    <Pencil className="w-3 h-3 text-muted-foreground" />
+                  )}
+                </div>
+                {editingField === "category" ? (
+                  <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <Select value={editCategory} onValueChange={setEditCategory}>
+                      <SelectTrigger className="h-8 text-sm" data-testid="select-category">
+                        <SelectValue placeholder="Select category..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NDIS">NDIS</SelectItem>
+                        <SelectItem value="Support at Home">Support at Home</SelectItem>
+                        <SelectItem value="Private">Private</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-1">
+                      <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("category")} disabled={updateFieldMutation.isPending} data-testid="button-save-category">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing} data-testid="button-cancel-category">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1">
+                    <CategoryBadge category={client.category} />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* NDIS Details - Show based on activeProgramCategory */}
+          {activeProgramCategory === "NDIS" && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">NDIS Details</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">NDIS Number</p>
-                  <p className="text-sm mt-1 font-mono">{client.ndisDetails.ndisNumber || "Not provided"}</p>
+              <CardContent className="space-y-4">
+                {/* NDIS Number */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "ndisNumber" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "ndisNumber" && startEditing("ndisNumber")}
+                  data-testid="field-ndis-number"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">NDIS Number</p>
+                    {!isArchived && editingField !== "ndisNumber" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "ndisNumber" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Input 
+                        value={editNdisNumber} 
+                        onChange={(e) => setEditNdisNumber(e.target.value)} 
+                        className="h-8 text-sm font-mono"
+                        placeholder="Enter NDIS number..."
+                        data-testid="input-ndis-number"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("ndisNumber")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1 font-mono">{client.ndisDetails?.ndisNumber || "Not provided"}</p>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Funding Type</p>
-                  <p className="text-sm mt-1">{client.ndisDetails.ndisFundingType || "Not specified"}</p>
+
+                {/* NDIS Funding Type */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "ndisFundingType" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "ndisFundingType" && startEditing("ndisFundingType")}
+                  data-testid="field-ndis-funding-type"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Funding Type</p>
+                    {!isArchived && editingField !== "ndisFundingType" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "ndisFundingType" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Select value={editNdisFundingType} onValueChange={setEditNdisFundingType}>
+                        <SelectTrigger className="h-8 text-sm" data-testid="select-ndis-funding-type">
+                          <SelectValue placeholder="Select funding type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Self-Managed">Self-Managed</SelectItem>
+                          <SelectItem value="Plan-Managed">Plan-Managed</SelectItem>
+                          <SelectItem value="NDIA-Managed">NDIA-Managed</SelectItem>
+                          <SelectItem value="Combination">Combination</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("ndisFundingType")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1">{client.ndisDetails?.ndisFundingType || "Not specified"}</p>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Plan Start Date</p>
-                  <p className="text-sm mt-1">{client.ndisDetails.ndisPlanStartDate ? new Date(client.ndisDetails.ndisPlanStartDate).toLocaleDateString('en-AU') : "Not set"}</p>
+
+                {/* Plan Start Date */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "ndisPlanStartDate" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "ndisPlanStartDate" && startEditing("ndisPlanStartDate")}
+                  data-testid="field-ndis-plan-start"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plan Start Date</p>
+                    {!isArchived && editingField !== "ndisPlanStartDate" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "ndisPlanStartDate" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Input 
+                        type="date"
+                        value={editNdisPlanStartDate} 
+                        onChange={(e) => setEditNdisPlanStartDate(e.target.value)} 
+                        className="h-8 text-sm"
+                        data-testid="input-ndis-plan-start"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("ndisPlanStartDate")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1">{client.ndisDetails?.ndisPlanStartDate ? new Date(client.ndisDetails.ndisPlanStartDate).toLocaleDateString('en-AU') : "Not set"}</p>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Plan End Date</p>
-                  <p className="text-sm mt-1">{client.ndisDetails.ndisPlanEndDate ? new Date(client.ndisDetails.ndisPlanEndDate).toLocaleDateString('en-AU') : "Not set"}</p>
+
+                {/* Plan End Date */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "ndisPlanEndDate" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "ndisPlanEndDate" && startEditing("ndisPlanEndDate")}
+                  data-testid="field-ndis-plan-end"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plan End Date</p>
+                    {!isArchived && editingField !== "ndisPlanEndDate" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "ndisPlanEndDate" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Input 
+                        type="date"
+                        value={editNdisPlanEndDate} 
+                        onChange={(e) => setEditNdisPlanEndDate(e.target.value)} 
+                        className="h-8 text-sm"
+                        data-testid="input-ndis-plan-end"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("ndisPlanEndDate")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1">{client.ndisDetails?.ndisPlanEndDate ? new Date(client.ndisDetails.ndisPlanEndDate).toLocaleDateString('en-AU') : "Not set"}</p>
+                  )}
                 </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground">Schedule of Supports / Budget</p>
-                  <p className="text-sm mt-1">{client.ndisDetails.scheduleOfSupports || "Not provided"}</p>
+
+                {/* Schedule of Supports */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "ndisScheduleOfSupports" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "ndisScheduleOfSupports" && startEditing("ndisScheduleOfSupports")}
+                  data-testid="field-ndis-schedule"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Schedule of Supports / Budget</p>
+                    {!isArchived && editingField !== "ndisScheduleOfSupports" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "ndisScheduleOfSupports" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Textarea 
+                        value={editNdisScheduleOfSupports} 
+                        onChange={(e) => setEditNdisScheduleOfSupports(e.target.value)} 
+                        className="text-sm min-h-[80px]"
+                        placeholder="Enter schedule of supports..."
+                        data-testid="input-ndis-schedule"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("ndisScheduleOfSupports")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{client.ndisDetails?.scheduleOfSupports || "Not provided"}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {client.category === "Support at Home" && client.supportAtHomeDetails && (
+          {/* Support at Home Details - Show based on activeProgramCategory */}
+          {activeProgramCategory === "Support at Home" && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">Support at Home Details</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">SaH Number</p>
-                  <p className="text-sm mt-1 font-mono">{client.supportAtHomeDetails.sahNumber || "Not provided"}</p>
+              <CardContent className="space-y-4">
+                {/* SaH Number */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "sahNumber" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "sahNumber" && startEditing("sahNumber")}
+                  data-testid="field-sah-number"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">SaH Number</p>
+                    {!isArchived && editingField !== "sahNumber" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "sahNumber" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Input 
+                        value={editSahNumber} 
+                        onChange={(e) => setEditSahNumber(e.target.value)} 
+                        className="h-8 text-sm font-mono"
+                        placeholder="Enter SaH number..."
+                        data-testid="input-sah-number"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("sahNumber")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1 font-mono">{client.supportAtHomeDetails?.sahNumber || "Not provided"}</p>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">SaH Funding Level</p>
-                  <p className="text-sm mt-1">{client.supportAtHomeDetails.sahFundingLevel || "Not specified"}</p>
+
+                {/* SaH Funding Level */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "sahFundingLevel" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "sahFundingLevel" && startEditing("sahFundingLevel")}
+                  data-testid="field-sah-funding-level"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Funding Level</p>
+                    {!isArchived && editingField !== "sahFundingLevel" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "sahFundingLevel" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Select value={editSahFundingLevel} onValueChange={setEditSahFundingLevel}>
+                        <SelectTrigger className="h-8 text-sm" data-testid="select-sah-funding-level">
+                          <SelectValue placeholder="Select funding level..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Level 1">Level 1</SelectItem>
+                          <SelectItem value="Level 2">Level 2</SelectItem>
+                          <SelectItem value="Level 3">Level 3</SelectItem>
+                          <SelectItem value="Level 4">Level 4</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("sahFundingLevel")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1">{client.supportAtHomeDetails?.sahFundingLevel || "Not specified"}</p>
+                  )}
                 </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground">Schedule of Supports</p>
-                  <p className="text-sm mt-1">{client.supportAtHomeDetails.scheduleOfSupports || "Not specified"}</p>
+
+                {/* SaH Schedule of Supports */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "sahScheduleOfSupports" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "sahScheduleOfSupports" && startEditing("sahScheduleOfSupports")}
+                  data-testid="field-sah-schedule"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Schedule of Supports</p>
+                    {!isArchived && editingField !== "sahScheduleOfSupports" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "sahScheduleOfSupports" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Textarea 
+                        value={editSahScheduleOfSupports} 
+                        onChange={(e) => setEditSahScheduleOfSupports(e.target.value)} 
+                        className="text-sm min-h-[80px]"
+                        placeholder="Enter schedule of supports..."
+                        data-testid="input-sah-schedule"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("sahScheduleOfSupports")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{client.supportAtHomeDetails?.scheduleOfSupports || "Not specified"}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {client.category === "Private" && client.privateClientDetails && (
+          {/* Private Client Details - Show based on activeProgramCategory */}
+          {activeProgramCategory === "Private" && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">Private Client Details</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Payment Method</p>
-                  <p className="text-sm mt-1">{client.privateClientDetails.paymentMethod || "Not specified"}</p>
+              <CardContent className="space-y-4">
+                {/* Payment Method */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "paymentMethod" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "paymentMethod" && startEditing("paymentMethod")}
+                  data-testid="field-payment-method"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Payment Method</p>
+                    {!isArchived && editingField !== "paymentMethod" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "paymentMethod" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Select value={editPaymentMethod} onValueChange={setEditPaymentMethod}>
+                        <SelectTrigger className="h-8 text-sm" data-testid="select-payment-method">
+                          <SelectValue placeholder="Select payment method..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Credit Card">Credit Card</SelectItem>
+                          <SelectItem value="Direct Debit">Direct Debit</SelectItem>
+                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="Invoice">Invoice</SelectItem>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("paymentMethod")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1">{client.privateClientDetails?.paymentMethod || "Not specified"}</p>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Service Rates</p>
-                  <p className="text-sm mt-1">{client.privateClientDetails.serviceRates || "Not specified"}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground">Billing Preferences</p>
-                  <p className="text-sm mt-1">{client.privateClientDetails.billingPreferences || "Not specified"}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {!client.ndisDetails && !client.supportAtHomeDetails && !client.privateClientDetails && (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                No program information available for this client.
+                {/* Service Rates */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "serviceRates" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "serviceRates" && startEditing("serviceRates")}
+                  data-testid="field-service-rates"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Service Rates</p>
+                    {!isArchived && editingField !== "serviceRates" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "serviceRates" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Input 
+                        value={editServiceRates} 
+                        onChange={(e) => setEditServiceRates(e.target.value)} 
+                        className="h-8 text-sm"
+                        placeholder="Enter service rates..."
+                        data-testid="input-service-rates"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("serviceRates")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1">{client.privateClientDetails?.serviceRates || "Not specified"}</p>
+                  )}
+                </div>
+
+                {/* Billing Preferences */}
+                <div 
+                  className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "billingPreferences" ? "cursor-pointer hover-elevate" : ""}`}
+                  onClick={() => editingField !== "billingPreferences" && startEditing("billingPreferences")}
+                  data-testid="field-billing-preferences"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Billing Preferences</p>
+                    {!isArchived && editingField !== "billingPreferences" && (
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {editingField === "billingPreferences" ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <Textarea 
+                        value={editBillingPreferences} 
+                        onChange={(e) => setEditBillingPreferences(e.target.value)} 
+                        className="text-sm min-h-[80px]"
+                        placeholder="Enter billing preferences..."
+                        data-testid="input-billing-preferences"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("billingPreferences")} disabled={updateFieldMutation.isPending}>
+                          {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{client.privateClientDetails?.billingPreferences || "Not specified"}</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
