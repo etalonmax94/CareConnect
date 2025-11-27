@@ -2620,7 +2620,7 @@ export default function ClientProfile() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Support Coordination</CardTitle>
+                <CardTitle className="text-base">Support Coordinator</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {client.careTeam?.supportCoordinator && (
