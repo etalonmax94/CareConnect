@@ -1,0 +1,87 @@
+Page Layout and Dashboard (User-Friendly Design):
+
+Title: 'SIL Houses'
+Subtitle: 'Manage Supported Independent Living accommodation and residents – NDIS Compliant'
+Dashboard stats section (in easy-to-read cards with icons):
+Total Houses: Count of all houses, subtext 'X active'
+Total Residents: Current residents across houses, subtext 'of Y capacity'
+Occupancy Rate: (Total residents / total capacity) * 100 as 'Z.Z%', subtext 'W beds available'
+Property Types: Count of unique types
+Add a compliance overview card: 'Compliance Status' showing '% houses with valid certificates' (calculate based on non-expired safety/fire/building dates)
+
+Filters: Simple dropdowns for Status (All, Active, Inactive, Under Maintenance), Type (All, Apartment, House, Unit, Villa, Other), and a quick search bar for house name/address. Include a 'Filter' button to apply.
+Main view: Responsive table/grid with columns: House Name, Full Address, Status, Type, Max Residents, Current Residents, Occupancy %, Compliance Status (e.g., 'Up to Date' if all dates valid, 'Action Needed' if expired), Actions (Edit, Delete, View Details).
+If no houses: Centered message 'No houses yet. Get started by adding your first SIL house' with large 'Add First House' button.
+Add House button always visible at top-right.
+
+Tooltips: Hover tips on stats (e.g., 'Occupancy Rate: Based on current residents vs. max capacity per NDIS guidelines') and columns (e.g., 'Compliance Status: Ensures NDIS safety standards').
+Workflow aids: Quick-action buttons like 'Export Report' for CSV/PDF of all houses (include all fields for NDIS audits).
+
+Add/Edit House Form (Guided Workflow and NDIS Compliance):
+
+Open as a multi-step wizard (steps: Basic Info > Details > Financial > Compliance > Review & Submit) to guide staff sequentially, reducing errors. Use progress bar at top.
+Mandatory fields (*) with real-time validation (e.g., red highlights, error messages like 'Required for NDIS compliance').
+Include NDIS-specific notes/tooltips (e.g., 'This field ensures alignment with NDIS Practice Standards for safe accommodation').
+Basic Info step:
+House Name (text, *)
+Street Address (text, *)
+Suburb (text, *)
+Postcode (text, *, 4-digit validation)
+State (dropdown, *, default 'NSW', options: NSW, VIC, QLD, SA, WA, TAS, NT, ACT)
+Property Type (dropdown, *, options: Apartment, House, Unit, Villa, Other; allow custom entry)
+Status (dropdown, default 'Active', options: Active, Inactive, Under Maintenance)
+
+Details step:
+Max Residents (number, *, min 1, tooltip: 'NDIS-funded capacity')
+Bedrooms (number, optional)
+Bathrooms (number, optional)
+Wheelchair Accessible (checkbox, default false, tooltip: 'Required for NDIS accessibility compliance')
+Management & Contact:
+House Manager (dropdown/text, optional, link to staff table if exists)
+Contact Name (text, optional)
+Contact Phone (text, optional, phone validation)
+Contact Email (text, optional, email validation)
+
+Notes (textarea, optional, tooltip: 'Include any NDIS participant-related notes; ensure privacy compliance')
+Add NDIS-specific: SIL Provider Number (text, optional, for registration tracking)
+
+Financial step:
+Lease Start Date (date, optional)
+Lease End Date (date, optional, validate > start)
+Rent Amount (number, optional)
+Rent Frequency (dropdown, default 'Weekly', options: Weekly, Fortnightly, Monthly)
+Add NDIS-specific: NDIS Funding Category (dropdown, optional, options: Core Supports, Capital Supports; tooltip: 'Aligns with NDIS pricing arrangements')
+
+Compliance step:
+Safety Certificate Expiry (date, *, validate future date, tooltip: 'Mandatory for NDIS Quality Standard 1: Rights and Responsibilities')
+Fire Safety Check Date (date, *, tooltip: 'Required under NDIS Practice Standard for safe environments')
+Building Inspection Date (date, *, tooltip: 'Ensures compliance with NDIS safeguards')
+Add NDIS-specific: Incident Reporting Log (textarea, optional, for noting past incidents); Privacy Consent Obtained (checkbox, default false, tooltip: 'Confirm participant data handling per Australian Privacy Principles')
+
+Review & Submit step: Summary of all inputs, editable via 'Back', with 'Submit' button.
+Navigation: Cancel, Previous, Next buttons. On submit: Log action in audit trail (e.g., 'House added by [user] on [date]'), refresh dashboard.
+For edits: Pre-fill data, highlight changes for review.
+
+Data Model and Backend Logic (Compliance-Focused):
+
+House schema: All fields above, plus ID, created/updated timestamps, last_modified_by (for audits), current_residents (default 0).
+Residents: Include a simple current_residents counter; add note for future integration with resident module to auto-update (e.g., link via house ID).
+Stats: Real-time queries; add compliance % calculation (houses with all compliance dates valid / total houses).
+CRUD with Compliance:
+Create/Update: Require mandatory fields; log changes (store in separate audit table: action, user, timestamp, details).
+Read: Secure access (assume role-based if CRM has users; e.g., staff view only).
+Delete: Require confirmation with reason (logged for NDIS audits).
+
+Filters/Search/Sort: Easy column sorting; search across name/address/type.
+Error Handling: User-friendly messages (e.g., 'Safety Expiry must be future date for NDIS compliance').
+Security/Compliance: Encrypt sensitive fields if possible; remind in UI: 'All data handled per NDIS privacy requirements'.
+Exports: CSV/PDF with all data, including audit logs, for NDIS reporting.
+
+Additional Features for Staff Workflow and NDIS:
+
+Reminders: Alert badges on expired compliance dates (e.g., red icon if safety expiry < 30 days).
+Integration: If CRM has residents/staff, link for auto-population.
+Accessibility: Ensure UI is WCAG-compliant (e.g., alt text, keyboard nav) for NDIS inclusivity.
+Testing: Add sample data; ensure end-to-end functionality with compliance checks.
+
+This design simplifies workflows for staff while embedding NDIS compliance to minimize risks."
