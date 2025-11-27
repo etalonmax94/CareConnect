@@ -1990,191 +1990,202 @@ export default function ClientProfile() {
                         )}
                       </div>
 
-                      {/* Emergency Contact - Highlighted under address - Inline Editable */}
-                      <div 
-                        className={`p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 ${!isArchived && editingField !== "emergencyContact" ? "cursor-pointer hover-elevate" : ""}`}
-                        onClick={() => editingField !== "emergencyContact" && startEditing("emergencyContact")}
-                        data-testid="field-emergency-contact"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                            <p className="text-xs font-medium text-red-700 dark:text-red-300 uppercase tracking-wide">Emergency Contact</p>
-                          </div>
-                          {!isArchived && editingField !== "emergencyContact" && (
-                            <Pencil className="w-3 h-3 text-red-600 dark:text-red-400" />
-                          )}
-                        </div>
-                        {editingField === "emergencyContact" ? (
-                          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                            <Input
-                              value={editEmergencyContactName}
-                              onChange={(e) => setEditEmergencyContactName(e.target.value)}
-                              placeholder="Contact name..."
-                              className="h-8 text-sm"
-                              data-testid="input-emergency-name"
-                            />
-                            <Input
-                              value={editEmergencyContactPhone}
-                              onChange={(e) => setEditEmergencyContactPhone(e.target.value)}
-                              placeholder="Phone number..."
-                              className="h-8 text-sm"
-                              data-testid="input-emergency-phone"
-                            />
-                            <Select value={editEmergencyContactRelationship} onValueChange={setEditEmergencyContactRelationship}>
-                              <SelectTrigger className="h-8 text-sm" data-testid="select-emergency-relationship">
-                                <SelectValue placeholder="Relationship..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="spouse">Spouse</SelectItem>
-                                <SelectItem value="parent">Parent</SelectItem>
-                                <SelectItem value="child">Child</SelectItem>
-                                <SelectItem value="sibling">Sibling</SelectItem>
-                                <SelectItem value="friend">Friend</SelectItem>
-                                <SelectItem value="carer">Carer</SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <div className="flex gap-1">
-                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("emergencyContact")} disabled={updateFieldMutation.isPending}>
-                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (() => {
-                          const emergencyContacts = clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes");
-                          if (emergencyContacts.length > 0) {
-                            return (
-                              <div className="space-y-2">
-                                {emergencyContacts.slice(0, 2).map((contact) => (
-                                  <div key={contact.id} className="flex items-center justify-between">
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <p className="font-semibold text-sm">{contact.name}</p>
-                                        <div className="flex gap-1">
-                                          {contact.isNok === "yes" && <Badge variant="outline" className="text-xs h-5">NOK</Badge>}
-                                          {contact.isEmergencyContact === "yes" && <Badge variant="destructive" className="text-xs h-5">Emergency</Badge>}
-                                        </div>
-                                      </div>
-                                      <p className="text-xs text-muted-foreground capitalize">{contact.relationship}</p>
-                                    </div>
-                                    {contact.phoneNumber && (
-                                      <a href={`tel:${contact.phoneNumber}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
-                                        <Phone className="w-3 h-3" />
-                                        {contact.phoneNumber}
-                                      </a>
-                                    )}
+                      {/* Emergency Contact and EPOA - share row when both have data */}
+                      {(() => {
+                        const emergencyContactsData = clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes");
+                        const hasEmergencyData = emergencyContactsData.length > 0 || client.nokEpoa;
+                        const hasEpoaData = client.epoa;
+                        const showBothInRow = hasEmergencyData && hasEpoaData;
+                        
+                        return (
+                          <div className={`grid gap-3 ${showBothInRow ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+                            {/* Emergency Contact - Highlighted block - Inline Editable */}
+                            <div 
+                              className={`p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 ${!isArchived && editingField !== "emergencyContact" ? "cursor-pointer hover-elevate" : ""}`}
+                              onClick={() => editingField !== "emergencyContact" && startEditing("emergencyContact")}
+                              data-testid="field-emergency-contact"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                  <p className="text-xs font-medium text-red-700 dark:text-red-300 uppercase tracking-wide">Emergency Contact</p>
+                                </div>
+                                {!isArchived && editingField !== "emergencyContact" && (
+                                  <Pencil className="w-3 h-3 text-red-600 dark:text-red-400" />
+                                )}
+                              </div>
+                              {editingField === "emergencyContact" ? (
+                                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                                  <Input
+                                    value={editEmergencyContactName}
+                                    onChange={(e) => setEditEmergencyContactName(e.target.value)}
+                                    placeholder="Contact name..."
+                                    className="h-8 text-sm"
+                                    data-testid="input-emergency-name"
+                                  />
+                                  <Input
+                                    value={editEmergencyContactPhone}
+                                    onChange={(e) => setEditEmergencyContactPhone(e.target.value)}
+                                    placeholder="Phone number..."
+                                    className="h-8 text-sm"
+                                    data-testid="input-emergency-phone"
+                                  />
+                                  <Select value={editEmergencyContactRelationship} onValueChange={setEditEmergencyContactRelationship}>
+                                    <SelectTrigger className="h-8 text-sm" data-testid="select-emergency-relationship">
+                                      <SelectValue placeholder="Relationship..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="spouse">Spouse</SelectItem>
+                                      <SelectItem value="parent">Parent</SelectItem>
+                                      <SelectItem value="child">Child</SelectItem>
+                                      <SelectItem value="sibling">Sibling</SelectItem>
+                                      <SelectItem value="friend">Friend</SelectItem>
+                                      <SelectItem value="carer">Carer</SelectItem>
+                                      <SelectItem value="other">Other</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("emergencyContact")} disabled={updateFieldMutation.isPending}>
+                                      {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                    </Button>
+                                    <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                      Cancel
+                                    </Button>
                                   </div>
-                                ))}
-                              </div>
-                            );
-                          }
-                          if (client.nokEpoa) {
-                            const nokParts = client.nokEpoa.split(' - ');
-                            const name = nokParts[0];
-                            const relationship = nokParts[1];
-                            const phone = nokParts[2];
-                            return (
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-semibold text-sm">{name}</p>
-                                  {relationship && <p className="text-xs text-muted-foreground capitalize">{relationship}</p>}
                                 </div>
-                                {phone && (
-                                  <a href={`tel:${phone}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
-                                    <Phone className="w-3 h-3" />
-                                    {phone}
-                                  </a>
+                              ) : (() => {
+                                if (emergencyContactsData.length > 0) {
+                                  return (
+                                    <div className="space-y-2">
+                                      {emergencyContactsData.slice(0, 2).map((contact) => (
+                                        <div key={contact.id} className="flex items-center justify-between">
+                                          <div>
+                                            <div className="flex items-center gap-2">
+                                              <p className="font-semibold text-sm">{contact.name}</p>
+                                              <div className="flex gap-1">
+                                                {contact.isNok === "yes" && <Badge variant="outline" className="text-xs h-5">NOK</Badge>}
+                                                {contact.isEmergencyContact === "yes" && <Badge variant="destructive" className="text-xs h-5">Emergency</Badge>}
+                                              </div>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground capitalize">{contact.relationship}</p>
+                                          </div>
+                                          {contact.phoneNumber && (
+                                            <a href={`tel:${contact.phoneNumber}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
+                                              <Phone className="w-3 h-3" />
+                                              {contact.phoneNumber}
+                                            </a>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                                if (client.nokEpoa) {
+                                  const nokParts = client.nokEpoa.split(' - ');
+                                  const name = nokParts[0];
+                                  const relationship = nokParts[1];
+                                  const phone = nokParts[2];
+                                  return (
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="font-semibold text-sm">{name}</p>
+                                        {relationship && <p className="text-xs text-muted-foreground capitalize">{relationship}</p>}
+                                      </div>
+                                      {phone && (
+                                        <a href={`tel:${phone}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
+                                          <Phone className="w-3 h-3" />
+                                          {phone}
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                                return <p className="text-sm text-muted-foreground">Click to add emergency contact</p>;
+                              })()}
+                            </div>
+
+                            {/* EPOA - Enduring Power of Attorney - Highlighted block */}
+                            <div 
+                              className={`p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 ${!isArchived && editingField !== "epoa" ? "cursor-pointer hover-elevate" : ""}`}
+                              onClick={() => editingField !== "epoa" && startEditing("epoa")}
+                              data-testid="field-epoa-overview"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                  <p className="text-xs font-medium text-purple-700 dark:text-purple-300 uppercase tracking-wide">EPOA (Power of Attorney)</p>
+                                </div>
+                                {!isArchived && editingField !== "epoa" && (
+                                  <Pencil className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                                 )}
                               </div>
-                            );
-                          }
-                          return <p className="text-sm text-muted-foreground">Click to add emergency contact</p>;
-                        })()}
-                      </div>
-
-                      {/* EPOA - Enduring Power of Attorney - Highlighted block */}
-                      <div 
-                        className={`p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 ${!isArchived && editingField !== "epoa" ? "cursor-pointer hover-elevate" : ""}`}
-                        onClick={() => editingField !== "epoa" && startEditing("epoa")}
-                        data-testid="field-epoa-overview"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                            <p className="text-xs font-medium text-purple-700 dark:text-purple-300 uppercase tracking-wide">EPOA (Power of Attorney)</p>
-                          </div>
-                          {!isArchived && editingField !== "epoa" && (
-                            <Pencil className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                          )}
-                        </div>
-                        {editingField === "epoa" ? (
-                          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                            <Input
-                              value={editEpoaName}
-                              onChange={(e) => setEditEpoaName(e.target.value)}
-                              placeholder="EPOA name..."
-                              className="h-8 text-sm"
-                              data-testid="input-epoa-name"
-                            />
-                            <Input
-                              value={editEpoaPhone}
-                              onChange={(e) => setEditEpoaPhone(e.target.value)}
-                              placeholder="Phone number..."
-                              className="h-8 text-sm"
-                              data-testid="input-epoa-phone"
-                            />
-                            <Select value={editEpoaRelationship} onValueChange={setEditEpoaRelationship}>
-                              <SelectTrigger className="h-8 text-sm" data-testid="select-epoa-relationship">
-                                <SelectValue placeholder="Relationship..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="spouse">Spouse</SelectItem>
-                                <SelectItem value="parent">Parent</SelectItem>
-                                <SelectItem value="child">Child</SelectItem>
-                                <SelectItem value="sibling">Sibling</SelectItem>
-                                <SelectItem value="friend">Friend</SelectItem>
-                                <SelectItem value="solicitor">Solicitor</SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <div className="flex gap-1">
-                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("epoa")} disabled={updateFieldMutation.isPending}>
-                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
-                                Cancel
-                              </Button>
+                              {editingField === "epoa" ? (
+                                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                                  <Input
+                                    value={editEpoaName}
+                                    onChange={(e) => setEditEpoaName(e.target.value)}
+                                    placeholder="EPOA name..."
+                                    className="h-8 text-sm"
+                                    data-testid="input-epoa-name"
+                                  />
+                                  <Input
+                                    value={editEpoaPhone}
+                                    onChange={(e) => setEditEpoaPhone(e.target.value)}
+                                    placeholder="Phone number..."
+                                    className="h-8 text-sm"
+                                    data-testid="input-epoa-phone"
+                                  />
+                                  <Select value={editEpoaRelationship} onValueChange={setEditEpoaRelationship}>
+                                    <SelectTrigger className="h-8 text-sm" data-testid="select-epoa-relationship">
+                                      <SelectValue placeholder="Relationship..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="spouse">Spouse</SelectItem>
+                                      <SelectItem value="parent">Parent</SelectItem>
+                                      <SelectItem value="child">Child</SelectItem>
+                                      <SelectItem value="sibling">Sibling</SelectItem>
+                                      <SelectItem value="friend">Friend</SelectItem>
+                                      <SelectItem value="solicitor">Solicitor</SelectItem>
+                                      <SelectItem value="other">Other</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("epoa")} disabled={updateFieldMutation.isPending}>
+                                      {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                    </Button>
+                                    <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : client.epoa ? (
+                                (() => {
+                                  const epoaParts = client.epoa.split(' - ');
+                                  const name = epoaParts[0];
+                                  const relationship = epoaParts[1];
+                                  const phone = epoaParts[2];
+                                  return (
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="font-semibold text-sm">{name}</p>
+                                        {relationship && <p className="text-xs text-muted-foreground capitalize">{relationship}</p>}
+                                      </div>
+                                      {phone && (
+                                        <a href={`tel:${phone}`} className="text-sm text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
+                                          <Phone className="w-3 h-3" />
+                                          {phone}
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <p className="text-sm text-muted-foreground">Click to add EPOA</p>
+                              )}
                             </div>
                           </div>
-                        ) : client.epoa ? (
-                          (() => {
-                            const epoaParts = client.epoa.split(' - ');
-                            const name = epoaParts[0];
-                            const relationship = epoaParts[1];
-                            const phone = epoaParts[2];
-                            return (
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-semibold text-sm">{name}</p>
-                                  {relationship && <p className="text-xs text-muted-foreground capitalize">{relationship}</p>}
-                                </div>
-                                {phone && (
-                                  <a href={`tel:${phone}`} className="text-sm text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
-                                    <Phone className="w-3 h-3" />
-                                    {phone}
-                                  </a>
-                                )}
-                              </div>
-                            );
-                          })()
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Click to add EPOA</p>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
 
