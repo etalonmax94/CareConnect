@@ -16,6 +16,8 @@ import { Loader2 } from "lucide-react";
 import { SuburbAutocomplete } from "@/components/AddressAutocomplete";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
+import { AddProviderDialog } from "@/components/AddProviderDialog";
+import { queryClient } from "@/lib/queryClient";
 
 interface ClientFormProps {
   client?: Client;
@@ -696,24 +698,34 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Care Manager</FormLabel>
-                      <Select 
-                        onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-care-manager">
-                            <SelectValue placeholder="Select care manager..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {careManagers.map((staff) => (
-                            <SelectItem key={staff.id} value={staff.name}>
-                              {staff.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-1">
+                        <Select 
+                          onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-care-manager">
+                              <SelectValue placeholder="Select care manager..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {careManagers.map((staff) => (
+                              <SelectItem key={staff.id} value={staff.name}>
+                                {staff.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <AddProviderDialog 
+                          providerType="staff" 
+                          defaultValues={{ role: "care_manager" }}
+                          onSuccess={(newStaff) => {
+                            queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+                            field.onChange(newStaff.name);
+                          }}
+                        />
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -739,39 +751,49 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>General Practitioner</FormLabel>
-                      <Select 
-                        onValueChange={(value) => {
-                          if (value === "none") {
-                            field.onChange("");
-                          } else {
-                            const selectedGP = gps.find(g => g.id === value);
-                            if (selectedGP) {
-                              const displayName = `${selectedGP.name}${selectedGP.practiceName ? ` - ${selectedGP.practiceName}` : ''}`;
-                              field.onChange(displayName);
+                      <div className="flex gap-1">
+                        <Select 
+                          onValueChange={(value) => {
+                            if (value === "none") {
+                              field.onChange("");
+                            } else {
+                              const selectedGP = gps.find(g => g.id === value);
+                              if (selectedGP) {
+                                const displayName = `${selectedGP.name}${selectedGP.practiceName ? ` - ${selectedGP.practiceName}` : ''}`;
+                                field.onChange(displayName);
+                              }
                             }
-                          }
-                        }}
-                        value={gps.find(g => 
-                          field.value?.includes(g.name) || 
-                          (g.practiceName && field.value?.includes(g.practiceName))
-                        )?.id || (field.value ? "custom" : "")}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-gp">
-                            <SelectValue placeholder="Select GP...">
-                              {field.value || "Select GP..."}
-                            </SelectValue>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {gps.map((gp) => (
-                            <SelectItem key={gp.id} value={gp.id}>
-                              {gp.name}{gp.practiceName ? ` - ${gp.practiceName}` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          }}
+                          value={gps.find(g => 
+                            field.value?.includes(g.name) || 
+                            (g.practiceName && field.value?.includes(g.practiceName))
+                          )?.id || (field.value ? "custom" : "")}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-gp">
+                              <SelectValue placeholder="Select GP...">
+                                {field.value || "Select GP..."}
+                              </SelectValue>
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {gps.map((gp) => (
+                              <SelectItem key={gp.id} value={gp.id}>
+                                {gp.name}{gp.practiceName ? ` - ${gp.practiceName}` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <AddProviderDialog 
+                          providerType="gp" 
+                          onSuccess={(newGP) => {
+                            queryClient.invalidateQueries({ queryKey: ["/api/gps"] });
+                            const displayName = `${newGP.name}${newGP.practiceName ? ` - ${newGP.practiceName}` : ''}`;
+                            field.onChange(displayName);
+                          }}
+                        />
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -783,29 +805,38 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Support Coordinator</FormLabel>
-                      <Select 
-                        onValueChange={(value) => {
-                          field.onChange(value === "none" ? undefined : value);
-                          // Also set the display name for backwards compatibility
-                          const sc = supportCoordinators.find(s => s.id === value);
-                          form.setValue("careTeam.supportCoordinator", sc ? `${sc.name}${sc.organisation ? ` (${sc.organisation})` : ''}` : '');
-                        }} 
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-coordinator">
-                            <SelectValue placeholder="Select support coordinator..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {supportCoordinators.map((sc) => (
-                            <SelectItem key={sc.id} value={sc.id}>
-                              {sc.name}{sc.organisation ? ` (${sc.organisation})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-1">
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value === "none" ? undefined : value);
+                            const sc = supportCoordinators.find(s => s.id === value);
+                            form.setValue("careTeam.supportCoordinator", sc ? `${sc.name}${sc.organisation ? ` (${sc.organisation})` : ''}` : '');
+                          }} 
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-coordinator">
+                              <SelectValue placeholder="Select support coordinator..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {supportCoordinators.map((sc) => (
+                              <SelectItem key={sc.id} value={sc.id}>
+                                {sc.name}{sc.organisation ? ` (${sc.organisation})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <AddProviderDialog 
+                          providerType="supportCoordinator" 
+                          onSuccess={(newSC) => {
+                            queryClient.invalidateQueries({ queryKey: ["/api/support-coordinators"] });
+                            field.onChange(newSC.id);
+                            form.setValue("careTeam.supportCoordinator", `${newSC.name}${newSC.organisation ? ` (${newSC.organisation})` : ''}`);
+                          }}
+                        />
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -817,29 +848,38 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Plan Manager</FormLabel>
-                      <Select 
-                        onValueChange={(value) => {
-                          field.onChange(value === "none" ? undefined : value);
-                          // Also set the display name for backwards compatibility
-                          const pm = planManagers.find(p => p.id === value);
-                          form.setValue("careTeam.planManager", pm ? `${pm.name}${pm.organisation ? ` (${pm.organisation})` : ''}` : '');
-                        }} 
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-plan-manager">
-                            <SelectValue placeholder="Select plan manager..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {planManagers.map((pm) => (
-                            <SelectItem key={pm.id} value={pm.id}>
-                              {pm.name}{pm.organisation ? ` (${pm.organisation})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-1">
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value === "none" ? undefined : value);
+                            const pm = planManagers.find(p => p.id === value);
+                            form.setValue("careTeam.planManager", pm ? `${pm.name}${pm.organisation ? ` (${pm.organisation})` : ''}` : '');
+                          }} 
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-plan-manager">
+                              <SelectValue placeholder="Select plan manager..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {planManagers.map((pm) => (
+                              <SelectItem key={pm.id} value={pm.id}>
+                                {pm.name}{pm.organisation ? ` (${pm.organisation})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <AddProviderDialog 
+                          providerType="planManager" 
+                          onSuccess={(newPM) => {
+                            queryClient.invalidateQueries({ queryKey: ["/api/plan-managers"] });
+                            field.onChange(newPM.id);
+                            form.setValue("careTeam.planManager", `${newPM.name}${newPM.organisation ? ` (${newPM.organisation})` : ''}`);
+                          }}
+                        />
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -853,28 +893,37 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                     return (
                       <FormItem>
                         <FormLabel>Allied Health Professional</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value === "none" ? undefined : value);
-                          }} 
-                          value={field.value || ""}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-allied-health">
-                              <SelectValue placeholder="Select allied health professional...">
-                                {selectedAhp ? `${selectedAhp.name} (${selectedAhp.specialty})` : "Select allied health professional..."}
-                              </SelectValue>
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {alliedHealthProfessionals.map((ahp) => (
-                              <SelectItem key={ahp.id} value={ahp.id}>
-                                {ahp.name} ({ahp.specialty})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex gap-1">
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value === "none" ? undefined : value);
+                            }} 
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-allied-health">
+                                <SelectValue placeholder="Select allied health professional...">
+                                  {selectedAhp ? `${selectedAhp.name} (${selectedAhp.specialty})` : "Select allied health professional..."}
+                                </SelectValue>
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {alliedHealthProfessionals.map((ahp) => (
+                                <SelectItem key={ahp.id} value={ahp.id}>
+                                  {ahp.name} ({ahp.specialty})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <AddProviderDialog 
+                            providerType="alliedHealth" 
+                            onSuccess={(newAHP) => {
+                              queryClient.invalidateQueries({ queryKey: ["/api/allied-health-professionals"] });
+                              field.onChange(newAHP.id);
+                            }}
+                          />
+                        </div>
                         {selectedAhp && (
                           <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1">
                             {selectedAhp.practiceName && <p>Practice: {selectedAhp.practiceName}</p>}
@@ -896,37 +945,47 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                     return (
                       <FormItem>
                         <FormLabel>Pharmacy</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            if (value === "none") {
-                              field.onChange(null);
-                              form.setValue("careTeam.pharmacy", "");
-                            } else {
-                              field.onChange(value);
-                              const pharmacy = pharmacies.find(p => p.id === value);
-                              if (pharmacy) {
-                                form.setValue("careTeam.pharmacy", pharmacy.name);
+                        <div className="flex gap-1">
+                          <Select 
+                            onValueChange={(value) => {
+                              if (value === "none") {
+                                field.onChange(null);
+                                form.setValue("careTeam.pharmacy", "");
+                              } else {
+                                field.onChange(value);
+                                const pharmacy = pharmacies.find(p => p.id === value);
+                                if (pharmacy) {
+                                  form.setValue("careTeam.pharmacy", pharmacy.name);
+                                }
                               }
-                            }
-                          }}
-                          value={field.value || ""}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-pharmacy">
-                              <SelectValue placeholder="Select pharmacy...">
-                                {selectedPharmacy?.name || "Select pharmacy..."}
-                              </SelectValue>
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {pharmacies.map((pharmacy) => (
-                              <SelectItem key={pharmacy.id} value={pharmacy.id}>
-                                {pharmacy.name}{pharmacy.deliveryAvailable === "yes" ? " (Delivers)" : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            }}
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-pharmacy">
+                                <SelectValue placeholder="Select pharmacy...">
+                                  {selectedPharmacy?.name || "Select pharmacy..."}
+                                </SelectValue>
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {pharmacies.map((pharmacy) => (
+                                <SelectItem key={pharmacy.id} value={pharmacy.id}>
+                                  {pharmacy.name}{pharmacy.deliveryAvailable === "yes" ? " (Delivers)" : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <AddProviderDialog 
+                            providerType="pharmacy" 
+                            onSuccess={(newPharmacy) => {
+                              queryClient.invalidateQueries({ queryKey: ["/api/pharmacies"] });
+                              field.onChange(newPharmacy.id);
+                              form.setValue("careTeam.pharmacy", newPharmacy.name);
+                            }}
+                          />
+                        </div>
                         {selectedPharmacy && (
                           <div className="mt-2 p-2 bg-muted rounded-md text-xs space-y-1">
                             {selectedPharmacy.phoneNumber && <p>Phone: {selectedPharmacy.phoneNumber}</p>}
