@@ -3263,6 +3263,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check if user is authenticated
       if (!req.session?.user) {
+        console.log("Photo upload failed - no session:", {
+          sessionId: req.session?.id,
+          hasSession: !!req.session,
+          hasUser: !!req.session?.user,
+          cookies: req.headers.cookie ? 'present' : 'missing'
+        });
         return res.status(401).json({ error: "Authentication required" });
       }
 
