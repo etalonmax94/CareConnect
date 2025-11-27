@@ -20,8 +20,21 @@ export default function EditClient() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: InsertClient) => {
+    mutationFn: async ({ data, photoFile }: { data: InsertClient; photoFile?: File | null }) => {
       const response = await apiRequest("PATCH", `/api/clients/${params?.id}`, data);
+      
+      // If there's a new photo, upload it
+      if (photoFile && params?.id) {
+        const formData = new FormData();
+        formData.append("photo", photoFile);
+        
+        await fetch(`/api/clients/${params.id}/photo`, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+      }
+      
       return response;
     },
     onSuccess: () => {
@@ -98,7 +111,9 @@ export default function EditClient() {
 
       <ClientForm
         client={client}
-        onSubmit={async (data) => { await updateMutation.mutateAsync(data); }}
+        onSubmit={async (data, photoFile) => { 
+          await updateMutation.mutateAsync({ data, photoFile }); 
+        }}
         onCancel={() => setLocation(`/clients/${params?.id}`)}
       />
     </div>

@@ -6,6 +6,7 @@ import {
   documents, clientStaffAssignments, serviceDeliveries, clientGoals,
   ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
   clientContacts, clientBehaviors, leadershipMeetingNotes,
+  computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
   type InsertSettings, type Settings, type InsertActivityLog, type ActivityLog,
@@ -45,6 +46,7 @@ export interface IStorage {
   archiveClient(id: string, userId: string, reason: string): Promise<Client | undefined>;
   restoreClient(id: string): Promise<Client | undefined>;
   getUpcomingBirthdays(days: number): Promise<Client[]>;
+  getDistinctDiagnoses(search?: string): Promise<string[]>;
   
   // Progress Notes
   getAllProgressNotes(): Promise<ProgressNote[]>;
@@ -268,6 +270,8 @@ export class DbStorage implements IStorage {
       conditions.push(
         or(
           ilike(clients.participantName, `%${searchTerm}%`),
+          ilike(clients.firstName, `%${searchTerm}%`),
+          ilike(clients.lastName, `%${searchTerm}%`),
           ilike(clients.medicareNumber, `%${searchTerm}%`),
           ilike(clients.email, `%${searchTerm}%`)
         )
@@ -290,7 +294,18 @@ export class DbStorage implements IStorage {
   }
 
   async createClient(client: InsertClient): Promise<Client> {
-    const result = await db.insert(clients).values([client]).returning();
+    // Compute participantName from name fields
+    const participantName = client.participantName || 
+      computeFullName(client.firstName, client.middleName, client.lastName);
+    
+    const clientData = {
+      ...client,
+      participantName,
+      firstName: client.firstName || "",
+      lastName: client.lastName || "",
+    };
+    
+    const result = await db.insert(clients).values([clientData]).returning();
     return result[0];
   }
 
@@ -304,8 +319,17 @@ export class DbStorage implements IStorage {
       throw new Error("Cannot update archived client");
     }
     
+    // If name fields are being updated, recompute participantName
+    const updateData = { ...clientUpdate };
+    if (clientUpdate.firstName !== undefined || clientUpdate.middleName !== undefined || clientUpdate.lastName !== undefined) {
+      const firstName = clientUpdate.firstName ?? existingClient.firstName;
+      const middleName = clientUpdate.middleName ?? existingClient.middleName;
+      const lastName = clientUpdate.lastName ?? existingClient.lastName;
+      updateData.participantName = computeFullName(firstName, middleName, lastName);
+    }
+    
     const result = await db.update(clients)
-      .set({ ...clientUpdate as any, updatedAt: new Date() })
+      .set({ ...updateData as any, updatedAt: new Date() })
       .where(eq(clients.id, id))
       .returning();
     return result[0];
@@ -424,6 +448,28 @@ export class DbStorage implements IStorage {
       if (bdayB.getTime() < today.getTime()) bdayB.setFullYear(currentYear + 1);
       return bdayA.getTime() - bdayB.getTime();
     });
+  }
+
+  async getDistinctDiagnoses(search?: string): Promise<string[]> {
+    // Get distinct non-null diagnoses from all clients, ordered by frequency
+    const result = await db
+      .select({ 
+        diagnosis: clients.mainDiagnosis,
+        count: sql<number>`count(*)`
+      })
+      .from(clients)
+      .where(
+        and(
+          sql`${clients.mainDiagnosis} IS NOT NULL`,
+          sql`${clients.mainDiagnosis} <> ''`,
+          search ? ilike(clients.mainDiagnosis, `%${search}%`) : sql`1=1`
+        )
+      )
+      .groupBy(clients.mainDiagnosis)
+      .orderBy(sql`count(*) DESC`)
+      .limit(50);
+    
+    return result.map(r => r.diagnosis).filter(Boolean) as string[];
   }
 
   // Progress Notes

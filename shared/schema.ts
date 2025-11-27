@@ -105,6 +105,11 @@ export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientNumber: serial("client_number").notNull(),
   category: text("category").notNull().$type<ClientCategory>(),
+  // Name fields - firstName and lastName are required, middleName is optional
+  firstName: text("first_name").notNull().default(""),
+  lastName: text("last_name").notNull().default(""),
+  middleName: text("middle_name"),
+  // Legacy field - kept for backward compatibility, will be computed from firstName + middleName + lastName
   participantName: text("participant_name").notNull(),
   photo: text("photo"),
   dateOfBirth: date("date_of_birth"),
@@ -231,7 +236,10 @@ export const clients = pgTable("clients", {
 });
 
 export const insertClientSchema = createInsertSchema(clients, {
-  participantName: z.string().min(1, "Participant name is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  middleName: z.string().optional().nullable(),
+  participantName: z.string().optional(), // Will be computed from name fields
   email: z.string().email().optional().nullable().or(z.literal("")),
   category: z.enum(["NDIS", "Support at Home", "Private"]),
   dateOfBirth: z.string().optional().or(z.literal("")),
@@ -284,6 +292,31 @@ export type Client = typeof clients.$inferSelect;
 export function formatClientNumber(clientNumber?: number | null): string {
   if (!clientNumber) return "";
   return `C-${clientNumber}`;
+}
+
+// Helper function to compute full name from name parts
+export function computeFullName(firstName?: string | null, middleName?: string | null, lastName?: string | null): string {
+  const parts = [firstName, middleName, lastName].filter(Boolean);
+  return parts.join(" ").trim();
+}
+
+// Helper function to split a full name into parts (for migration)
+export function splitFullName(fullName: string): { firstName: string; middleName: string | null; lastName: string } {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) {
+    return { firstName: "", middleName: null, lastName: "" };
+  } else if (parts.length === 1) {
+    return { firstName: parts[0], middleName: null, lastName: "" };
+  } else if (parts.length === 2) {
+    return { firstName: parts[0], middleName: null, lastName: parts[1] };
+  } else {
+    // More than 2 parts: first is firstName, last is lastName, middle parts are middleName
+    return {
+      firstName: parts[0],
+      middleName: parts.slice(1, -1).join(" "),
+      lastName: parts[parts.length - 1]
+    };
+  }
 }
 
 // Helper function to calculate age

@@ -1624,6 +1624,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get distinct diagnoses for autocomplete
+  app.get("/api/diagnoses", async (req, res) => {
+    try {
+      const search = req.query.search as string | undefined;
+      const diagnoses = await storage.getDistinctDiagnoses(search);
+      res.json(diagnoses);
+    } catch (error) {
+      console.error("Error fetching diagnoses:", error);
+      res.status(500).json({ error: "Failed to fetch diagnoses" });
+    }
+  });
+
   // Get progress notes for a client
   // Get all progress notes
   app.get("/api/progress-notes", async (req, res) => {

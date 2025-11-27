@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type InsertClient, type Client, type ClientCategory, type SupportCoordinator, type PlanManager, type Staff, type GP, type Pharmacy, type AlliedHealthProfessional } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -12,16 +12,20 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, X, Camera } from "lucide-react";
 import { SuburbAutocomplete } from "@/components/AddressAutocomplete";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { AddProviderDialog } from "@/components/AddProviderDialog";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 
 interface ClientFormProps {
   client?: Client;
-  onSubmit: (data: InsertClient) => Promise<void>;
+  onSubmit: (data: InsertClient, photoFile?: File | null) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -58,17 +62,61 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
   // Filter staff by role for care managers
   const careManagers = allStaff.filter(s => s.role === "care_manager" && s.isActive === "yes");
 
+  const { toast } = useToast();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(client?.photo || null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [diagnosisSearch, setDiagnosisSearch] = useState("");
+  const [diagnosisOpen, setDiagnosisOpen] = useState(false);
+
+  // Fetch diagnoses for autocomplete
+  const { data: diagnoses = [] } = useQuery<string[]>({
+    queryKey: ["/api/diagnoses", diagnosisSearch],
+    enabled: diagnosisOpen,
+  });
+
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
-    defaultValues: client || {
+    defaultValues: client ? {
+      ...client,
+      firstName: client.firstName || "",
+      lastName: client.lastName || "",
+      middleName: client.middleName || null,
+    } : {
       category: "NDIS",
-      participantName: "",
+      firstName: "",
+      lastName: "",
+      middleName: null,
       careTeam: {},
       clinicalDocuments: {},
       highIntensitySupports: [],
       notificationPreferences: {},
     } as any,
   });
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Photo must be under 5MB", variant: "destructive" });
+        return;
+      }
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (photoInputRef.current) {
+      photoInputRef.current.value = "";
+    }
+  };
 
   const isDirty = form.formState.isDirty;
   const { showWarning, confirmNavigation, handleConfirm, handleCancel } = useUnsavedChanges({
@@ -83,7 +131,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
     setIsSubmitting(true);
     setFormSubmitted(true);
     try {
-      await onSubmit(data);
+      await onSubmit(data, photoFile);
     } finally {
       setIsSubmitting(false);
     }
@@ -103,9 +151,10 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
           <div className="bg-destructive/10 border border-destructive rounded-md p-4 mb-4">
             <p className="text-destructive font-medium text-sm">Please fix the following errors:</p>
             <ul className="list-disc list-inside text-destructive text-sm mt-2">
-              {formErrors.participantName && <li>Participant Name is required</li>}
+              {formErrors.firstName && <li>First Name is required</li>}
+              {formErrors.lastName && <li>Last Name is required</li>}
               {formErrors.category && <li>Client Category is required</li>}
-              {Object.entries(formErrors).filter(([key]) => !['participantName', 'category'].includes(key)).map(([key, error]) => (
+              {Object.entries(formErrors).filter(([key]) => !['firstName', 'lastName', 'category'].includes(key)).map(([key, error]) => (
                 <li key={key}>{key}: {(error as any)?.message || 'Invalid value'}</li>
               ))}
             </ul>
@@ -127,7 +176,52 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
               <CardHeader>
                 <CardTitle className="text-base">Personal Information</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="space-y-6">
+                {/* Photo Upload Section */}
+                <div className="flex items-center gap-4 pb-4 border-b">
+                  <div className="relative">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={photoPreview || undefined} alt="Client photo" />
+                      <AvatarFallback className="bg-muted">
+                        <Camera className="h-8 w-8 text-muted-foreground" />
+                      </AvatarFallback>
+                    </Avatar>
+                    {photoPreview && (
+                      <button
+                        type="button"
+                        onClick={removePhoto}
+                        className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 hover-elevate"
+                        data-testid="button-remove-photo"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">Client Photo</Label>
+                    <p className="text-xs text-muted-foreground mb-2">Upload a photo (max 5MB)</p>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                      data-testid="input-photo-upload"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => photoInputRef.current?.click()}
+                      data-testid="button-upload-photo"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {photoPreview ? "Change Photo" : "Upload Photo"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="category"
@@ -153,12 +247,40 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                 
                 <FormField
                   control={form.control}
-                  name="participantName"
+                  name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Participant Name *</FormLabel>
+                      <FormLabel>First Name *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Full name" data-testid="input-name" />
+                        <Input {...field} placeholder="First name" data-testid="input-firstname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="middleName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Middle Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="Middle name (optional)" data-testid="input-middlename" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Last name" data-testid="input-lastname" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -323,9 +445,65 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
                       <FormLabel>Main Diagnosis</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value || ""} data-testid="input-diagnosis" />
-                      </FormControl>
+                      <Popover open={diagnosisOpen} onOpenChange={setDiagnosisOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between font-normal"
+                              data-testid="input-diagnosis"
+                            >
+                              {field.value || "Select or type a diagnosis..."}
+                              <span className="ml-2 text-muted-foreground">▼</span>
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search diagnoses..."
+                              value={diagnosisSearch}
+                              onValueChange={(value) => {
+                                setDiagnosisSearch(value);
+                                field.onChange(value);
+                              }}
+                            />
+                            <CommandList>
+                              <CommandEmpty>
+                                {diagnosisSearch ? (
+                                  <div
+                                    className="cursor-pointer p-2 hover:bg-accent"
+                                    onClick={() => {
+                                      field.onChange(diagnosisSearch);
+                                      setDiagnosisOpen(false);
+                                    }}
+                                  >
+                                    Create "{diagnosisSearch}"
+                                  </div>
+                                ) : (
+                                  "No diagnoses found"
+                                )}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {diagnoses.map((diagnosis) => (
+                                  <CommandItem
+                                    key={diagnosis}
+                                    value={diagnosis}
+                                    onSelect={() => {
+                                      field.onChange(diagnosis);
+                                      setDiagnosisSearch("");
+                                      setDiagnosisOpen(false);
+                                    }}
+                                  >
+                                    {diagnosis}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -504,6 +682,7 @@ export default function ClientForm({ client, onSubmit, onCancel }: ClientFormPro
                       )}
                     />
                   </div>
+                </div>
                 </div>
               </CardContent>
             </Card>

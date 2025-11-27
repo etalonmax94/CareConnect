@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { InsertClient } from "@shared/schema";
+import type { InsertClient, Client } from "@shared/schema";
 import ClientForm from "@/components/ClientForm";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,24 @@ export default function AddClient() {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: async (data: InsertClient) => {
+    mutationFn: async ({ data, photoFile }: { data: InsertClient; photoFile?: File | null }) => {
+      // Create the client first
       const response = await apiRequest("POST", "/api/clients", data);
-      return response;
+      const createdClient = response as Client;
+      
+      // If there's a photo, upload it
+      if (photoFile && createdClient.id) {
+        const formData = new FormData();
+        formData.append("photo", photoFile);
+        
+        await fetch(`/api/clients/${createdClient.id}/photo`, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+      }
+      
+      return createdClient;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
@@ -52,7 +67,9 @@ export default function AddClient() {
       </div>
 
       <ClientForm
-        onSubmit={async (data) => { await createMutation.mutateAsync(data); }}
+        onSubmit={async (data, photoFile) => { 
+          await createMutation.mutateAsync({ data, photoFile }); 
+        }}
         onCancel={() => setLocation("/clients")}
       />
     </div>
