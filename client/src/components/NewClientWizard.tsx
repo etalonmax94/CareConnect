@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { insertClientSchema, type InsertClient, type ClientCategory, type SupportCoordinator, type PlanManager, type Staff, type GP, type Pharmacy, type AlliedHealthProfessional } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,10 +17,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
-  Loader2, Upload, X, Camera, ArrowLeft, ArrowRight, Check, 
+  Loader2, Upload, X, Camera, ArrowLeft, ArrowRight, Check, Plus,
   User, Phone, Heart, Settings, Briefcase, Users, Target, FileCheck,
-  MapPin, Calendar, Mail, Stethoscope, Pill, UserCog
+  MapPin, Calendar, Mail, Stethoscope, Pill, UserCog, Building2, Shield
 } from "lucide-react";
 import { SuburbAutocomplete } from "@/components/AddressAutocomplete";
 import { useToast } from "@/hooks/use-toast";
@@ -47,15 +49,31 @@ const WIZARD_STEPS: WizardStep[] = [
   { id: "review", title: "Review", description: "Confirm details", icon: FileCheck },
 ];
 
+const RELATIONSHIP_OPTIONS = [
+  "Spouse", "Partner", "Parent", "Child", "Sibling", "Grandparent", "Grandchild",
+  "Aunt", "Uncle", "Cousin", "Friend", "Neighbour", "Carer", "Guardian", "Other"
+];
+
+type ProviderType = "gp" | "pharmacy" | "supportCoordinator" | "planManager" | "alliedHealth";
+
 export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [direction, setDirection] = useState(0);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+
+  const [addProviderDialogOpen, setAddProviderDialogOpen] = useState(false);
+  const [addingProviderType, setAddingProviderType] = useState<ProviderType | null>(null);
+  const [newProviderName, setNewProviderName] = useState("");
+  const [newProviderOrg, setNewProviderOrg] = useState("");
+  const [newProviderPhone, setNewProviderPhone] = useState("");
+  const [newProviderEmail, setNewProviderEmail] = useState("");
+  const [newProviderAddress, setNewProviderAddress] = useState("");
 
   const { data: allStaff = [] } = useQuery<Staff[]>({ queryKey: ["/api/staff"] });
   const { data: supportCoordinators = [] } = useQuery<SupportCoordinator[]>({ queryKey: ["/api/support-coordinators"] });
@@ -81,6 +99,14 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     } as any,
   });
 
+  const [nokName, setNokName] = useState("");
+  const [nokRelationship, setNokRelationship] = useState("");
+  const [nokPhone, setNokPhone] = useState("");
+
+  const [epoaName, setEpoaName] = useState("");
+  const [epoaRelationship, setEpoaRelationship] = useState("");
+  const [epoaPhone, setEpoaPhone] = useState("");
+
   const selectedCategory = form.watch("category") as ClientCategory;
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,9 +129,109 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
+  const createProviderMutation = useMutation({
+    mutationFn: async ({ type, data }: { type: ProviderType; data: any }) => {
+      const endpoints: Record<ProviderType, string> = {
+        gp: "/api/gps",
+        pharmacy: "/api/pharmacies",
+        supportCoordinator: "/api/support-coordinators",
+        planManager: "/api/plan-managers",
+        alliedHealth: "/api/allied-health-professionals",
+      };
+      const response = await apiRequest("POST", endpoints[type], data);
+      return await response.json();
+    },
+    onSuccess: async (newProvider, { type }) => {
+      const queryKeyMap: Record<ProviderType, string> = {
+        gp: "/api/gps",
+        pharmacy: "/api/pharmacies",
+        supportCoordinator: "/api/support-coordinators",
+        planManager: "/api/plan-managers",
+        alliedHealth: "/api/allied-health-professionals",
+      };
+      await queryClient.invalidateQueries({ queryKey: [queryKeyMap[type]] });
+      
+      if (type === "gp") form.setValue("generalPractitionerId", newProvider.id);
+      else if (type === "pharmacy") form.setValue("pharmacyId", newProvider.id);
+      else if (type === "supportCoordinator") form.setValue("careTeam.supportCoordinatorId", newProvider.id);
+      else if (type === "planManager") form.setValue("careTeam.planManagerId", newProvider.id);
+      else if (type === "alliedHealth") form.setValue("careTeam.alliedHealthProfessionalId", newProvider.id);
+      
+      toast({ title: "Provider Added", description: `${newProvider.name} has been added and selected.` });
+      closeAddProviderDialog();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openAddProviderDialog = (type: ProviderType) => {
+    setAddingProviderType(type);
+    setNewProviderName("");
+    setNewProviderOrg("");
+    setNewProviderPhone("");
+    setNewProviderEmail("");
+    setNewProviderAddress("");
+    setAddProviderDialogOpen(true);
+  };
+
+  const closeAddProviderDialog = () => {
+    setAddProviderDialogOpen(false);
+    setAddingProviderType(null);
+  };
+
+  const handleAddProvider = () => {
+    if (!addingProviderType || !newProviderName.trim()) return;
+    
+    let data: any = { name: newProviderName.trim() };
+    
+    if (addingProviderType === "gp") {
+      data = { name: newProviderName, practiceName: newProviderOrg, phone: newProviderPhone, email: newProviderEmail, address: newProviderAddress };
+    } else if (addingProviderType === "pharmacy") {
+      data = { name: newProviderName, phone: newProviderPhone, email: newProviderEmail, address: newProviderAddress };
+    } else if (addingProviderType === "supportCoordinator") {
+      data = { name: newProviderName, organisation: newProviderOrg, phone: newProviderPhone, email: newProviderEmail };
+    } else if (addingProviderType === "planManager") {
+      data = { name: newProviderName, organisation: newProviderOrg, phone: newProviderPhone, email: newProviderEmail };
+    } else if (addingProviderType === "alliedHealth") {
+      data = { name: newProviderName, specialty: newProviderOrg, phone: newProviderPhone, email: newProviderEmail, address: newProviderAddress };
+    }
+    
+    createProviderMutation.mutate({ type: addingProviderType, data });
+  };
+
+  const getProviderDialogTitle = (): string => {
+    const titles: Record<ProviderType, string> = {
+      gp: "Add New GP",
+      pharmacy: "Add New Pharmacy",
+      supportCoordinator: "Add New Support Coordinator",
+      planManager: "Add New Plan Manager",
+      alliedHealth: "Add New Allied Health Professional",
+    };
+    return addingProviderType ? titles[addingProviderType] : "";
+  };
+
+  const getOrgLabel = (): string => {
+    const labels: Record<ProviderType, string> = {
+      gp: "Practice Name",
+      pharmacy: "",
+      supportCoordinator: "Organisation",
+      planManager: "Organisation",
+      alliedHealth: "Specialty",
+    };
+    return addingProviderType ? labels[addingProviderType] : "";
+  };
+
   const goNext = async () => {
     const fieldsToValidate = getFieldsForStep(currentStep);
     const isValid = await form.trigger(fieldsToValidate as any);
+    
+    if (currentStep === 1) {
+      const nokValue = [nokName, nokRelationship, nokPhone].filter(Boolean).join(" - ");
+      const epoaValue = [epoaName, epoaRelationship, epoaPhone].filter(Boolean).join(" - ");
+      form.setValue("nokEpoa", nokValue || null);
+      form.setValue("epoa", epoaValue || null);
+    }
     
     if (isValid) {
       setDirection(1);
@@ -176,28 +302,26 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
       case "identity":
         return (
           <div className="space-y-6">
-            <div className="flex items-center gap-4 pb-4">
-              <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={photoPreview || undefined} alt="Client photo" />
-                  <AvatarFallback className="bg-muted">
-                    <Camera className="h-10 w-10 text-muted-foreground" />
-                  </AvatarFallback>
-                </Avatar>
-                {photoPreview && (
-                  <button
-                    type="button"
-                    onClick={removePhoto}
-                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1"
-                    data-testid="button-remove-photo"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Client Photo</Label>
-                <p className="text-xs text-muted-foreground mb-2">Optional (max 5MB)</p>
+            <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-6 items-start">
+              <div className="flex flex-col gap-2">
+                <div className="relative">
+                  <Avatar className="h-28 w-28 border-2 border-muted">
+                    <AvatarImage src={photoPreview || undefined} alt="Client photo" />
+                    <AvatarFallback className="bg-muted">
+                      <Camera className="h-10 w-10 text-muted-foreground" />
+                    </AvatarFallback>
+                  </Avatar>
+                  {photoPreview && (
+                    <button
+                      type="button"
+                      onClick={removePhoto}
+                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1"
+                      data-testid="button-remove-photo"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
                 <input
                   ref={photoInputRef}
                   type="file"
@@ -210,87 +334,90 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   <Upload className="h-4 w-4 mr-2" />
                   {photoPreview ? "Change" : "Upload"}
                 </Button>
+                <p className="text-xs text-muted-foreground text-center">Optional</p>
+              </div>
+
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client Category *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="NDIS">NDIS</SelectItem>
+                          <SelectItem value="Support at Home">Support at Home</SelectItem>
+                          <SelectItem value="Private">Private</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="First name" data-testid="input-firstname" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="middleName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Middle Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="Optional" data-testid="input-middlename" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Last name" data-testid="input-lastname" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="dateOfBirth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date of Birth</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="date" value={field.value || ""} data-testid="input-dob" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
-
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client Category *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="NDIS">NDIS</SelectItem>
-                      <SelectItem value="Support at Home">Support at Home</SelectItem>
-                      <SelectItem value="Private">Private</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="firstName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="First name" data-testid="input-firstname" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="middleName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Middle Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="Optional" data-testid="input-middlename" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Last name" data-testid="input-lastname" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="dateOfBirth"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Date of Birth</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="date" value={field.value || ""} data-testid="input-dob" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </div>
         );
 
@@ -406,19 +533,87 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="nokEpoa"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Next of Kin / EPOA</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value || ""} placeholder="Name - Relationship - Contact" data-testid="input-nok" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <Separator className="my-4" />
+
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h4 className="font-medium text-blue-900 dark:text-blue-100">Next of Kin</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Full Name</Label>
+                  <Input 
+                    value={nokName} 
+                    onChange={(e) => setNokName(e.target.value)} 
+                    placeholder="Contact name"
+                    data-testid="input-nok-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Relationship</Label>
+                  <Select value={nokRelationship} onValueChange={setNokRelationship}>
+                    <SelectTrigger data-testid="select-nok-relationship">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELATIONSHIP_OPTIONS.map((rel) => (
+                        <SelectItem key={rel} value={rel}>{rel}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Phone</Label>
+                  <Input 
+                    value={nokPhone} 
+                    onChange={(e) => setNokPhone(e.target.value)} 
+                    placeholder="04XX XXX XXX"
+                    data-testid="input-nok-phone"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <h4 className="font-medium text-purple-900 dark:text-purple-100">EPOA (Enduring Power of Attorney)</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Full Name</Label>
+                  <Input 
+                    value={epoaName} 
+                    onChange={(e) => setEpoaName(e.target.value)} 
+                    placeholder="Attorney name"
+                    data-testid="input-epoa-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Relationship</Label>
+                  <Select value={epoaRelationship} onValueChange={setEpoaRelationship}>
+                    <SelectTrigger data-testid="select-epoa-relationship">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELATIONSHIP_OPTIONS.map((rel) => (
+                        <SelectItem key={rel} value={rel}>{rel}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Phone</Label>
+                  <Input 
+                    value={epoaPhone} 
+                    onChange={(e) => setEpoaPhone(e.target.value)} 
+                    placeholder="04XX XXX XXX"
+                    data-testid="input-epoa-phone"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         );
 
@@ -802,8 +997,11 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               name="careTeam.supportCoordinatorId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <UserCog className="w-4 h-4" /> Support Coordinator
+                  <FormLabel className="flex items-center justify-between">
+                    <span className="flex items-center gap-2"><UserCog className="w-4 h-4" /> Support Coordinator</span>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("supportCoordinator")}>
+                      <Plus className="w-3 h-3 mr-1" /> Add New
+                    </Button>
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
@@ -814,7 +1012,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {supportCoordinators.map((sc) => (
-                        <SelectItem key={sc.id} value={sc.id}>{sc.name} - {sc.organisation}</SelectItem>
+                        <SelectItem key={sc.id} value={sc.id}>{sc.name} {sc.organisation && `(${sc.organisation})`}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -828,8 +1026,11 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               name="generalPractitionerId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <Stethoscope className="w-4 h-4" /> General Practitioner
+                  <FormLabel className="flex items-center justify-between">
+                    <span className="flex items-center gap-2"><Stethoscope className="w-4 h-4" /> General Practitioner</span>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("gp")}>
+                      <Plus className="w-3 h-3 mr-1" /> Add New
+                    </Button>
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
@@ -854,8 +1055,11 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               name="pharmacyId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <Pill className="w-4 h-4" /> Pharmacy
+                  <FormLabel className="flex items-center justify-between">
+                    <span className="flex items-center gap-2"><Pill className="w-4 h-4" /> Pharmacy</span>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("pharmacy")}>
+                      <Plus className="w-3 h-3 mr-1" /> Add New
+                    </Button>
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
@@ -875,14 +1079,46 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="careTeam.alliedHealthProfessionalId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center justify-between">
+                    <span className="flex items-center gap-2"><Heart className="w-4 h-4" /> Allied Health Professional</span>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("alliedHealth")}>
+                      <Plus className="w-3 h-3 mr-1" /> Add New
+                    </Button>
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-allied-health">
+                        <SelectValue placeholder="Select professional..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {alliedHealthProfessionals.map((ah) => (
+                        <SelectItem key={ah.id} value={ah.id}>{ah.name} {ah.specialty && `(${ah.specialty})`}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {selectedCategory === "NDIS" && (
               <FormField
                 control={form.control}
                 name="careTeam.planManagerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Briefcase className="w-4 h-4" /> Plan Manager
+                    <FormLabel className="flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Briefcase className="w-4 h-4" /> Plan Manager</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openAddProviderDialog("planManager")}>
+                        <Plus className="w-3 h-3 mr-1" /> Add New
+                      </Button>
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl>
@@ -912,6 +1148,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
         const gp = gps.find(g => g.id === values.generalPractitionerId);
         const pharmacy = pharmacies.find(p => p.id === values.pharmacyId);
         const planManager = planManagers.find(pm => pm.id === values.careTeam?.planManagerId);
+        const alliedHealth = alliedHealthProfessionals.find(ah => ah.id === values.careTeam?.alliedHealthProfessionalId);
 
         return (
           <div className="space-y-6">
@@ -967,10 +1204,29 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   {gp && <p>GP: {gp.name}</p>}
                   {pharmacy && <p>Pharmacy: {pharmacy.name}</p>}
                   {planManager && <p>Plan Manager: {planManager.name}</p>}
-                  {!careManager && !supportCoordinator && !gp && !pharmacy && !planManager && <p>None assigned yet</p>}
+                  {alliedHealth && <p>Allied Health: {alliedHealth.name}</p>}
+                  {!careManager && !supportCoordinator && !gp && !pharmacy && !planManager && !alliedHealth && <p>None assigned yet</p>}
                 </div>
               </div>
             </div>
+
+            {nokName && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                <h4 className="font-medium text-sm flex items-center gap-2"><Users className="w-4 h-4" /> Next of Kin</h4>
+                <p className="text-sm text-muted-foreground">
+                  {nokName} {nokRelationship && `(${nokRelationship})`} {nokPhone && `- ${nokPhone}`}
+                </p>
+              </div>
+            )}
+
+            {epoaName && (
+              <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                <h4 className="font-medium text-sm flex items-center gap-2"><Shield className="w-4 h-4" /> EPOA</h4>
+                <p className="text-sm text-muted-foreground">
+                  {epoaName} {epoaRelationship && `(${epoaRelationship})`} {epoaPhone && `- ${epoaPhone}`}
+                </p>
+              </div>
+            )}
 
             {selectedCategory === "NDIS" && values.ndisDetails?.ndisNumber && (
               <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
@@ -1000,115 +1256,194 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   };
 
   return (
-    <Form {...form}>
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Step {currentStep + 1} of {WIZARD_STEPS.length}</span>
-            <span className="text-sm text-muted-foreground">{Math.round(progress)}% complete</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
-
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {WIZARD_STEPS.map((step, index) => {
-            const StepIcon = step.icon;
-            const isComplete = index < currentStep;
-            const isCurrent = index === currentStep;
-            
-            return (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => goToStep(index)}
-                disabled={index > currentStep}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors",
-                  isCurrent && "bg-primary text-primary-foreground",
-                  isComplete && "bg-primary/10 text-primary cursor-pointer",
-                  !isCurrent && !isComplete && "bg-muted text-muted-foreground cursor-not-allowed"
-                )}
-                data-testid={`step-${step.id}`}
-              >
-                {isComplete ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <StepIcon className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">{step.title}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <Card className="min-h-[400px]">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              {(() => {
-                const StepIcon = WIZARD_STEPS[currentStep].icon;
-                return <StepIcon className="w-6 h-6 text-primary" />;
-              })()}
-              <div>
-                <CardTitle>{WIZARD_STEPS[currentStep].title}</CardTitle>
-                <CardDescription>{WIZARD_STEPS[currentStep].description}</CardDescription>
-              </div>
+    <>
+      <Form {...form}>
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Step {currentStep + 1} of {WIZARD_STEPS.length}</span>
+              <span className="text-sm text-muted-foreground">{Math.round(progress)}% complete</span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <AnimatePresence mode="wait" custom={direction}>
-              <motion.div
-                key={currentStep}
-                custom={direction}
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-              >
-                {renderStepContent()}
-              </motion.div>
-            </AnimatePresence>
-          </CardContent>
-        </Card>
+            <Progress value={progress} className="h-2" />
+          </div>
 
-        <div className="flex justify-between mt-6">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={currentStep === 0 ? onCancel : goBack}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            {currentStep === 0 ? "Cancel" : "Back"}
-          </Button>
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            {WIZARD_STEPS.map((step, index) => {
+              const StepIcon = step.icon;
+              const isComplete = index < currentStep;
+              const isCurrent = index === currentStep;
+              
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => goToStep(index)}
+                  disabled={index > currentStep}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors",
+                    isCurrent && "bg-primary text-primary-foreground",
+                    isComplete && "bg-primary/10 text-primary cursor-pointer",
+                    !isCurrent && !isComplete && "bg-muted text-muted-foreground cursor-not-allowed"
+                  )}
+                  data-testid={`step-${step.id}`}
+                >
+                  {isComplete ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <StepIcon className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">{step.title}</span>
+                </button>
+              );
+            })}
+          </div>
 
-          {currentStep === WIZARD_STEPS.length - 1 ? (
+          <Card className="min-h-[400px]">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                {(() => {
+                  const StepIcon = WIZARD_STEPS[currentStep].icon;
+                  return <StepIcon className="w-6 h-6 text-primary" />;
+                })()}
+                <div>
+                  <CardTitle>{WIZARD_STEPS[currentStep].title}</CardTitle>
+                  <CardDescription>{WIZARD_STEPS[currentStep].description}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={currentStep}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                >
+                  {renderStepContent()}
+                </motion.div>
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-between mt-6">
             <Button
               type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              data-testid="button-create-client"
+              variant="outline"
+              onClick={currentStep === 0 ? onCancel : goBack}
+              data-testid="button-back"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
-                </>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              {currentStep === 0 ? "Cancel" : "Back"}
+            </Button>
+
+            {currentStep === WIZARD_STEPS.length - 1 ? (
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                data-testid="button-create-client"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Create Client
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button type="button" onClick={goNext} data-testid="button-next">
+                Next
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </Form>
+
+      <Dialog open={addProviderDialogOpen} onOpenChange={setAddProviderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{getProviderDialogTitle()}</DialogTitle>
+            <DialogDescription>
+              Add a new provider to the system. They will be automatically selected for this client.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input 
+                value={newProviderName} 
+                onChange={(e) => setNewProviderName(e.target.value)} 
+                placeholder="Provider name"
+                data-testid="input-new-provider-name"
+              />
+            </div>
+            {getOrgLabel() && (
+              <div className="space-y-2">
+                <Label>{getOrgLabel()}</Label>
+                <Input 
+                  value={newProviderOrg} 
+                  onChange={(e) => setNewProviderOrg(e.target.value)} 
+                  placeholder={getOrgLabel()}
+                  data-testid="input-new-provider-org"
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input 
+                value={newProviderPhone} 
+                onChange={(e) => setNewProviderPhone(e.target.value)} 
+                placeholder="Phone number"
+                data-testid="input-new-provider-phone"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input 
+                value={newProviderEmail} 
+                onChange={(e) => setNewProviderEmail(e.target.value)} 
+                placeholder="Email address"
+                type="email"
+                data-testid="input-new-provider-email"
+              />
+            </div>
+            {(addingProviderType === "gp" || addingProviderType === "pharmacy" || addingProviderType === "alliedHealth") && (
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Input 
+                  value={newProviderAddress} 
+                  onChange={(e) => setNewProviderAddress(e.target.value)} 
+                  placeholder="Address"
+                  data-testid="input-new-provider-address"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeAddProviderDialog}>Cancel</Button>
+            <Button 
+              onClick={handleAddProvider} 
+              disabled={!newProviderName.trim() || createProviderMutation.isPending}
+              data-testid="button-save-provider"
+            >
+              {createProviderMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding...</>
               ) : (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Create Client
-                </>
+                "Add Provider"
               )}
             </Button>
-          ) : (
-            <Button type="button" onClick={goNext} data-testid="button-next">
-              Next
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          )}
-        </div>
-      </div>
-    </Form>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
