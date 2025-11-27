@@ -2087,59 +2087,8 @@ export default function ClientProfile() {
                 </div>
               </div>
 
-              {/* Bottom Section - Program Summary (Standalone) */}
+              {/* Bottom Section - Recent Incidents */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                {/* Program Info Summary */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <ClipboardCheck className="w-4 h-4" />
-                      Program Summary
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Category</p>
-                        <p className="text-sm font-semibold">{client.category}</p>
-                      </div>
-                      
-                      {client.category === "NDIS" && (
-                        <>
-                          <div className="p-3 bg-muted/30 rounded-lg">
-                            <p className="text-xs text-muted-foreground">NDIS Number</p>
-                            <p className="text-sm font-semibold font-mono">{getNdisNumber() || 'Not provided'}</p>
-                          </div>
-                          <div className="p-3 bg-muted/30 rounded-lg col-span-2">
-                            <p className="text-xs text-muted-foreground">Funding Type</p>
-                            <p className="text-sm font-semibold">{client.ndisDetails?.ndisFundingType || 'Not specified'}</p>
-                          </div>
-                        </>
-                      )}
-                      
-                      {client.category === "Support at Home" && (
-                        <>
-                          <div className="p-3 bg-muted/30 rounded-lg">
-                            <p className="text-xs text-muted-foreground">SaH Number</p>
-                            <p className="text-sm font-semibold font-mono">{getSahNumber() || 'Not provided'}</p>
-                          </div>
-                          <div className="p-3 bg-muted/30 rounded-lg col-span-2">
-                            <p className="text-xs text-muted-foreground">Funding Level</p>
-                            <p className="text-sm font-semibold">{client.supportAtHomeDetails?.sahFundingLevel || 'Not specified'}</p>
-                          </div>
-                        </>
-                      )}
-
-                      {client.category === "Private" && client.medicareNumber && (
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800 col-span-2">
-                          <p className="text-xs text-emerald-700 dark:text-emerald-400">Medicare Number</p>
-                          <p className="text-sm font-semibold font-mono text-emerald-900 dark:text-emerald-100">{client.medicareNumber}</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
                 {/* Recent Incidents */}
                 {incidentReports.length > 0 && (
                   <Card>
