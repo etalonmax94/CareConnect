@@ -140,6 +140,70 @@ export default function CareTeam() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <ProviderTile
+          title="Staff"
+          description="Internal care workers"
+          icon={UserCog}
+          iconColor="text-cyan-600"
+          bgColor="bg-cyan-100 dark:bg-cyan-900/30"
+          count={staff.length}
+          href="/staff"
+          isLoading={isLoadingStaff}
+          recentItems={staff.slice(-3).reverse().map(s => ({
+            id: s.id,
+            name: s.name,
+            subtitle: s.role || undefined
+          }))}
+        />
+
+        <ProviderTile
+          title="Support Coordinators"
+          description="NDIS support coordination"
+          icon={Building2}
+          iconColor="text-indigo-600"
+          bgColor="bg-indigo-100 dark:bg-indigo-900/30"
+          count={supportCoordinators.length}
+          href="/support-coordinators"
+          isLoading={isLoadingSupportCoordinators}
+          recentItems={supportCoordinators.slice(-3).reverse().map(sc => ({
+            id: sc.id,
+            name: sc.name,
+            subtitle: sc.organisation || undefined
+          }))}
+        />
+
+        <ProviderTile
+          title="Plan Managers"
+          description="NDIS plan management"
+          icon={Briefcase}
+          iconColor="text-pink-600"
+          bgColor="bg-pink-100 dark:bg-pink-900/30"
+          count={planManagers.length}
+          href="/plan-managers"
+          isLoading={isLoadingPlanManagers}
+          recentItems={planManagers.slice(-3).reverse().map(pm => ({
+            id: pm.id,
+            name: pm.name,
+            subtitle: pm.organisation || undefined
+          }))}
+        />
+
+        <ProviderTile
+          title="Allied Health"
+          description="Therapists and specialists"
+          icon={HeartPulse}
+          iconColor="text-violet-600"
+          bgColor="bg-violet-100 dark:bg-violet-900/30"
+          count={alliedHealth.length}
+          href="/allied-health-professionals"
+          isLoading={isLoadingAlliedHealth}
+          recentItems={alliedHealth.slice(-3).reverse().map(ah => ({
+            id: ah.id,
+            name: ah.name,
+            subtitle: ah.specialty
+          }))}
+        />
+
+        <ProviderTile
           title="General Practitioners"
           description="Doctors and medical practices"
           icon={Stethoscope}
@@ -168,70 +232,6 @@ export default function CareTeam() {
             id: p.id,
             name: p.name,
             subtitle: p.deliveryAvailable === "yes" ? "Delivery Available" : undefined
-          }))}
-        />
-
-        <ProviderTile
-          title="Allied Health"
-          description="Therapists and specialists"
-          icon={HeartPulse}
-          iconColor="text-violet-600"
-          bgColor="bg-violet-100 dark:bg-violet-900/30"
-          count={alliedHealth.length}
-          href="/allied-health-professionals"
-          isLoading={isLoadingAlliedHealth}
-          recentItems={alliedHealth.slice(-3).reverse().map(ah => ({
-            id: ah.id,
-            name: ah.name,
-            subtitle: ah.specialty
-          }))}
-        />
-
-        <ProviderTile
-          title="Plan Managers"
-          description="NDIS plan management"
-          icon={Briefcase}
-          iconColor="text-pink-600"
-          bgColor="bg-pink-100 dark:bg-pink-900/30"
-          count={planManagers.length}
-          href="/plan-managers"
-          isLoading={isLoadingPlanManagers}
-          recentItems={planManagers.slice(-3).reverse().map(pm => ({
-            id: pm.id,
-            name: pm.name,
-            subtitle: pm.organisation || undefined
-          }))}
-        />
-
-        <ProviderTile
-          title="Support Coordinators"
-          description="NDIS support coordination"
-          icon={Building2}
-          iconColor="text-indigo-600"
-          bgColor="bg-indigo-100 dark:bg-indigo-900/30"
-          count={supportCoordinators.length}
-          href="/support-coordinators"
-          isLoading={isLoadingSupportCoordinators}
-          recentItems={supportCoordinators.slice(-3).reverse().map(sc => ({
-            id: sc.id,
-            name: sc.name,
-            subtitle: sc.organisation || undefined
-          }))}
-        />
-
-        <ProviderTile
-          title="Staff"
-          description="Internal care workers"
-          icon={UserCog}
-          iconColor="text-cyan-600"
-          bgColor="bg-cyan-100 dark:bg-cyan-900/30"
-          count={staff.length}
-          href="/staff"
-          isLoading={isLoadingStaff}
-          recentItems={staff.slice(-3).reverse().map(s => ({
-            id: s.id,
-            name: s.name,
-            subtitle: s.role || undefined
           }))}
         />
       </div>

@@ -66,12 +66,6 @@ const menuCategories: MenuCategory[] = [
     label: "Team",
     items: [
       { title: "Care Team", url: "/care-team", icon: UsersRound, iconColor: "text-emerald-500" },
-      { title: "Staff", url: "/staff", icon: UserCog, iconColor: "text-cyan-500" },
-      { title: "Support Coordinators", url: "/support-coordinators", icon: Building2, iconColor: "text-indigo-500" },
-      { title: "Plan Managers", url: "/plan-managers", icon: Briefcase, iconColor: "text-pink-500" },
-      { title: "GPs", url: "/gps", icon: Stethoscope, iconColor: "text-rose-500" },
-      { title: "Pharmacies", url: "/pharmacies", icon: Pill, iconColor: "text-teal-500" },
-      { title: "Allied Health", url: "/allied-health-professionals", icon: HeartPulse, iconColor: "text-violet-500" },
     ],
   },
   {

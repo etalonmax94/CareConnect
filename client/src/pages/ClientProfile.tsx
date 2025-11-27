@@ -25,7 +25,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator, ClientStaffPreference, ClientStaffRestriction, ClientStatusLog } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator, ClientStaffPreference, ClientStaffRestriction, ClientStatusLog, PlanManager, AlliedHealthProfessional } from "@shared/schema";
 import { calculateAge, formatClientNumber } from "@shared/schema";
 import ClientLocationMap from "@/components/ClientLocationMap";
 import CarePlanTab from "@/components/CarePlanTab";
@@ -312,6 +312,26 @@ export default function ClientProfile() {
 
   const { data: supportCoordinatorsList = [] } = useQuery<SupportCoordinator[]>({
     queryKey: ["/api/support-coordinators"],
+  });
+
+  const { data: planManagersList = [] } = useQuery<PlanManager[]>({
+    queryKey: ["/api/plan-managers"],
+  });
+
+  const { data: alliedHealthList = [] } = useQuery<AlliedHealthProfessional[]>({
+    queryKey: ["/api/allied-health-professionals"],
+  });
+
+  // Fetch Plan Manager details if client has one assigned
+  const { data: planManagerDetails } = useQuery<PlanManager>({
+    queryKey: ["/api/plan-managers", client?.careTeam?.planManagerId],
+    enabled: !!client?.careTeam?.planManagerId,
+  });
+
+  // Fetch Allied Health details if client has one assigned
+  const { data: alliedHealthDetails } = useQuery<AlliedHealthProfessional>({
+    queryKey: ["/api/allied-health-professionals", client?.careTeam?.alliedHealthProfessionalId],
+    enabled: !!client?.careTeam?.alliedHealthProfessionalId,
   });
 
   // Fetch client contacts (NOK, emergency contacts, etc.)
@@ -673,6 +693,8 @@ export default function ClientProfile() {
   const [editPharmacyId, setEditPharmacyId] = useState<string>("");
   const [editSupportCoordinatorId, setEditSupportCoordinatorId] = useState<string>("");
   const [editCareManagerId, setEditCareManagerId] = useState<string>("");
+  const [editPlanManagerId, setEditPlanManagerId] = useState<string>("");
+  const [editAlliedHealthId, setEditAlliedHealthId] = useState<string>("");
   const [editNokEpoa, setEditNokEpoa] = useState<string>("");
   const [editMedicareNumber, setEditMedicareNumber] = useState<string>("");
   const [editNotificationsPreference, setEditNotificationsPreference] = useState<string>("");
@@ -778,6 +800,12 @@ export default function ClientProfile() {
         break;
       case "careManager":
         setEditCareManagerId(client?.careTeam?.careManagerId || "");
+        break;
+      case "planManager":
+        setEditPlanManagerId(client?.careTeam?.planManagerId || "");
+        break;
+      case "alliedHealth":
+        setEditAlliedHealthId(client?.careTeam?.alliedHealthProfessionalId || "");
         break;
       case "nokEpoa":
         const nokInfoPersonal = client?.nokEpoa || "";
@@ -925,6 +953,26 @@ export default function ClientProfile() {
             ...careTeamForManager, 
             careManagerId: editCareManagerId || undefined,
             careManager: selectedManager?.name || undefined
+          } as any 
+        });
+        break;
+      case "planManager":
+        // Update careTeam JSON with the new plan manager ID
+        const careTeamForPlanManager = client?.careTeam || {};
+        updateFieldMutation.mutate({ 
+          careTeam: { 
+            ...careTeamForPlanManager, 
+            planManagerId: editPlanManagerId || undefined 
+          } as any 
+        });
+        break;
+      case "alliedHealth":
+        // Update careTeam JSON with the new allied health professional ID
+        const careTeamForAlliedHealth = client?.careTeam || {};
+        updateFieldMutation.mutate({ 
+          careTeam: { 
+            ...careTeamForAlliedHealth, 
+            alliedHealthProfessionalId: editAlliedHealthId || undefined 
           } as any 
         });
         break;
@@ -1540,12 +1588,6 @@ export default function ClientProfile() {
               </Button>
             ) : (
               <>
-                <Link href={`/clients/${params?.id}/edit`}>
-                  <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:gap-2 sm:px-3" data-testid="button-edit-client">
-                    <Pencil className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline">Edit</span>
-                  </Button>
-                </Link>
                 {hasServiceAgreement ? (
                   client.zohoWorkdriveLink ? (
                     <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-service-agreement">
@@ -3861,25 +3903,367 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
 
-            {client.careTeam?.otherHealthProfessionals && client.careTeam.otherHealthProfessionals.length > 0 && (
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle className="text-base">Allied Health Professionals</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {client.careTeam.otherHealthProfessionals.map((professional, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                        <Avatar className="w-10 h-10">
-                          <AvatarFallback>{professional.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <p className="text-sm font-medium">{professional}</p>
-                      </div>
-                    ))}
+            {/* GP - Interactive Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4 text-rose-500" />
+                    General Practitioner
+                  </CardTitle>
+                  {!isArchived && editingField !== "gp" && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => startEditing("gp")}
+                      data-testid="button-edit-gp-team"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {editingField === "gp" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select GP</Label>
+                      <Select value={editGpId || "none"} onValueChange={(v) => setEditGpId(v === "none" ? "" : v)}>
+                        <SelectTrigger data-testid="select-gp-team">
+                          <SelectValue placeholder="Select a GP..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No GP</SelectItem>
+                          {gpsList.map((gp) => (
+                            <SelectItem key={gp.id} value={gp.id}>{gp.name} {gp.practiceName && `(${gp.practiceName})`}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveField("gp")} disabled={updateFieldMutation.isPending} data-testid="button-save-gp-team">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-gp-team">
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : gpDetails ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback>{gpDetails.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">{gpDetails.name}</p>
+                        <p className="text-xs text-muted-foreground">{gpDetails.practiceName}</p>
+                      </div>
+                      <Link 
+                        href={`/gps?highlight=${gpDetails.id}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-gp-team"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    {gpDetails.phoneNumber && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <a href={`tel:${gpDetails.phoneNumber}`} className="text-primary hover:underline">{gpDetails.phoneNumber}</a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Stethoscope className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No GP assigned</p>
+                    {!isArchived && (
+                      <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("gp")} data-testid="button-assign-gp-team">
+                        <Plus className="w-3 h-3 mr-1" /> Assign GP
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pharmacy - Interactive Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Pill className="w-4 h-4 text-teal-500" />
+                    Pharmacy
+                  </CardTitle>
+                  {!isArchived && editingField !== "pharmacy" && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => startEditing("pharmacy")}
+                      data-testid="button-edit-pharmacy-team"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {editingField === "pharmacy" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select Pharmacy</Label>
+                      <Select value={editPharmacyId || "none"} onValueChange={(v) => setEditPharmacyId(v === "none" ? "" : v)}>
+                        <SelectTrigger data-testid="select-pharmacy-team">
+                          <SelectValue placeholder="Select a Pharmacy..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Pharmacy</SelectItem>
+                          {pharmaciesList.map((pharmacy) => (
+                            <SelectItem key={pharmacy.id} value={pharmacy.id}>{pharmacy.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveField("pharmacy")} disabled={updateFieldMutation.isPending} data-testid="button-save-pharmacy-team">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-pharmacy-team">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : pharmacyDetails ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback>{pharmacyDetails.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">{pharmacyDetails.name}</p>
+                        {pharmacyDetails.deliveryAvailable === "yes" && (
+                          <Badge variant="secondary" className="text-xs">Delivery Available</Badge>
+                        )}
+                      </div>
+                      <Link 
+                        href={`/pharmacies?highlight=${pharmacyDetails.id}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-pharmacy-team"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    {pharmacyDetails.phoneNumber && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <a href={`tel:${pharmacyDetails.phoneNumber}`} className="text-primary hover:underline">{pharmacyDetails.phoneNumber}</a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Pill className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No pharmacy assigned</p>
+                    {!isArchived && (
+                      <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("pharmacy")} data-testid="button-assign-pharmacy-team">
+                        <Plus className="w-3 h-3 mr-1" /> Assign Pharmacy
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Plan Manager - Interactive Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-pink-500" />
+                    Plan Manager
+                  </CardTitle>
+                  {!isArchived && editingField !== "planManager" && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => startEditing("planManager")}
+                      data-testid="button-edit-plan-manager-team"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {editingField === "planManager" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select Plan Manager</Label>
+                      <Select value={editPlanManagerId || "none"} onValueChange={(v) => setEditPlanManagerId(v === "none" ? "" : v)}>
+                        <SelectTrigger data-testid="select-plan-manager-team">
+                          <SelectValue placeholder="Select a Plan Manager..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Plan Manager</SelectItem>
+                          {planManagersList.map((pm) => (
+                            <SelectItem key={pm.id} value={pm.id}>{pm.name} {pm.organisation && `(${pm.organisation})`}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveField("planManager")} disabled={updateFieldMutation.isPending} data-testid="button-save-plan-manager-team">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-plan-manager-team">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : planManagerDetails ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback>{planManagerDetails.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">{planManagerDetails.name}</p>
+                        <p className="text-xs text-muted-foreground">{planManagerDetails.organisation}</p>
+                      </div>
+                      <Link 
+                        href={`/plan-managers?highlight=${planManagerDetails.id}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-plan-manager-team"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    {planManagerDetails.phoneNumber && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <a href={`tel:${planManagerDetails.phoneNumber}`} className="text-primary hover:underline">{planManagerDetails.phoneNumber}</a>
+                      </div>
+                    )}
+                    {planManagerDetails.email && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <a href={`mailto:${planManagerDetails.email}`} className="text-primary hover:underline">{planManagerDetails.email}</a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Briefcase className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No plan manager assigned</p>
+                    {!isArchived && (
+                      <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("planManager")} data-testid="button-assign-plan-manager-team">
+                        <Plus className="w-3 h-3 mr-1" /> Assign Plan Manager
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Allied Health - Interactive Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <HeartPulse className="w-4 h-4 text-violet-500" />
+                    Allied Health
+                  </CardTitle>
+                  {!isArchived && editingField !== "alliedHealth" && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => startEditing("alliedHealth")}
+                      data-testid="button-edit-allied-health-team"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {editingField === "alliedHealth" ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select Allied Health Professional</Label>
+                      <Select value={editAlliedHealthId || "none"} onValueChange={(v) => setEditAlliedHealthId(v === "none" ? "" : v)}>
+                        <SelectTrigger data-testid="select-allied-health-team">
+                          <SelectValue placeholder="Select an Allied Health Professional..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Allied Health</SelectItem>
+                          {alliedHealthList.map((ah) => (
+                            <SelectItem key={ah.id} value={ah.id}>{ah.name} {ah.specialty && `(${ah.specialty})`}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveField("alliedHealth")} disabled={updateFieldMutation.isPending} data-testid="button-save-allied-health-team">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-allied-health-team">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : alliedHealthDetails ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback>{alliedHealthDetails.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">{alliedHealthDetails.name}</p>
+                        <p className="text-xs text-muted-foreground">{alliedHealthDetails.specialty}</p>
+                      </div>
+                      <Link 
+                        href={`/allied-health-professionals?highlight=${alliedHealthDetails.id}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-allied-health-team"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    {alliedHealthDetails.phoneNumber && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <a href={`tel:${alliedHealthDetails.phoneNumber}`} className="text-primary hover:underline">{alliedHealthDetails.phoneNumber}</a>
+                      </div>
+                    )}
+                    {alliedHealthDetails.email && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <a href={`mailto:${alliedHealthDetails.email}`} className="text-primary hover:underline">{alliedHealthDetails.email}</a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <HeartPulse className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">No allied health assigned</p>
+                    {!isArchived && (
+                      <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("alliedHealth")} data-testid="button-assign-allied-health-team">
+                        <Plus className="w-3 h-3 mr-1" /> Assign Allied Health
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Preferred Staff Section */}
             <Card>
@@ -4155,82 +4539,6 @@ export default function ClientProfile() {
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-6">
-          {/* Zoho WorkDrive Link - Inline Editable */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  Zoho WorkDrive
-                </CardTitle>
-                {!isArchived && editingField !== "zohoWorkdriveLink" && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => startEditing("zohoWorkdriveLink")}
-                    data-testid="button-edit-workdrive-link"
-                  >
-                    <Pencil className="w-3 h-3 mr-1" />
-                    Edit
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {editingField === "zohoWorkdriveLink" ? (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="zoho-workdrive-link">WorkDrive Folder URL</Label>
-                    <Input
-                      id="zoho-workdrive-link"
-                      type="url"
-                      value={editZohoWorkdriveLink}
-                      onChange={(e) => setEditZohoWorkdriveLink(e.target.value)}
-                      placeholder="https://workdrive.zoho.com/..."
-                      className="font-mono text-sm"
-                      data-testid="input-zoho-workdrive-link"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Link to the client's document folder in Zoho WorkDrive
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => saveField("zohoWorkdriveLink")} disabled={updateFieldMutation.isPending} data-testid="button-save-workdrive-link">
-                      {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                      Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="button-cancel-workdrive-link">
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : client.zohoWorkdriveLink ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm font-mono text-muted-foreground truncate">{client.zohoWorkdriveLink}</span>
-                  </div>
-                  <Button variant="outline" size="sm" asChild className="ml-4 flex-shrink-0">
-                    <a href={client.zohoWorkdriveLink} target="_blank" rel="noopener noreferrer" data-testid="link-open-workdrive">
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open in WorkDrive
-                    </a>
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <FileText className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                  <p className="text-sm text-muted-foreground">No WorkDrive folder linked</p>
-                  {!isArchived && (
-                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("zohoWorkdriveLink")} data-testid="button-add-workdrive-link">
-                      <Plus className="w-3 h-3 mr-1" /> Add WorkDrive Link
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           <DocumentTracker 
             documents={client.clinicalDocuments} 
             clientId={client.id}
