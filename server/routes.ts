@@ -3256,14 +3256,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Document type is required" });
       }
       
-      // Validate document type
+      // Validate document type - includes all document types from the Documents section
       const validDocumentTypes = [
         "Service Agreement", "NDIS Plan", "Care Plan", "Risk Assessment",
         "Medical Report", "Consent Form", "Progress Report", "Assessment",
-        "Referral", "Certificate", "Policy Document", "Other"
+        "Referral", "Certificate", "Policy Document", "Other",
+        "Self Assessment (Medx Tool)", "Medication Consent", "Personal Emergency Plan",
+        "Health Summary", "Wound Care Plan"
       ];
       if (!validDocumentTypes.includes(documentType)) {
-        return res.status(400).json({ error: "Invalid document type" });
+        return res.status(400).json({ error: `Invalid document type: ${documentType}` });
       }
 
       // Create a URL to serve the uploaded file with client ID for authorization
