@@ -121,6 +121,8 @@ export const clients = pgTable("clients", {
   phoneNumber: text("phone_number"),
   email: text("email"),
   medicareNumber: text("medicare_number"),
+  sex: text("sex").$type<"Male" | "Female" | "Other" | null>(),
+  maritalStatus: text("marital_status").$type<"Single" | "Never married" | "Married" | "Widowed" | "Divorced" | null>(),
   nokEpoa: text("nok_epoa"), // Next of Kin info (name, relationship, phone)
   epoa: text("epoa"), // Enduring Power of Attorney (name, relationship, phone)
   frequencyOfServices: text("frequency_of_services"),
@@ -131,6 +133,11 @@ export const clients = pgTable("clients", {
   }>(),
   mainDiagnosis: text("main_diagnosis"),
   allergies: text("allergies"),
+  fallsRiskScore: integer("falls_risk_score"), // Scale 5-20
+  substanceUseNotes: text("substance_use_notes"), // Alcohol/drugs/smoke notes
+  dietPatterns: text("diet_patterns"),
+  exercisePatterns: text("exercise_patterns"),
+  sleepPatterns: text("sleep_patterns"),
   advancedCareDirective: text("advanced_care_directive").$type<"NFR" | "For Resus" | "None" | null>(),
   advancedCareDirectiveDocumentId: varchar("acd_document_id"),
   summaryOfServices: text("summary_of_services"),
@@ -169,6 +176,11 @@ export const clients = pgTable("clients", {
   attentionNotes: text("attention_notes"),
   latitude: text("latitude"),
   longitude: text("longitude"),
+  
+  // Personal preferences and lifestyle
+  culturalBackground: text("cultural_background"), // Religious/cultural preferences
+  hobbiesInterests: text("hobbies_interests"), // Favorite activities, food, shows
+  intakeComments: text("intake_comments"), // General intake notes
   
   // Care Team - foreign keys for linked entities
   generalPractitionerId: varchar("general_practitioner_id"),
@@ -276,6 +288,17 @@ export const insertClientSchema = createInsertSchema(clients, {
   suburb: z.string().optional().nullable(),
   state: z.string().optional().nullable(),
   postcode: z.string().optional().nullable(),
+  // New intake fields
+  sex: z.enum(["Male", "Female", "Other"]).optional().nullable(),
+  maritalStatus: z.enum(["Single", "Never married", "Married", "Widowed", "Divorced"]).optional().nullable(),
+  fallsRiskScore: z.number().min(5).max(20).optional().nullable(),
+  substanceUseNotes: z.string().optional().nullable(),
+  dietPatterns: z.string().optional().nullable(),
+  exercisePatterns: z.string().optional().nullable(),
+  sleepPatterns: z.string().optional().nullable(),
+  culturalBackground: z.string().optional().nullable(),
+  hobbiesInterests: z.string().optional().nullable(),
+  intakeComments: z.string().optional().nullable(),
 }).omit({
   id: true,
   clientNumber: true,
