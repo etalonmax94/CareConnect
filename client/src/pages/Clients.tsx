@@ -22,6 +22,7 @@ type DensityMode = "compact" | "standard" | "expanded";
 
 interface ColumnVisibility {
   client: boolean;
+  status: boolean;
   category: boolean;
   phone: boolean;
   careManager: boolean;
@@ -30,6 +31,7 @@ interface ColumnVisibility {
 
 const defaultColumnVisibility: ColumnVisibility = {
   client: true,
+  status: true,
   category: true,
   phone: true,
   careManager: true,
@@ -48,6 +50,7 @@ export default function Clients() {
     return "All";
   });
   const [selectedCareManager, setSelectedCareManager] = useState<string>("All");
+  const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [selectedCompliance, setSelectedCompliance] = useState<string>("All");
   
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -64,7 +67,7 @@ export default function Clients() {
     const saved = localStorage.getItem("clientColumnVisibility");
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...parsed, client: true };
+      return { ...defaultColumnVisibility, ...parsed, client: true, status: parsed.status ?? true };
     }
     return defaultColumnVisibility;
   });
@@ -116,18 +119,21 @@ export default function Clients() {
     return clients.filter(client => {
       const matchesCategory = selectedCategory === "All" || client.category === selectedCategory;
       const matchesCareManager = selectedCareManager === "All" || client.careTeam?.careManager === selectedCareManager;
+      const clientStatus = client.status || "Active";
+      const matchesStatus = selectedStatus === "All" || clientStatus === selectedStatus;
       const compStatus = getComplianceStatus(client.clinicalDocuments?.carePlanDate);
       const matchesCompliance = selectedCompliance === "All" || 
         (selectedCompliance === "compliant" && compStatus === "compliant") ||
         (selectedCompliance === "due-soon" && compStatus === "due-soon") ||
         (selectedCompliance === "overdue" && compStatus === "overdue");
-      return matchesCategory && matchesCareManager && matchesCompliance;
+      return matchesCategory && matchesCareManager && matchesStatus && matchesCompliance;
     });
-  }, [clients, selectedCategory, selectedCareManager, selectedCompliance]);
+  }, [clients, selectedCategory, selectedCareManager, selectedStatus, selectedCompliance]);
 
-  const hasActiveFilters = selectedCategory !== "All" || selectedCareManager !== "All" || selectedCompliance !== "All";
+  const hasActiveFilters = selectedCategory !== "All" || selectedCareManager !== "All" || selectedStatus !== "All" || selectedCompliance !== "All";
 
   const clearAllFilters = () => {
+    setSelectedStatus("All");
     setSelectedCategory("All");
     setSelectedCareManager("All");
     setSelectedCompliance("All");
@@ -205,6 +211,19 @@ export default function Clients() {
               {careManagers.map(cm => (
                 <SelectItem key={cm} value={cm}>{cm}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <SelectTrigger className="w-[130px]" data-testid="filter-status">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">Status</SelectItem>
+              <SelectItem value="Active">Active</SelectItem>
+              <SelectItem value="Hospital">Hospital</SelectItem>
+              <SelectItem value="Paused">Paused</SelectItem>
+              <SelectItem value="Discharged">Discharged</SelectItem>
             </SelectContent>
           </Select>
 
@@ -302,6 +321,15 @@ export default function Clients() {
                       <div className="flex items-center justify-between">
                         <Label className="text-sm text-muted-foreground">Client (required)</Label>
                         <Switch checked disabled className="opacity-50" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="col-status" className="text-sm cursor-pointer">Status</Label>
+                        <Switch 
+                          id="col-status" 
+                          checked={columnVisibility.status} 
+                          onCheckedChange={() => toggleColumn("status")}
+                          data-testid="toggle-column-status"
+                        />
                       </div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="col-category" className="text-sm cursor-pointer">Category</Label>
