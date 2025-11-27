@@ -2511,13 +2511,6 @@ export default function ClientProfile() {
                         )}
                       </div>
                       
-                      {/* Category - Display only */}
-                      <div className="p-3 -m-3">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</p>
-                        <div className="mt-1">
-                          <CategoryBadge category={client.category} />
-                        </div>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -2618,6 +2611,14 @@ export default function ClientProfile() {
                             )}
                           </div>
                         )}
+                      </div>
+
+                      {/* Category - Display only */}
+                      <div className="p-3 -m-3">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</p>
+                        <div className="mt-1">
+                          <CategoryBadge category={client.category} />
+                        </div>
                       </div>
 
                       {/* Allergies - Inline Editable */}
