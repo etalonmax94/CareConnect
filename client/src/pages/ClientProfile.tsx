@@ -684,6 +684,7 @@ export default function ClientProfile() {
   const [editEpoaRelationship, setEditEpoaRelationship] = useState<string>("");
   const [editServiceType, setEditServiceType] = useState<string>("");
   const [editZohoWorkdriveLink, setEditZohoWorkdriveLink] = useState<string>("");
+  const [editCommunicationNeeds, setEditCommunicationNeeds] = useState<string>("");
   
   // Inline field update mutation
   const updateFieldMutation = useMutation({
@@ -799,6 +800,9 @@ export default function ClientProfile() {
       case "zohoWorkdriveLink":
         setEditZohoWorkdriveLink(client?.zohoWorkdriveLink || "");
         break;
+      case "communicationNeeds":
+        setEditCommunicationNeeds(client?.communicationNeeds || "");
+        break;
     }
   };
 
@@ -903,6 +907,9 @@ export default function ClientProfile() {
         break;
       case "zohoWorkdriveLink":
         updateFieldMutation.mutate({ zohoWorkdriveLink: editZohoWorkdriveLink || null });
+        break;
+      case "communicationNeeds":
+        updateFieldMutation.mutate({ communicationNeeds: editCommunicationNeeds });
         break;
     }
   };
@@ -2834,12 +2841,39 @@ export default function ClientProfile() {
                         )}
                       </div>
 
-                      {/* Category - Display only */}
-                      <div className="p-3 -m-3">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</p>
-                        <div className="mt-1">
-                          <CategoryBadge category={client.category} />
+                      {/* Communication Needs - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "communicationNeeds" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "communicationNeeds" && startEditing("communicationNeeds")}
+                        data-testid="field-communication-needs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Communication Needs</p>
+                          {!isArchived && editingField !== "communicationNeeds" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
                         </div>
+                        {editingField === "communicationNeeds" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editCommunicationNeeds}
+                              onChange={(e) => setEditCommunicationNeeds(e.target.value)}
+                              placeholder="Describe communication needs..."
+                              className="h-8 text-sm"
+                              data-testid="input-communication-needs"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("communicationNeeds")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mt-1 font-medium">{client.communicationNeeds || "No special needs (click to add)"}</p>
+                        )}
                       </div>
 
                       {/* Allergies - Inline Editable */}
@@ -2920,15 +2954,52 @@ export default function ClientProfile() {
                           </div>
                         )}
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Communication Needs</p>
-                        <p className="text-sm mt-1 font-medium">{client.communicationNeeds || "No special needs"}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notification Preferences</p>
+                      {/* Category - Display only */}
+                      <div className="p-3 -m-3">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</p>
                         <div className="mt-1">
-                          <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
+                          <CategoryBadge category={client.category} />
                         </div>
+                      </div>
+                      {/* Notification Preferences - Inline Editable */}
+                      <div 
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "notificationsPreference" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "notificationsPreference" && startEditing("notificationsPreference")}
+                        data-testid="field-notification-preferences-personal"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notification Preferences</p>
+                          {!isArchived && editingField !== "notificationsPreference" && (
+                            <Pencil className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        {editingField === "notificationsPreference" ? (
+                          <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Select value={editNotificationsPreference} onValueChange={setEditNotificationsPreference}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-notifications-personal">
+                                <SelectValue placeholder="Select preference..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Email">Email</SelectItem>
+                                <SelectItem value="SMS">SMS</SelectItem>
+                                <SelectItem value="Call">Phone Call</SelectItem>
+                                <SelectItem value="N/A">No Notifications</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("notificationsPreference")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-1">
+                            <NotificationPreferencesBadges preferences={client.notificationPreferences as NotificationPreferencesType} />
+                          </div>
+                        )}
                       </div>
                     </div>
                     {client.summaryOfServices && (
