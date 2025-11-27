@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { LogIn, Code, Loader2, Users, Shield, FileText, BarChart3, Calendar, Heart, CheckCircle, ArrowRight, Star } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { LogIn, Code, Loader2, Users, Shield, FileText, BarChart3, Calendar, Heart, CheckCircle, ArrowRight, Star, Mail, Phone, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
@@ -61,20 +62,64 @@ function FeatureCard({ feature, index, isActive }: { feature: typeof features[0]
   const Icon = feature.icon;
   return (
     <div 
-      className={`flex items-start gap-3 p-3 rounded-xl transition-all duration-500 cursor-default ${
+      className={`flex items-start gap-3 p-2 sm:p-3 rounded-xl transition-all duration-500 cursor-default ${
         isActive 
           ? 'bg-white/20 backdrop-blur-sm border border-white/30 scale-[1.02] shadow-lg' 
           : 'bg-white/5 border border-transparent hover:bg-white/10'
       }`}
     >
-      <div className={`p-2 rounded-lg transition-all duration-300 ${isActive ? 'bg-white/30' : 'bg-white/10'}`}>
-        <Icon className={`w-4 h-4 transition-all duration-300 ${isActive ? 'text-white' : 'text-white/80'}`} />
+      <div className={`p-1.5 sm:p-2 rounded-lg transition-all duration-300 ${isActive ? 'bg-white/30' : 'bg-white/10'}`}>
+        <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-all duration-300 ${isActive ? 'text-white' : 'text-white/80'}`} />
       </div>
-      <div>
-        <h3 className={`font-semibold transition-all duration-300 ${isActive ? 'text-white' : 'text-white/90'}`}>{feature.title}</h3>
-        <p className={`text-sm transition-all duration-300 ${isActive ? 'text-white/80' : 'text-white/60'}`}>{feature.description}</p>
+      <div className="min-w-0 flex-1">
+        <h3 className={`font-semibold text-sm sm:text-base transition-all duration-300 ${isActive ? 'text-white' : 'text-white/90'}`}>{feature.title}</h3>
+        <p className={`text-xs sm:text-sm transition-all duration-300 line-clamp-2 ${isActive ? 'text-white/80' : 'text-white/60'}`}>{feature.description}</p>
       </div>
     </div>
+  );
+}
+
+function SupportModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-xl">Contact Support</DialogTitle>
+          <DialogDescription>
+            Get in touch with our support team for assistance
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <a 
+            href="mailto:connect@empowerlink.au"
+            className="flex items-center gap-4 p-4 rounded-xl border bg-muted/50 hover:bg-muted transition-colors group"
+          >
+            <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <Mail className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Email Us</p>
+              <p className="text-sm text-muted-foreground">connect@empowerlink.au</p>
+            </div>
+          </a>
+          <a 
+            href="tel:1300546563"
+            className="flex items-center gap-4 p-4 rounded-xl border bg-muted/50 hover:bg-muted transition-colors group"
+          >
+            <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <Phone className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Call Us</p>
+              <p className="text-sm text-muted-foreground">1300 546 563</p>
+            </div>
+          </a>
+        </div>
+        <p className="text-xs text-center text-muted-foreground">
+          Our support team is available Monday to Friday, 9am - 5pm AEST
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -84,6 +129,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeFeature, setActiveFeature] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -130,16 +176,19 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Support Modal */}
+      <SupportModal open={supportOpen} onOpenChange={setSupportOpen} />
+
       {/* Left Side - Feature Showcase with Animated Background (40%) */}
-      <div className="hidden lg:flex lg:w-[40%] relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/70">
+      <div className="lg:flex lg:w-[40%] relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/70">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
-          <FloatingShape className="w-64 h-64 bg-white/10 -top-16 -left-16 animate-float" delay={0} duration={18} />
-          <FloatingShape className="w-80 h-80 bg-white/5 top-1/4 -right-20 animate-float" delay={1} duration={22} />
-          <FloatingShape className="w-48 h-48 bg-white/10 bottom-20 left-1/4 animate-float" delay={2} duration={16} />
-          <FloatingShape className="w-32 h-32 bg-white/15 top-1/2 left-10 animate-float" delay={1.5} duration={20} />
-          <FloatingShape className="w-72 h-72 bg-white/5 -bottom-32 -right-16 animate-float" delay={0.5} duration={24} />
+          <FloatingShape className="w-32 sm:w-64 h-32 sm:h-64 bg-white/10 -top-8 sm:-top-16 -left-8 sm:-left-16 animate-float" delay={0} duration={18} />
+          <FloatingShape className="w-40 sm:w-80 h-40 sm:h-80 bg-white/5 top-1/4 -right-10 sm:-right-20 animate-float" delay={1} duration={22} />
+          <FloatingShape className="w-24 sm:w-48 h-24 sm:h-48 bg-white/10 bottom-10 sm:bottom-20 left-1/4 animate-float" delay={2} duration={16} />
+          <FloatingShape className="w-16 sm:w-32 h-16 sm:h-32 bg-white/15 top-1/2 left-5 sm:left-10 animate-float" delay={1.5} duration={20} />
+          <FloatingShape className="w-36 sm:w-72 h-36 sm:h-72 bg-white/5 -bottom-16 sm:-bottom-32 -right-8 sm:-right-16 animate-float" delay={0.5} duration={24} />
           
           {/* Subtle grid pattern */}
           <div className="absolute inset-0 opacity-5" style={{
@@ -149,28 +198,28 @@ export default function Login() {
         </div>
 
         {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between p-8 w-full">
+        <div className="relative z-10 flex flex-col justify-between p-4 sm:p-6 lg:p-8 w-full">
           {/* Logo and Tagline */}
           <div className="animate-fadeIn">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm shadow-lg">
-                <Heart className="w-7 h-7 text-white" />
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <div className="p-2 sm:p-2.5 bg-white/20 rounded-lg sm:rounded-xl backdrop-blur-sm shadow-lg">
+                <Heart className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
               </div>
-              <span className="text-2xl font-bold text-white">EmpowerLink</span>
+              <span className="text-xl sm:text-2xl font-bold text-white">EmpowerLink</span>
             </div>
-            <p className="text-white/80 text-base max-w-xs">
+            <p className="text-white/80 text-sm sm:text-base whitespace-nowrap">
               Our own built and managed healthcare CRM
             </p>
           </div>
 
-          {/* Feature Cards */}
+          {/* Feature Cards - Hidden on very small screens, shown on md+ */}
           <div 
-            className="space-y-2 my-6"
+            className="hidden sm:block space-y-1.5 sm:space-y-2 my-4 sm:my-6"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >
-            <h2 className="text-lg font-semibold text-white mb-4">Everything you need</h2>
-            <div className="space-y-2">
+            <h2 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">Everything you need</h2>
+            <div className="space-y-1.5 sm:space-y-2">
               {features.map((feature, index) => (
                 <div 
                   key={feature.title}
@@ -186,14 +235,29 @@ export default function Login() {
             </div>
           </div>
 
+          {/* Mobile Feature Summary */}
+          <div className="sm:hidden py-4">
+            <div className="flex flex-wrap gap-2">
+              {features.slice(0, 3).map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div key={feature.title} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/10 rounded-full text-xs text-white/90">
+                    <Icon className="w-3 h-3" />
+                    <span>{feature.title}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Bottom Stats */}
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-full backdrop-blur-sm">
-              <CheckCircle className="w-4 h-4 text-emerald-300" />
+          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap">
+            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/10 rounded-full backdrop-blur-sm">
+              <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-300" />
               <span className="text-white/90">HIPAA Compliant</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-full backdrop-blur-sm">
-              <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/10 rounded-full backdrop-blur-sm">
+              <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-300 fill-yellow-300" />
               <span className="text-white/90">5 Star Service</span>
             </div>
           </div>
@@ -201,68 +265,58 @@ export default function Login() {
       </div>
 
       {/* Right Side - Login Form (60%) */}
-      <div className="w-full lg:w-[60%] flex flex-col bg-background">
-        {/* Mobile Header */}
-        <div className="lg:hidden p-6 bg-gradient-to-r from-primary to-primary/80">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-xl">
-              <Heart className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">EmpowerLink</span>
-          </div>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center p-8 lg:p-16">
-          <div className="w-full max-w-md space-y-8">
+      <div className="flex-1 lg:w-[60%] flex flex-col bg-background">
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-16">
+          <div className="w-full max-w-md space-y-6 sm:space-y-8">
             {/* Logo for Desktop */}
-            <div className="hidden lg:block text-center mb-10">
+            <div className="hidden lg:block text-center mb-6 sm:mb-10">
               <img 
                 src={logoImage} 
                 alt="EmpowerLink" 
-                className="h-14 w-auto mx-auto mb-6 drop-shadow-sm" 
+                className="h-10 sm:h-14 w-auto mx-auto mb-4 sm:mb-6 drop-shadow-sm" 
                 data-testid="img-logo" 
               />
             </div>
 
             {/* Welcome Text */}
             <div className="text-center">
-              <h1 className="text-3xl font-bold text-foreground mb-3">Welcome back</h1>
-              <p className="text-muted-foreground text-lg">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2 sm:mb-3">Welcome back</h1>
+              <p className="text-muted-foreground text-base sm:text-lg">
                 Sign in to access your healthcare CRM dashboard
               </p>
             </div>
 
             {/* Login Card */}
             <Card className="border shadow-xl bg-card overflow-hidden">
-              <CardContent className="p-8 space-y-6">
+              <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
                 {/* Zoho Login Button */}
                 <a 
                   href={`${API_BASE_URL}/api/auth/zoho`}
-                  className="group flex items-center justify-center gap-3 w-full h-14 px-6 rounded-xl bg-primary text-primary-foreground font-medium transition-all duration-300 hover:bg-primary/90 hover:scale-[1.02] hover:shadow-xl shadow-lg shadow-primary/20"
+                  className="group flex items-center justify-center gap-2 sm:gap-3 w-full h-12 sm:h-14 px-4 sm:px-6 rounded-xl bg-primary text-primary-foreground font-medium transition-all duration-300 hover:bg-primary/90 hover:scale-[1.02] hover:shadow-xl shadow-lg shadow-primary/20"
                   data-testid="button-zoho-login"
                 >
-                  <LogIn className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
-                  <span>Sign in with Zoho</span>
-                  <ArrowRight className="h-4 w-4 ml-auto transition-transform group-hover:translate-x-1" />
+                  <LogIn className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:-translate-x-1" />
+                  <span className="text-sm sm:text-base">Sign in with Zoho</span>
+                  <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-auto transition-transform group-hover:translate-x-1" />
                 </a>
 
                 {/* Features List */}
-                <div className="flex items-center justify-center gap-8 py-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground group cursor-default">
-                    <div className="p-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 group-hover:scale-110 transition-transform">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                <div className="flex items-center justify-center gap-4 sm:gap-8 py-3 sm:py-4 flex-wrap">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground group cursor-default">
+                    <div className="p-0.5 sm:p-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 group-hover:scale-110 transition-transform">
+                      <CheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
                     </div>
                     <span>Secure</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground group cursor-default">
-                    <div className="p-1 rounded-full bg-blue-100 dark:bg-blue-900/30 group-hover:scale-110 transition-transform">
-                      <CheckCircle className="w-3.5 h-3.5 text-blue-500" />
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground group cursor-default">
+                    <div className="p-0.5 sm:p-1 rounded-full bg-blue-100 dark:bg-blue-900/30 group-hover:scale-110 transition-transform">
+                      <CheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
                     </div>
                     <span>Fast</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground group cursor-default">
-                    <div className="p-1 rounded-full bg-purple-100 dark:bg-purple-900/30 group-hover:scale-110 transition-transform">
-                      <CheckCircle className="w-3.5 h-3.5 text-purple-500" />
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground group cursor-default">
+                    <div className="p-0.5 sm:p-1 rounded-full bg-purple-100 dark:bg-purple-900/30 group-hover:scale-110 transition-transform">
+                      <CheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-500" />
                     </div>
                     <span>Reliable</span>
                   </div>
@@ -278,29 +332,29 @@ export default function Login() {
                       </span>
                     </div>
 
-                    <div className="space-y-4 p-4 border border-dashed border-amber-500/50 rounded-xl bg-amber-50/50 dark:bg-amber-900/10">
-                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm font-medium">
-                        <Code className="h-4 w-4" />
+                    <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 border border-dashed border-amber-500/50 rounded-xl bg-amber-50/50 dark:bg-amber-900/10">
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs sm:text-sm font-medium">
+                        <Code className="h-3 w-3 sm:h-4 sm:w-4" />
                         Developer Access
                       </div>
                       
-                      <div className="space-y-3">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="dev-name" className="text-sm">Display Name</Label>
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <Label htmlFor="dev-name" className="text-xs sm:text-sm">Display Name</Label>
                           <Input
                             id="dev-name"
                             value={devName}
                             onChange={(e) => setDevName(e.target.value)}
                             placeholder="Enter name"
-                            className="h-11"
+                            className="h-9 sm:h-11 text-sm"
                             data-testid="input-dev-name"
                           />
                         </div>
                         
-                        <div className="space-y-1.5">
-                          <Label htmlFor="dev-role" className="text-sm">Role</Label>
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <Label htmlFor="dev-role" className="text-xs sm:text-sm">Role</Label>
                           <Select value={devRole} onValueChange={setDevRole}>
-                            <SelectTrigger id="dev-role" className="h-11" data-testid="select-dev-role">
+                            <SelectTrigger id="dev-role" className="h-9 sm:h-11 text-sm" data-testid="select-dev-role">
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
                             <SelectContent>
@@ -320,14 +374,14 @@ export default function Login() {
                       <Button
                         onClick={handleDevLogin}
                         variant="outline"
-                        className="w-full h-11 gap-2 border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-all hover:scale-[1.01]"
+                        className="w-full h-9 sm:h-11 gap-2 border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-all hover:scale-[1.01] text-sm"
                         disabled={isLoading || !devName}
                         data-testid="button-dev-login"
                       >
                         {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                         ) : (
-                          <Code className="h-4 w-4" />
+                          <Code className="h-3 w-3 sm:h-4 sm:w-4" />
                         )}
                         Login as Developer
                       </Button>
@@ -338,25 +392,37 @@ export default function Login() {
             </Card>
 
             {/* Footer */}
-            <div className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
+            <div className="text-center space-y-3 sm:space-y-4">
+              <p className="text-xs sm:text-sm text-muted-foreground px-4">
                 By signing in, you agree to comply with Australian privacy laws
                 and EmpowerLink's data protection policies.
               </p>
-              <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-                <span className="hover:text-foreground cursor-pointer transition-colors">Privacy Policy</span>
-                <span className="text-border">|</span>
+              <div className="flex items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground flex-wrap">
+                <a 
+                  href="https://empowerlink.au/privacy-and-cookie-policy/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground cursor-pointer transition-colors"
+                >
+                  Privacy Policy
+                </a>
+                <span className="text-border hidden sm:inline">|</span>
                 <span className="hover:text-foreground cursor-pointer transition-colors">Terms of Service</span>
-                <span className="text-border">|</span>
-                <span className="hover:text-foreground cursor-pointer transition-colors">Support</span>
+                <span className="text-border hidden sm:inline">|</span>
+                <button 
+                  onClick={() => setSupportOpen(true)}
+                  className="hover:text-foreground cursor-pointer transition-colors"
+                >
+                  Support
+                </button>
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer Brand */}
-        <div className="p-4 text-center border-t bg-muted/30">
-          <p className="text-xs text-muted-foreground">
+        <div className="p-3 sm:p-4 text-center border-t bg-muted/30">
+          <p className="text-[10px] sm:text-xs text-muted-foreground">
             © 2024 EmpowerLink. Proudly Australian.
           </p>
         </div>
