@@ -15,6 +15,7 @@ type DensityMode = "compact" | "standard" | "expanded";
 
 interface ColumnVisibility {
   client: boolean;
+  status: boolean;
   category: boolean;
   phone: boolean;
   careManager: boolean;
@@ -29,11 +30,12 @@ interface ClientTableProps {
   columnVisibility?: ColumnVisibility;
 }
 
-type SortField = "name" | "category" | "careManager" | "phone" | "compliance";
+type SortField = "name" | "status" | "category" | "careManager" | "phone" | "compliance";
 type SortDirection = "asc" | "desc";
 
 const defaultColumnVisibility: ColumnVisibility = {
   client: true,
+  status: true,
   category: true,
   phone: true,
   careManager: true,
@@ -68,7 +70,7 @@ export default function ClientTable({
 
   const getClientId = (client: Client) => {
     if (client.category === "NDIS") return client.ndisDetails?.ndisNumber;
-    if (client.category === "Support at Home") return client.supportAtHomeDetails?.hcpNumber;
+    if (client.category === "Support at Home") return client.supportAtHomeDetails?.sahNumber;
     return client.medicareNumber;
   };
 
@@ -85,6 +87,12 @@ export default function ClientTable({
           aVal = a.participantName.toLowerCase();
           bVal = b.participantName.toLowerCase();
           break;
+        case "status": {
+          const clientStatusOrder: Record<string, number> = { "Active": 0, "Hospital": 1, "Paused": 2, "Discharged": 3 };
+          aVal = a.isArchived === "yes" ? 4 : clientStatusOrder[a.status || "Active"] ?? 0;
+          bVal = b.isArchived === "yes" ? 4 : clientStatusOrder[b.status || "Active"] ?? 0;
+          break;
+        }
         case "category":
           aVal = a.category;
           bVal = b.category;
@@ -97,11 +105,12 @@ export default function ClientTable({
           aVal = a.phoneNumber || "";
           bVal = b.phoneNumber || "";
           break;
-        case "compliance":
-          const statusOrder: Record<string, number> = { "none": 0, "overdue": 1, "due-soon": 2, "compliant": 3 };
-          aVal = statusOrder[getComplianceStatus(a.clinicalDocuments?.carePlanDate)] ?? 0;
-          bVal = statusOrder[getComplianceStatus(b.clinicalDocuments?.carePlanDate)] ?? 0;
+        case "compliance": {
+          const complianceOrder: Record<string, number> = { "none": 0, "overdue": 1, "due-soon": 2, "compliant": 3 };
+          aVal = complianceOrder[getComplianceStatus(a.clinicalDocuments?.carePlanDate)] ?? 0;
+          bVal = complianceOrder[getComplianceStatus(b.clinicalDocuments?.carePlanDate)] ?? 0;
           break;
+        }
       }
       
       if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
@@ -206,6 +215,17 @@ export default function ClientTable({
                     data-testid="sort-name"
                   >
                     Client <SortIcon field="name" />
+                  </button>
+                </TableHead>
+              )}
+              {columnVisibility.status && (
+                <TableHead>
+                  <button 
+                    className="flex items-center font-medium hover:text-primary transition-colors"
+                    onClick={() => handleSort("status")}
+                    data-testid="sort-status"
+                  >
+                    Status <SortIcon field="status" />
                   </button>
                 </TableHead>
               )}
@@ -317,27 +337,6 @@ export default function ClientTable({
                                 New
                               </Badge>
                             )}
-                            {/* Client Status Badge */}
-                            {client.isArchived === "yes" ? (
-                              <Badge 
-                                className="text-xs text-white border-0 bg-slate-500"
-                                data-testid={`badge-status-${client.id}`}
-                              >
-                                Archived
-                              </Badge>
-                            ) : (
-                              <Badge 
-                                className={`text-xs text-white border-0 ${
-                                  client.status === "Hospital" ? "bg-orange-500" :
-                                  client.status === "Paused" ? "bg-amber-500" :
-                                  client.status === "Discharged" ? "bg-red-500" :
-                                  "bg-emerald-500"
-                                }`}
-                                data-testid={`badge-status-${client.id}`}
-                              >
-                                {client.status || "Active"}
-                              </Badge>
-                            )}
                             {client.advancedCareDirective === "NFR" && (
                               <Badge 
                                 variant="outline" 
@@ -366,6 +365,30 @@ export default function ClientTable({
                           )}
                         </div>
                       </div>
+                    </TableCell>
+                  )}
+                  {columnVisibility.status && (
+                    <TableCell>
+                      {client.isArchived === "yes" ? (
+                        <Badge 
+                          className="text-xs text-white border-0 bg-slate-500"
+                          data-testid={`badge-status-${client.id}`}
+                        >
+                          Archived
+                        </Badge>
+                      ) : (
+                        <Badge 
+                          className={`text-xs text-white border-0 ${
+                            client.status === "Hospital" ? "bg-orange-500" :
+                            client.status === "Paused" ? "bg-amber-500" :
+                            client.status === "Discharged" ? "bg-red-500" :
+                            "bg-emerald-500"
+                          }`}
+                          data-testid={`badge-status-${client.id}`}
+                        >
+                          {client.status || "Active"}
+                        </Badge>
+                      )}
                     </TableCell>
                   )}
                   {columnVisibility.category && (
