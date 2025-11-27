@@ -563,6 +563,11 @@ export default function ClientProfile() {
   const [editSupportCoordinatorId, setEditSupportCoordinatorId] = useState<string>("");
   const [editNokEpoa, setEditNokEpoa] = useState<string>("");
   const [editMedicareNumber, setEditMedicareNumber] = useState<string>("");
+  const [editNotificationsPreference, setEditNotificationsPreference] = useState<string>("");
+  const [editEmergencyContactName, setEditEmergencyContactName] = useState<string>("");
+  const [editEmergencyContactPhone, setEditEmergencyContactPhone] = useState<string>("");
+  const [editEmergencyContactRelationship, setEditEmergencyContactRelationship] = useState<string>("");
+  const [editServiceType, setEditServiceType] = useState<string>("");
   
   // Inline field update mutation
   const updateFieldMutation = useMutation({
@@ -617,6 +622,12 @@ export default function ClientProfile() {
       case "parkingInstructions":
         setEditParkingInstructions(client?.parkingInstructions || "");
         break;
+      case "address":
+        setEditStreetAddress(client?.streetAddress || "");
+        setEditSuburb(client?.suburb || "");
+        setEditState(client?.state || "");
+        setEditPostcode(client?.postcode || "");
+        break;
       case "gp":
         setEditGpId(client?.generalPractitionerId || "");
         break;
@@ -631,6 +642,28 @@ export default function ClientProfile() {
         break;
       case "medicareNumber":
         setEditMedicareNumber(client?.medicareNumber || "");
+        break;
+      case "notificationsPreference":
+        const notifPrefs = client?.notificationPreferences as NotificationPreferencesType;
+        if (notifPrefs?.smsArrival || notifPrefs?.smsSchedule) {
+          setEditNotificationsPreference("SMS");
+        } else if (notifPrefs?.callArrival || notifPrefs?.callSchedule) {
+          setEditNotificationsPreference("Call");
+        } else if (notifPrefs?.none) {
+          setEditNotificationsPreference("N/A");
+        } else {
+          setEditNotificationsPreference("Email");
+        }
+        break;
+      case "emergencyContact":
+        const nokInfo = client?.nokEpoa || "";
+        const nokParts = nokInfo.split(' - ');
+        setEditEmergencyContactName(nokParts[0] || "");
+        setEditEmergencyContactRelationship(nokParts[1] || "");
+        setEditEmergencyContactPhone(nokParts[2] || "");
+        break;
+      case "serviceType":
+        setEditServiceType(client?.serviceType || "");
         break;
     }
   };
@@ -691,6 +724,30 @@ export default function ClientProfile() {
         break;
       case "medicareNumber":
         updateFieldMutation.mutate({ medicareNumber: editMedicareNumber });
+        break;
+      case "notificationsPreference":
+        let newNotifPrefs: NotificationPreferencesType = {};
+        switch (editNotificationsPreference) {
+          case "SMS":
+            newNotifPrefs = { smsArrival: true, smsSchedule: true };
+            break;
+          case "Call":
+            newNotifPrefs = { callArrival: true, callSchedule: true };
+            break;
+          case "N/A":
+            newNotifPrefs = { none: true };
+            break;
+          default:
+            newNotifPrefs = {};
+        }
+        updateFieldMutation.mutate({ notificationPreferences: newNotifPrefs as any });
+        break;
+      case "emergencyContact":
+        const emergencyInfo = [editEmergencyContactName, editEmergencyContactRelationship, editEmergencyContactPhone].filter(Boolean).join(' - ');
+        updateFieldMutation.mutate({ nokEpoa: emergencyInfo });
+        break;
+      case "serviceType":
+        updateFieldMutation.mutate({ serviceType: editServiceType as any });
         break;
     }
   };
@@ -1216,81 +1273,6 @@ export default function ClientProfile() {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-6">
-          {/* Stat Cards Row - Clean design with borders - Interactive */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
-            <Card 
-              className="bg-card hover-elevate cursor-pointer"
-              onClick={() => setActiveSection("details")}
-              data-testid="stat-age"
-            >
-              <CardContent className="p-2.5 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
-                    <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-600 dark:text-teal-400" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Age</p>
-                    <p className="text-base sm:text-xl font-semibold">{clientAge || '-'}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card 
-              className="bg-card hover-elevate cursor-pointer"
-              onClick={() => setActiveSection("program")}
-              data-testid="stat-support-level"
-            >
-              <CardContent className="p-2.5 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
-                    <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Support</p>
-                    <p className="text-base sm:text-xl font-semibold truncate">{getSupportLevel() || '-'}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card 
-              className="bg-card hover-elevate cursor-pointer"
-              onClick={() => setActiveSection("team")}
-              data-testid="stat-assigned-staff"
-            >
-              <CardContent className="p-2.5 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
-                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 dark:text-slate-400" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Staff</p>
-                    <p className="text-base sm:text-xl font-semibold">{assignedStaffCount}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card 
-              className="bg-card hover-elevate cursor-pointer"
-              onClick={() => setActiveSection("budget")}
-              data-testid="stat-budget"
-            >
-              <CardContent className="p-2.5 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
-                    <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-600 dark:text-violet-400" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Budget</p>
-                    <p className="text-base sm:text-xl font-semibold">${remainingBudget.toLocaleString()}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Overview Section */}
           {activeSection === "overview" && (
             <div className="space-y-6">
@@ -1331,15 +1313,41 @@ export default function ClientProfile() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card 
                   className="bg-card hover-elevate cursor-pointer"
-                  onClick={() => setActiveSection("services")}
+                  onClick={() => !editingField && startEditing("serviceType")}
                   data-testid="card-service-type"
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Activity className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                       <span className="text-xs text-muted-foreground font-medium">Service Type</span>
+                      {!isArchived && !editingField && (
+                        <Pencil className="w-3 h-3 text-muted-foreground ml-auto" />
+                      )}
                     </div>
-                    <p className="text-sm font-semibold">{client.serviceType || 'Not specified'}</p>
+                    {editingField === "serviceType" ? (
+                      <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Select value={editServiceType} onValueChange={setEditServiceType}>
+                          <SelectTrigger className="h-8 text-xs" data-testid="select-service-type-inline">
+                            <SelectValue placeholder="Select type..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NDIS">NDIS</SelectItem>
+                            <SelectItem value="Support at Home">Support at Home</SelectItem>
+                            <SelectItem value="Private">Private</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-1">
+                          <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("serviceType")} disabled={updateFieldMutation.isPending} data-testid="button-save-service-type">
+                            {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing} data-testid="button-cancel-service-type">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-semibold">{client.serviceType || 'Click to set'}</p>
+                    )}
                   </CardContent>
                 </Card>
                 <Card 
@@ -1399,15 +1407,38 @@ export default function ClientProfile() {
                 </Card>
                 <Card 
                   className="bg-card md:col-span-2 hover-elevate cursor-pointer"
-                  onClick={() => setActiveSection("details")}
+                  onClick={() => !editingField && startEditing("parkingInstructions")}
                   data-testid="card-parking"
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Car className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                       <span className="text-xs text-muted-foreground font-medium">Parking / Access</span>
+                      {!isArchived && !editingField && (
+                        <Pencil className="w-3 h-3 text-muted-foreground ml-auto" />
+                      )}
                     </div>
-                    <p className="text-sm font-semibold">{client.parkingInstructions || 'No instructions provided'}</p>
+                    {editingField === "parkingInstructions" ? (
+                      <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={editParkingInstructions}
+                          onChange={(e) => setEditParkingInstructions(e.target.value)}
+                          placeholder="Enter parking/access instructions..."
+                          className="h-8 text-sm"
+                          data-testid="input-parking-inline"
+                        />
+                        <div className="flex gap-1">
+                          <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("parkingInstructions")} disabled={updateFieldMutation.isPending} data-testid="button-save-parking">
+                            {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing} data-testid="button-cancel-parking">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-semibold">{client.parkingInstructions || 'Click to add'}</p>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1523,89 +1554,250 @@ export default function ClientProfile() {
                         </div>
                       </div>
                       
-                      {/* Notification Preferences */}
-                      {client.notificationPreferences && (client.notificationPreferences.smsArrival || client.notificationPreferences.smsSchedule || client.notificationPreferences.callArrival || client.notificationPreferences.callSchedule) && (
-                        <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                          <Bell className="w-4 h-4 text-muted-foreground" />
-                          <div className="flex-1">
+                      {/* Notification Preferences - Inline Editable */}
+                      <div 
+                        className={`flex items-center gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "notificationsPreference" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "notificationsPreference" && startEditing("notificationsPreference")}
+                        data-testid="field-notifications"
+                      >
+                        <Bell className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
                             <p className="text-xs text-muted-foreground">Notification Preference</p>
-                            <p className="text-sm font-medium" data-testid="text-notification-pref">
-                              {(() => {
-                                const prefs = [];
-                                if (client.notificationPreferences?.smsArrival || client.notificationPreferences?.smsSchedule) {
-                                  prefs.push('SMS Arrivals & Schedules');
-                                }
-                                if (client.notificationPreferences?.callArrival || client.notificationPreferences?.callSchedule) {
-                                  prefs.push('Calls Arrivals & Schedules');
-                                }
-                                return prefs.join(', ') || 'None';
-                              })()}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {(client.homeAddress || client.streetAddress) && (
-                        <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                          <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground">Address</p>
-                            <p className="text-sm font-medium">
-                              {client.streetAddress ? (
-                                <>
-                                  {client.streetAddress}
-                                  {(client.suburb || client.state || client.postcode) && <br />}
-                                  {[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}
-                                </>
-                              ) : client.homeAddress}
-                            </p>
-                            {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                <Navigation className="w-3 h-3 inline mr-1" />
-                                {distanceData.distanceKm} km from office
-                              </p>
+                            {!isArchived && editingField !== "notificationsPreference" && (
+                              <Pencil className="w-3 h-3 text-muted-foreground" />
                             )}
                           </div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(client.homeAddress!, 'Address')}>
+                          {editingField === "notificationsPreference" ? (
+                            <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
+                              <Select value={editNotificationsPreference} onValueChange={setEditNotificationsPreference}>
+                                <SelectTrigger className="h-8 text-sm" data-testid="select-notifications-inline">
+                                  <SelectValue placeholder="Select preference..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Email">Email</SelectItem>
+                                  <SelectItem value="SMS">SMS</SelectItem>
+                                  <SelectItem value="Call">Phone Call</SelectItem>
+                                  <SelectItem value="N/A">No Notifications</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="flex gap-1">
+                                <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("notificationsPreference")} disabled={updateFieldMutation.isPending}>
+                                  {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-medium" data-testid="text-notification-pref">
+                              {(() => {
+                                const prefs = client.notificationPreferences as NotificationPreferencesType;
+                                if (prefs?.none) return 'No Notifications';
+                                const prefsList = [];
+                                if (prefs?.smsArrival || prefs?.smsSchedule) prefsList.push('SMS');
+                                if (prefs?.callArrival || prefs?.callSchedule) prefsList.push('Calls');
+                                return prefsList.join(' & ') || 'Click to set';
+                              })()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Address - Inline Editable */}
+                      <div 
+                        className={`flex items-start gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "address" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "address" && startEditing("address")}
+                        data-testid="field-address"
+                      >
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-muted-foreground">Address</p>
+                            {!isArchived && editingField !== "address" && (
+                              <Pencil className="w-3 h-3 text-muted-foreground" />
+                            )}
+                          </div>
+                          {editingField === "address" ? (
+                            <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
+                              <Input
+                                value={editStreetAddress}
+                                onChange={(e) => setEditStreetAddress(e.target.value)}
+                                placeholder="Street address..."
+                                className="h-8 text-sm"
+                                data-testid="input-street-address"
+                              />
+                              <div className="grid grid-cols-3 gap-1">
+                                <Input
+                                  value={editSuburb}
+                                  onChange={(e) => setEditSuburb(e.target.value)}
+                                  placeholder="Suburb"
+                                  className="h-8 text-sm"
+                                  data-testid="input-suburb"
+                                />
+                                <Input
+                                  value={editState}
+                                  onChange={(e) => setEditState(e.target.value)}
+                                  placeholder="State"
+                                  className="h-8 text-sm"
+                                  data-testid="input-state"
+                                />
+                                <Input
+                                  value={editPostcode}
+                                  onChange={(e) => setEditPostcode(e.target.value)}
+                                  placeholder="Postcode"
+                                  className="h-8 text-sm"
+                                  data-testid="input-postcode"
+                                />
+                              </div>
+                              <div className="flex gap-1">
+                                <Button size="sm" className="h-6 text-xs flex-1" onClick={() => {
+                                  updateFieldMutation.mutate({ 
+                                    streetAddress: editStreetAddress,
+                                    suburb: editSuburb,
+                                    state: editState,
+                                    postcode: editPostcode
+                                  });
+                                }} disabled={updateFieldMutation.isPending}>
+                                  {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium">
+                                {client.streetAddress ? (
+                                  <>
+                                    {client.streetAddress}
+                                    {(client.suburb || client.state || client.postcode) && <br />}
+                                    {[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}
+                                  </>
+                                ) : client.homeAddress || 'Click to add address'}
+                              </p>
+                              {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  <Navigation className="w-3 h-3 inline mr-1" />
+                                  {distanceData.distanceKm} km from office
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        {(client.homeAddress || client.streetAddress) && editingField !== "address" && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); copyToClipboard(client.streetAddress || client.homeAddress!, 'Address'); }}>
                             <Copy className="w-3 h-3" />
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
 
-                      {/* Emergency Contact - Highlighted under address */}
-                      <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                          <p className="text-xs font-medium text-red-700 dark:text-red-300 uppercase tracking-wide">Emergency Contact</p>
+                      {/* Emergency Contact - Highlighted under address - Inline Editable */}
+                      <div 
+                        className={`p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 ${!isArchived && editingField !== "emergencyContact" ? "cursor-pointer hover-elevate" : ""}`}
+                        onClick={() => editingField !== "emergencyContact" && startEditing("emergencyContact")}
+                        data-testid="field-emergency-contact"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            <p className="text-xs font-medium text-red-700 dark:text-red-300 uppercase tracking-wide">Emergency Contact</p>
+                          </div>
+                          {!isArchived && editingField !== "emergencyContact" && (
+                            <Pencil className="w-3 h-3 text-red-600 dark:text-red-400" />
+                          )}
                         </div>
-                        {clientContacts.length > 0 && clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes").length > 0 ? (
-                          <div className="space-y-2">
-                            {clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes").slice(0, 2).map((contact) => (
-                              <div key={contact.id} className="flex items-center justify-between">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-semibold text-sm">{contact.name}</p>
-                                    <div className="flex gap-1">
-                                      {contact.isNok === "yes" && <Badge variant="outline" className="text-xs h-5">NOK</Badge>}
-                                      {contact.isEmergencyContact === "yes" && <Badge variant="destructive" className="text-xs h-5">Emergency</Badge>}
+                        {editingField === "emergencyContact" ? (
+                          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editEmergencyContactName}
+                              onChange={(e) => setEditEmergencyContactName(e.target.value)}
+                              placeholder="Contact name..."
+                              className="h-8 text-sm"
+                              data-testid="input-emergency-name"
+                            />
+                            <Input
+                              value={editEmergencyContactPhone}
+                              onChange={(e) => setEditEmergencyContactPhone(e.target.value)}
+                              placeholder="Phone number..."
+                              className="h-8 text-sm"
+                              data-testid="input-emergency-phone"
+                            />
+                            <Select value={editEmergencyContactRelationship} onValueChange={setEditEmergencyContactRelationship}>
+                              <SelectTrigger className="h-8 text-sm" data-testid="select-emergency-relationship">
+                                <SelectValue placeholder="Relationship..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="spouse">Spouse</SelectItem>
+                                <SelectItem value="parent">Parent</SelectItem>
+                                <SelectItem value="child">Child</SelectItem>
+                                <SelectItem value="sibling">Sibling</SelectItem>
+                                <SelectItem value="friend">Friend</SelectItem>
+                                <SelectItem value="carer">Carer</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("emergencyContact")} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (() => {
+                          const emergencyContacts = clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes");
+                          if (emergencyContacts.length > 0) {
+                            return (
+                              <div className="space-y-2">
+                                {emergencyContacts.slice(0, 2).map((contact) => (
+                                  <div key={contact.id} className="flex items-center justify-between">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-semibold text-sm">{contact.name}</p>
+                                        <div className="flex gap-1">
+                                          {contact.isNok === "yes" && <Badge variant="outline" className="text-xs h-5">NOK</Badge>}
+                                          {contact.isEmergencyContact === "yes" && <Badge variant="destructive" className="text-xs h-5">Emergency</Badge>}
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground capitalize">{contact.relationship}</p>
                                     </div>
+                                    {contact.phoneNumber && (
+                                      <a href={`tel:${contact.phoneNumber}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
+                                        <Phone className="w-3 h-3" />
+                                        {contact.phoneNumber}
+                                      </a>
+                                    )}
                                   </div>
-                                  <p className="text-xs text-muted-foreground capitalize">{contact.relationship}</p>
+                                ))}
+                              </div>
+                            );
+                          }
+                          if (client.nokEpoa) {
+                            const nokParts = client.nokEpoa.split(' - ');
+                            const name = nokParts[0];
+                            const relationship = nokParts[1];
+                            const phone = nokParts[2];
+                            return (
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold text-sm">{name}</p>
+                                  {relationship && <p className="text-xs text-muted-foreground capitalize">{relationship}</p>}
                                 </div>
-                                {contact.phoneNumber && (
-                                  <a href={`tel:${contact.phoneNumber}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium">
+                                {phone && (
+                                  <a href={`tel:${phone}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium" onClick={(e) => e.stopPropagation()}>
                                     <Phone className="w-3 h-3" />
-                                    {contact.phoneNumber}
+                                    {phone}
                                   </a>
                                 )}
                               </div>
-                            ))}
-                          </div>
-                        ) : client.nokEpoa ? (
-                          <p className="text-sm font-medium">{client.nokEpoa}</p>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No emergency contact listed</p>
-                        )}
+                            );
+                          }
+                          return <p className="text-sm text-muted-foreground">Click to add emergency contact</p>;
+                        })()}
                       </div>
                     </CardContent>
                   </Card>
