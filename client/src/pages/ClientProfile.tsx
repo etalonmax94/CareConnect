@@ -1570,24 +1570,29 @@ export default function ClientProfile() {
               {/* Critical Alerts Banner */}
               {(client.allergies || client.advancedCareDirective || client.attentionNotes) && (
                 <div className="space-y-3">
-                  {client.allergies && (
-                    <Alert variant="destructive" className="border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription className="font-medium">
-                        <span className="font-bold">ALLERGIES: </span>{client.allergies}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {client.advancedCareDirective && client.advancedCareDirective !== "None" && (
-                    <Alert className={`${client.advancedCareDirective === "NFR" ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30" : "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"}`}>
-                      <FileText className="h-4 w-4" />
-                      <AlertDescription className="font-medium">
-                        <span className="font-bold">Advanced Care Directive: </span>
-                        <Badge className={`ml-2 ${client.advancedCareDirective === "NFR" ? "bg-rose-600" : "bg-emerald-600"} text-white border-0`}>
-                          {client.advancedCareDirective === "NFR" ? "Not For Resuscitation" : "For Resuscitation"}
-                        </Badge>
-                      </AlertDescription>
-                    </Alert>
+                  {/* Allergies and Advanced Care Directive - share row when both present */}
+                  {(client.allergies || (client.advancedCareDirective && client.advancedCareDirective !== "None")) && (
+                    <div className={`grid gap-3 ${client.allergies && client.advancedCareDirective && client.advancedCareDirective !== "None" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+                      {client.allergies && (
+                        <Alert variant="destructive" className="border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription className="font-medium">
+                            <span className="font-bold">ALLERGIES: </span>{client.allergies}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      {client.advancedCareDirective && client.advancedCareDirective !== "None" && (
+                        <Alert className={`${client.advancedCareDirective === "NFR" ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30" : "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"}`}>
+                          <FileText className="h-4 w-4" />
+                          <AlertDescription className="font-medium">
+                            <span className="font-bold">Advanced Care Directive: </span>
+                            <Badge className={`ml-2 ${client.advancedCareDirective === "NFR" ? "bg-rose-600" : "bg-emerald-600"} text-white border-0`}>
+                              {client.advancedCareDirective === "NFR" ? "Not For Resuscitation" : "For Resuscitation"}
+                            </Badge>
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
                   )}
                   {client.attentionNotes && (
                     <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
