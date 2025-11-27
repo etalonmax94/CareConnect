@@ -4187,7 +4187,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update action plan
   app.patch("/api/action-plans/:id", async (req, res) => {
     try {
-      const plan = await storage.updateActionPlan(req.params.id, req.body);
+      // Convert completedAt string to Date if present
+      const updateData = { ...req.body };
+      if (updateData.completedAt && typeof updateData.completedAt === "string") {
+        updateData.completedAt = new Date(updateData.completedAt);
+      }
+      
+      const plan = await storage.updateActionPlan(req.params.id, updateData);
       if (!plan) {
         return res.status(404).json({ error: "Action plan not found" });
       }

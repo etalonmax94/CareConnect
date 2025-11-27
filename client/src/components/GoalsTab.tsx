@@ -82,11 +82,7 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
   const [goalNextReviewDate, setGoalNextReviewDate] = useState("");
   const [newNote, setNewNote] = useState("");
   
-  // Inline edit states
-  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
-  const [inlineEditTitle, setInlineEditTitle] = useState("");
-  const [inlineEditDescription, setInlineEditDescription] = useState("");
-  
+    
   // Filter/sort states
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"date" | "progress" | "status">("date");
@@ -135,7 +131,6 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId, "goals"] });
       setEditGoalOpen(false);
-      setInlineEditingId(null);
       toast({ title: "Goal updated" });
     },
     onError: () => {
@@ -300,26 +295,6 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
     setGoalResponsibleStaff(goal.responsibleStaffId || "none");
     setGoalNextReviewDate(goal.nextReviewDate || "");
     setEditGoalOpen(true);
-  };
-  
-  const startInlineEdit = (goal: ClientGoal) => {
-    setInlineEditingId(goal.id);
-    setInlineEditTitle(goal.title);
-    setInlineEditDescription(goal.description || "");
-  };
-  
-  const saveInlineEdit = () => {
-    if (!inlineEditingId) return;
-    updateGoalMutation.mutate({
-      id: inlineEditingId,
-      data: { title: inlineEditTitle, description: inlineEditDescription || undefined }
-    });
-  };
-  
-  const cancelInlineEdit = () => {
-    setInlineEditingId(null);
-    setInlineEditTitle("");
-    setInlineEditDescription("");
   };
   
   const openGoalSheet = (goal: ClientGoal) => {
@@ -1205,8 +1180,8 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
                                       id: plan.id,
                                       data: { 
                                         status: checked ? "completed" : "pending",
-                                        completedAt: checked ? new Date() : undefined
-                                      }
+                                        completedAt: checked ? new Date() : null
+                                      } as any
                                     });
                                   }}
                                   disabled={isArchived || selectedGoal.isArchived === "yes"}
@@ -1370,7 +1345,6 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
     const daysRemaining = getDaysRemaining(goal.targetDate);
     const goalIsOverdue = isOverdue(goal);
     const responsibleStaff = getStaffById(goal.responsibleStaffId);
-    const isEditing = inlineEditingId === goal.id;
     const isGoalArchived = goal.isArchived === "yes" || goal.status === "archived";
     
     return (
@@ -1384,35 +1358,7 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
           <div className="flex-1 min-w-0">
             {/* Header with title and badges */}
             <div className="flex items-start gap-2 mb-2 flex-wrap">
-              {isEditing ? (
-                <Input
-                  value={inlineEditTitle}
-                  onChange={(e) => setInlineEditTitle(e.target.value)}
-                  className="h-7 text-sm font-medium"
-                  autoFocus
-                />
-              ) : (
-                <div className="group flex items-center gap-1">
-                  <h4 
-                    className="font-medium text-sm cursor-text hover:text-primary transition-colors"
-                    onClick={(e) => { e.stopPropagation(); if (!isGoalArchived && !isArchived) startInlineEdit(goal); }}
-                  >
-                    {goal.title}
-                  </h4>
-                  {!isArchived && !isGoalArchived && (
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-5 w-5 opacity-60 hover:opacity-100 transition-opacity"
-                      onClick={(e) => { e.stopPropagation(); startInlineEdit(goal); }}
-                      data-testid={`button-inline-edit-${goal.id}`}
-                      aria-label="Edit goal title and description"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                  )}
-                </div>
-              )}
+              <h4 className="font-medium text-sm">{goal.title}</h4>
               
               <div className="flex items-center gap-1 flex-wrap">
                 <Badge className={`${status.color} gap-1`} variant="secondary">
@@ -1435,42 +1381,12 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
             </div>
             
             {/* Description */}
-            {isEditing ? (
-              <Textarea
-                value={inlineEditDescription}
-                onChange={(e) => setInlineEditDescription(e.target.value)}
-                className="text-sm mt-1"
-                rows={2}
-                placeholder="Add description..."
-              />
-            ) : goal.description ? (
-              <p 
-                className="text-sm text-muted-foreground mt-1 cursor-text hover:text-foreground/80 transition-colors"
-                onClick={(e) => { e.stopPropagation(); if (!isArchived && !isGoalArchived) startInlineEdit(goal); }}
-              >
-                {goal.description}
-              </p>
-            ) : !isArchived && !isGoalArchived ? (
-              <button 
-                className="text-xs text-muted-foreground/60 hover:text-muted-foreground mt-1 italic cursor-text"
-                onClick={(e) => { e.stopPropagation(); startInlineEdit(goal); }}
-              >
-                Click to add description...
-              </button>
-            ) : null}
-            
-            {/* Inline edit buttons */}
-            {isEditing && (
-              <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-                <Button size="sm" onClick={saveInlineEdit} disabled={updateGoalMutation.isPending}>
-                  {updateGoalMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={cancelInlineEdit}>Cancel</Button>
-              </div>
+            {goal.description && (
+              <p className="text-sm text-muted-foreground mt-1">{goal.description}</p>
             )}
             
             {/* Progress bar */}
-            {!isEditing && goal.progressPercent !== null && goal.progressPercent !== undefined && (
+            {goal.progressPercent !== null && goal.progressPercent !== undefined && (
               <div className="mt-3">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                   <span>Progress</span>
@@ -1481,8 +1397,7 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
             )}
             
             {/* Meta info row */}
-            {!isEditing && (
-              <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground flex-wrap">
                 {goal.targetDate && (
                   <span className={`flex items-center gap-1 ${goalIsOverdue ? "text-red-600 font-medium" : daysRemaining !== null && daysRemaining <= 7 ? "text-amber-600" : ""}`}>
                     <Calendar className="w-3 h-3" />
@@ -1521,12 +1436,11 @@ export default function GoalsTab({ clientId, isArchived }: GoalsTabProps) {
                     </TooltipContent>
                   </Tooltip>
                 )}
-              </div>
-            )}
+            </div>
           </div>
           
           {/* Actions */}
-          {!isArchived && !isEditing && (
+          {!isArchived && (
             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               {/* Quick status change */}
               <Select 
