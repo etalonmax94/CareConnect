@@ -715,6 +715,45 @@ export default function ClientProfile() {
   const [editFallsRiskScore, setEditFallsRiskScore] = useState<string>("");
   const [editSubstanceUseNotes, setEditSubstanceUseNotes] = useState<string>("");
   
+  // Add New Provider modal states
+  const [addGpOpen, setAddGpOpen] = useState(false);
+  const [addPharmacyOpen, setAddPharmacyOpen] = useState(false);
+  const [addPlanManagerOpen, setAddPlanManagerOpen] = useState(false);
+  const [addSupportCoordinatorOpen, setAddSupportCoordinatorOpen] = useState(false);
+  const [addAlliedHealthOpen, setAddAlliedHealthOpen] = useState(false);
+  
+  // New GP form state
+  const [newGpName, setNewGpName] = useState("");
+  const [newGpPracticeName, setNewGpPracticeName] = useState("");
+  const [newGpPhone, setNewGpPhone] = useState("");
+  const [newGpEmail, setNewGpEmail] = useState("");
+  const [newGpAddress, setNewGpAddress] = useState("");
+  
+  // New Pharmacy form state
+  const [newPharmacyName, setNewPharmacyName] = useState("");
+  const [newPharmacyPhone, setNewPharmacyPhone] = useState("");
+  const [newPharmacyAddress, setNewPharmacyAddress] = useState("");
+  const [newPharmacyDelivery, setNewPharmacyDelivery] = useState<"yes" | "no">("no");
+  
+  // New Plan Manager form state
+  const [newPmName, setNewPmName] = useState("");
+  const [newPmOrganisation, setNewPmOrganisation] = useState("");
+  const [newPmPhone, setNewPmPhone] = useState("");
+  const [newPmEmail, setNewPmEmail] = useState("");
+  
+  // New Support Coordinator form state
+  const [newScName, setNewScName] = useState("");
+  const [newScOrganisation, setNewScOrganisation] = useState("");
+  const [newScPhone, setNewScPhone] = useState("");
+  const [newScEmail, setNewScEmail] = useState("");
+  
+  // New Allied Health form state
+  const [newAhName, setNewAhName] = useState("");
+  const [newAhSpecialty, setNewAhSpecialty] = useState("");
+  const [newAhPracticeName, setNewAhPracticeName] = useState("");
+  const [newAhPhone, setNewAhPhone] = useState("");
+  const [newAhEmail, setNewAhEmail] = useState("");
+  
   // Program Info state variables
   const [editCategory, setEditCategory] = useState<string>("");
   // NDIS fields
@@ -750,6 +789,113 @@ export default function ClientProfile() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to update", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Create new GP mutation
+  const createGpMutation = useMutation({
+    mutationFn: async (data: { name: string; practiceName?: string; phoneNumber?: string; email?: string; address?: string }) => {
+      const response = await apiRequest("POST", "/api/gps", data);
+      return response.json();
+    },
+    onSuccess: (newGp: GP) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/gps"] });
+      setAddGpOpen(false);
+      setNewGpName("");
+      setNewGpPracticeName("");
+      setNewGpPhone("");
+      setNewGpEmail("");
+      setNewGpAddress("");
+      setEditGpId(newGp.id);
+      toast({ title: "GP created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create GP", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Create new Pharmacy mutation
+  const createPharmacyMutation = useMutation({
+    mutationFn: async (data: { name: string; phoneNumber?: string; address?: string; deliveryAvailable?: "yes" | "no" }) => {
+      const response = await apiRequest("POST", "/api/pharmacies", data);
+      return response.json();
+    },
+    onSuccess: (newPharmacy: Pharmacy) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pharmacies"] });
+      setAddPharmacyOpen(false);
+      setNewPharmacyName("");
+      setNewPharmacyPhone("");
+      setNewPharmacyAddress("");
+      setNewPharmacyDelivery("no");
+      setEditPharmacyId(newPharmacy.id);
+      toast({ title: "Pharmacy created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create Pharmacy", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Create new Plan Manager mutation
+  const createPlanManagerMutation = useMutation({
+    mutationFn: async (data: { name: string; organisation?: string; phoneNumber?: string; email?: string }) => {
+      const response = await apiRequest("POST", "/api/plan-managers", data);
+      return response.json();
+    },
+    onSuccess: (newPm: PlanManager) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plan-managers"] });
+      setAddPlanManagerOpen(false);
+      setNewPmName("");
+      setNewPmOrganisation("");
+      setNewPmPhone("");
+      setNewPmEmail("");
+      setEditPlanManagerId(newPm.id);
+      toast({ title: "Plan Manager created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create Plan Manager", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Create new Support Coordinator mutation
+  const createSupportCoordinatorMutation = useMutation({
+    mutationFn: async (data: { name: string; organisation?: string; phoneNumber?: string; email?: string }) => {
+      const response = await apiRequest("POST", "/api/support-coordinators", data);
+      return response.json();
+    },
+    onSuccess: (newSc: SupportCoordinator) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support-coordinators"] });
+      setAddSupportCoordinatorOpen(false);
+      setNewScName("");
+      setNewScOrganisation("");
+      setNewScPhone("");
+      setNewScEmail("");
+      setEditSupportCoordinatorId(newSc.id);
+      toast({ title: "Support Coordinator created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create Support Coordinator", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  // Create new Allied Health Professional mutation
+  const createAlliedHealthMutation = useMutation({
+    mutationFn: async (data: { name: string; specialty: string; practiceName?: string; phoneNumber?: string; email?: string }) => {
+      const response = await apiRequest("POST", "/api/allied-health-professionals", data);
+      return response.json();
+    },
+    onSuccess: (newAh: AlliedHealth) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/allied-health-professionals"] });
+      setAddAlliedHealthOpen(false);
+      setNewAhName("");
+      setNewAhSpecialty("");
+      setNewAhPracticeName("");
+      setNewAhPhone("");
+      setNewAhEmail("");
+      setEditAlliedHealthId(newAh.id);
+      toast({ title: "Allied Health Professional created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create Allied Health Professional", description: error?.message, variant: "destructive" });
     },
   });
 
@@ -4075,6 +4221,16 @@ export default function ClientProfile() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-2" 
+                        onClick={() => setAddSupportCoordinatorOpen(true)}
+                        data-testid="button-add-new-support-coordinator"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Add New Support Coordinator
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => saveField("supportCoordinator")} disabled={updateFieldMutation.isPending} data-testid="button-save-support-coordinator-team">
@@ -4178,6 +4334,16 @@ export default function ClientProfile() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-2" 
+                        onClick={() => setAddGpOpen(true)}
+                        data-testid="button-add-new-gp"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Add New GP
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => saveField("gp")} disabled={updateFieldMutation.isPending} data-testid="button-save-gp-team">
@@ -4265,6 +4431,16 @@ export default function ClientProfile() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-2" 
+                        onClick={() => setAddPharmacyOpen(true)}
+                        data-testid="button-add-new-pharmacy"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Add New Pharmacy
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => saveField("pharmacy")} disabled={updateFieldMutation.isPending} data-testid="button-save-pharmacy-team">
@@ -4354,6 +4530,16 @@ export default function ClientProfile() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-2" 
+                        onClick={() => setAddPlanManagerOpen(true)}
+                        data-testid="button-add-new-plan-manager"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Add New Plan Manager
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => saveField("planManager")} disabled={updateFieldMutation.isPending} data-testid="button-save-plan-manager-team">
@@ -4447,6 +4633,16 @@ export default function ClientProfile() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-2" 
+                        onClick={() => setAddAlliedHealthOpen(true)}
+                        data-testid="button-add-new-allied-health"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Add New Allied Health
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => saveField("alliedHealth")} disabled={updateFieldMutation.isPending} data-testid="button-save-allied-health-team">
@@ -6058,6 +6254,444 @@ export default function ClientProfile() {
                     </div>
                   )}
                 </ScrollArea>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add New GP Modal */}
+        <Dialog open={addGpOpen} onOpenChange={setAddGpOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-rose-500" />
+                Add New GP
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-gp-name">Name *</Label>
+                <Input
+                  id="new-gp-name"
+                  value={newGpName}
+                  onChange={(e) => setNewGpName(e.target.value)}
+                  placeholder="Dr. John Smith"
+                  data-testid="input-new-gp-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-gp-practice">Practice Name</Label>
+                <Input
+                  id="new-gp-practice"
+                  value={newGpPracticeName}
+                  onChange={(e) => setNewGpPracticeName(e.target.value)}
+                  placeholder="City Medical Centre"
+                  data-testid="input-new-gp-practice"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-gp-phone">Phone</Label>
+                <Input
+                  id="new-gp-phone"
+                  value={newGpPhone}
+                  onChange={(e) => setNewGpPhone(e.target.value)}
+                  placeholder="02 1234 5678"
+                  data-testid="input-new-gp-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-gp-email">Email</Label>
+                <Input
+                  id="new-gp-email"
+                  type="email"
+                  value={newGpEmail}
+                  onChange={(e) => setNewGpEmail(e.target.value)}
+                  placeholder="doctor@practice.com.au"
+                  data-testid="input-new-gp-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-gp-address">Address</Label>
+                <Input
+                  id="new-gp-address"
+                  value={newGpAddress}
+                  onChange={(e) => setNewGpAddress(e.target.value)}
+                  placeholder="123 Medical St, Sydney NSW 2000"
+                  data-testid="input-new-gp-address"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => {
+                    if (!newGpName.trim()) {
+                      toast({ title: "Name is required", variant: "destructive" });
+                      return;
+                    }
+                    createGpMutation.mutate({
+                      name: newGpName.trim(),
+                      practiceName: newGpPracticeName.trim() || undefined,
+                      phoneNumber: newGpPhone.trim() || undefined,
+                      email: newGpEmail.trim() || undefined,
+                      address: newGpAddress.trim() || undefined,
+                    });
+                  }}
+                  disabled={createGpMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-create-gp"
+                >
+                  {createGpMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Create GP
+                </Button>
+                <Button variant="outline" onClick={() => setAddGpOpen(false)} data-testid="button-cancel-create-gp">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add New Pharmacy Modal */}
+        <Dialog open={addPharmacyOpen} onOpenChange={setAddPharmacyOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Pill className="w-5 h-5 text-teal-500" />
+                Add New Pharmacy
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-pharmacy-name">Name *</Label>
+                <Input
+                  id="new-pharmacy-name"
+                  value={newPharmacyName}
+                  onChange={(e) => setNewPharmacyName(e.target.value)}
+                  placeholder="City Pharmacy"
+                  data-testid="input-new-pharmacy-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-pharmacy-phone">Phone</Label>
+                <Input
+                  id="new-pharmacy-phone"
+                  value={newPharmacyPhone}
+                  onChange={(e) => setNewPharmacyPhone(e.target.value)}
+                  placeholder="02 1234 5678"
+                  data-testid="input-new-pharmacy-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-pharmacy-address">Address</Label>
+                <Input
+                  id="new-pharmacy-address"
+                  value={newPharmacyAddress}
+                  onChange={(e) => setNewPharmacyAddress(e.target.value)}
+                  placeholder="123 Main St, Sydney NSW 2000"
+                  data-testid="input-new-pharmacy-address"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Delivery Available</Label>
+                <Select value={newPharmacyDelivery} onValueChange={(v) => setNewPharmacyDelivery(v as "yes" | "no")}>
+                  <SelectTrigger data-testid="select-new-pharmacy-delivery">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no">No</SelectItem>
+                    <SelectItem value="yes">Yes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => {
+                    if (!newPharmacyName.trim()) {
+                      toast({ title: "Name is required", variant: "destructive" });
+                      return;
+                    }
+                    createPharmacyMutation.mutate({
+                      name: newPharmacyName.trim(),
+                      phoneNumber: newPharmacyPhone.trim() || undefined,
+                      address: newPharmacyAddress.trim() || undefined,
+                      deliveryAvailable: newPharmacyDelivery,
+                    });
+                  }}
+                  disabled={createPharmacyMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-create-pharmacy"
+                >
+                  {createPharmacyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Create Pharmacy
+                </Button>
+                <Button variant="outline" onClick={() => setAddPharmacyOpen(false)} data-testid="button-cancel-create-pharmacy">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add New Plan Manager Modal */}
+        <Dialog open={addPlanManagerOpen} onOpenChange={setAddPlanManagerOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-blue-500" />
+                Add New Plan Manager
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-pm-name">Name *</Label>
+                <Input
+                  id="new-pm-name"
+                  value={newPmName}
+                  onChange={(e) => setNewPmName(e.target.value)}
+                  placeholder="Jane Doe"
+                  data-testid="input-new-pm-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-pm-organisation">Organisation</Label>
+                <Input
+                  id="new-pm-organisation"
+                  value={newPmOrganisation}
+                  onChange={(e) => setNewPmOrganisation(e.target.value)}
+                  placeholder="Plan Management Co."
+                  data-testid="input-new-pm-organisation"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-pm-phone">Phone</Label>
+                <Input
+                  id="new-pm-phone"
+                  value={newPmPhone}
+                  onChange={(e) => setNewPmPhone(e.target.value)}
+                  placeholder="02 1234 5678"
+                  data-testid="input-new-pm-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-pm-email">Email</Label>
+                <Input
+                  id="new-pm-email"
+                  type="email"
+                  value={newPmEmail}
+                  onChange={(e) => setNewPmEmail(e.target.value)}
+                  placeholder="manager@planmanagement.com.au"
+                  data-testid="input-new-pm-email"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => {
+                    if (!newPmName.trim()) {
+                      toast({ title: "Name is required", variant: "destructive" });
+                      return;
+                    }
+                    createPlanManagerMutation.mutate({
+                      name: newPmName.trim(),
+                      organisation: newPmOrganisation.trim() || undefined,
+                      phoneNumber: newPmPhone.trim() || undefined,
+                      email: newPmEmail.trim() || undefined,
+                    });
+                  }}
+                  disabled={createPlanManagerMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-create-pm"
+                >
+                  {createPlanManagerMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Create Plan Manager
+                </Button>
+                <Button variant="outline" onClick={() => setAddPlanManagerOpen(false)} data-testid="button-cancel-create-pm">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add New Support Coordinator Modal */}
+        <Dialog open={addSupportCoordinatorOpen} onOpenChange={setAddSupportCoordinatorOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserCog className="w-5 h-5 text-emerald-500" />
+                Add New Support Coordinator
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-sc-name">Name *</Label>
+                <Input
+                  id="new-sc-name"
+                  value={newScName}
+                  onChange={(e) => setNewScName(e.target.value)}
+                  placeholder="Sarah Johnson"
+                  data-testid="input-new-sc-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-sc-organisation">Organisation</Label>
+                <Input
+                  id="new-sc-organisation"
+                  value={newScOrganisation}
+                  onChange={(e) => setNewScOrganisation(e.target.value)}
+                  placeholder="Support Coordination Services"
+                  data-testid="input-new-sc-organisation"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-sc-phone">Phone</Label>
+                <Input
+                  id="new-sc-phone"
+                  value={newScPhone}
+                  onChange={(e) => setNewScPhone(e.target.value)}
+                  placeholder="02 1234 5678"
+                  data-testid="input-new-sc-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-sc-email">Email</Label>
+                <Input
+                  id="new-sc-email"
+                  type="email"
+                  value={newScEmail}
+                  onChange={(e) => setNewScEmail(e.target.value)}
+                  placeholder="coordinator@support.com.au"
+                  data-testid="input-new-sc-email"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => {
+                    if (!newScName.trim()) {
+                      toast({ title: "Name is required", variant: "destructive" });
+                      return;
+                    }
+                    createSupportCoordinatorMutation.mutate({
+                      name: newScName.trim(),
+                      organisation: newScOrganisation.trim() || undefined,
+                      phoneNumber: newScPhone.trim() || undefined,
+                      email: newScEmail.trim() || undefined,
+                    });
+                  }}
+                  disabled={createSupportCoordinatorMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-create-sc"
+                >
+                  {createSupportCoordinatorMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Create Support Coordinator
+                </Button>
+                <Button variant="outline" onClick={() => setAddSupportCoordinatorOpen(false)} data-testid="button-cancel-create-sc">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add New Allied Health Professional Modal */}
+        <Dialog open={addAlliedHealthOpen} onOpenChange={setAddAlliedHealthOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <HeartPulse className="w-5 h-5 text-violet-500" />
+                Add New Allied Health Professional
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-ah-name">Name *</Label>
+                <Input
+                  id="new-ah-name"
+                  value={newAhName}
+                  onChange={(e) => setNewAhName(e.target.value)}
+                  placeholder="Dr. Emily Brown"
+                  data-testid="input-new-ah-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-ah-specialty">Specialty *</Label>
+                <Select value={newAhSpecialty} onValueChange={setNewAhSpecialty}>
+                  <SelectTrigger data-testid="select-new-ah-specialty">
+                    <SelectValue placeholder="Select specialty..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Physiotherapist">Physiotherapist</SelectItem>
+                    <SelectItem value="Occupational Therapist">Occupational Therapist</SelectItem>
+                    <SelectItem value="Speech Pathologist">Speech Pathologist</SelectItem>
+                    <SelectItem value="Psychologist">Psychologist</SelectItem>
+                    <SelectItem value="Dietitian">Dietitian</SelectItem>
+                    <SelectItem value="Podiatrist">Podiatrist</SelectItem>
+                    <SelectItem value="Exercise Physiologist">Exercise Physiologist</SelectItem>
+                    <SelectItem value="Social Worker">Social Worker</SelectItem>
+                    <SelectItem value="Counsellor">Counsellor</SelectItem>
+                    <SelectItem value="Behaviour Support Practitioner">Behaviour Support Practitioner</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-ah-practice">Practice Name</Label>
+                <Input
+                  id="new-ah-practice"
+                  value={newAhPracticeName}
+                  onChange={(e) => setNewAhPracticeName(e.target.value)}
+                  placeholder="Allied Health Clinic"
+                  data-testid="input-new-ah-practice"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-ah-phone">Phone</Label>
+                <Input
+                  id="new-ah-phone"
+                  value={newAhPhone}
+                  onChange={(e) => setNewAhPhone(e.target.value)}
+                  placeholder="02 1234 5678"
+                  data-testid="input-new-ah-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-ah-email">Email</Label>
+                <Input
+                  id="new-ah-email"
+                  type="email"
+                  value={newAhEmail}
+                  onChange={(e) => setNewAhEmail(e.target.value)}
+                  placeholder="therapist@clinic.com.au"
+                  data-testid="input-new-ah-email"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => {
+                    if (!newAhName.trim()) {
+                      toast({ title: "Name is required", variant: "destructive" });
+                      return;
+                    }
+                    if (!newAhSpecialty) {
+                      toast({ title: "Specialty is required", variant: "destructive" });
+                      return;
+                    }
+                    createAlliedHealthMutation.mutate({
+                      name: newAhName.trim(),
+                      specialty: newAhSpecialty,
+                      practiceName: newAhPracticeName.trim() || undefined,
+                      phoneNumber: newAhPhone.trim() || undefined,
+                      email: newAhEmail.trim() || undefined,
+                    });
+                  }}
+                  disabled={createAlliedHealthMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-create-ah"
+                >
+                  {createAlliedHealthMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Create Allied Health
+                </Button>
+                <Button variant="outline" onClick={() => setAddAlliedHealthOpen(false)} data-testid="button-cancel-create-ah">
+                  Cancel
+                </Button>
               </div>
             </div>
           </DialogContent>
