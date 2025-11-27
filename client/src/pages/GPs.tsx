@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Stethoscope, MapPin, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Stethoscope, MapPin, FileText, ChevronRight } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
 import type { GP } from "@shared/schema";
 
 export default function GPsPage() {
@@ -48,6 +49,8 @@ export default function GPsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingGP, setEditingGP] = useState<GP | null>(null);
   const [deleteGP, setDeleteGP] = useState<GP | null>(null);
+  const [selectedGP, setSelectedGP] = useState<GP | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formData, setFormData] = useState({ 
     name: "", 
     practiceName: "", 
@@ -312,7 +315,11 @@ export default function GPsPage() {
                   <TableRow 
                     key={gp.id} 
                     ref={gp.id === highlightId ? highlightRef : undefined}
-                    className={highlightedId === gp.id ? "bg-primary/10 animate-pulse" : ""}
+                    className={`cursor-pointer hover-elevate ${highlightedId === gp.id ? "bg-primary/10 animate-pulse" : ""}`}
+                    onClick={() => {
+                      setSelectedGP(gp);
+                      setIsDrawerOpen(true);
+                    }}
                     data-testid={`row-gp-${gp.id}`}
                   >
                     <TableCell>
@@ -370,7 +377,10 @@ export default function GPsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => openEditDialog(gp)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(gp);
+                          }}
                           data-testid={`button-edit-gp-${gp.id}`}
                         >
                           <Pencil className="w-4 h-4" />
@@ -378,11 +388,15 @@ export default function GPsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeleteGP(gp)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteGP(gp);
+                          }}
                           data-testid={`button-delete-gp-${gp.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -426,6 +440,15 @@ export default function GPsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* GP Detail Drawer */}
+      <EntityDetailDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        entityType="gp"
+        entityId={selectedGP?.id || null}
+        entityData={selectedGP}
+      />
     </div>
   );
 }

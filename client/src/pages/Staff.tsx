@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, User, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, User, Loader2, ChevronRight } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +43,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
 import type { Staff } from "@shared/schema";
 
 export default function StaffPage() {
@@ -56,6 +57,8 @@ export default function StaffPage() {
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [deleteStaff, setDeleteStaff] = useState<Staff | null>(null);
   const [formData, setFormData] = useState({ name: "", phoneNumber: "", email: "", role: "" });
+  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const { data: staffList = [], isLoading } = useQuery<Staff[]>({
     queryKey: ["/api/staff"],
@@ -165,9 +168,9 @@ export default function StaffPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="text-center sm:text-left">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground" data-testid="text-page-title">
-            Support Workers
+            Staff
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage support worker staff members</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage team members and their assignments</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -179,7 +182,7 @@ export default function StaffPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add Staff Member</DialogTitle>
-              <DialogDescription>Add a new support worker to the system.</DialogDescription>
+              <DialogDescription>Add a new team member to the system.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -257,7 +260,7 @@ export default function StaffPage() {
             <div className="text-center py-8 text-muted-foreground">
               <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No staff members added yet</p>
-              <p className="text-sm">Click "Add Staff Member" to add support workers</p>
+              <p className="text-sm">Click "Add Staff Member" to add team members</p>
             </div>
           ) : (
             <Table>
@@ -275,7 +278,11 @@ export default function StaffPage() {
                   <TableRow 
                     key={staff.id} 
                     ref={staff.id === highlightId ? highlightRef : undefined}
-                    className={highlightedId === staff.id ? "bg-primary/10 animate-pulse" : ""}
+                    className={`cursor-pointer hover-elevate ${highlightedId === staff.id ? "bg-primary/10 animate-pulse" : ""}`}
+                    onClick={() => {
+                      setSelectedStaff(staff);
+                      setIsDrawerOpen(true);
+                    }}
                     data-testid={`row-staff-${staff.id}`}
                   >
                     <TableCell>
@@ -316,7 +323,10 @@ export default function StaffPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => openEditDialog(staff)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(staff);
+                          }}
                           data-testid={`button-edit-staff-${staff.id}`}
                         >
                           <Pencil className="w-4 h-4" />
@@ -324,11 +334,15 @@ export default function StaffPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeleteStaff(staff)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteStaff(staff);
+                          }}
                           data-testid={`button-delete-staff-${staff.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -431,6 +445,15 @@ export default function StaffPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Staff Detail Drawer */}
+      <EntityDetailDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        entityType="staff"
+        entityId={selectedStaff?.id || null}
+        entityData={selectedStaff}
+      />
     </div>
   );
 }

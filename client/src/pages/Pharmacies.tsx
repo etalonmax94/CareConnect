@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, Mail, Loader2, MapPin, FileText, Truck, Building2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Mail, Loader2, MapPin, FileText, Truck, Building2, ChevronRight } from "lucide-react";
 import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
 import type { Pharmacy } from "@shared/schema";
 
 export default function PharmaciesPage() {
@@ -56,6 +57,8 @@ export default function PharmaciesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingPharmacy, setEditingPharmacy] = useState<Pharmacy | null>(null);
   const [deletePharmacy, setDeletePharmacy] = useState<Pharmacy | null>(null);
+  const [selectedPharmacy, setSelectedPharmacy] = useState<Pharmacy | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formData, setFormData] = useState({ 
     name: "", 
     phoneNumber: "", 
@@ -323,7 +326,11 @@ export default function PharmaciesPage() {
                   <TableRow 
                     key={pharmacy.id} 
                     ref={pharmacy.id === highlightId ? highlightRef : undefined}
-                    className={highlightedId === pharmacy.id ? "bg-primary/10 animate-pulse" : ""}
+                    className={`cursor-pointer hover-elevate ${highlightedId === pharmacy.id ? "bg-primary/10 animate-pulse" : ""}`}
+                    onClick={() => {
+                      setSelectedPharmacy(pharmacy);
+                      setIsDrawerOpen(true);
+                    }}
                     data-testid={`row-pharmacy-${pharmacy.id}`}
                   >
                     <TableCell>
@@ -383,7 +390,10 @@ export default function PharmaciesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => openEditDialog(pharmacy)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(pharmacy);
+                          }}
                           data-testid={`button-edit-pharmacy-${pharmacy.id}`}
                         >
                           <Pencil className="w-4 h-4" />
@@ -391,11 +401,15 @@ export default function PharmaciesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeletePharmacy(pharmacy)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletePharmacy(pharmacy);
+                          }}
                           data-testid={`button-delete-pharmacy-${pharmacy.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -439,6 +453,15 @@ export default function PharmaciesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Pharmacy Detail Drawer */}
+      <EntityDetailDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        entityType="pharmacy"
+        entityId={selectedPharmacy?.id || null}
+        entityData={selectedPharmacy}
+      />
     </div>
   );
 }

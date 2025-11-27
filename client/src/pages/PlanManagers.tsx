@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Eye, ChevronRight } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import CategoryBadge from "@/components/CategoryBadge";
+import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
 import type { PlanManager, Client } from "@shared/schema";
 
 export default function PlanManagersPage() {
@@ -50,6 +51,8 @@ export default function PlanManagersPage() {
   const [editingManager, setEditingManager] = useState<PlanManager | null>(null);
   const [deleteManager, setDeleteManager] = useState<PlanManager | null>(null);
   const [viewingClients, setViewingClients] = useState<PlanManager | null>(null);
+  const [selectedManager, setSelectedManager] = useState<PlanManager | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", phoneNumber: "", email: "", organisation: "" });
 
   const { data: managers = [], isLoading } = useQuery<PlanManager[]>({
@@ -264,7 +267,11 @@ export default function PlanManagersPage() {
                   <TableRow 
                     key={manager.id} 
                     ref={manager.id === highlightId ? highlightRef : undefined}
-                    className={highlightedId === manager.id ? "bg-primary/10 animate-pulse" : ""}
+                    className={`cursor-pointer hover-elevate ${highlightedId === manager.id ? "bg-primary/10 animate-pulse" : ""}`}
+                    onClick={() => {
+                      setSelectedManager(manager);
+                      setIsDrawerOpen(true);
+                    }}
                     data-testid={`row-manager-${manager.id}`}
                   >
                     <TableCell>
@@ -312,7 +319,10 @@ export default function PlanManagersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setViewingClients(manager)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingClients(manager);
+                          }}
                           data-testid={`button-view-clients-${manager.id}`}
                         >
                           <Eye className="w-4 h-4" />
@@ -320,7 +330,10 @@ export default function PlanManagersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => openEditDialog(manager)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(manager);
+                          }}
                           data-testid={`button-edit-manager-${manager.id}`}
                         >
                           <Pencil className="w-4 h-4" />
@@ -328,11 +341,15 @@ export default function PlanManagersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeleteManager(manager)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteManager(manager);
+                          }}
                           data-testid={`button-delete-manager-${manager.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -471,6 +488,15 @@ export default function PlanManagersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Plan Manager Detail Drawer */}
+      <EntityDetailDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        entityType="planManager"
+        entityId={selectedManager?.id || null}
+        entityData={selectedManager}
+      />
     </div>
   );
 }

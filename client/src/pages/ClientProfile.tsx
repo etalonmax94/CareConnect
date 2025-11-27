@@ -17,7 +17,7 @@ import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
 import { ServiceScheduleModal } from "@/components/ServiceScheduleModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1266,6 +1266,15 @@ export default function ClientProfile() {
                         <CardTitle className="text-base flex items-center gap-2">
                           <Stethoscope className="w-4 h-4" />
                           General Practitioner
+                          {gpDetails && client.generalPractitionerId && (
+                            <Link 
+                              href={`/gps?highlight=${client.generalPractitionerId}`}
+                              className="ml-auto inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
+                              data-testid="link-gp-card"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Link>
+                          )}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -1306,6 +1315,15 @@ export default function ClientProfile() {
                         <CardTitle className="text-base flex items-center gap-2">
                           <Pill className="w-4 h-4" />
                           Pharmacy
+                          {pharmacyDetails && client.pharmacyId && (
+                            <Link 
+                              href={`/pharmacies?highlight=${client.pharmacyId}`}
+                              className="ml-auto inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
+                              data-testid="link-pharmacy-card"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Link>
+                          )}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -1727,10 +1745,19 @@ export default function ClientProfile() {
                     <Avatar className="w-10 h-10">
                       <AvatarFallback>{client.careTeam.careManager.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-medium">{client.careTeam.careManager}</p>
                       <p className="text-xs text-muted-foreground">Care Manager</p>
                     </div>
+                    {client.careTeam?.careManagerId && (
+                      <Link 
+                        href={`/staff?highlight=${client.careTeam.careManagerId}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-care-manager"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    )}
                   </div>
                 )}
                 {client.careTeam?.leadership && (
@@ -1749,10 +1776,19 @@ export default function ClientProfile() {
                     <Avatar className="w-10 h-10">
                       <AvatarFallback>{client.careTeam.generalPractitioner.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-medium">{client.careTeam.generalPractitioner}</p>
                       <p className="text-xs text-muted-foreground">General Practitioner</p>
                     </div>
+                    {client.generalPractitionerId && (
+                      <Link 
+                        href={`/gps?highlight=${client.generalPractitionerId}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-gp-team"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    )}
                   </div>
                 )}
                 {!client.careTeam?.careManager && !client.careTeam?.leadership && !client.careTeam?.generalPractitioner && (
@@ -1771,10 +1807,19 @@ export default function ClientProfile() {
                     <Avatar className="w-10 h-10">
                       <AvatarFallback>{client.careTeam.supportCoordinator.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-medium">{client.careTeam.supportCoordinator}</p>
                       <p className="text-xs text-muted-foreground">Support Coordinator</p>
                     </div>
+                    {client.careTeam?.supportCoordinatorId && (
+                      <Link 
+                        href={`/support-coordinators?highlight=${client.careTeam.supportCoordinatorId}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-support-coordinator"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    )}
                   </div>
                 )}
                 {client.careTeam?.planManager && (
@@ -1782,10 +1827,19 @@ export default function ClientProfile() {
                     <Avatar className="w-10 h-10">
                       <AvatarFallback>{client.careTeam.planManager.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-medium">{client.careTeam.planManager}</p>
                       <p className="text-xs text-muted-foreground">Plan Manager</p>
                     </div>
+                    {client.careTeam?.planManagerId && (
+                      <Link 
+                        href={`/plan-managers?highlight=${client.careTeam.planManagerId}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+                        data-testid="link-plan-manager"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    )}
                   </div>
                 )}
                 {!client.careTeam?.supportCoordinator && !client.careTeam?.planManager && (

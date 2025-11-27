@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Mail, Building2, Users, Loader2, Eye, ChevronRight } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import CategoryBadge from "@/components/CategoryBadge";
+import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
 import type { SupportCoordinator, Client } from "@shared/schema";
 
 export default function SupportCoordinatorsPage() {
@@ -50,6 +51,8 @@ export default function SupportCoordinatorsPage() {
   const [editingCoordinator, setEditingCoordinator] = useState<SupportCoordinator | null>(null);
   const [deleteCoordinator, setDeleteCoordinator] = useState<SupportCoordinator | null>(null);
   const [viewingClients, setViewingClients] = useState<SupportCoordinator | null>(null);
+  const [selectedCoordinator, setSelectedCoordinator] = useState<SupportCoordinator | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", phoneNumber: "", email: "", organisation: "" });
 
   const { data: coordinators = [], isLoading } = useQuery<SupportCoordinator[]>({
@@ -264,7 +267,11 @@ export default function SupportCoordinatorsPage() {
                   <TableRow 
                     key={coordinator.id} 
                     ref={coordinator.id === highlightId ? highlightRef : undefined}
-                    className={highlightedId === coordinator.id ? "bg-primary/10 animate-pulse" : ""}
+                    className={`cursor-pointer hover-elevate ${highlightedId === coordinator.id ? "bg-primary/10 animate-pulse" : ""}`}
+                    onClick={() => {
+                      setSelectedCoordinator(coordinator);
+                      setIsDrawerOpen(true);
+                    }}
                     data-testid={`row-coordinator-${coordinator.id}`}
                   >
                     <TableCell>
@@ -312,7 +319,10 @@ export default function SupportCoordinatorsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setViewingClients(coordinator)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingClients(coordinator);
+                          }}
                           data-testid={`button-view-clients-${coordinator.id}`}
                         >
                           <Eye className="w-4 h-4" />
@@ -320,7 +330,10 @@ export default function SupportCoordinatorsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => openEditDialog(coordinator)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(coordinator);
+                          }}
                           data-testid={`button-edit-coordinator-${coordinator.id}`}
                         >
                           <Pencil className="w-4 h-4" />
@@ -328,11 +341,15 @@ export default function SupportCoordinatorsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeleteCoordinator(coordinator)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteCoordinator(coordinator);
+                          }}
                           data-testid={`button-delete-coordinator-${coordinator.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -471,6 +488,15 @@ export default function SupportCoordinatorsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Support Coordinator Detail Drawer */}
+      <EntityDetailDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        entityType="supportCoordinator"
+        entityId={selectedCoordinator?.id || null}
+        entityData={selectedCoordinator}
+      />
     </div>
   );
 }

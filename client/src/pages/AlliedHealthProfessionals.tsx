@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Phone, Mail, Loader2, MapPin, Building2, Stethoscope } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Mail, Loader2, MapPin, Building2, Stethoscope, ChevronRight } from "lucide-react";
 import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { EntityDetailDrawer } from "@/components/EntityDetailDrawer";
 import type { AlliedHealthProfessional } from "@shared/schema";
 
 type Specialty = 
@@ -100,6 +101,8 @@ export default function AlliedHealthProfessionalsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingAhp, setEditingAhp] = useState<AlliedHealthProfessional | null>(null);
   const [deleteAhp, setDeleteAhp] = useState<AlliedHealthProfessional | null>(null);
+  const [selectedAhp, setSelectedAhp] = useState<AlliedHealthProfessional | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formData, setFormData] = useState({ 
     name: "", 
     specialty: "" as Specialty | "",
@@ -374,7 +377,11 @@ export default function AlliedHealthProfessionalsPage() {
                   <TableRow 
                     key={ahp.id} 
                     ref={ahp.id === highlightId ? highlightRef : undefined}
-                    className={highlightedId === ahp.id ? "bg-primary/10 animate-pulse" : ""}
+                    className={`cursor-pointer hover-elevate ${highlightedId === ahp.id ? "bg-primary/10 animate-pulse" : ""}`}
+                    onClick={() => {
+                      setSelectedAhp(ahp);
+                      setIsDrawerOpen(true);
+                    }}
                     data-testid={`row-ahp-${ahp.id}`}
                   >
                     <TableCell>
@@ -435,7 +442,10 @@ export default function AlliedHealthProfessionalsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => openEditDialog(ahp)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(ahp);
+                          }}
                           data-testid={`button-edit-ahp-${ahp.id}`}
                         >
                           <Pencil className="w-4 h-4" />
@@ -443,11 +453,15 @@ export default function AlliedHealthProfessionalsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeleteAhp(ahp)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteAhp(ahp);
+                          }}
                           data-testid={`button-delete-ahp-${ahp.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -491,6 +505,15 @@ export default function AlliedHealthProfessionalsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Allied Health Professional Detail Drawer */}
+      <EntityDetailDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        entityType="alliedHealth"
+        entityId={selectedAhp?.id || null}
+        entityData={selectedAhp}
+      />
     </div>
   );
 }
