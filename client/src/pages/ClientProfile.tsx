@@ -1862,144 +1862,147 @@ export default function ClientProfile() {
                         </div>
                       </div>
                       
-                      {/* Notification Preferences - Inline Editable */}
-                      <div 
-                        className={`flex items-center gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "notificationsPreference" ? "cursor-pointer hover-elevate" : ""}`}
-                        onClick={() => editingField !== "notificationsPreference" && startEditing("notificationsPreference")}
-                        data-testid="field-notifications"
-                      >
-                        <Bell className="w-4 h-4 text-muted-foreground" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-muted-foreground">Notification Preference</p>
-                            {!isArchived && editingField !== "notificationsPreference" && (
-                              <Pencil className="w-3 h-3 text-muted-foreground" />
-                            )}
-                          </div>
-                          {editingField === "notificationsPreference" ? (
-                            <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
-                              <Select value={editNotificationsPreference} onValueChange={setEditNotificationsPreference}>
-                                <SelectTrigger className="h-8 text-sm" data-testid="select-notifications-inline">
-                                  <SelectValue placeholder="Select preference..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Email">Email</SelectItem>
-                                  <SelectItem value="SMS">SMS</SelectItem>
-                                  <SelectItem value="Call">Phone Call</SelectItem>
-                                  <SelectItem value="N/A">No Notifications</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <div className="flex gap-1">
-                                <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("notificationsPreference")} disabled={updateFieldMutation.isPending}>
-                                  {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-sm font-medium" data-testid="text-notification-pref">
-                              {(() => {
-                                const prefs = client.notificationPreferences as NotificationPreferencesType;
-                                if (prefs?.none) return 'No Notifications';
-                                const prefsList = [];
-                                if (prefs?.smsArrival || prefs?.smsSchedule) prefsList.push('SMS');
-                                if (prefs?.callArrival || prefs?.callSchedule) prefsList.push('Calls');
-                                return prefsList.join(' & ') || 'Click to set';
-                              })()}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Address - Inline Editable */}
-                      <div 
-                        className={`flex items-start gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "address" ? "cursor-pointer hover-elevate" : ""}`}
-                        onClick={() => editingField !== "address" && startEditing("address")}
-                        data-testid="field-address"
-                      >
-                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-muted-foreground">Address</p>
-                            {!isArchived && editingField !== "address" && (
-                              <Pencil className="w-3 h-3 text-muted-foreground" />
-                            )}
-                          </div>
-                          {editingField === "address" ? (
-                            <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
-                              <Input
-                                value={editStreetAddress}
-                                onChange={(e) => setEditStreetAddress(e.target.value)}
-                                placeholder="Street address..."
-                                className="h-8 text-sm"
-                                data-testid="input-street-address"
-                              />
-                              <div className="grid grid-cols-3 gap-1">
-                                <Input
-                                  value={editSuburb}
-                                  onChange={(e) => setEditSuburb(e.target.value)}
-                                  placeholder="Suburb"
-                                  className="h-8 text-sm"
-                                  data-testid="input-suburb"
-                                />
-                                <Input
-                                  value={editState}
-                                  onChange={(e) => setEditState(e.target.value)}
-                                  placeholder="State"
-                                  className="h-8 text-sm"
-                                  data-testid="input-state"
-                                />
-                                <Input
-                                  value={editPostcode}
-                                  onChange={(e) => setEditPostcode(e.target.value)}
-                                  placeholder="Postcode"
-                                  className="h-8 text-sm"
-                                  data-testid="input-postcode"
-                                />
-                              </div>
-                              <div className="flex gap-1">
-                                <Button size="sm" className="h-6 text-xs flex-1" onClick={() => {
-                                  updateFieldMutation.mutate({ 
-                                    streetAddress: editStreetAddress,
-                                    suburb: editSuburb,
-                                    state: editState,
-                                    postcode: editPostcode
-                                  });
-                                }} disabled={updateFieldMutation.isPending}>
-                                  {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="text-sm font-medium">
-                                {client.streetAddress ? (
-                                  <>
-                                    {client.streetAddress}
-                                    {(client.suburb || client.state || client.postcode) && <br />}
-                                    {[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}
-                                  </>
-                                ) : client.homeAddress || 'Click to add address'}
-                              </p>
-                              {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  <Navigation className="w-3 h-3 inline mr-1" />
-                                  {distanceData.distanceKm} km from office
-                                </p>
+                      {/* Notification Preferences and Address - share row on medium+ screens */}
+                      <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                        {/* Notification Preferences - Inline Editable */}
+                        <div 
+                          className={`flex items-center gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "notificationsPreference" ? "cursor-pointer hover-elevate" : ""}`}
+                          onClick={() => editingField !== "notificationsPreference" && startEditing("notificationsPreference")}
+                          data-testid="field-notifications"
+                        >
+                          <Bell className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground">Notification Preference</p>
+                              {!isArchived && editingField !== "notificationsPreference" && (
+                                <Pencil className="w-3 h-3 text-muted-foreground" />
                               )}
-                            </>
+                            </div>
+                            {editingField === "notificationsPreference" ? (
+                              <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
+                                <Select value={editNotificationsPreference} onValueChange={setEditNotificationsPreference}>
+                                  <SelectTrigger className="h-8 text-sm" data-testid="select-notifications-inline">
+                                    <SelectValue placeholder="Select preference..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Email">Email</SelectItem>
+                                    <SelectItem value="SMS">SMS</SelectItem>
+                                    <SelectItem value="Call">Phone Call</SelectItem>
+                                    <SelectItem value="N/A">No Notifications</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex gap-1">
+                                  <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("notificationsPreference")} disabled={updateFieldMutation.isPending}>
+                                    {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm font-medium" data-testid="text-notification-pref">
+                                {(() => {
+                                  const prefs = client.notificationPreferences as NotificationPreferencesType;
+                                  if (prefs?.none) return 'No Notifications';
+                                  const prefsList = [];
+                                  if (prefs?.smsArrival || prefs?.smsSchedule) prefsList.push('SMS');
+                                  if (prefs?.callArrival || prefs?.callSchedule) prefsList.push('Calls');
+                                  return prefsList.join(' & ') || 'Click to set';
+                                })()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Address - Inline Editable */}
+                        <div 
+                          className={`flex items-start gap-3 p-3 bg-muted/30 rounded-lg ${!isArchived && editingField !== "address" ? "cursor-pointer hover-elevate" : ""}`}
+                          onClick={() => editingField !== "address" && startEditing("address")}
+                          data-testid="field-address"
+                        >
+                          <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground">Address</p>
+                              {!isArchived && editingField !== "address" && (
+                                <Pencil className="w-3 h-3 text-muted-foreground" />
+                              )}
+                            </div>
+                            {editingField === "address" ? (
+                              <div className="mt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                  value={editStreetAddress}
+                                  onChange={(e) => setEditStreetAddress(e.target.value)}
+                                  placeholder="Street address..."
+                                  className="h-8 text-sm"
+                                  data-testid="input-street-address"
+                                />
+                                <div className="grid grid-cols-3 gap-1">
+                                  <Input
+                                    value={editSuburb}
+                                    onChange={(e) => setEditSuburb(e.target.value)}
+                                    placeholder="Suburb"
+                                    className="h-8 text-sm"
+                                    data-testid="input-suburb"
+                                  />
+                                  <Input
+                                    value={editState}
+                                    onChange={(e) => setEditState(e.target.value)}
+                                    placeholder="State"
+                                    className="h-8 text-sm"
+                                    data-testid="input-state"
+                                  />
+                                  <Input
+                                    value={editPostcode}
+                                    onChange={(e) => setEditPostcode(e.target.value)}
+                                    placeholder="Postcode"
+                                    className="h-8 text-sm"
+                                    data-testid="input-postcode"
+                                  />
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button size="sm" className="h-6 text-xs flex-1" onClick={() => {
+                                    updateFieldMutation.mutate({ 
+                                      streetAddress: editStreetAddress,
+                                      suburb: editSuburb,
+                                      state: editState,
+                                      postcode: editPostcode
+                                    });
+                                  }} disabled={updateFieldMutation.isPending}>
+                                    {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-sm font-medium">
+                                  {client.streetAddress ? (
+                                    <>
+                                      {client.streetAddress}
+                                      {(client.suburb || client.state || client.postcode) && <br />}
+                                      {[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}
+                                    </>
+                                  ) : client.homeAddress || 'Click to add address'}
+                                </p>
+                                {distanceData?.distanceKm !== null && distanceData?.distanceKm !== undefined && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    <Navigation className="w-3 h-3 inline mr-1" />
+                                    {distanceData.distanceKm} km from office
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          {(client.homeAddress || client.streetAddress) && editingField !== "address" && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); copyToClipboard(client.streetAddress || client.homeAddress!, 'Address'); }}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
                           )}
                         </div>
-                        {(client.homeAddress || client.streetAddress) && editingField !== "address" && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); copyToClipboard(client.streetAddress || client.homeAddress!, 'Address'); }}>
-                            <Copy className="w-3 h-3" />
-                          </Button>
-                        )}
                       </div>
 
                       {/* Emergency Contact and EPOA - always share row on medium+ screens */}
