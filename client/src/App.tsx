@@ -28,6 +28,8 @@ import AuditLog from "@/pages/AuditLog";
 import LeadershipMeeting from "@/pages/LeadershipMeeting";
 import Quotes from "@/pages/Quotes";
 import QuoteEditor from "@/pages/QuoteEditor";
+import Appointments from "@/pages/Appointments";
+import FormTemplates from "@/pages/FormTemplates";
 import Login from "@/pages/Login";
 import SelectRole from "@/pages/SelectRole";
 import PendingApproval from "@/pages/PendingApproval";
@@ -67,6 +69,8 @@ function ProtectedRouter() {
       <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
       <Route path="/quotes" component={Quotes} />
       <Route path="/quotes/:id" component={QuoteEditor} />
+      <Route path="/appointments" component={Appointments} />
+      <Route path="/form-templates" component={FormTemplates} />
       <Route path="/reports" component={Reports} />
       <Route path="/audit-log" component={AuditLog} />
       <Route path="/leadership-meeting" component={LeadershipMeeting} />

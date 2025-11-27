@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -57,6 +57,7 @@ const menuCategories: MenuCategory[] = [
     label: "Clients",
     items: [
       { title: "Clients", url: "/clients", icon: Users, iconColor: "text-emerald-500" },
+      { title: "Appointments", url: "/appointments", icon: Calendar, iconColor: "text-sky-500" },
       { title: "Quotes", url: "/quotes", icon: Calculator, iconColor: "text-purple-500" },
       { title: "Documents", url: "/documents", icon: FileText, iconColor: "text-amber-500" },
     ],
@@ -76,6 +77,7 @@ const menuCategories: MenuCategory[] = [
     label: "System",
     items: [
       { title: "Reports", url: "/reports", icon: BarChart3, iconColor: "text-orange-500" },
+      { title: "Form Templates", url: "/form-templates", icon: ClipboardList, iconColor: "text-lime-500" },
       { title: "Audit Log", url: "/audit-log", icon: History, iconColor: "text-slate-500" },
     ],
   },
