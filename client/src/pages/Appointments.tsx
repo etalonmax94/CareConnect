@@ -15,26 +15,22 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Appointment, Client } from "@shared/schema";
 
 const APPOINTMENT_TYPES = [
-  "initial_assessment",
-  "support_session", 
-  "plan_review",
   "home_visit",
   "community_access",
-  "therapy",
   "transport",
-  "respite",
+  "nursing",
+  "assessment",
+  "review",
   "other"
 ] as const;
 
 const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
-  initial_assessment: "Initial Assessment",
-  support_session: "Support Session",
-  plan_review: "Plan Review",
   home_visit: "Home Visit",
   community_access: "Community Access",
-  therapy: "Therapy",
   transport: "Transport",
-  respite: "Respite",
+  nursing: "Nursing",
+  assessment: "Assessment",
+  review: "Plan Review",
   other: "Other"
 };
 
@@ -55,7 +51,7 @@ export default function Appointments() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAppointment, setNewAppointment] = useState({
     clientId: "",
-    appointmentType: "support_session" as typeof APPOINTMENT_TYPES[number],
+    appointmentType: "home_visit" as typeof APPOINTMENT_TYPES[number],
     title: "",
     description: "",
     scheduledStart: "",
@@ -84,15 +80,17 @@ export default function Appointments() {
     mutationFn: async (data: typeof newAppointment) => {
       return apiRequest("POST", "/api/appointments", {
         ...data,
+        scheduledStart: new Date(data.scheduledStart).toISOString(),
+        scheduledEnd: new Date(data.scheduledEnd).toISOString(),
         status: "scheduled"
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/range"] });
       setIsCreateDialogOpen(false);
       setNewAppointment({
         clientId: "",
-        appointmentType: "support_session",
+        appointmentType: "home_visit",
         title: "",
         description: "",
         scheduledStart: "",
@@ -112,7 +110,7 @@ export default function Appointments() {
       return apiRequest("PATCH", `/api/appointments/${id}`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/range"] });
       toast({ title: "Appointment status updated" });
     }
   });

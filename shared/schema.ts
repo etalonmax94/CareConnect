@@ -1154,6 +1154,8 @@ export const insertAppointmentSchema = createInsertSchema(appointments, {
   status: z.enum(["scheduled", "confirmed", "in_progress", "completed", "cancelled", "no_show"]).optional(),
   useClientAddress: z.enum(["yes", "no"]).optional(),
   isRecurring: z.enum(["yes", "no"]).optional(),
+  scheduledStart: z.coerce.date(),
+  scheduledEnd: z.coerce.date(),
 }).omit({
   id: true,
   createdAt: true,
@@ -1650,6 +1652,8 @@ export const insertFormTemplateSchema = createInsertSchema(formTemplates, {
   status: z.enum(["draft", "active", "archived"]).optional(),
   requiresSignature: z.enum(["yes", "no"]).optional(),
   allowDraft: z.enum(["yes", "no"]).optional(),
+  createdById: z.string().optional().nullable(),
+  createdByName: z.string().optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,

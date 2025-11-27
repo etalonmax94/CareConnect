@@ -62,9 +62,7 @@ export default function FormTemplates() {
     mutationFn: async (data: typeof newTemplate) => {
       return apiRequest("POST", "/api/form-templates", {
         ...data,
-        version: "1",
-        createdById: "system",
-        createdByName: "System"
+        version: "1"
       });
     },
     onSuccess: () => {

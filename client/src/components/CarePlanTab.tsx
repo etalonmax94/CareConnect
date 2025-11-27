@@ -73,9 +73,12 @@ export default function CarePlanTab({ clientId, clientName, isArchived }: CarePl
   });
 
   const activeCarePlan = carePlans.find(cp => cp.status === "active");
+  const draftCarePlan = carePlans.find(cp => cp.status === "draft");
+  const currentCarePlan = activeCarePlan || draftCarePlan;
+  
   const displayCarePlan = selectedVersion 
     ? carePlans.find(cp => cp.id === selectedVersion) 
-    : activeCarePlan;
+    : currentCarePlan;
 
   const { data: healthMatters = [] } = useQuery<CarePlanHealthMatter[]>({
     queryKey: ["/api/care-plans", displayCarePlan?.id, "health-matters"],
