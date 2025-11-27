@@ -2623,7 +2623,7 @@ export default function ClientProfile() {
 
                       {/* Allergies - Inline Editable */}
                       <div 
-                        className={`p-3 -m-3 rounded-lg transition-colors md:col-span-2 ${!isArchived && editingField !== "allergies" ? "cursor-pointer hover-elevate" : ""}`}
+                        className={`p-3 -m-3 rounded-lg transition-colors ${!isArchived && editingField !== "allergies" ? "cursor-pointer hover-elevate" : ""}`}
                         onClick={() => editingField !== "allergies" && startEditing("allergies")}
                         data-testid="field-allergies"
                       >
