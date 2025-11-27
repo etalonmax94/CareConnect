@@ -18,7 +18,7 @@ import CategoryBadge from "@/components/CategoryBadge";
 import DocumentTracker from "@/components/DocumentTracker";
 import { ArchiveClientModal } from "@/components/ArchiveClientModal";
 import { ServiceScheduleModal } from "@/components/ServiceScheduleModal";
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download, ChevronRight, HeartPulse, Star, Ban, Tag } from "lucide-react";
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2, FileText, ExternalLink, DollarSign, Clock, Bell, MessageSquare, PhoneCall, Archive, RotateCcw, AlertTriangle, Heart, HeartOff, Plus, UserCircle, Trash2, Target, Shield, CheckCircle, Sparkles, TrendingUp, Pencil, Copy, Users, ClipboardCheck, Stethoscope, AlertCircle, Briefcase, UserCog, Building2, CreditCard, FileWarning, CalendarDays, Car, Pill, Activity, Navigation, Settings, BookOpen, UserPlus, FileCheck, Camera, Eye, Download, ChevronRight, HeartPulse, Star, Ban, Tag, Utensils, Dumbbell, Moon } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2913,6 +2913,24 @@ export default function ClientProfile() {
                           <p className="text-sm mt-1 text-muted-foreground">Click to add</p>
                         )}
                       </div>
+
+                      {/* Sex/Gender - Display */}
+                      <div className="p-3 -m-3" data-testid="field-sex">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sex</p>
+                        <p className="text-sm mt-1 font-medium">{client.sex || <span className="text-muted-foreground">Not specified</span>}</p>
+                      </div>
+
+                      {/* Marital Status - Display */}
+                      <div className="p-3 -m-3" data-testid="field-marital-status">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Marital Status</p>
+                        <p className="text-sm mt-1 font-medium">{client.maritalStatus || <span className="text-muted-foreground">Not specified</span>}</p>
+                      </div>
+
+                      {/* Cultural Background - Display */}
+                      <div className="p-3 -m-3" data-testid="field-cultural-background">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cultural Background</p>
+                        <p className="text-sm mt-1 font-medium">{client.culturalBackground || <span className="text-muted-foreground">Not specified</span>}</p>
+                      </div>
                       
                     </div>
                   </CardContent>
@@ -3086,6 +3104,30 @@ export default function ClientProfile() {
                         ) : (
                           <p className="text-sm mt-1 text-muted-foreground">No known allergies (click to add)</p>
                         )}
+                      </div>
+
+                      {/* Falls Risk Score - Display */}
+                      <div className="p-3 -m-3" data-testid="field-falls-risk">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Falls Risk Score</p>
+                        <div className="mt-1 flex items-center gap-2">
+                          {client.fallsRiskScore ? (
+                            <Badge className={`${
+                              client.fallsRiskScore <= 10 ? 'bg-emerald-500' :
+                              client.fallsRiskScore <= 15 ? 'bg-amber-500' :
+                              'bg-red-500'
+                            } text-white border-0`}>
+                              {client.fallsRiskScore}/20
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not assessed</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Substance Use - Display */}
+                      <div className="p-3 -m-3" data-testid="field-substance-use">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Substance Use Notes</p>
+                        <p className="text-sm mt-1 font-medium">{client.substanceUseNotes || <span className="text-muted-foreground">None recorded</span>}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -4534,7 +4576,21 @@ export default function ClientProfile() {
           </div>
         </TabsContent>
 
-        <TabsContent value="goals">
+        <TabsContent value="goals" className="space-y-6">
+          {/* Hobbies & Interests */}
+          {client.hobbiesInterests && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Star className="w-4 h-4 text-amber-500" />
+                  Hobbies & Interests
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{client.hobbiesInterests}</p>
+              </CardContent>
+            </Card>
+          )}
           <GoalsTab clientId={params?.id || ""} isArchived={isArchived} />
         </TabsContent>
 
@@ -4555,6 +4611,51 @@ export default function ClientProfile() {
               <p className="text-sm whitespace-pre-wrap">{client.clinicalNotes || "No clinical notes recorded"}</p>
             </CardContent>
           </Card>
+
+          {/* Lifestyle Patterns - Diet, Exercise, Sleep */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Utensils className="w-4 h-4 text-orange-500" />
+                  Diet
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {client.dietPatterns || "No diet information recorded"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Dumbbell className="w-4 h-4 text-blue-500" />
+                  Exercise
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {client.exercisePatterns || "No exercise information recorded"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Moon className="w-4 h-4 text-indigo-500" />
+                  Sleep
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {client.sleepPatterns || "No sleep information recorded"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
