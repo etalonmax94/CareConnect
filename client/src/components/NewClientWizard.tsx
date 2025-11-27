@@ -1335,45 +1335,55 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     <>
       <Form {...form}>
         <div className="max-w-4xl mx-auto px-2 sm:px-4">
-          {/* Progress bar and step indicators */}
+          {/* Step labels and progress bar - inline layout */}
           <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Step {currentStep + 1} of {WIZARD_STEPS.length}</span>
-              <span className="text-sm text-muted-foreground">{Math.round(progress)}% complete</span>
+            {/* Step labels row - aligned with progress bar segments */}
+            <div className="flex justify-between mb-2">
+              {WIZARD_STEPS.map((step, index) => {
+                const StepIcon = step.icon;
+                const isComplete = index < currentStep;
+                const isCurrent = index === currentStep;
+                
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => goToStep(index)}
+                    disabled={index > currentStep}
+                    className={cn(
+                      "flex flex-col items-center gap-1 px-1 py-1 rounded-lg text-xs transition-all flex-1",
+                      isCurrent && "text-primary font-semibold",
+                      isComplete && "text-primary cursor-pointer hover:bg-primary/10",
+                      !isCurrent && !isComplete && "text-muted-foreground cursor-not-allowed opacity-50"
+                    )}
+                    data-testid={`step-${step.id}`}
+                  >
+                    <div className={cn(
+                      "flex items-center justify-center w-7 h-7 rounded-full transition-all",
+                      isCurrent && "bg-primary text-primary-foreground shadow-md",
+                      isComplete && "bg-primary/20 text-primary",
+                      !isCurrent && !isComplete && "bg-muted text-muted-foreground"
+                    )}>
+                      {isComplete ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <StepIcon className="w-4 h-4" />
+                      )}
+                    </div>
+                    <span className="hidden sm:block text-[10px] leading-tight text-center">{step.title}</span>
+                  </button>
+                );
+              })}
             </div>
+            
+            {/* Progress bar */}
             <Progress value={progress} className="h-2" />
-          </div>
-
-          {/* Step indicator pills */}
-          <div className="flex gap-1.5 mb-4 overflow-x-auto pb-2 justify-center">
-            {WIZARD_STEPS.map((step, index) => {
-              const StepIcon = step.icon;
-              const isComplete = index < currentStep;
-              const isCurrent = index === currentStep;
-              
-              return (
-                <button
-                  key={step.id}
-                  type="button"
-                  onClick={() => goToStep(index)}
-                  disabled={index > currentStep}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs whitespace-nowrap transition-all",
-                    isCurrent && "bg-primary text-primary-foreground shadow-md",
-                    isComplete && "bg-primary/15 text-primary cursor-pointer hover:bg-primary/25",
-                    !isCurrent && !isComplete && "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
-                  )}
-                  data-testid={`step-${step.id}`}
-                >
-                  {isComplete ? (
-                    <Check className="w-3.5 h-3.5" />
-                  ) : (
-                    <StepIcon className="w-3.5 h-3.5" />
-                  )}
-                  <span className="hidden md:inline">{step.title}</span>
-                </button>
-              );
-            })}
+            
+            {/* Progress text */}
+            <div className="flex items-center justify-between mt-1.5">
+              <span className="text-xs text-muted-foreground">Step {currentStep + 1} of {WIZARD_STEPS.length}</span>
+              <span className="text-xs text-muted-foreground">{Math.round(progress)}% complete</span>
+            </div>
           </div>
 
           {/* Main wizard layout with vertical side buttons */}
