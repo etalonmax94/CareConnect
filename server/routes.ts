@@ -411,12 +411,24 @@ const SUBURB_COORDS: Record<string, { lat: number; lon: number }> = {
 };
 
 // Calculate distance for a client's address
-function getDistanceFromOffice(address: string | null | undefined): number | null {
+function getDistanceFromOffice(address: string | null | undefined, suburb?: string | null): number | null {
+  // First try to match by suburb field directly (most accurate)
+  if (suburb) {
+    const suburbLower = suburb.toLowerCase().trim();
+    for (const [suburbKey, coords] of Object.entries(SUBURB_COORDS)) {
+      if (suburbLower === suburbKey || suburbLower.includes(suburbKey)) {
+        const distance = calculateDistance(OFFICE_LOCATION.lat, OFFICE_LOCATION.lon, coords.lat, coords.lon);
+        return Math.round(distance * 10) / 10;
+      }
+    }
+  }
+  
+  // Fall back to checking the full address string
   if (!address) return null;
   
   const addressLower = address.toLowerCase();
-  for (const [suburb, coords] of Object.entries(SUBURB_COORDS)) {
-    if (addressLower.includes(suburb)) {
+  for (const [suburbKey, coords] of Object.entries(SUBURB_COORDS)) {
+    if (addressLower.includes(suburbKey)) {
       const distance = calculateDistance(OFFICE_LOCATION.lat, OFFICE_LOCATION.lon, coords.lat, coords.lon);
       return Math.round(distance * 10) / 10;
     }
@@ -1600,10 +1612,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Client not found" });
       }
       
-      const distanceKm = getDistanceFromOffice(client.homeAddress);
+      // Combine address fields for display
+      const fullAddress = client.streetAddress 
+        ? `${client.streetAddress}${client.suburb ? ', ' + client.suburb : ''}${client.state ? ' ' + client.state : ''}${client.postcode ? ' ' + client.postcode : ''}`
+        : client.homeAddress;
+      
+      // Calculate distance using suburb field first, then fall back to full address
+      const distanceKm = getDistanceFromOffice(fullAddress, client.suburb);
+      
       res.json({
         clientId: client.id,
-        address: client.homeAddress,
+        address: fullAddress,
         distanceKm,
         officeAddress: OFFICE_LOCATION.address
       });
@@ -2334,41 +2353,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const allClients = await storage.getAllClients();
       
-      // Simulated geocoding based on suburb names (for demo purposes)
-      const suburbCoords: Record<string, { lat: number; lon: number }> = {
-        "caboolture": { lat: -27.0847, lon: 152.9511 },
-        "morayfield": { lat: -27.1053, lon: 152.9469 },
-        "burpengary": { lat: -27.1564, lon: 152.9583 },
-        "narangba": { lat: -27.2039, lon: 152.9639 },
-        "deception bay": { lat: -27.1944, lon: 153.0247 },
-        "redcliffe": { lat: -27.2297, lon: 153.1089 },
-        "bribie island": { lat: -27.0667, lon: 153.1333 },
-        "bellmere": { lat: -27.0694, lon: 152.9125 },
-        "beachmere": { lat: -27.1208, lon: 153.0461 },
-        "brisbane": { lat: -27.4698, lon: 153.0251 },
-        "sunshine coast": { lat: -26.6500, lon: 153.0667 }
-      };
-      
       const distanceReport = allClients.map(client => {
-        let distance = null;
-        let estimatedCoords = null;
+        // Build full address from components
+        const fullAddress = client.streetAddress 
+          ? `${client.streetAddress}${client.suburb ? ', ' + client.suburb : ''}${client.state ? ' ' + client.state : ''}${client.postcode ? ' ' + client.postcode : ''}`
+          : client.homeAddress;
         
-        if (client.homeAddress) {
-          const addressLower = client.homeAddress.toLowerCase();
-          for (const [suburb, coords] of Object.entries(suburbCoords)) {
-            if (addressLower.includes(suburb)) {
-              distance = calculateDistance(OFFICE_LOCATION.lat, OFFICE_LOCATION.lon, coords.lat, coords.lon);
-              estimatedCoords = coords;
-              break;
-            }
+        // Calculate distance using suburb field first, then full address
+        const distanceKm = getDistanceFromOffice(fullAddress, client.suburb);
+        
+        // Get coordinates for the matched suburb
+        let estimatedCoords = null;
+        const suburbToCheck = client.suburb?.toLowerCase().trim() || '';
+        for (const [suburbKey, coords] of Object.entries(SUBURB_COORDS)) {
+          if (suburbToCheck === suburbKey || suburbToCheck.includes(suburbKey) || 
+              (fullAddress && fullAddress.toLowerCase().includes(suburbKey))) {
+            estimatedCoords = coords;
+            break;
           }
         }
         
         return {
           clientId: client.id,
           clientName: client.participantName,
-          address: client.homeAddress || "No address",
-          distanceKm: distance ? Math.round(distance * 10) / 10 : null,
+          address: fullAddress || "No address",
+          distanceKm,
           estimatedCoords
         };
       });
