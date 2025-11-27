@@ -3221,6 +3221,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update document (requires authentication) - allows manual expiry date override
+  app.patch("/api/documents/:id", async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const { expiryDate, uploadDate } = req.body;
+      
+      // Get existing document
+      const existingDoc = await storage.getDocumentById(req.params.id);
+      if (!existingDoc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Build update object
+      const updates: { expiryDate?: string | null; uploadDate?: string } = {};
+      
+      if (expiryDate !== undefined) {
+        // Allow null to clear expiry date, or a valid date string
+        updates.expiryDate = expiryDate ? new Date(expiryDate).toISOString().split('T')[0] : null;
+      }
+      
+      if (uploadDate !== undefined) {
+        updates.uploadDate = new Date(uploadDate).toISOString();
+      }
+      
+      const updatedDoc = await storage.updateDocument(req.params.id, updates);
+      
+      // Log activity
+      await storage.logActivity({
+        clientId: existingDoc.clientId,
+        action: "document_updated",
+        description: `Document ${existingDoc.fileName} dates updated`,
+        performedBy: (req.session as any)?.user?.displayName || "System"
+      });
+      
+      // Create audit log
+      await logAudit({
+        entityType: "document",
+        entityId: req.params.id,
+        entityName: existingDoc.fileName,
+        operation: "update",
+        oldValues: { expiryDate: existingDoc.expiryDate, uploadDate: existingDoc.uploadDate },
+        newValues: updates as Record<string, unknown>,
+        clientId: existingDoc.clientId,
+        req
+      });
+      
+      res.json(updatedDoc);
+    } catch (error) {
+      console.error("Error updating document:", error);
+      res.status(500).json({ error: "Failed to update document" });
+    }
+  });
+
   // Delete document (requires authentication)
   app.delete("/api/documents/:id", async (req, res) => {
     try {

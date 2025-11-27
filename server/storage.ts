@@ -200,6 +200,7 @@ export interface IStorage {
   getDocumentsByClient(clientId: string): Promise<Document[]>;
   getDocumentById(id: string): Promise<Document | undefined>;
   createDocument(document: InsertDocument): Promise<Document>;
+  updateDocument(id: string, updates: { expiryDate?: string | null; uploadDate?: string }): Promise<Document | undefined>;
   deleteDocument(id: string): Promise<boolean>;
   
   // Client-Staff Assignments
@@ -1203,6 +1204,21 @@ export class DbStorage implements IStorage {
 
   async createDocument(document: InsertDocument): Promise<Document> {
     const result = await db.insert(documents).values(document).returning();
+    return result[0];
+  }
+
+  async updateDocument(id: string, updates: { expiryDate?: string | null; uploadDate?: string }): Promise<Document | undefined> {
+    const updateData: any = {};
+    if (updates.expiryDate !== undefined) {
+      updateData.expiryDate = updates.expiryDate;
+    }
+    if (updates.uploadDate !== undefined) {
+      updateData.uploadDate = new Date(updates.uploadDate);
+    }
+    const result = await db.update(documents)
+      .set(updateData)
+      .where(eq(documents.id, id))
+      .returning();
     return result[0];
   }
 

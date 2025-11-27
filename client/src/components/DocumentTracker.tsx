@@ -7,8 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
-import { Upload, Eye, FileText, Trash2, ExternalLink, Loader2, File, Link } from "lucide-react";
+import { Upload, Eye, FileText, Trash2, ExternalLink, Loader2, File, Link, Calendar, Pencil } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Document } from "@shared/schema";
@@ -89,6 +90,55 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
       queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId, "documents"] });
     },
   });
+
+  // Edit document state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<Document | null>(null);
+  const [editUploadDate, setEditUploadDate] = useState("");
+  const [editExpiryDate, setEditExpiryDate] = useState("");
+  const [useManualExpiry, setUseManualExpiry] = useState(false);
+
+  const editMutation = useMutation({
+    mutationFn: async (data: { docId: string; uploadDate?: string; expiryDate?: string | null }) => {
+      return apiRequest("PATCH", `/api/documents/${data.docId}`, {
+        uploadDate: data.uploadDate,
+        expiryDate: data.expiryDate,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId, "documents"] });
+      setEditDialogOpen(false);
+      setEditingDoc(null);
+      toast({
+        title: "Document updated",
+        description: "Document dates have been updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Update failed",
+        description: "Failed to update document dates",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openEditDialog = (doc: Document) => {
+    setEditingDoc(doc);
+    setEditUploadDate(doc.uploadDate ? new Date(doc.uploadDate).toISOString().split('T')[0] : "");
+    setEditExpiryDate(doc.expiryDate || "");
+    setUseManualExpiry(!!doc.expiryDate);
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingDoc) return;
+    editMutation.mutate({
+      docId: editingDoc.id,
+      uploadDate: editUploadDate || undefined,
+      expiryDate: useManualExpiry ? (editExpiryDate || null) : null,
+    });
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -241,6 +291,15 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                         <Button 
                           size="icon" 
                           variant="ghost" 
+                          className="h-6 w-6"
+                          onClick={() => openEditDialog(uploadedDoc)}
+                          data-testid={`button-edit-doc-${doc.key}`}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
                           className="h-6 w-6 text-destructive"
                           onClick={() => deleteMutation.mutate(uploadedDoc.id)}
                         >
@@ -250,13 +309,15 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                     </div>
                     {uploadedDoc.uploadDate && (
                       <div className="flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
                         <span>Uploaded:</span>
                         <span>{new Date(uploadedDoc.uploadDate).toLocaleDateString()}</span>
                       </div>
                     )}
                     {uploadedDoc.expiryDate ? (
                       <div className="flex items-center gap-1 text-muted-foreground">
-                        <span>Auto-expires:</span>
+                        <Calendar className="w-3 h-3" />
+                        <span>Expires:</span>
                         <span className={`font-medium ${
                           new Date(uploadedDoc.expiryDate) < new Date() ? 'text-red-600' :
                           new Date(uploadedDoc.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' :
@@ -390,6 +451,94 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
           );
         })}
       </div>
+
+      {/* Edit Document Dates Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Document Dates</DialogTitle>
+          </DialogHeader>
+          {editingDoc && (
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium text-sm">{editingDoc.documentType}</p>
+                <p className="text-xs text-muted-foreground truncate">{editingDoc.fileName}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editUploadDate">Upload Date</Label>
+                <Input 
+                  id="editUploadDate"
+                  type="date"
+                  value={editUploadDate}
+                  onChange={(e) => setEditUploadDate(e.target.value)}
+                  data-testid="input-edit-upload-date"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Change when this document was uploaded (affects auto-expiry calculation)
+                </p>
+              </div>
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="manualExpiry">Manual Expiry Date</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Override the automatic expiry calculation
+                    </p>
+                  </div>
+                  <Switch
+                    id="manualExpiry"
+                    checked={useManualExpiry}
+                    onCheckedChange={setUseManualExpiry}
+                    data-testid="switch-manual-expiry"
+                  />
+                </div>
+
+                {useManualExpiry && (
+                  <div className="space-y-2">
+                    <Label htmlFor="editExpiryDate">Expiry Date</Label>
+                    <Input 
+                      id="editExpiryDate"
+                      type="date"
+                      value={editExpiryDate}
+                      onChange={(e) => setEditExpiryDate(e.target.value)}
+                      data-testid="input-edit-expiry-date"
+                    />
+                  </div>
+                )}
+
+                {!useManualExpiry && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Expiry will be automatically calculated based on document type and upload date.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setEditDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-1"
+                  onClick={handleSaveEdit}
+                  disabled={editMutation.isPending}
+                  data-testid="button-save-edit"
+                >
+                  {editMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
