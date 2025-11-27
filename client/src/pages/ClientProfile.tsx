@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document } from "@shared/schema";
-import { calculateAge } from "@shared/schema";
+import { calculateAge, formatClientNumber } from "@shared/schema";
 import ClientLocationMap from "@/components/ClientLocationMap";
 
 function NotificationBadge({ type }: { type: string }) {
@@ -714,6 +714,11 @@ export default function ClientProfile() {
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
+              {client.clientNumber && (
+                <Badge variant="secondary" className="font-mono text-sm h-6 px-2.5" data-testid="badge-client-number">
+                  {formatClientNumber(client.clientNumber)}
+                </Badge>
+              )}
               <h1 className="text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
               <Badge variant={isArchived ? "secondary" : "default"} className={`h-6 px-2.5 ${isArchived ? "" : "bg-emerald-500 hover:bg-emerald-600 text-white border-0"}`}>
                 {isArchived ? 'Archived' : 'Active'}
@@ -752,17 +757,19 @@ export default function ClientProfile() {
                 </div>
               )}
               
-              <div 
-                className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
-                onClick={() => setActiveSection("details")}
-                data-testid="chip-id"
-              >
-                <User className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-[10px] uppercase text-muted-foreground font-medium">ID</p>
-                  <p className="text-sm font-semibold font-mono text-foreground truncate max-w-[100px]" title={client.id}>{client.id.substring(0, 10)}...</p>
+              {client.clientNumber && (
+                <div 
+                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 cursor-pointer hover-elevate transition-colors"
+                  onClick={() => setActiveSection("details")}
+                  data-testid="chip-client-number"
+                >
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Client #</p>
+                    <p className="text-sm font-semibold font-mono text-foreground">{formatClientNumber(client.clientNumber)}</p>
+                  </div>
                 </div>
-              </div>
+              )}
               
               {client.category === "NDIS" && getNdisNumber() && (
                 <div 

@@ -307,46 +307,34 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card 
-          className={`hover-elevate cursor-pointer border-0 ${
-            (budgetAlerts?.overspentCount || 0) > 0 
-              ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white'
-              : (budgetAlerts?.totalAlerts || 0) > 0 
-                ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white'
-                : 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white'
-          }`}
-          onClick={() => setActiveModal("budgetAlerts")}
-          data-testid="card-budget-alerts"
-        >
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-base font-semibold opacity-90 mb-3">Budget Alerts</p>
-                <p className="text-5xl font-bold mb-3" data-testid="text-stat-budget-alerts">
-                  {budgetAlerts?.totalAlerts || 0}
-                </p>
-                <div className="flex items-center gap-1 opacity-90">
-                  {(budgetAlerts?.overspentCount || 0) > 0 ? (
-                    <span className="text-sm font-semibold">
-                      {budgetAlerts?.overspentCount} overspent, {budgetAlerts?.lowCount} low
-                    </span>
-                  ) : (budgetAlerts?.totalAlerts || 0) > 0 ? (
-                    <span className="text-sm font-semibold">{budgetAlerts?.lowCount} budgets at 80%+</span>
-                  ) : (
-                    <span className="text-sm font-semibold">All budgets healthy</span>
-                  )}
+        <Link href="/staff">
+          <Card 
+            className="hover-elevate cursor-pointer border-0 bg-gradient-to-br from-teal-500 to-teal-600 text-white"
+            data-testid="card-staff-members"
+          >
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-base font-semibold text-teal-50 mb-3">Staff Members</p>
+                  <p className="text-5xl font-bold mb-3" data-testid="text-stat-staff-count">
+                    {activeStaff.length}
+                  </p>
+                  <div className="flex items-center gap-1 text-teal-50">
+                    <span className="text-xl font-bold">+{newStaffIn30Days}</span>
+                    <span className="text-sm font-semibold">new in 30 days</span>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/20">
+                  <UserPlus className="w-7 h-7" />
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-white/20">
-                <DollarSign className="w-7 h-7" />
+              <div className="flex items-center gap-1 mt-2 text-teal-100 text-sm">
+                <span>Click to manage staff</span>
+                <ChevronRight className="w-4 h-4" />
               </div>
-            </div>
-            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
-              <span>Click to view details</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card 
           className={`hover-elevate cursor-pointer border-0 ${
@@ -418,34 +406,46 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Link href="/staff">
-          <Card 
-            className="hover-elevate cursor-pointer border-0 bg-gradient-to-br from-teal-500 to-teal-600 text-white"
-            data-testid="card-staff-members"
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-base font-semibold text-teal-50 mb-3">Staff Members</p>
-                  <p className="text-5xl font-bold mb-3" data-testid="text-stat-staff-count">
-                    {activeStaff.length}
-                  </p>
-                  <div className="flex items-center gap-1 text-teal-50">
-                    <span className="text-xl font-bold">+{newStaffIn30Days}</span>
-                    <span className="text-sm font-semibold">new in 30 days</span>
-                  </div>
-                </div>
-                <div className="p-3 rounded-lg bg-white/20">
-                  <UserPlus className="w-7 h-7" />
+        <Card 
+          className={`hover-elevate cursor-pointer border-0 ${
+            (budgetAlerts?.overspentCount || 0) > 0 
+              ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white'
+              : (budgetAlerts?.totalAlerts || 0) > 0 
+                ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white'
+                : 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white'
+          }`}
+          onClick={() => setActiveModal("budgetAlerts")}
+          data-testid="card-budget-alerts"
+        >
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-base font-semibold opacity-90 mb-3">Budget Alerts</p>
+                <p className="text-5xl font-bold mb-3" data-testid="text-stat-budget-alerts">
+                  {budgetAlerts?.totalAlerts || 0}
+                </p>
+                <div className="flex items-center gap-1 opacity-90">
+                  {(budgetAlerts?.overspentCount || 0) > 0 ? (
+                    <span className="text-sm font-semibold">
+                      {budgetAlerts?.overspentCount} overspent, {budgetAlerts?.lowCount} low
+                    </span>
+                  ) : (budgetAlerts?.totalAlerts || 0) > 0 ? (
+                    <span className="text-sm font-semibold">{budgetAlerts?.lowCount} budgets at 80%+</span>
+                  ) : (
+                    <span className="text-sm font-semibold">All budgets healthy</span>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-1 mt-2 text-teal-100 text-sm">
-                <span>Click to manage staff</span>
-                <ChevronRight className="w-4 h-4" />
+              <div className="p-3 rounded-lg bg-white/20">
+                <DollarSign className="w-7 h-7" />
               </div>
-            </CardContent>
-          </Card>
-        </Link>
+            </div>
+            <div className="flex items-center gap-1 mt-2 opacity-80 text-sm">
+              <span>Click to view details</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -17,7 +17,7 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 - **Frontend**: React with TypeScript, Wouter for routing, React Query for server state management, and Recharts for data visualization.
 - **Backend**: Express.js, PostgreSQL with Neon, and Drizzle ORM for type-safe database operations. Zod is used for schema validation.
 - **Authentication**: Zoho OAuth2 for secure login with session-based authentication and multi-role access control.
-- **Client Management**: Full CRUD operations with conditional fields for NDIS, Support at Home, and Private clients, including critical medical information display.
+- **Client Management**: Full CRUD operations with conditional fields for NDIS, Support at Home, and Private clients, including critical medical information display. Clients are assigned sequential numbers displayed as "C-1", "C-2", etc.
 - **Data Management**: Dropdown selections for GPs, Pharmacies, Support Coordinators, and Plan Managers with auto-display of contact information.
 - **Archiving**: Australian Privacy Act compliant 7-year retention policy with server-side retention calculation, activity logging, and read-only enforcement.
 - **Global Search**: Fuzzy matching search for clients.

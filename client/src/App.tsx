@@ -79,12 +79,26 @@ function ProtectedRouter() {
 
 function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> }) {
   const [location] = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(location === "/");
+  const isDashboard = location === "/";
+  const [userToggledSidebar, setUserToggledSidebar] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // Auto-expand sidebar on dashboard, collapse on other pages
+  // Auto-expand sidebar on dashboard, respect user toggle on other pages
   useEffect(() => {
-    setSidebarOpen(location === "/");
-  }, [location]);
+    if (isDashboard) {
+      setSidebarOpen(true);
+      setUserToggledSidebar(false);
+    } else if (!userToggledSidebar) {
+      setSidebarOpen(false);
+    }
+  }, [isDashboard, userToggledSidebar]);
+
+  const handleSidebarChange = (open: boolean) => {
+    setSidebarOpen(open);
+    if (!isDashboard) {
+      setUserToggledSidebar(true);
+    }
+  };
 
   const style = {
     "--sidebar-width": "16rem",
@@ -92,7 +106,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
   };
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} style={style as React.CSSProperties}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange} style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">

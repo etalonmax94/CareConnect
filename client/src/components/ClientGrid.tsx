@@ -1,5 +1,5 @@
 import type { Client } from "@shared/schema";
-import { calculateAge } from "@shared/schema";
+import { calculateAge, formatClientNumber } from "@shared/schema";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,6 +100,14 @@ export default function ClientGrid({ clients, onViewClient, density = "standard"
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {client.clientNumber && (
+                          <Badge 
+                            variant="secondary" 
+                            className="font-mono text-xs shrink-0"
+                          >
+                            {formatClientNumber(client.clientNumber)}
+                          </Badge>
+                        )}
                         <p className="font-medium truncate">{client.participantName}</p>
                         {isNewClient && (
                           <Badge 

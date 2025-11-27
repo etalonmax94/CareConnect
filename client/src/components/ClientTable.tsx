@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import type { Client } from "@shared/schema";
-import { calculateAge } from "@shared/schema";
+import { calculateAge, formatClientNumber } from "@shared/schema";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -297,6 +297,15 @@ export default function ClientTable({
                         </Avatar>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
+                            {client.clientNumber && (
+                              <Badge 
+                                variant="secondary" 
+                                className="font-mono text-xs"
+                                data-testid={`badge-client-number-${client.id}`}
+                              >
+                                {formatClientNumber(client.clientNumber)}
+                              </Badge>
+                            )}
                             <p className="font-medium">{client.participantName}</p>
                             {isNewClient && (
                               <Badge 

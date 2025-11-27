@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, json, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, json, date, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -103,6 +103,7 @@ export type ClientCategory = "NDIS" | "Support at Home" | "Private";
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientNumber: serial("client_number").notNull(),
   category: text("category").notNull().$type<ClientCategory>(),
   participantName: text("participant_name").notNull(),
   photo: text("photo"),
@@ -262,6 +263,7 @@ export const insertClientSchema = createInsertSchema(clients, {
   postcode: z.string().optional().nullable(),
 }).omit({
   id: true,
+  clientNumber: true,
   createdAt: true,
   updatedAt: true,
   archivedAt: true,
@@ -276,6 +278,12 @@ export const selectClientSchema = createSelectSchema(clients);
 
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+
+// Helper function to format client number as "C-X"
+export function formatClientNumber(clientNumber?: number | null): string {
+  if (!clientNumber) return "";
+  return `C-${clientNumber}`;
+}
 
 // Helper function to calculate age
 export function calculateAge(dateOfBirth?: Date | string | null): number | undefined {
