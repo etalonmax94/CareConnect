@@ -31,6 +31,46 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'empowerlink-jwt-secret-change-in-production';
 const JWT_EXPIRES_IN = '7d'; // Token valid for 7 days
 
+// Document frequency configuration for auto-calculating expiry dates
+const DOCUMENT_FREQUENCIES: Record<string, "annual" | "6-monthly" | "as-needed"> = {
+  "Service Agreement": "annual",
+  "Consent Form": "annual",
+  "Risk Assessment": "annual",
+  "Self Assessment (Medx Tool)": "annual",
+  "Medication Consent": "annual",
+  "Personal Emergency Plan": "annual",
+  "Care Plan": "6-monthly",
+  "Health Summary": "6-monthly",
+  "Wound Care Plan": "as-needed",
+  // Other document types default to annual
+  "NDIS Plan": "annual",
+  "Medical Report": "annual",
+  "Progress Report": "annual",
+  "Assessment": "annual",
+  "Referral": "annual",
+  "Certificate": "annual",
+  "Policy Document": "annual",
+  "Other": "as-needed",
+};
+
+// Calculate expiry date based on document type and upload date
+function calculateDocumentExpiryDate(documentType: string, uploadDate: Date = new Date()): string | null {
+  const frequency = DOCUMENT_FREQUENCIES[documentType] || "annual";
+  
+  if (frequency === "as-needed") {
+    return null; // No expiry for as-needed documents
+  }
+  
+  const expiryDate = new Date(uploadDate);
+  if (frequency === "annual") {
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+  } else if (frequency === "6-monthly") {
+    expiryDate.setMonth(expiryDate.getMonth() + 6);
+  }
+  
+  return expiryDate.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+}
+
 // Configure multer for file uploads
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -3251,7 +3291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded. Please select a PDF file." });
       }
 
-      const { documentType, fileName, expiryDate } = req.body;
+      const { documentType, fileName } = req.body;
       if (!documentType) {
         return res.status(400).json({ error: "Document type is required" });
       }
@@ -3268,6 +3308,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: `Invalid document type: ${documentType}` });
       }
 
+      // Auto-calculate expiry date based on document type and upload date
+      const uploadDate = new Date();
+      const autoExpiryDate = calculateDocumentExpiryDate(documentType, uploadDate);
+
       // Create a URL to serve the uploaded file with client ID for authorization
       const safeClientId = sanitizeFilename(req.params.clientId);
       const fileUrl = `/uploads/${safeClientId}/${req.file.filename}`;
@@ -3277,14 +3321,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         documentType,
         fileName: fileName || req.file.originalname,
         fileUrl,
-        expiryDate: expiryDate || null,
+        expiryDate: autoExpiryDate,
       });
 
-      // Log activity
+      // Log activity with auto-calculated expiry info
+      const frequency = DOCUMENT_FREQUENCIES[documentType] || "annual";
       await storage.logActivity({
         clientId: req.params.clientId,
         action: "document_uploaded",
-        description: `Document ${document.fileName} was uploaded${expiryDate ? ` (expires: ${expiryDate})` : ''}`,
+        description: `Document ${document.fileName} was uploaded (${frequency} review, ${autoExpiryDate ? `expires: ${autoExpiryDate}` : 'no expiry'})`,
         performedBy: req.session.user.email || "System"
       });
 

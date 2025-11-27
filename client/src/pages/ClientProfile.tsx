@@ -1033,31 +1033,20 @@ export default function ClientProfile() {
 
   const assignedStaffCount = staffAssignments?.filter(a => !a.endDate || new Date(a.endDate) > new Date()).length || 0;
 
-  // Calculate document compliance status for sidebar indicator
+  // Calculate document compliance status for sidebar indicator using uploaded documents
   const getDocumentsStatus = (): "green" | "orange" | "red" | null => {
-    const docs = client.clinicalDocuments;
-    if (!docs) return null;
+    // Use uploaded documents with auto-calculated expiry dates
+    const docsWithExpiry = clientDocuments.filter(doc => doc.expiryDate);
     
-    const documentDates = [
-      docs.serviceAgreementDate,
-      docs.consentFormDate,
-      docs.riskAssessmentDate,
-      docs.selfAssessmentMedxDate,
-      docs.medicationConsentDate,
-      docs.personalEmergencyPlanDate,
-      docs.carePlanDate,
-      docs.healthSummaryDate,
-      docs.woundCarePlanDate,
-    ].filter(Boolean) as string[];
-    
-    if (documentDates.length === 0) return null;
+    if (docsWithExpiry.length === 0) return null;
     
     const now = new Date();
     let hasExpired = false;
     let hasExpiringSoon = false;
     
-    for (const dateString of documentDates) {
-      const date = new Date(dateString);
+    for (const doc of docsWithExpiry) {
+      if (!doc.expiryDate) continue;
+      const date = new Date(doc.expiryDate);
       const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       
       if (diffDays < 0) {

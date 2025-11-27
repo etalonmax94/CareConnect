@@ -55,7 +55,6 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [fileUrl, setFileUrl] = useState("");
   const [fileName, setFileName] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
   const [uploadMode, setUploadMode] = useState<"file" | "link">("file");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -124,9 +123,6 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
       formData.append("file", selectedFile);
       formData.append("documentType", selectedDocType);
       formData.append("fileName", fileName || selectedFile.name);
-      if (expiryDate) {
-        formData.append("expiryDate", expiryDate);
-      }
 
       const response = await fetch(`/api/clients/${clientId}/documents/upload`, {
         method: "POST",
@@ -143,7 +139,6 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
       setUploadDialogOpen(false);
       setFileUrl("");
       setFileName("");
-      setExpiryDate("");
       setSelectedDocType("");
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -204,9 +199,10 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {documentList.map((doc) => {
-          const date = documents[doc.key];
-          const status = getComplianceStatus(date);
           const uploadedDoc = getUploadedDoc(doc.name);
+          // Use uploaded document's auto-calculated expiry date for status
+          const expiryDate = uploadedDoc?.expiryDate || undefined;
+          const status = getComplianceStatus(expiryDate);
           
           return (
             <Card 
@@ -232,17 +228,10 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                   <p className="text-xs text-muted-foreground mb-1">Status</p>
                   <ComplianceIndicator status={status} />
                 </div>
-                {date && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
-                    <p className="text-sm font-mono">{new Date(date).toLocaleDateString()}</p>
-                  </div>
-                )}
                 {uploadedDoc && (
-                  <div className="p-2 bg-muted rounded text-xs space-y-1">
-                    <p className="text-muted-foreground">Uploaded File</p>
+                  <div className="p-2 bg-muted rounded text-xs space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="truncate max-w-32">{uploadedDoc.fileName}</span>
+                      <span className="truncate max-w-32 font-medium">{uploadedDoc.fileName}</span>
                       <div className="flex gap-1">
                         <Button size="icon" variant="ghost" className="h-6 w-6" asChild>
                           <a href={uploadedDoc.fileUrl} target="_blank" rel="noopener noreferrer">
@@ -259,9 +248,15 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                         </Button>
                       </div>
                     </div>
-                    {uploadedDoc.expiryDate && (
+                    {uploadedDoc.uploadDate && (
                       <div className="flex items-center gap-1 text-muted-foreground">
-                        <span>Expires:</span>
+                        <span>Uploaded:</span>
+                        <span>{new Date(uploadedDoc.uploadDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {uploadedDoc.expiryDate ? (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <span>Auto-expires:</span>
                         <span className={`font-medium ${
                           new Date(uploadedDoc.expiryDate) < new Date() ? 'text-red-600' :
                           new Date(uploadedDoc.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' :
@@ -269,6 +264,10 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                         }`}>
                           {new Date(uploadedDoc.expiryDate).toLocaleDateString()}
                         </span>
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground">
+                        <span>No expiry (as-needed)</span>
                       </div>
                     )}
                   </div>
@@ -329,16 +328,11 @@ export default function DocumentTracker({ documents, clientId, zohoWorkdriveLink
                                 </span>
                               </div>
                             )}
-                            <div className="space-y-2">
-                              <Label htmlFor="expiryDate">Expiry Date (Optional)</Label>
-                              <Input 
-                                id="expiryDate"
-                                type="date"
-                                value={expiryDate}
-                                onChange={(e) => setExpiryDate(e.target.value)}
-                                data-testid="input-doc-expiry"
-                              />
-                              <p className="text-xs text-muted-foreground">Set when this document will expire</p>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <p className="text-xs text-blue-700 dark:text-blue-300">
+                                <strong>Auto-expiry:</strong> Expiry date will be automatically calculated based on document type 
+                                ({doc.frequency === "annual" ? "12 months" : doc.frequency === "6-monthly" ? "6 months" : "no expiry"} from upload date).
+                              </p>
                             </div>
                           </TabsContent>
                           <TabsContent value="link" className="space-y-4 mt-4">
