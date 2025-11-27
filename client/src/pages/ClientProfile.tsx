@@ -1331,9 +1331,9 @@ export default function ClientProfile() {
                             <SelectValue placeholder="Select type..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="NDIS">NDIS</SelectItem>
-                            <SelectItem value="Support at Home">Support at Home</SelectItem>
-                            <SelectItem value="Private">Private</SelectItem>
+                            <SelectItem value="Support Work">Support Work</SelectItem>
+                            <SelectItem value="Nursing">Nursing</SelectItem>
+                            <SelectItem value="Both">Both</SelectItem>
                           </SelectContent>
                         </Select>
                         <div className="flex gap-1">
