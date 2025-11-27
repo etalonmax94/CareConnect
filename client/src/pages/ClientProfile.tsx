@@ -1571,10 +1571,48 @@ export default function ClientProfile() {
                           </Button>
                         </div>
                       )}
+
+                      {/* Emergency Contact - Highlighted under address */}
+                      <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                          <p className="text-xs font-medium text-red-700 dark:text-red-300 uppercase tracking-wide">Emergency Contact</p>
+                        </div>
+                        {clientContacts.length > 0 && clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes").length > 0 ? (
+                          <div className="space-y-2">
+                            {clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes").slice(0, 2).map((contact) => (
+                              <div key={contact.id} className="flex items-center justify-between">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-semibold text-sm">{contact.name}</p>
+                                    <div className="flex gap-1">
+                                      {contact.isNok === "yes" && <Badge variant="outline" className="text-xs h-5">NOK</Badge>}
+                                      {contact.isEmergencyContact === "yes" && <Badge variant="destructive" className="text-xs h-5">Emergency</Badge>}
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground capitalize">{contact.relationship}</p>
+                                </div>
+                                {contact.phoneNumber && (
+                                  <a href={`tel:${contact.phoneNumber}`} className="text-sm text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 font-medium">
+                                    <Phone className="w-3 h-3" />
+                                    {contact.phoneNumber}
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : client.nokEpoa ? (
+                          <p className="text-sm font-medium">{client.nokEpoa}</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No emergency contact listed</p>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
 
-                  {/* GP Information - Inline Editable */}
+                  {/* GP and Pharmacy - Side by Side */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* GP Information - Inline Editable */}
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
@@ -1666,53 +1704,92 @@ export default function ClientProfile() {
                     </CardContent>
                   </Card>
 
-                  {/* Emergency Contact - Below GP */}
-                  <Card className="border-l-4 border-l-red-500">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        Emergency Contact
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {clientContacts.length > 0 ? (
-                        <div className="space-y-3">
-                          {clientContacts.filter(c => c.isEmergencyContact === "yes" || c.isNok === "yes").slice(0, 2).map((contact) => (
-                            <div key={contact.id} className="p-3 bg-muted/30 rounded-lg">
-                              <div className="flex items-center justify-between mb-1">
-                                <p className="font-semibold text-sm">{contact.name}</p>
-                                <div className="flex gap-1">
-                                  {contact.isNok === "yes" && <Badge variant="outline" className="text-xs">NOK</Badge>}
-                                  {contact.isEmergencyContact === "yes" && <Badge variant="destructive" className="text-xs">Emergency</Badge>}
-                                </div>
-                              </div>
-                              <p className="text-xs text-muted-foreground capitalize mb-2">{contact.relationship}</p>
-                              {contact.phoneNumber && (
-                                <div className="flex items-center gap-2">
-                                  <a href={`tel:${contact.phoneNumber}`} className="text-sm text-primary hover:underline flex items-center gap-1">
-                                    <Phone className="w-3 h-3" />
-                                    {contact.phoneNumber}
-                                  </a>
-                                </div>
-                              )}
+                    {/* Pharmacy Information - Inline Editable */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Pill className="w-4 h-4" />
+                          Pharmacy
+                          {!isArchived && editingField !== "pharmacy" && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="ml-auto h-6 w-6" 
+                              onClick={() => startEditing("pharmacy")}
+                              data-testid="button-edit-pharmacy-left"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          )}
+                          {pharmacyDetails && client.pharmacyId && editingField !== "pharmacy" && (
+                            <Link 
+                              href={`/pharmacies?highlight=${client.pharmacyId}`}
+                              className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
+                              data-testid="link-pharmacy-card-left"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Link>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {editingField === "pharmacy" ? (
+                          <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                            <Select value={editPharmacyId} onValueChange={setEditPharmacyId}>
+                              <SelectTrigger className="w-full" data-testid="select-pharmacy-inline-left">
+                                <SelectValue placeholder="Select a Pharmacy..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No pharmacy assigned</SelectItem>
+                                {pharmaciesList.map((pharmacy) => (
+                                  <SelectItem key={pharmacy.id} value={pharmacy.id}>
+                                    {pharmacy.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-7 text-xs flex-1" onClick={() => {
+                                if (editPharmacyId === "none") setEditPharmacyId("");
+                                saveField("pharmacy");
+                              }} disabled={updateFieldMutation.isPending}>
+                                {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={cancelEditing}>
+                                Cancel
+                              </Button>
                             </div>
-                          ))}
-                        </div>
-                      ) : client.nokEpoa ? (
-                        <div className="p-3 bg-muted/30 rounded-lg">
-                          <p className="text-sm">{client.nokEpoa}</p>
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <Users className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                          <p className="text-sm text-muted-foreground">No emergency contact listed</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                          </div>
+                        ) : pharmacyDetails ? (
+                          <div className="space-y-2">
+                            <p className="font-semibold">{pharmacyDetails.name}</p>
+                            {pharmacyDetails.phoneNumber && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="w-3 h-3 text-muted-foreground" />
+                                <a href={`tel:${pharmacyDetails.phoneNumber}`} className="hover:text-primary">{pharmacyDetails.phoneNumber}</a>
+                              </div>
+                            )}
+                            {pharmacyDetails.address && (
+                              <p className="text-sm text-muted-foreground">{pharmacyDetails.address}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <Pill className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                            <p className="text-sm text-muted-foreground">No pharmacy assigned</p>
+                            {!isArchived && (
+                              <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("pharmacy")}>
+                                <Plus className="w-3 h-3 mr-1" /> Assign Pharmacy
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
 
-                {/* Right Column - Support Coordinator, Pharmacy, Map & Program Info */}
+                {/* Right Column - Support Coordinator & Location Map */}
                 <div className="space-y-6">
                   {/* Support Coordinator - Inline Editable */}
                   <Card>
@@ -1808,115 +1885,28 @@ export default function ClientProfile() {
                     </CardContent>
                   </Card>
 
-                  {/* Pharmacy Information - Inline Editable */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Pill className="w-4 h-4" />
-                        Pharmacy
-                        {!isArchived && editingField !== "pharmacy" && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="ml-auto h-6 w-6" 
-                            onClick={() => startEditing("pharmacy")}
-                            data-testid="button-edit-pharmacy"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </Button>
-                        )}
-                        {pharmacyDetails && client.pharmacyId && editingField !== "pharmacy" && (
-                          <Link 
-                            href={`/pharmacies?highlight=${client.pharmacyId}`}
-                            className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-accent-foreground"
-                            data-testid="link-pharmacy-card"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </Link>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {editingField === "pharmacy" ? (
-                        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                          <Select value={editPharmacyId} onValueChange={setEditPharmacyId}>
-                            <SelectTrigger className="w-full" data-testid="select-pharmacy-inline">
-                              <SelectValue placeholder="Select a Pharmacy..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No pharmacy assigned</SelectItem>
-                              {pharmaciesList.map((pharmacy) => (
-                                <SelectItem key={pharmacy.id} value={pharmacy.id}>
-                                  {pharmacy.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <div className="flex gap-1">
-                            <Button size="sm" className="h-7 text-xs flex-1" onClick={() => {
-                              if (editPharmacyId === "none") setEditPharmacyId("");
-                              saveField("pharmacy");
-                            }} disabled={updateFieldMutation.isPending}>
-                              {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                            </Button>
-                            <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={cancelEditing}>
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : pharmacyDetails ? (
-                        <div className="space-y-2">
-                          <p className="font-semibold">{pharmacyDetails.name}</p>
-                          {pharmacyDetails.phoneNumber && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Phone className="w-3 h-3 text-muted-foreground" />
-                              <a href={`tel:${pharmacyDetails.phoneNumber}`} className="hover:text-primary">{pharmacyDetails.phoneNumber}</a>
-                            </div>
-                          )}
-                          {pharmacyDetails.faxNumber && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <span className="text-xs text-muted-foreground">Fax:</span>
-                              <span>{pharmacyDetails.faxNumber}</span>
-                            </div>
-                          )}
-                          {pharmacyDetails.address && (
-                            <p className="text-sm text-muted-foreground">{pharmacyDetails.address}</p>
-                          )}
-                          {pharmacyDetails.deliveryAvailable === "yes" && (
-                            <Badge variant="secondary" className="mt-1">Delivery Available</Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <Pill className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                          <p className="text-sm text-muted-foreground">No pharmacy assigned</p>
-                          {!isArchived && (
-                            <Button variant="ghost" size="sm" className="mt-2" onClick={() => startEditing("pharmacy")}>
-                              <Plus className="w-3 h-3 mr-1" /> Assign Pharmacy
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Location Map - Moved to right column */}
+                  {/* Location Map - Under Support Coordinator */}
                   <ClientLocationMap
                     latitude={client.latitude}
                     longitude={client.longitude}
                     address={client.streetAddress ? `${client.streetAddress}, ${[client.suburb, client.state, client.postcode].filter(Boolean).join(' ')}` : client.homeAddress}
                     clientName={client.participantName}
                   />
+                </div>
+              </div>
 
-                  {/* Program Info Summary */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <ClipboardCheck className="w-4 h-4" />
-                        Program Summary
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
+              {/* Bottom Section - Program Summary (Standalone) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                {/* Program Info Summary */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ClipboardCheck className="w-4 h-4" />
+                      Program Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="p-3 bg-muted/30 rounded-lg">
                         <p className="text-xs text-muted-foreground">Category</p>
                         <p className="text-sm font-semibold">{client.category}</p>
@@ -1928,7 +1918,7 @@ export default function ClientProfile() {
                             <p className="text-xs text-muted-foreground">NDIS Number</p>
                             <p className="text-sm font-semibold font-mono">{getNdisNumber() || 'Not provided'}</p>
                           </div>
-                          <div className="p-3 bg-muted/30 rounded-lg">
+                          <div className="p-3 bg-muted/30 rounded-lg col-span-2">
                             <p className="text-xs text-muted-foreground">Funding Type</p>
                             <p className="text-sm font-semibold">{client.ndisDetails?.ndisFundingType || 'Not specified'}</p>
                           </div>
@@ -1941,7 +1931,7 @@ export default function ClientProfile() {
                             <p className="text-xs text-muted-foreground">SaH Number</p>
                             <p className="text-sm font-semibold font-mono">{getSahNumber() || 'Not provided'}</p>
                           </div>
-                          <div className="p-3 bg-muted/30 rounded-lg">
+                          <div className="p-3 bg-muted/30 rounded-lg col-span-2">
                             <p className="text-xs text-muted-foreground">Funding Level</p>
                             <p className="text-sm font-semibold">{client.supportAtHomeDetails?.sahFundingLevel || 'Not specified'}</p>
                           </div>
@@ -1949,40 +1939,40 @@ export default function ClientProfile() {
                       )}
 
                       {client.category === "Private" && client.medicareNumber && (
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800 col-span-2">
                           <p className="text-xs text-emerald-700 dark:text-emerald-400">Medicare Number</p>
                           <p className="text-sm font-semibold font-mono text-emerald-900 dark:text-emerald-100">{client.medicareNumber}</p>
                         </div>
                       )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Recent Incidents */}
+                {incidentReports.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Recent Incidents
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {incidentReports.slice(0, 3).map((incident) => (
+                          <div key={incident.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+                            <Badge variant={incident.severity === 'high' || incident.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
+                              {incident.incidentType}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(incident.incidentDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
-
-                  {/* Recent Incidents */}
-                  {incidentReports.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4" />
-                          Recent Incidents
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {incidentReports.slice(0, 3).map((incident) => (
-                            <div key={incident.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-                              <Badge variant={incident.severity === 'high' || incident.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
-                                {incident.incidentType}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(incident.incidentDate).toLocaleDateString()}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           )}
