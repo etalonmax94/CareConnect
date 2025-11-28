@@ -40,6 +40,7 @@ import HelpDesk from "@/pages/HelpDesk";
 import Tasks from "@/pages/Tasks";
 import Chat from "@/pages/Chat";
 import Notifications from "@/pages/Notifications";
+import SchedulingConflicts from "@/pages/SchedulingConflicts";
 import NotFound from "@/pages/not-found";
 import NotificationBell from "@/components/NotificationBell";
 import HelpWidget from "@/components/HelpWidget";
@@ -90,6 +91,7 @@ function ProtectedRouter() {
       <Route path="/tasks" component={Tasks} />
       <Route path="/chat" component={Chat} />
       <Route path="/notifications" component={Notifications} />
+      <Route path="/scheduling-conflicts" component={SchedulingConflicts} />
       <Route component={NotFound} />
     </Switch>
   );

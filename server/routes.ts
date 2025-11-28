@@ -5293,7 +5293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create appointment assignment
+  // Create appointment assignment (with conflict validation)
   app.post("/api/appointments/:appointmentId/assignments", async (req, res) => {
     try {
       const validationResult = insertAppointmentAssignmentSchema.safeParse({
@@ -5303,22 +5303,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validationResult.success) {
         return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
       }
+      
+      const { staffId } = validationResult.data;
+      const appointmentId = req.params.appointmentId;
+      
+      // Fetch the appointment to get timing details
+      const appointment = await storage.getAppointmentById(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      
+      // If we have a staffId, validate the assignment
+      let conflicts: any[] = [];
+      if (staffId) {
+        const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+        
+        const validationData = {
+          staffId,
+          clientId: appointment.clientId || undefined,
+          appointmentId,
+          startTime: new Date(appointment.startDate),
+          endTime: appointment.endDate ? new Date(appointment.endDate) : new Date(appointment.startDate),
+        };
+        
+        // Validate and create conflict records if any issues found
+        conflicts = await staffAssignmentValidator.validateAndRecordConflicts(validationData);
+        
+        // Check if any critical conflicts exist that should block the assignment
+        const criticalConflicts = conflicts.filter(c => c.severity === "critical");
+        
+        // For now, we'll allow the assignment but return the conflicts as warnings
+        // This can be changed to block critical conflicts if needed
+        if (criticalConflicts.length > 0) {
+          // Check if the request includes a flag to force the assignment
+          const forceAssignment = req.body.forceAssignment === true;
+          
+          if (!forceAssignment) {
+            return res.status(409).json({
+              error: "Critical scheduling conflicts detected",
+              conflicts: criticalConflicts.map(c => ({
+                type: c.conflictType,
+                severity: c.severity,
+                description: c.description,
+              })),
+              requiresConfirmation: true,
+              message: "Set forceAssignment=true to proceed despite conflicts"
+            });
+          }
+        }
+      }
+      
       const assignment = await storage.createAppointmentAssignment(validationResult.data);
-      res.status(201).json(assignment);
+      
+      res.status(201).json({
+        ...assignment,
+        conflicts: conflicts.length > 0 ? conflicts.map(c => ({
+          type: c.conflictType,
+          severity: c.severity,
+          description: c.description,
+        })) : undefined,
+        hasWarnings: conflicts.some(c => c.severity === "warning"),
+        hasCritical: conflicts.some(c => c.severity === "critical"),
+      });
     } catch (error) {
       console.error("Error creating appointment assignment:", error);
       res.status(500).json({ error: "Failed to create assignment" });
     }
   });
 
-  // Update appointment assignment
+  // Update appointment assignment (with conflict revalidation when staff changes)
   app.patch("/api/appointment-assignments/:id", async (req, res) => {
     try {
-      const assignment = await storage.updateAppointmentAssignment(req.params.id, req.body);
+      const assignmentId = req.params.id;
+      
+      // Get the existing assignment to check if staffId is changing
+      const existingAssignment = await storage.getAppointmentAssignmentById(assignmentId);
+      if (!existingAssignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      const newStaffId = req.body.staffId;
+      const staffChanging = newStaffId && newStaffId !== existingAssignment.staffId;
+      
+      let conflicts: any[] = [];
+      
+      // If staff is changing, validate the new assignment
+      if (staffChanging) {
+        const appointment = await storage.getAppointmentById(existingAssignment.appointmentId);
+        if (!appointment) {
+          return res.status(404).json({ error: "Appointment not found" });
+        }
+        
+        const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+        
+        // First, auto-resolve any existing conflicts for this appointment with the old staff
+        if (existingAssignment.staffId) {
+          await storage.autoResolveConflictsForAppointment(
+            existingAssignment.appointmentId,
+            existingAssignment.staffId,
+            "Staff reassigned"
+          );
+        }
+        
+        const validationData = {
+          staffId: newStaffId,
+          clientId: appointment.clientId || undefined,
+          appointmentId: existingAssignment.appointmentId,
+          startTime: new Date(appointment.startDate),
+          endTime: appointment.endDate ? new Date(appointment.endDate) : new Date(appointment.startDate),
+        };
+        
+        // Validate and create conflict records for the new assignment
+        conflicts = await staffAssignmentValidator.validateAndRecordConflicts(validationData);
+        
+        // Check for critical conflicts
+        const criticalConflicts = conflicts.filter(c => c.severity === "critical");
+        
+        if (criticalConflicts.length > 0) {
+          const forceAssignment = req.body.forceAssignment === true;
+          
+          if (!forceAssignment) {
+            return res.status(409).json({
+              error: "Critical scheduling conflicts detected for new staff assignment",
+              conflicts: criticalConflicts.map(c => ({
+                type: c.conflictType,
+                severity: c.severity,
+                description: c.description,
+              })),
+              requiresConfirmation: true,
+              message: "Set forceAssignment=true to proceed despite conflicts"
+            });
+          }
+        }
+      }
+      
+      const assignment = await storage.updateAppointmentAssignment(assignmentId, req.body);
       if (!assignment) {
         return res.status(404).json({ error: "Assignment not found" });
       }
-      res.json(assignment);
+      
+      res.json({
+        ...assignment,
+        conflicts: conflicts.length > 0 ? conflicts.map(c => ({
+          type: c.conflictType,
+          severity: c.severity,
+          description: c.description,
+        })) : undefined,
+        hasWarnings: conflicts.some(c => c.severity === "warning"),
+        hasCritical: conflicts.some(c => c.severity === "critical"),
+      });
     } catch (error) {
       console.error("Error updating appointment assignment:", error);
       res.status(500).json({ error: "Failed to update assignment" });
@@ -5475,7 +5608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create staff restriction
+  // Create staff restriction (triggers revalidation of affected appointments)
   app.post("/api/clients/:clientId/staff-restrictions", async (req, res) => {
     try {
       const validationResult = insertClientStaffRestrictionSchema.safeParse({
@@ -5486,6 +5619,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
       }
       const restriction = await storage.createStaffRestriction(validationResult.data);
+      
+      // Trigger async revalidation of affected appointments
+      const staffId = restriction.staffId;
+      if (staffId) {
+        const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+        staffAssignmentValidator.revalidateStaffFutureAppointments(staffId).catch(err => {
+          console.error("Error revalidating after restriction created:", err);
+        });
+      }
+      
       res.status(201).json(restriction);
     } catch (error) {
       console.error("Error creating staff restriction:", error);
@@ -5534,7 +5677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create availability window
+  // Create availability window (triggers revalidation of affected appointments)
   app.post("/api/staff/:staffId/availability", async (req, res) => {
     try {
       const validationResult = insertStaffAvailabilityWindowSchema.safeParse({
@@ -5545,6 +5688,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
       }
       const window = await storage.createAvailabilityWindow(validationResult.data);
+      
+      // Trigger async revalidation of affected appointments
+      const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+      staffAssignmentValidator.revalidateStaffFutureAppointments(req.params.staffId).catch(err => {
+        console.error("Error revalidating after availability window created:", err);
+      });
+      
       res.status(201).json(window);
     } catch (error) {
       console.error("Error creating availability window:", error);
@@ -5611,7 +5761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create unavailability period
+  // Create unavailability period (triggers revalidation of affected appointments)
   app.post("/api/staff/:staffId/unavailability", async (req, res) => {
     try {
       const validationResult = insertStaffUnavailabilityPeriodSchema.safeParse({
@@ -5622,6 +5772,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
       }
       const period = await storage.createUnavailabilityPeriod(validationResult.data);
+      
+      // Trigger async revalidation of affected appointments
+      const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+      staffAssignmentValidator.revalidateStaffFutureAppointments(req.params.staffId).catch(err => {
+        console.error("Error revalidating after unavailability period created:", err);
+      });
+      
       res.status(201).json(period);
     } catch (error) {
       console.error("Error creating unavailability period:", error);
@@ -9063,6 +9220,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching conflicts count:", error);
       res.status(500).json({ error: "Failed to fetch conflicts count" });
+    }
+  });
+
+  // Get scheduling conflicts summary for dashboard
+  app.get("/api/scheduling-conflicts/dashboard", requireAuth, async (req: any, res) => {
+    try {
+      // Get open conflicts with critical and warning severity
+      const result = await storage.getSchedulingConflicts({ 
+        status: "open",
+        limit: 10 
+      });
+      
+      const conflicts = result.conflicts || [];
+      const criticalCount = conflicts.filter(c => c.severity === "critical").length;
+      const warningCount = conflicts.filter(c => c.severity === "warning").length;
+      
+      res.json({
+        total: result.total || conflicts.length,
+        critical: criticalCount,
+        warning: warningCount,
+        conflicts: conflicts.slice(0, 5), // Return top 5 for preview
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard scheduling conflicts:", error);
+      res.status(500).json({ error: "Failed to fetch scheduling conflicts dashboard" });
     }
   });
 

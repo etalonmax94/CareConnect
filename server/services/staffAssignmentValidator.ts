@@ -401,6 +401,46 @@ export class StaffAssignmentValidator {
     return result;
   }
 
+  /**
+   * Public wrapper to validate a staff assignment and record any conflicts.
+   * This is the main entry point for routes to validate assignments.
+   */
+  async validateAndRecordConflicts(data: {
+    staffId: string;
+    clientId?: string;
+    appointmentId: string;
+    startTime: Date;
+    endTime: Date;
+  }): Promise<ConflictRecord[]> {
+    const [staffMember] = await db.select().from(staff).where(eq(staff.id, data.staffId));
+    if (!staffMember) {
+      throw new Error(`Staff member ${data.staffId} not found`);
+    }
+
+    let clientName = "Unknown Client";
+    if (data.clientId) {
+      const [client] = await db.select().from(clients).where(eq(clients.id, data.clientId));
+      if (client) {
+        clientName = client.participantName || `${client.firstName} ${client.lastName}`;
+      }
+    }
+
+    const context: ValidationContext = {
+      appointmentId: data.appointmentId,
+      clientId: data.clientId || "",
+      clientName,
+      staffId: data.staffId,
+      staffName: staffMember.name || "Unknown Staff",
+      scheduledStart: data.startTime,
+      scheduledEnd: data.endTime,
+    };
+
+    const result = await this.detectAndRecordConflicts(context);
+    
+    // Return all conflicts combined for the route to use
+    return [...result.conflicts, ...result.warnings, ...result.info];
+  }
+
   async validateAndRecordForAppointment(
     appointmentId: string
   ): Promise<Map<string, ValidationResult>> {

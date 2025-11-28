@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign, Shield, UserX, UserPlus, Accessibility, Home, Wallet } from "lucide-react";
+import { Users, FileCheck, Clock, AlertTriangle, Plus, X, ChevronRight, Calendar, User, Cake, Gift, UsersRound, DollarSign, Shield, UserX, UserPlus, Accessibility, Home, Wallet, CalendarX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -69,7 +69,28 @@ interface BudgetAlertsData {
   alerts: BudgetAlert[];
 }
 
-type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | "birthdays" | "budgetAlerts" | "incidents" | "unassignedClients" | null;
+interface SchedulingConflict {
+  id: string;
+  appointmentId: string;
+  clientId?: string | null;
+  staffId?: string | null;
+  conflictType: string;
+  severity: "critical" | "warning" | "info";
+  description: string;
+  status: "open" | "resolved" | "dismissed";
+  detectedAt: string;
+  clientName?: string | null;
+  staffName?: string | null;
+}
+
+interface SchedulingConflictsData {
+  total: number;
+  critical: number;
+  warning: number;
+  conflicts: SchedulingConflict[];
+}
+
+type ModalType = "newClients" | "compliance" | "dueThisMonth" | "overdue" | "birthdays" | "budgetAlerts" | "incidents" | "unassignedClients" | "schedulingConflicts" | null;
 
 export default function Dashboard() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -104,6 +125,11 @@ export default function Dashboard() {
 
   const { data: budgetAlerts } = useQuery<BudgetAlertsData>({
     queryKey: ["/api/reports/budget-alerts"],
+  });
+
+  // Fetch scheduling conflicts for the dashboard
+  const { data: schedulingConflicts } = useQuery<SchedulingConflictsData>({
+    queryKey: ["/api/scheduling-conflicts/dashboard"],
   });
 
   const { data: staffList = [] } = useQuery<Staff[]>({
@@ -584,7 +610,90 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card 
+          className={`hover-elevate cursor-pointer ${
+            (schedulingConflicts?.critical || 0) > 0 
+              ? 'border-red-200 dark:border-red-900/50'
+              : (schedulingConflicts?.warning || 0) > 0 
+                ? 'border-amber-200 dark:border-amber-900/50'
+                : ''
+          }`}
+          onClick={() => setActiveModal("schedulingConflicts")}
+          data-testid="card-scheduling-conflicts"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CalendarX className={`w-5 h-5 ${
+                (schedulingConflicts?.critical || 0) > 0 ? 'text-red-500' :
+                (schedulingConflicts?.warning || 0) > 0 ? 'text-amber-500' :
+                'text-muted-foreground'
+              }`} />
+              Scheduling Alerts
+            </CardTitle>
+            {(schedulingConflicts?.total || 0) > 0 ? (
+              <div className="flex items-center gap-2">
+                {(schedulingConflicts?.critical || 0) > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {schedulingConflicts?.critical} critical
+                  </Badge>
+                )}
+                {(schedulingConflicts?.warning || 0) > 0 && (
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    {schedulingConflicts?.warning} warnings
+                  </Badge>
+                )}
+              </div>
+            ) : (
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                All clear
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {schedulingConflicts?.conflicts && schedulingConflicts.conflicts.length > 0 ? (
+              schedulingConflicts.conflicts.slice(0, 3).map((conflict) => (
+                <div key={conflict.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      conflict.severity === "critical" ? 'bg-red-100 dark:bg-red-900/30' :
+                      conflict.severity === "warning" ? 'bg-amber-100 dark:bg-amber-900/30' :
+                      'bg-muted'
+                    }`}>
+                      <AlertTriangle className={`w-4 h-4 ${
+                        conflict.severity === "critical" ? 'text-red-600 dark:text-red-400' :
+                        conflict.severity === "warning" ? 'text-amber-600 dark:text-amber-400' :
+                        'text-muted-foreground'
+                      }`} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm truncate max-w-[200px]">
+                        {conflict.staffName || 'Staff'} - {conflict.clientName || 'Client'}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {conflict.conflictType.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                No scheduling conflicts detected
+              </div>
+            )}
+            {(schedulingConflicts?.total || 0) > 3 && (
+              <div className="text-center pt-2">
+                <span className="text-sm text-muted-foreground">
+                  +{(schedulingConflicts?.total || 0) - 3} more conflicts
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Recent Activity</CardTitle>
           <Link href="/activity">
@@ -629,7 +738,8 @@ export default function Dashboard() {
             )}
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       {/* New Clients Modal */}
       <Dialog open={activeModal === "newClients"} onOpenChange={() => setActiveModal(null)}>
@@ -967,6 +1077,83 @@ export default function Dashboard() {
               )}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scheduling Conflicts Modal */}
+      <Dialog open={activeModal === "schedulingConflicts"} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarX className="w-5 h-5 text-amber-600" />
+              Scheduling Conflicts
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3">
+              {schedulingConflicts?.conflicts && schedulingConflicts.conflicts.length > 0 ? (
+                schedulingConflicts.conflicts.map((conflict) => (
+                  <Card key={conflict.id} className={`${
+                    conflict.severity === "critical"
+                      ? 'border-red-200 dark:border-red-800' 
+                      : conflict.severity === "warning"
+                        ? 'border-amber-200 dark:border-amber-800'
+                        : ''
+                  }`} data-testid={`card-conflict-${conflict.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium">{conflict.staffName || 'Staff'}</p>
+                            <Badge variant={
+                              conflict.severity === "critical" ? "destructive" :
+                              conflict.severity === "warning" ? "secondary" :
+                              "outline"
+                            } className={
+                              conflict.severity === "warning" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" : ""
+                            }>
+                              {conflict.severity}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Client: {conflict.clientName || 'Unknown'}
+                          </p>
+                          <p className="text-sm text-muted-foreground capitalize mt-1">
+                            {conflict.conflictType.replace(/_/g, ' ')}
+                          </p>
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                            {conflict.description}
+                          </p>
+                        </div>
+                        <div className="text-right ml-4">
+                          <Badge variant="outline">
+                            {conflict.status}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDate(conflict.detectedAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CalendarX className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>No scheduling conflicts</p>
+                  <p className="text-sm mt-1">All staff assignments are valid</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          <div className="flex justify-end mt-4">
+            <Link href="/scheduling-conflicts">
+              <Button variant="outline" data-testid="button-view-all-conflicts">
+                View All Conflicts
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
         </DialogContent>
       </Dialog>
 

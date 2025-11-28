@@ -356,6 +356,7 @@ export interface IStorage {
   // Appointment Assignments
   getAssignmentsByAppointment(appointmentId: string): Promise<AppointmentAssignment[]>;
   getAppointmentAssignmentsByStaff(staffId: string): Promise<AppointmentAssignment[]>;
+  getAppointmentAssignmentById(id: string): Promise<AppointmentAssignment | undefined>;
   createAppointmentAssignment(assignment: InsertAppointmentAssignment): Promise<AppointmentAssignment>;
   updateAppointmentAssignment(id: string, assignment: Partial<InsertAppointmentAssignment>): Promise<AppointmentAssignment | undefined>;
   deleteAppointmentAssignment(id: string): Promise<boolean>;
@@ -2173,6 +2174,13 @@ export class DbStorage implements IStorage {
     return await db.select().from(appointmentAssignments)
       .where(eq(appointmentAssignments.staffId, staffId))
       .orderBy(desc(appointmentAssignments.assignedAt));
+  }
+
+  async getAppointmentAssignmentById(id: string): Promise<AppointmentAssignment | undefined> {
+    const result = await db.select().from(appointmentAssignments)
+      .where(eq(appointmentAssignments.id, id))
+      .limit(1);
+    return result[0];
   }
 
   async createAppointmentAssignment(assignment: InsertAppointmentAssignment): Promise<AppointmentAssignment> {
