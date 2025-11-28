@@ -9508,15 +9508,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Determine attachment type
         let attachmentType: "photo" | "video" | "gif" = "photo";
+        let messageType: "image" | "video" | "gif" = "image";
         if (isVideo) {
           attachmentType = "video";
+          messageType = "video";
         } else if (file.mimetype === 'image/gif') {
           attachmentType = "gif";
+          messageType = "gif";
         }
 
-        // Create attachment record
-        const attachment = await storage.createChatMessageAttachment({
+        // First create a message for this attachment
+        const message = await storage.createChatMessage({
           roomId,
+          senderId: userContext.userId,
+          senderName: userContext.userName,
+          content: file.originalname,
+          messageType: messageType,
+          attachmentUrl: file.path,
+          attachmentName: file.originalname,
+          attachmentType: attachmentType,
+        });
+
+        // Create attachment record linked to message
+        const attachment = await storage.createChatMessageAttachment({
+          messageId: message.id,
           type: attachmentType,
           fileName: file.originalname,
           fileSize: file.size,

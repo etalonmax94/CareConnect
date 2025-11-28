@@ -3127,7 +3127,7 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages, {
     staffName: z.string(),
     startIndex: z.number(),
     endIndex: z.number(),
-  })).optional(),
+  })).optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
