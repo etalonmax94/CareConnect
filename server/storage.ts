@@ -19,7 +19,7 @@ import {
   silHouses, silHouseAuditLog,
   serviceSubtypes,
   // Notifications, tickets, and announcements
-  notifications, supportTickets, ticketComments, announcements,
+  notifications, notificationPreferences, supportTickets, ticketComments, announcements,
   // Tasks
   tasks, taskComments, taskChecklists,
   // Chat
@@ -78,7 +78,7 @@ import {
   type InsertSilHouseAuditLog, type SilHouseAuditLog,
   type InsertServiceSubtype, type ServiceSubtype,
   // Notifications, tickets, and announcements types
-  type InsertNotification, type Notification,
+  type InsertNotification, type Notification, type NotificationPreferences, type InsertNotificationPreferences,
   type InsertSupportTicket, type SupportTicket,
   type InsertTicketComment, type TicketComment,
   type InsertAnnouncement, type Announcement,
@@ -3010,6 +3010,97 @@ export class DbStorage implements IStorage {
       .where(eq(notifications.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  async getNotificationsByUserPaginated(
+    userId: string, 
+    options: { 
+      limit?: number; 
+      offset?: number; 
+      isRead?: "yes" | "no"; 
+      type?: string;
+      includeArchived?: boolean;
+    } = {}
+  ): Promise<{ notifications: Notification[]; total: number }> {
+    const { limit = 20, offset = 0, isRead, type, includeArchived = false } = options;
+    
+    const conditions = [eq(notifications.userId, userId)];
+    
+    if (!includeArchived) {
+      conditions.push(eq(notifications.isArchived, "no"));
+    }
+    
+    if (isRead) {
+      conditions.push(eq(notifications.isRead, isRead));
+    }
+    
+    if (type) {
+      conditions.push(eq(notifications.type, type as any));
+    }
+    
+    const [notificationList, countResult] = await Promise.all([
+      db.select().from(notifications)
+        .where(and(...conditions))
+        .orderBy(desc(notifications.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(and(...conditions))
+    ]);
+    
+    return {
+      notifications: notificationList,
+      total: Number(countResult[0]?.count || 0)
+    };
+  }
+
+  async archiveNotification(id: string): Promise<Notification | undefined> {
+    const result = await db.update(notifications)
+      .set({ isArchived: "yes", archivedAt: new Date() })
+      .where(eq(notifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markNotificationAsDelivered(id: string, method: string = "websocket"): Promise<Notification | undefined> {
+    const result = await db.update(notifications)
+      .set({ isDelivered: "yes", deliveredAt: new Date() })
+      .where(eq(notifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createBulkNotifications(notificationsList: InsertNotification[]): Promise<Notification[]> {
+    if (notificationsList.length === 0) return [];
+    const result = await db.insert(notifications).values(notificationsList).returning();
+    return result;
+  }
+
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
+    const result = await db.select().from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+    return result[0];
+  }
+
+  async createOrUpdateNotificationPreferences(
+    userId: string, 
+    prefs: Partial<InsertNotificationPreferences>
+  ): Promise<NotificationPreferences> {
+    const existing = await this.getNotificationPreferences(userId);
+    
+    if (existing) {
+      const result = await db.update(notificationPreferences)
+        .set({ ...prefs, updatedAt: new Date() })
+        .where(eq(notificationPreferences.userId, userId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(notificationPreferences)
+        .values({ userId, ...prefs })
+        .returning();
+      return result[0];
+    }
   }
 
   // ============================================

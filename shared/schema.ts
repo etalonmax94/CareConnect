@@ -2365,40 +2365,137 @@ export type NotificationType =
   | "ticket_updated"
   | "ticket_assigned"
   | "ticket_comment"
+  | "ticket_resolved"
   | "announcement"
   | "task_assigned"
+  | "task_updated"
+  | "task_completed"
   | "task_due"
   | "approval_required"
+  | "appointment_reminder"
+  | "appointment_update"
+  | "appointment_cancelled"
+  | "compliance_warning"
+  | "compliance_expired"
+  | "chat_message"
+  | "chat_mention"
+  | "client_update"
+  | "client_incident"
+  | "care_plan_update"
+  | "document_uploaded"
   | "system";
+
+export type NotificationPriority = "low" | "normal" | "high" | "urgent";
 
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   
-  userId: varchar("user_id").notNull(), // Recipient user
+  userId: varchar("user_id").notNull(),
   type: text("type").$type<NotificationType>().notNull(),
+  priority: text("priority").$type<NotificationPriority>().default("normal"),
+  
   title: text("title").notNull(),
   message: text("message").notNull(),
   
-  // Link to related entity
-  relatedType: text("related_type"), // "ticket", "announcement", "task", etc.
+  // Link to related entity for navigation
+  relatedType: text("related_type"), // "ticket", "task", "appointment", "client", "chat", etc.
   relatedId: varchar("related_id"),
+  linkUrl: text("link_url"), // Full URL path for navigation
   
+  // Additional metadata as JSON
+  metadata: json("metadata").$type<Record<string, any>>(),
+  
+  // Read tracking
   isRead: text("is_read").default("no").$type<"yes" | "no">(),
   readAt: timestamp("read_at"),
+  
+  // Delivery tracking
+  isDelivered: text("is_delivered").default("no").$type<"yes" | "no">(),
+  deliveredAt: timestamp("delivered_at"),
+  
+  // Archiving
+  isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
+  archivedAt: timestamp("archived_at"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+const notificationTypeEnum = z.enum([
+  "ticket_created", "ticket_updated", "ticket_assigned", "ticket_comment", "ticket_resolved",
+  "announcement", "task_assigned", "task_updated", "task_completed", "task_due", "approval_required",
+  "appointment_reminder", "appointment_update", "appointment_cancelled",
+  "compliance_warning", "compliance_expired",
+  "chat_message", "chat_mention",
+  "client_update", "client_incident", "care_plan_update", "document_uploaded",
+  "system"
+]);
+
 export const insertNotificationSchema = createInsertSchema(notifications, {
-  type: z.enum(["ticket_created", "ticket_updated", "ticket_assigned", "ticket_comment", "announcement", "task_assigned", "task_due", "approval_required", "system"]),
+  type: notificationTypeEnum,
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional().default("normal"),
   isRead: z.enum(["yes", "no"]).optional(),
+  isDelivered: z.enum(["yes", "no"]).optional(),
+  isArchived: z.enum(["yes", "no"]).optional(),
 }).omit({
   id: true,
   createdAt: true,
+  readAt: true,
+  deliveredAt: true,
+  archivedAt: true,
 });
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+// Notification Preferences - per user settings
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  userId: varchar("user_id").notNull().unique(),
+  
+  // Global settings
+  emailEnabled: text("email_enabled").default("yes").$type<"yes" | "no">(),
+  pushEnabled: text("push_enabled").default("yes").$type<"yes" | "no">(),
+  soundEnabled: text("sound_enabled").default("yes").$type<"yes" | "no">(),
+  
+  // Per-category toggles
+  appointmentAlerts: text("appointment_alerts").default("yes").$type<"yes" | "no">(),
+  taskAlerts: text("task_alerts").default("yes").$type<"yes" | "no">(),
+  complianceAlerts: text("compliance_alerts").default("yes").$type<"yes" | "no">(),
+  chatAlerts: text("chat_alerts").default("yes").$type<"yes" | "no">(),
+  ticketAlerts: text("ticket_alerts").default("yes").$type<"yes" | "no">(),
+  clientAlerts: text("client_alerts").default("yes").$type<"yes" | "no">(),
+  systemAlerts: text("system_alerts").default("yes").$type<"yes" | "no">(),
+  
+  // Quiet hours
+  quietHoursEnabled: text("quiet_hours_enabled").default("no").$type<"yes" | "no">(),
+  quietHoursStart: text("quiet_hours_start"), // e.g., "22:00"
+  quietHoursEnd: text("quiet_hours_end"), // e.g., "07:00"
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences, {
+  emailEnabled: z.enum(["yes", "no"]).optional(),
+  pushEnabled: z.enum(["yes", "no"]).optional(),
+  soundEnabled: z.enum(["yes", "no"]).optional(),
+  appointmentAlerts: z.enum(["yes", "no"]).optional(),
+  taskAlerts: z.enum(["yes", "no"]).optional(),
+  complianceAlerts: z.enum(["yes", "no"]).optional(),
+  chatAlerts: z.enum(["yes", "no"]).optional(),
+  ticketAlerts: z.enum(["yes", "no"]).optional(),
+  clientAlerts: z.enum(["yes", "no"]).optional(),
+  systemAlerts: z.enum(["yes", "no"]).optional(),
+  quietHoursEnabled: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 
 // ============================================
 // HELP DESK / SUPPORT TICKETS

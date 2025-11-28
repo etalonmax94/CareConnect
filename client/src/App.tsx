@@ -39,6 +39,7 @@ import UserApprovals from "@/pages/UserApprovals";
 import HelpDesk from "@/pages/HelpDesk";
 import Tasks from "@/pages/Tasks";
 import Chat from "@/pages/Chat";
+import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/not-found";
 import NotificationBell from "@/components/NotificationBell";
 import HelpWidget from "@/components/HelpWidget";
@@ -88,6 +89,7 @@ function ProtectedRouter() {
       <Route path="/help-desk" component={HelpDesk} />
       <Route path="/tasks" component={Tasks} />
       <Route path="/chat" component={Chat} />
+      <Route path="/notifications" component={Notifications} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -177,7 +179,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
                   <p>Open Connecteam</p>
                 </TooltipContent>
               </Tooltip>
-              <NotificationBell />
+              <NotificationBell userId={user.id} userName={user.displayName} />
               <UserProfileDropdown user={user} />
             </div>
           </header>

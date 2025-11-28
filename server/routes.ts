@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupWebSocket } from "./websocket";
+import { setupWebSocket, broadcastNotification } from "./websocket";
 import { storage } from "./storage";
 import { 
   insertClientSchema, updateClientSchema, insertProgressNoteSchema, 
@@ -7396,6 +7396,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get paginated notifications with filters
+  app.get("/api/notifications/paginated", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const isRead = req.query.isRead as "yes" | "no" | undefined;
+      const type = req.query.type as string | undefined;
+      const includeArchived = req.query.includeArchived === "true";
+      
+      const result = await storage.getNotificationsByUserPaginated(userId, {
+        limit,
+        offset,
+        isRead,
+        type,
+        includeArchived,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching paginated notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Archive notification (soft delete)
+  app.patch("/api/notifications/:id/archive", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const notification = await storage.archiveNotification(id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      res.json(notification);
+    } catch (error) {
+      console.error("Error archiving notification:", error);
+      res.status(500).json({ error: "Failed to archive notification" });
+    }
+  });
+
+  // Get notification preferences
+  app.get("/api/notifications/preferences", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      let prefs = await storage.getNotificationPreferences(userId);
+      
+      // Return default preferences if none exist
+      if (!prefs) {
+        prefs = {
+          id: "",
+          userId,
+          emailEnabled: "yes",
+          pushEnabled: "yes",
+          soundEnabled: "yes",
+          appointmentAlerts: "yes",
+          taskAlerts: "yes",
+          complianceAlerts: "yes",
+          chatAlerts: "yes",
+          ticketAlerts: "yes",
+          clientAlerts: "yes",
+          systemAlerts: "yes",
+          quietHoursEnabled: "no",
+          quietHoursStart: null,
+          quietHoursEnd: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      }
+      
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  // Update notification preferences
+  app.put("/api/notifications/preferences", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const prefs = await storage.createOrUpdateNotificationPreferences(userId, req.body);
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ error: "Failed to update preferences" });
+    }
+  });
+
+  // Create notification (internal use / admin)
+  app.post("/api/notifications", requireAuth, async (req: any, res) => {
+    try {
+      const userRoles = req.session?.user?.roles || [];
+      const isAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager"].includes(role)
+      );
+      
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      
+      const notification = await storage.createNotification(req.body);
+      res.status(201).json(notification);
+    } catch (error) {
+      console.error("Error creating notification:", error);
+      res.status(500).json({ error: "Failed to create notification" });
+    }
+  });
+
   // ============================================
   // SUPPORT TICKETS API
   // ============================================
@@ -7470,14 +7590,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user.roles.includes("director") || 
           user.roles.includes("operations_manager")
         )) {
-          await storage.createNotification({
+          const notification = await storage.createNotification({
             userId: user.id,
             type: "ticket_created",
             title: "New Support Ticket",
             message: `${userName} submitted a new ticket: ${ticket.title}`,
             relatedType: "ticket",
-            relatedId: ticket.id
+            relatedId: ticket.id,
+            linkUrl: `/help-desk?ticket=${ticket.id}`
           });
+          await broadcastNotification(user.id, notification);
         }
       }
 
@@ -7518,25 +7640,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Notify the assigned user
-      await storage.createNotification({
+      const assignedNotification = await storage.createNotification({
         userId: assignedToId,
         type: "ticket_assigned",
         title: "Ticket Assigned to You",
         message: `You have been assigned to ticket #${ticket.ticketNumber}: ${ticket.title}`,
         relatedType: "ticket",
-        relatedId: ticket.id
+        relatedId: ticket.id,
+        linkUrl: `/help-desk?ticket=${ticket.id}`
       });
+      await broadcastNotification(assignedToId, assignedNotification);
 
       // Notify the ticket creator
       if (ticket.createdById !== assignedToId) {
-        await storage.createNotification({
+        const creatorNotification = await storage.createNotification({
           userId: ticket.createdById,
           type: "ticket_updated",
           title: "Your Ticket Has Been Assigned",
           message: `Your ticket #${ticket.ticketNumber} has been assigned to ${assignedToName}`,
           relatedType: "ticket",
-          relatedId: ticket.id
+          relatedId: ticket.id,
+          linkUrl: `/help-desk?ticket=${ticket.id}`
         });
+        await broadcastNotification(ticket.createdById, creatorNotification);
       }
 
       res.json(ticket);
@@ -7643,14 +7769,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       for (const notifyUserId of usersToNotify) {
-        await storage.createNotification({
+        const notification = await storage.createNotification({
           userId: notifyUserId,
           type: "ticket_comment",
           title: "New Comment on Ticket",
           message: `${userName} commented on ticket #${ticket.ticketNumber}`,
           relatedType: "ticket",
-          relatedId: ticket.id
+          relatedId: ticket.id,
+          linkUrl: `/help-desk?ticket=${ticket.id}`
         });
+        await broadcastNotification(notifyUserId, notification);
       }
 
       res.status(201).json(comment);
@@ -7852,16 +7980,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const task = await storage.createTask(validatedData);
 
-      // If assigned to someone else, create notification
+      // If assigned to someone else, create notification and broadcast
       if (task.assignedToId && task.assignedToId !== userId) {
-        await storage.createNotification({
+        const notification = await storage.createNotification({
           userId: task.assignedToId,
           type: "task_assigned",
           title: "New Task Assigned",
           message: `${userName} assigned you a task: ${task.title}`,
           relatedType: "task",
-          relatedId: task.id
+          relatedId: task.id,
+          linkUrl: `/tasks?task=${task.id}`
         });
+        // Broadcast via WebSocket
+        await broadcastNotification(task.assignedToId, notification);
       }
 
       res.status(201).json(task);
@@ -7898,27 +8029,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Notify task creator if different from completer
         if (existingTask.createdById !== userId) {
-          await storage.createNotification({
+          const notification = await storage.createNotification({
             userId: existingTask.createdById,
             type: "task_completed",
             title: "Task Completed",
             message: `${userName} completed the task: ${existingTask.title}`,
             relatedType: "task",
-            relatedId: id
+            relatedId: id,
+            linkUrl: `/tasks?task=${id}`
           });
+          await broadcastNotification(existingTask.createdById, notification);
         }
       }
 
       // If task was reassigned, notify new assignee
       if (req.body.assignedToId && req.body.assignedToId !== existingTask.assignedToId && req.body.assignedToId !== userId) {
-        await storage.createNotification({
+        const notification = await storage.createNotification({
           userId: req.body.assignedToId,
           type: "task_assigned",
           title: "Task Assigned to You",
           message: `${userName} assigned you a task: ${existingTask.title}`,
           relatedType: "task",
-          relatedId: id
+          relatedId: id,
+          linkUrl: `/tasks?task=${id}`
         });
+        await broadcastNotification(req.body.assignedToId, notification);
       }
 
       res.json(task);
@@ -8066,14 +8201,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       for (const notifyUserId of usersToNotify) {
-        await storage.createNotification({
+        const notification = await storage.createNotification({
           userId: notifyUserId,
           type: "task_comment",
           title: "New Comment on Task",
           message: `${userName} commented on task: ${task.title}`,
           relatedType: "task",
-          relatedId: task.id
+          relatedId: task.id,
+          linkUrl: `/tasks?task=${task.id}`
         });
+        await broadcastNotification(notifyUserId, notification);
       }
 
       res.status(201).json(comment);

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Check, CheckCheck, Trash2, ExternalLink, MessageSquare, AlertCircle, Megaphone, ClipboardList } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, ExternalLink, MessageSquare, AlertCircle, Megaphone, ClipboardList, Calendar, FileText, Users, Heart, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,24 +16,102 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import type { Notification } from "@shared/schema";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface NotificationBellProps {
   className?: string;
+  userId?: string;
+  userName?: string;
 }
 
-export default function NotificationBell({ className }: NotificationBellProps) {
+export default function NotificationBell({ className, userId, userName }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
-    refetchInterval: 30000, // Poll every 30 seconds
+    refetchInterval: 60000, // Poll every 60 seconds as backup
   });
 
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
+
+  // WebSocket connection for real-time notifications
+  const connectWebSocket = useCallback(() => {
+    if (!userId || wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/chat?userId=${userId}&userName=${encodeURIComponent(userName || "User")}`;
+
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("[Notifications] WebSocket connected");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === "notification") {
+            // New notification received - refresh queries
+            queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+            
+            // Show toast for new notification
+            toast({
+              title: data.notification.title,
+              description: data.notification.message,
+            });
+          } else if (data.type === "unread_count") {
+            // Update unread count directly
+            queryClient.setQueryData(["/api/notifications/unread-count"], { count: data.count });
+          } else if (data.type === "notification_update") {
+            // Notification was updated (read/archived)
+            queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+          }
+        } catch (error) {
+          console.error("[Notifications] Error parsing message:", error);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("[Notifications] WebSocket disconnected");
+        // Attempt to reconnect after 5 seconds
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (error) => {
+        console.error("[Notifications] WebSocket error:", error);
+      };
+    } catch (error) {
+      console.error("[Notifications] Error creating WebSocket:", error);
+    }
+  }, [userId, userName, toast]);
+
+  useEffect(() => {
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [connectWebSocket]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -65,21 +143,44 @@ export default function NotificationBell({ className }: NotificationBellProps) {
     },
   });
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, priority?: string | null) => {
+    const priorityColor = priority === "urgent" ? "text-red-500" : 
+                         priority === "high" ? "text-orange-500" : undefined;
+    
     switch (type) {
       case "ticket_created":
       case "ticket_updated":
       case "ticket_assigned":
-        return <ClipboardList className="h-4 w-4 text-blue-500" />;
+      case "ticket_resolved":
+        return <ClipboardList className={`h-4 w-4 ${priorityColor || "text-blue-500"}`} />;
       case "ticket_comment":
-        return <MessageSquare className="h-4 w-4 text-green-500" />;
+        return <MessageSquare className={`h-4 w-4 ${priorityColor || "text-green-500"}`} />;
       case "announcement":
-        return <Megaphone className="h-4 w-4 text-purple-500" />;
+      case "system":
+        return <Megaphone className={`h-4 w-4 ${priorityColor || "text-purple-500"}`} />;
       case "task_assigned":
+      case "task_updated":
+      case "task_completed":
       case "task_due":
-        return <ClipboardList className="h-4 w-4 text-orange-500" />;
+        return <ClipboardList className={`h-4 w-4 ${priorityColor || "text-orange-500"}`} />;
       case "approval_required":
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+        return <AlertCircle className={`h-4 w-4 ${priorityColor || "text-yellow-500"}`} />;
+      case "appointment_reminder":
+      case "appointment_update":
+      case "appointment_cancelled":
+        return <Calendar className={`h-4 w-4 ${priorityColor || "text-sky-500"}`} />;
+      case "compliance_warning":
+      case "compliance_expired":
+        return <Shield className={`h-4 w-4 ${priorityColor || "text-red-500"}`} />;
+      case "chat_message":
+      case "chat_mention":
+        return <MessageSquare className={`h-4 w-4 ${priorityColor || "text-pink-500"}`} />;
+      case "client_update":
+      case "client_incident":
+      case "care_plan_update":
+        return <Users className={`h-4 w-4 ${priorityColor || "text-emerald-500"}`} />;
+      case "document_uploaded":
+        return <FileText className={`h-4 w-4 ${priorityColor || "text-amber-500"}`} />;
       default:
         return <Bell className="h-4 w-4 text-muted-foreground" />;
     }
@@ -91,9 +192,29 @@ export default function NotificationBell({ className }: NotificationBellProps) {
       markAsReadMutation.mutate(notification.id);
     }
 
-    // Navigate based on type
-    if (notification.relatedType === "ticket" && notification.relatedId) {
-      setLocation(`/help-desk?ticket=${notification.relatedId}`);
+    // Navigate based on linkUrl or relatedType
+    if (notification.linkUrl) {
+      setLocation(notification.linkUrl);
+    } else if (notification.relatedType && notification.relatedId) {
+      switch (notification.relatedType) {
+        case "ticket":
+          setLocation(`/help-desk?ticket=${notification.relatedId}`);
+          break;
+        case "task":
+          setLocation(`/tasks?task=${notification.relatedId}`);
+          break;
+        case "appointment":
+          setLocation(`/appointments?id=${notification.relatedId}`);
+          break;
+        case "client":
+          setLocation(`/clients/${notification.relatedId}`);
+          break;
+        case "chat":
+          setLocation(`/chat?room=${notification.relatedId}`);
+          break;
+        default:
+          break;
+      }
     }
     
     setOpen(false);
@@ -164,7 +285,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
                 data-testid={`notification-item-${notification.id}`}
               >
                 <div className="mt-0.5">
-                  {getNotificationIcon(notification.type)}
+                  {getNotificationIcon(notification.type, notification.priority)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -205,15 +326,15 @@ export default function NotificationBell({ className }: NotificationBellProps) {
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
-              className="justify-center text-sm text-primary"
+              className="justify-center text-sm text-primary cursor-pointer"
               onClick={() => {
-                setLocation("/help-desk");
+                setLocation("/notifications");
                 setOpen(false);
               }}
               data-testid="link-view-all-notifications"
             >
               <ExternalLink className="h-3 w-3 mr-1" />
-              View Help Desk
+              View All Notifications
             </DropdownMenuItem>
           </>
         )}

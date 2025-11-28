@@ -273,3 +273,102 @@ export function getOnlineUsers(): string[] {
 export function isUserOnline(userId: string): boolean {
   return clients.has(userId) && (clients.get(userId)?.size || 0) > 0;
 }
+
+// ============================================
+// NOTIFICATION BROADCASTING
+// ============================================
+
+interface NotificationPayload {
+  id: string;
+  type: string;
+  priority?: string;
+  title: string;
+  message: string;
+  relatedType?: string | null;
+  relatedId?: string | null;
+  linkUrl?: string | null;
+  metadata?: Record<string, any> | null;
+  createdAt: Date;
+}
+
+export async function broadcastNotification(userId: string, notification: NotificationPayload): Promise<boolean> {
+  const userClients = clients.get(userId);
+  
+  if (!userClients || userClients.size === 0) {
+    return false;
+  }
+
+  const message = {
+    type: "notification",
+    notification
+  };
+
+  let delivered = false;
+  userClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
+      delivered = true;
+    }
+  });
+
+  if (delivered) {
+    try {
+      await storage.markNotificationAsDelivered(notification.id, "websocket");
+      // Also send updated unread count
+      const unreadCount = await storage.getUnreadNotificationCount(userId);
+      broadcastUnreadCountUpdate(userId, unreadCount);
+    } catch (error) {
+      console.error("Error marking notification as delivered:", error);
+    }
+  }
+
+  return delivered;
+}
+
+export async function broadcastNotificationToMultiple(userIds: string[], notification: NotificationPayload): Promise<number> {
+  let deliveredCount = 0;
+  
+  for (const userId of userIds) {
+    const delivered = await broadcastNotification(userId, notification);
+    if (delivered) {
+      deliveredCount++;
+    }
+  }
+  
+  return deliveredCount;
+}
+
+export function broadcastNotificationUpdate(userId: string, notificationId: string, update: { isRead?: string; isArchived?: string }): void {
+  const userClients = clients.get(userId);
+  
+  if (!userClients) return;
+
+  const message = {
+    type: "notification_update",
+    notificationId,
+    update
+  };
+
+  userClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
+    }
+  });
+}
+
+export function broadcastUnreadCountUpdate(userId: string, count: number): void {
+  const userClients = clients.get(userId);
+  
+  if (!userClients) return;
+
+  const message = {
+    type: "unread_count",
+    count
+  };
+
+  userClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
+    }
+  });
+}
