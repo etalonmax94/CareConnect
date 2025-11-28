@@ -1601,7 +1601,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               type="button"
               onClick={currentStep === 0 ? onCancel : goBack}
               className={cn(
-                "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] lg:min-h-[520px] rounded-lg border transition-all duration-200",
+                "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
                 "bg-background hover:bg-muted/50 border-border hover:border-primary/30",
                 "text-muted-foreground hover:text-foreground",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
@@ -1614,8 +1614,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               </span>
             </button>
 
-            {/* Center Card - Dynamic height with responsive max-height for large screens */}
-            <Card className="flex-1 flex flex-col min-h-[380px] max-h-[500px] lg:max-h-[600px] overflow-hidden">
+            {/* Center Card - Unified fixed height */}
+            <Card className="flex-1 flex flex-col min-h-[380px] max-h-[500px] overflow-hidden">
               <CardHeader className="flex-shrink-0 py-2 px-4 border-b">
                 <div className="flex items-center gap-2">
                   {(() => {
@@ -1656,7 +1656,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] lg:min-h-[520px] rounded-lg border transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
                   isSubmitting && "opacity-70 cursor-not-allowed"
@@ -1677,7 +1677,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 type="button"
                 onClick={goNext}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] lg:min-h-[520px] rounded-lg border transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 )}
