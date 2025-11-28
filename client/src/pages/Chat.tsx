@@ -139,7 +139,7 @@ export default function Chat() {
   const [isAnnouncement, setIsAnnouncement] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [typingUsers, setTypingUsers] = useState<Map<string, Set<string>>>(new Map());
-  const [isMobileView, setIsMobileView] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [filterByRole, setFilterByRole] = useState<string>("all");
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
@@ -159,6 +159,14 @@ export default function Chat() {
   const messageInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const { data: authData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -975,23 +983,23 @@ export default function Chat() {
                 <h1 className="text-xl md:text-2xl font-semibold tracking-tight" data-testid="text-page-title">Messages</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">Team communication</p>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center">
                 {isAppAdmin && (
                   <Button 
                     size="icon" 
                     variant="ghost" 
-                    className="rounded-full"
+                    className="rounded-full min-w-[44px] min-h-[44px]"
                     onClick={() => setShowCustomChatDialog(true)}
                     title="Create Custom Chat"
                     data-testid="button-admin-create-chat"
                   >
-                    <Shield className="h-4 w-4" />
+                    <Shield className="h-5 w-5" />
                   </Button>
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="icon" className="rounded-full" data-testid="button-new-chat">
-                      <Plus className="h-4 w-4" />
+                    <Button size="icon" className="rounded-full min-w-[44px] min-h-[44px]" data-testid="button-new-chat">
+                      <Plus className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
@@ -1163,11 +1171,9 @@ export default function Chat() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden rounded-full shrink-0"
-                  onClick={() => {
-                    setSelectedRoomId(null);
-                    setIsMobileView(false);
-                  }}
+                  className="md:hidden rounded-full shrink-0 min-w-[44px] min-h-[44px]"
+                  onClick={() => setSelectedRoomId(null)}
+                  data-testid="button-back-to-list"
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
@@ -1211,8 +1217,8 @@ export default function Chat() {
               {(isRoomAdmin || isAppAdmin) && selectedRoom.type !== "direct" && (
                 <Sheet open={showRoomSettings} onOpenChange={setShowRoomSettings}>
                   <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full shrink-0" data-testid="button-room-settings">
-                      <Settings className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="rounded-full shrink-0 min-w-[44px] min-h-[44px]" data-testid="button-room-settings">
+                      <Settings className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent>
@@ -1563,33 +1569,33 @@ export default function Chat() {
                   data-testid="input-file-upload"
                 />
                 
-                {/* Attachment Buttons */}
-                <div className="flex items-center gap-1 shrink-0">
+                {/* Attachment Buttons - Touch-friendly for mobile */}
+                <div className="flex items-center shrink-0">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full"
+                    className="rounded-full min-w-[44px] min-h-[44px]"
                     onClick={() => selectedRoomId && fileInputRef.current?.click()}
                     disabled={!selectedRoomId || uploadAttachmentMutation.isPending}
                     data-testid="button-attach-file"
                     title={!selectedRoomId ? "Select a chat first" : "Attach file"}
                   >
                     {uploadAttachmentMutation.isPending ? (
-                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <Paperclip className="h-4 w-4" />
+                      <Paperclip className="h-5 w-5" />
                     )}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full"
+                    className="rounded-full min-w-[44px] min-h-[44px]"
                     onClick={() => selectedRoomId && setShowGifPicker(true)}
                     disabled={!selectedRoomId || sendGifMutation.isPending}
                     data-testid="button-gif-picker"
                     title={!selectedRoomId ? "Select a chat first" : "Send GIF"}
                   >
-                    <ImageIcon className="h-4 w-4" />
+                    <ImageIcon className="h-5 w-5" />
                   </Button>
                 </div>
                 
@@ -1647,15 +1653,15 @@ export default function Chat() {
                   )}
                 </div>
                 
-                {/* Send Button */}
+                {/* Send Button - Touch-friendly for mobile */}
                 <Button
                   size="icon"
-                  className="rounded-full shrink-0 shadow-sm"
+                  className="rounded-full shrink-0 shadow-sm min-w-[44px] min-h-[44px]"
                   onClick={handleSendMessage}
                   disabled={!messageText.trim() || sendMessageMutation.isPending}
                   data-testid="button-send-message"
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-5 w-5" />
                 </Button>
               </div>
             </div>
