@@ -82,6 +82,35 @@ interface ChatRoomWithParticipants extends ChatRoom {
   participants: ChatRoomParticipant[];
 }
 
+interface TenorGif {
+  id: string;
+  title: string;
+  previewUrl: string;
+  originalUrl: string;
+  width: number;
+  height: number;
+}
+
+interface GifSearchResult {
+  results: TenorGif[];
+  next?: string;
+}
+
+interface ChatAttachment {
+  id: string;
+  messageId: string;
+  type: "image" | "video" | "gif" | "document";
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  storageKey: string;
+  thumbnailKey?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  gifUrl?: string;
+}
+
 interface WebSocketMessage {
   type: "message" | "typing" | "read" | "presence" | "join" | "leave" | "error";
   roomId?: string;
@@ -115,8 +144,11 @@ export default function Chat() {
   const [showForwardDialog, setShowForwardDialog] = useState(false);
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
   const [selectedForwardRooms, setSelectedForwardRooms] = useState<string[]>([]);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearchQuery, setGifSearchQuery] = useState("");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -145,6 +177,25 @@ export default function Chat() {
     queryKey: ["/api/chat/rooms", selectedRoomId, "messages"],
     enabled: !!selectedRoomId,
   });
+
+  const { data: gifSearchResults = { results: [] }, isFetching: gifSearchLoading } = useQuery<GifSearchResult>({
+    queryKey: ["/api/chat/gifs/search", gifSearchQuery],
+    enabled: showGifPicker && !!selectedRoomId && gifSearchQuery.length >= 2,
+    staleTime: 60000,
+  });
+
+  const { data: trendingGifs = { results: [] } } = useQuery<GifSearchResult>({
+    queryKey: ["/api/chat/gifs/trending"],
+    enabled: showGifPicker && !!selectedRoomId && gifSearchQuery.length < 2,
+    staleTime: 60000,
+  });
+
+  const displayedGifs = gifSearchQuery.length >= 2 ? gifSearchResults.results : trendingGifs.results;
+  
+  useEffect(() => {
+    setShowGifPicker(false);
+    setGifSearchQuery("");
+  }, [selectedRoomId]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -446,6 +497,87 @@ export default function Chat() {
       toast({ title: "Failed to delete message", variant: "destructive" });
     },
   });
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: async ({ file, roomId }: { file: File; roomId: string }) => {
+      if (!roomId) throw new Error("No room selected");
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const response = await fetch(`/api/chat/rooms/${roomId}/attachments`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Upload failed");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchMessages();
+      toast({ title: "Media uploaded" });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Failed to upload media", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const sendGifMutation = useMutation({
+    mutationFn: async ({ gif, roomId }: { gif: TenorGif; roomId: string }) => {
+      if (!roomId) throw new Error("No room selected");
+      
+      const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/messages`, {
+        content: "",
+        attachmentType: "gif",
+        gifUrl: gif.originalUrl,
+        gifPreviewUrl: gif.previewUrl,
+        gifTitle: gif.title,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      setShowGifPicker(false);
+      setGifSearchQuery("");
+      refetchMessages();
+    },
+    onError: () => {
+      toast({ title: "Failed to send GIF", variant: "destructive" });
+    },
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedRoomId) return;
+    
+    const file = files[0];
+    const maxSize = file.type.startsWith("video/") ? 60 * 1024 * 1024 : 15 * 1024 * 1024;
+    
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: `Maximum size is ${file.type.startsWith("video/") ? "60MB" : "15MB"}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    uploadAttachmentMutation.mutate({ file, roomId: selectedRoomId });
+    e.target.value = "";
+  };
+
+  const handleGifSelect = (gif: TenorGif) => {
+    if (!selectedRoomId) return;
+    sendGifMutation.mutate({ gif, roomId: selectedRoomId });
+  };
 
   const handleSendMessage = () => {
     if (!messageText.trim() || !selectedRoomId) return;
@@ -1204,6 +1336,39 @@ export default function Chat() {
                 </div>
               )}
               <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept="image/*,video/*"
+                  className="hidden"
+                  disabled={!selectedRoomId}
+                  data-testid="input-file-upload"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => selectedRoomId && fileInputRef.current?.click()}
+                  disabled={!selectedRoomId || uploadAttachmentMutation.isPending}
+                  data-testid="button-attach-file"
+                  title={!selectedRoomId ? "Select a chat first" : "Attach file"}
+                >
+                  {uploadAttachmentMutation.isPending ? (
+                    <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Paperclip className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => selectedRoomId && setShowGifPicker(true)}
+                  disabled={!selectedRoomId || sendGifMutation.isPending}
+                  data-testid="button-gif-picker"
+                  title={!selectedRoomId ? "Select a chat first" : "Send GIF"}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
                 <Input
                   placeholder={replyToMessage ? "Type your reply..." : "Type a message..."}
                   value={messageText}
@@ -1628,6 +1793,84 @@ export default function Chat() {
               Forward to {selectedForwardRooms.length} chat{selectedForwardRooms.length !== 1 ? "s" : ""}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* GIF Picker Dialog */}
+      <Dialog open={showGifPicker} onOpenChange={(open) => {
+        setShowGifPicker(open);
+        if (!open) {
+          setGifSearchQuery("");
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Send a GIF
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search for GIFs..."
+                value={gifSearchQuery}
+                onChange={(e) => setGifSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-gif-search"
+              />
+            </div>
+            
+            <div className="text-xs text-muted-foreground">
+              {gifSearchQuery.length >= 2 
+                ? `Showing results for "${gifSearchQuery}"`
+                : "Trending GIFs"}
+            </div>
+            
+            <ScrollArea className="h-[300px]">
+              {gifSearchLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : displayedGifs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {gifSearchQuery.length >= 2 
+                      ? "No GIFs found. Try a different search."
+                      : "GIF service not available"}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {displayedGifs.map((gif) => (
+                    <button
+                      key={gif.id}
+                      onClick={() => handleGifSelect(gif)}
+                      className="relative group rounded-lg overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                      data-testid={`gif-${gif.id}`}
+                    >
+                      <img
+                        src={gif.previewUrl}
+                        alt={gif.title}
+                        className="w-full h-24 object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs">Send</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+            
+            <p className="text-xs text-center text-muted-foreground">
+              Powered by Tenor
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
