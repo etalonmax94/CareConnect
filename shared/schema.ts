@@ -2695,6 +2695,20 @@ export const tasks = pgTable("tasks", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Helper to coerce string dates to Date objects with validation
+const coerceDateSchema = z.preprocess(
+  (val) => {
+    if (val === null || val === undefined || val === "") return null;
+    if (val instanceof Date) return val;
+    if (typeof val === "string") {
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }
+    return null;
+  },
+  z.date().nullable().optional()
+);
+
 export const insertTaskSchema = createInsertSchema(tasks, {
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
@@ -2702,12 +2716,30 @@ export const insertTaskSchema = createInsertSchema(tasks, {
   priority: z.enum(["low", "medium", "high", "urgent"]).optional().default("medium"),
   status: z.enum(["not_started", "in_progress", "completed", "cancelled"]).optional().default("not_started"),
   isRecurring: z.enum(["yes", "no"]).optional(),
+  recurrencePattern: z.enum(["daily", "weekly", "fortnightly", "monthly", "custom"]).optional().nullable(),
+  // Coerce string dates from JSON to Date objects with validation
+  dueDate: coerceDateSchema,
+  reminderDate: coerceDateSchema,
+  recurrenceEndDate: coerceDateSchema,
+  assignedAt: coerceDateSchema,
 }).omit({
   id: true,
   taskNumber: true,
   createdAt: true,
   updatedAt: true,
-});
+}).refine(
+  (data) => {
+    // If recurring is "yes", require a recurrence pattern
+    if (data.isRecurring === "yes" && !data.recurrencePattern) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "Recurrence pattern is required when task is recurring",
+    path: ["recurrencePattern"],
+  }
+);
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;

@@ -31,6 +31,7 @@ import {
   MoreHorizontal,
   Edit,
   ListTodo,
+  Repeat,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,9 @@ export default function Tasks() {
   const [completionNotes, setCompletionNotes] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
+  // Recurrence pattern type
+  type RecurrencePattern = "daily" | "weekly" | "fortnightly" | "monthly" | "custom" | "";
+
   // Form state for new task
   const [newTask, setNewTask] = useState({
     title: "",
@@ -120,6 +124,9 @@ export default function Tasks() {
     assignedToName: "",
     clientId: "",
     clientName: "",
+    isRecurring: "no" as "yes" | "no",
+    recurrencePattern: "" as RecurrencePattern,
+    recurrenceEndDate: "",
   });
 
   // Queries
@@ -168,6 +175,8 @@ export default function Tasks() {
         clientName: taskData.clientName || null,
         assignedToId: taskData.assignedToId || null,
         assignedToName: taskData.assignedToName || null,
+        recurrencePattern: taskData.recurrencePattern || null,
+        recurrenceEndDate: taskData.recurrenceEndDate ? new Date(taskData.recurrenceEndDate).toISOString() : null,
       });
     },
     onSuccess: () => {
@@ -186,6 +195,9 @@ export default function Tasks() {
         assignedToName: "",
         clientId: "",
         clientName: "",
+        isRecurring: "no",
+        recurrencePattern: "",
+        recurrenceEndDate: "",
       });
     },
     onError: () => {
@@ -928,6 +940,77 @@ export default function Tasks() {
                 data-testid="input-task-due-date"
               />
             </div>
+            
+            {/* Recurring Task Options */}
+            <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Repeat className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">Recurring Task</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={newTask.isRecurring === "no" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setNewTask({ ...newTask, isRecurring: "no", recurrencePattern: "", recurrenceEndDate: "" })}
+                    data-testid="button-recurring-no"
+                  >
+                    No
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={newTask.isRecurring === "yes" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setNewTask({ ...newTask, isRecurring: "yes" })}
+                    data-testid="button-recurring-yes"
+                  >
+                    Yes
+                  </Button>
+                </div>
+              </div>
+              
+              {newTask.isRecurring === "yes" && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div>
+                    <Label className="text-sm">Repeat Every *</Label>
+                    <Select
+                      value={newTask.recurrencePattern}
+                      onValueChange={(v) => setNewTask({ ...newTask, recurrencePattern: v as RecurrencePattern })}
+                    >
+                      <SelectTrigger className="mt-1" data-testid="select-recurrence-pattern">
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="fortnightly">Fortnightly (Every 2 weeks)</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {newTask.isRecurring === "yes" && !newTask.recurrencePattern && (
+                      <p className="text-xs text-destructive mt-1">Please select a frequency</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="task-recurrence-end">End Recurrence (Optional)</Label>
+                    <Input
+                      id="task-recurrence-end"
+                      type="date"
+                      value={newTask.recurrenceEndDate}
+                      onChange={(e) => setNewTask({ ...newTask, recurrenceEndDate: e.target.value })}
+                      className="mt-1"
+                      data-testid="input-recurrence-end-date"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Leave empty for indefinite recurrence
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div>
               <Label>Assign To (Optional)</Label>
               <Select
@@ -985,7 +1068,11 @@ export default function Tasks() {
             </Button>
             <Button
               onClick={() => createTaskMutation.mutate(newTask)}
-              disabled={!newTask.title.trim() || createTaskMutation.isPending}
+              disabled={
+                !newTask.title.trim() || 
+                createTaskMutation.isPending ||
+                (newTask.isRecurring === "yes" && !newTask.recurrencePattern)
+              }
               data-testid="button-submit-task"
             >
               <Plus className="h-4 w-4 mr-1" />
