@@ -1573,7 +1573,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   return (
     <>
       <Form {...form}>
-        <div className="max-w-4xl mx-auto px-2 sm:px-4 h-[calc(100vh-120px)] flex flex-col">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4">
           {/* Step labels and progress bar - compact layout */}
           <div className="mb-3 flex-shrink-0">
             {/* Step labels row - compact */}
@@ -1625,8 +1625,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
             </div>
           </div>
 
-          {/* Main wizard layout with vertical side buttons - fills available height */}
-          <div className="flex items-stretch gap-2 flex-1 min-h-0">
+          {/* Main wizard layout with vertical side buttons - fixed height */}
+          <div className="flex items-stretch gap-2 h-[420px]">
             {/* Left navigation button - Back/Cancel */}
             <button
               type="button"
@@ -1645,8 +1645,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               </span>
             </button>
 
-            {/* Center Card - Fills available height */}
-            <Card className="flex-1 flex flex-col overflow-hidden">
+            {/* Center Card - Fixed height for uniformity */}
+            <Card className="flex-1 flex flex-col overflow-hidden h-full">
               <CardHeader className="flex-shrink-0 py-2 px-4 border-b">
                 <div className="flex items-center gap-2">
                   {(() => {
