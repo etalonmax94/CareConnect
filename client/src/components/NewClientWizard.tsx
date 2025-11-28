@@ -23,7 +23,7 @@ import {
   Loader2, Upload, X, Camera, ArrowLeft, ArrowRight, Check, Plus,
   User, Phone, Heart, Settings, Briefcase, Users, Target, FileCheck,
   MapPin, Calendar, Mail, Stethoscope, Pill, UserCog, Building2, Shield,
-  AlertTriangle
+  AlertTriangle, Activity, Sparkles
 } from "lucide-react";
 import { SuburbAutocomplete } from "@/components/AddressAutocomplete";
 import { useToast } from "@/hooks/use-toast";
@@ -604,19 +604,45 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
       case "medical":
         return (
           <div className="space-y-4">
-            <FormField
-              control={form.control}
-              name="mainDiagnosis"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Primary Diagnosis</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value || ""} placeholder="e.g., Cerebral Palsy, Multiple Sclerosis" data-testid="input-diagnosis" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Primary Diagnosis and Advanced Care Directive in grid row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="mainDiagnosis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Primary Diagnosis</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="e.g., Cerebral Palsy, Multiple Sclerosis" data-testid="input-diagnosis" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="advancedCareDirective"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Advanced Care Directive</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-acd">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="NFR">NFR (Not for Resuscitation)</SelectItem>
+                        <SelectItem value="For Resus">For Resuscitation</SelectItem>
+                        <SelectItem value="None">None / Unknown</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
@@ -627,29 +653,6 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   <FormControl>
                     <Textarea {...field} value={field.value || ""} placeholder="List any known allergies..." rows={3} data-testid="input-allergies" />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="advancedCareDirective"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Advanced Care Directive</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-acd">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="NFR">NFR (Not for Resuscitation)</SelectItem>
-                      <SelectItem value="For Resus">For Resuscitation</SelectItem>
-                      <SelectItem value="None">None / Unknown</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -674,47 +677,46 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
       case "lifestyle":
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="dietPatterns"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Diet</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} value={field.value || ""} placeholder="Dietary patterns, restrictions..." rows={3} data-testid="input-diet" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="exercisePatterns"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Exercise</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} value={field.value || ""} placeholder="Physical activity levels..." rows={3} data-testid="input-exercise" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="sleepPatterns"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sleep</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} value={field.value || ""} placeholder="Sleep patterns, issues..." rows={3} data-testid="input-sleep" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Diet, Exercise, Sleep in vertical stack (not grid) */}
+            <FormField
+              control={form.control}
+              name="dietPatterns"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Diet</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value || ""} placeholder="Dietary patterns, restrictions..." rows={2} data-testid="input-diet" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="exercisePatterns"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Exercise</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value || ""} placeholder="Physical activity levels..." rows={2} data-testid="input-exercise" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sleepPatterns"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sleep</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value || ""} placeholder="Sleep patterns, issues..." rows={2} data-testid="input-sleep" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -723,7 +725,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 <FormItem>
                   <FormLabel>Clinical Notes</FormLabel>
                   <FormControl>
-                    <Textarea {...field} value={field.value || ""} placeholder="Additional clinical information..." rows={3} data-testid="input-clinical-notes" />
+                    <Textarea {...field} value={field.value || ""} placeholder="Additional clinical information..." rows={2} data-testid="input-clinical-notes" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1466,99 +1468,145 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
         const alliedHealth = alliedHealthProfessionals.find(ah => ah.id === values.careTeam?.alliedHealthProfessionalId);
 
         return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
+          <div className="space-y-3 text-sm">
+            {/* Header with photo and name */}
+            <div className="flex items-center gap-3 pb-2 border-b">
+              <Avatar className="h-12 w-12">
                 <AvatarImage src={photoPreview || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-xl">
+                <AvatarFallback className="bg-primary/10 text-primary text-lg">
                   {values.firstName?.charAt(0)}{values.lastName?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="text-lg font-semibold">{values.firstName} {values.middleName} {values.lastName}</h3>
-                <Badge>{values.category}</Badge>
+                <h3 className="font-semibold">{values.firstName} {values.middleName} {values.lastName}</h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{values.category}</Badge>
+                  {fratAssessment.totalScore > 0 && (
+                    <Badge className={getRiskCategoryColor(fratAssessment.riskCategory)}>
+                      FRAT: {fratAssessment.riskCategory}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
-            <Separator />
-
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="space-y-3">
-                <h4 className="font-medium flex items-center gap-2"><User className="w-4 h-4" /> Identity</h4>
-                <div className="space-y-1 text-muted-foreground">
-                  <p><Calendar className="w-3 h-3 inline mr-1" /> {values.dateOfBirth || "DOB not set"}</p>
-                  <p><Phone className="w-3 h-3 inline mr-1" /> {values.phoneNumber || "No phone"}</p>
-                  <p><Mail className="w-3 h-3 inline mr-1" /> {values.email || "No email"}</p>
+            {/* Main grid - 3 columns for compact display */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* Column 1: Identity & Contact */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-xs text-primary flex items-center gap-1">
+                  <User className="w-3 h-3" /> Identity
+                </h4>
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  <p>DOB: {values.dateOfBirth || "Not set"}</p>
+                  <p>Phone: {values.phoneNumber || "Not set"}</p>
+                  <p>Email: {values.email || "Not set"}</p>
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium flex items-center gap-2"><MapPin className="w-4 h-4" /> Address</h4>
-                <p className="text-muted-foreground">
-                  {values.streetAddress && `${values.streetAddress}, `}
-                  {values.suburb && `${values.suburb} `}
-                  {values.state} {values.postcode}
-                  {!values.streetAddress && !values.suburb && "Not provided"}
+                
+                <h4 className="font-medium text-xs text-primary flex items-center gap-1 pt-1">
+                  <MapPin className="w-3 h-3" /> Address
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  {values.streetAddress || "Not set"}
+                  {values.suburb && `, ${values.suburb}`}
+                  {values.state && ` ${values.state}`}
+                  {values.postcode && ` ${values.postcode}`}
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <h4 className="font-medium flex items-center gap-2"><Heart className="w-4 h-4" /> Clinical</h4>
-                <div className="space-y-1 text-muted-foreground">
+              {/* Column 2: Medical & Lifestyle */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-xs text-primary flex items-center gap-1">
+                  <Heart className="w-3 h-3" /> Medical
+                </h4>
+                <div className="space-y-0.5 text-xs text-muted-foreground">
                   <p>Diagnosis: {values.mainDiagnosis || "Not set"}</p>
-                  <p>Allergies: {values.allergies || "None listed"}</p>
                   <p>ACD: {values.advancedCareDirective || "Not set"}</p>
+                  <p>Allergies: {values.allergies || "None"}</p>
+                </div>
+                
+                <h4 className="font-medium text-xs text-primary flex items-center gap-1 pt-1">
+                  <Activity className="w-3 h-3" /> Lifestyle
+                </h4>
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  <p>Diet: {values.dietPatterns ? "Recorded" : "Not set"}</p>
+                  <p>Exercise: {values.exercisePatterns ? "Recorded" : "Not set"}</p>
+                  <p>Sleep: {values.sleepPatterns ? "Recorded" : "Not set"}</p>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <h4 className="font-medium flex items-center gap-2"><Users className="w-4 h-4" /> Care Team</h4>
-                <div className="space-y-1 text-muted-foreground">
-                  {careManager && <p>Care Manager: {careManager.name}</p>}
-                  {supportCoordinator && <p>Coordinator: {supportCoordinator.name}</p>}
-                  {gp && <p>GP: {gp.name}</p>}
-                  {pharmacy && <p>Pharmacy: {pharmacy.name}</p>}
-                  {planManager && <p>Plan Manager: {planManager.name}</p>}
-                  {alliedHealth && <p>Allied Health: {alliedHealth.name}</p>}
-                  {!careManager && !supportCoordinator && !gp && !pharmacy && !planManager && !alliedHealth && <p>None assigned yet</p>}
+              {/* Column 3: Preferences & Services */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-xs text-primary flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> Preferences
+                </h4>
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  <p>Culture: {values.culturalBackground || "Not set"}</p>
+                  <p>Hobbies: {values.hobbiesInterests || "Not set"}</p>
+                </div>
+                
+                <h4 className="font-medium text-xs text-primary flex items-center gap-1 pt-1">
+                  <Briefcase className="w-3 h-3" /> Services
+                </h4>
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  <p>Type: {values.serviceType || "Not set"}</p>
+                  <p>Communication: {values.communicationNeeds || "Standard"}</p>
                 </div>
               </div>
             </div>
 
-            {nokName && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                <h4 className="font-medium text-sm flex items-center gap-2"><Users className="w-4 h-4" /> Next of Kin</h4>
-                <p className="text-sm text-muted-foreground">
-                  {nokName} {nokRelationship && `(${nokRelationship})`} {nokPhone && `- ${nokPhone}`}
-                </p>
-              </div>
-            )}
+            {/* Emergency Contacts Row */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {nokName && (
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-md">
+                  <h4 className="font-medium text-xs flex items-center gap-1"><Users className="w-3 h-3" /> Next of Kin</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {nokName} {nokRelationship && `(${nokRelationship})`} {nokPhone && `• ${nokPhone}`}
+                  </p>
+                </div>
+              )}
+              {epoaName && (
+                <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded-md">
+                  <h4 className="font-medium text-xs flex items-center gap-1"><Shield className="w-3 h-3" /> EPOA</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {epoaName} {epoaRelationship && `(${epoaRelationship})`} {epoaPhone && `• ${epoaPhone}`}
+                  </p>
+                </div>
+              )}
+            </div>
 
-            {epoaName && (
-              <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
-                <h4 className="font-medium text-sm flex items-center gap-2"><Shield className="w-4 h-4" /> EPOA</h4>
-                <p className="text-sm text-muted-foreground">
-                  {epoaName} {epoaRelationship && `(${epoaRelationship})`} {epoaPhone && `- ${epoaPhone}`}
-                </p>
+            {/* Care Team */}
+            <div className="p-2 bg-muted/50 rounded-md">
+              <h4 className="font-medium text-xs flex items-center gap-1 mb-1"><Users className="w-3 h-3" /> Care Team</h4>
+              <div className="grid grid-cols-3 gap-1 text-xs text-muted-foreground">
+                {careManager && <p>CM: {careManager.name}</p>}
+                {supportCoordinator && <p>SC: {supportCoordinator.name}</p>}
+                {gp && <p>GP: {gp.name}</p>}
+                {pharmacy && <p>Pharmacy: {pharmacy.name}</p>}
+                {planManager && <p>PM: {planManager.name}</p>}
+                {alliedHealth && <p>AH: {alliedHealth.name}</p>}
+                {!careManager && !supportCoordinator && !gp && !pharmacy && !planManager && !alliedHealth && (
+                  <p className="col-span-3">No team members assigned yet</p>
+                )}
               </div>
-            )}
+            </div>
 
+            {/* Program Details */}
             {selectedCategory === "NDIS" && values.ndisDetails?.ndisNumber && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                <h4 className="font-medium text-sm">NDIS Details</h4>
-                <p className="text-sm text-muted-foreground">
-                  Number: {values.ndisDetails.ndisNumber} | 
-                  Funding: {values.ndisDetails.ndisFundingType || "Not set"}
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-md">
+                <h4 className="font-medium text-xs">NDIS Details</h4>
+                <p className="text-xs text-muted-foreground">
+                  Number: {values.ndisDetails.ndisNumber} • Funding: {values.ndisDetails.ndisFundingType || "Not set"}
+                  {values.ndisDetails.planStartDate && ` • Plan: ${values.ndisDetails.planStartDate} to ${values.ndisDetails.planEndDate || "ongoing"}`}
                 </p>
               </div>
             )}
 
             {selectedCategory === "Support at Home" && values.supportAtHomeDetails?.sahNumber && (
-              <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                <h4 className="font-medium text-sm">Support at Home Details</h4>
-                <p className="text-sm text-muted-foreground">
-                  Number: {values.supportAtHomeDetails.sahNumber} | 
-                  Level: {values.supportAtHomeDetails.sahFundingLevel || "Not set"}
+              <div className="p-2 bg-green-50 dark:bg-green-950/20 rounded-md">
+                <h4 className="font-medium text-xs">Support at Home Details</h4>
+                <p className="text-xs text-muted-foreground">
+                  Number: {values.supportAtHomeDetails.sahNumber} • Level: {values.supportAtHomeDetails.sahFundingLevel || "Not set"}
                 </p>
               </div>
             )}
@@ -1625,8 +1673,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
             </div>
           </div>
 
-          {/* Main wizard layout with vertical side buttons - fixed height */}
-          <div className="flex items-stretch gap-2 h-[420px]">
+          {/* Main wizard layout with vertical side buttons - fixed height 550px */}
+          <div className="flex items-stretch gap-2 h-[550px]">
             {/* Left navigation button - Back/Cancel */}
             <button
               type="button"
