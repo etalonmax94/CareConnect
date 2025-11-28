@@ -25,6 +25,16 @@ import {
   Filter,
   X,
   Check,
+  Reply,
+  Forward,
+  Trash2,
+  Image as ImageIcon,
+  Paperclip,
+  Play,
+  Download,
+  Lock,
+  Unlock,
+  ArchiveRestore,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -101,6 +111,10 @@ export default function Chat() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [filterByRole, setFilterByRole] = useState<string>("all");
+  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
+  const [showForwardDialog, setShowForwardDialog] = useState(false);
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
+  const [selectedForwardRooms, setSelectedForwardRooms] = useState<string[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -374,21 +388,22 @@ export default function Chat() {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (data: { content: string; replyToId?: string; replyToSenderId?: string; replyToSenderName?: string; replyToPreview?: string }) => {
       if (wsRef.current?.readyState === WebSocket.OPEN && selectedRoomId) {
         wsRef.current.send(JSON.stringify({
           type: "message",
           roomId: selectedRoomId,
-          content
+          ...data
         }));
         return { success: true };
       } else {
-        const response = await apiRequest("POST", `/api/chat/rooms/${selectedRoomId}/messages`, { content });
+        const response = await apiRequest("POST", `/api/chat/rooms/${selectedRoomId}/messages`, data);
         return response.json();
       }
     },
     onSuccess: () => {
       setMessageText("");
+      setReplyToMessage(null);
       sendTypingIndicator(false);
       refetchMessages();
     },
@@ -397,9 +412,87 @@ export default function Chat() {
     },
   });
 
+  const forwardMessageMutation = useMutation({
+    mutationFn: async (data: { messageId: string; targetRoomIds: string[] }) => {
+      const results = await Promise.all(
+        data.targetRoomIds.map(async (roomId) => {
+          const response = await apiRequest("POST", `/api/chat/messages/${data.messageId}/forward`, { targetRoomId: roomId });
+          return response.json();
+        })
+      );
+      return results;
+    },
+    onSuccess: () => {
+      setShowForwardDialog(false);
+      setForwardingMessage(null);
+      setSelectedForwardRooms([]);
+      toast({ title: "Message forwarded successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to forward message", variant: "destructive" });
+    },
+  });
+
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const response = await apiRequest("DELETE", `/api/chat/messages/${messageId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchMessages();
+      toast({ title: "Message deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete message", variant: "destructive" });
+    },
+  });
+
   const handleSendMessage = () => {
     if (!messageText.trim() || !selectedRoomId) return;
-    sendMessageMutation.mutate(messageText.trim());
+    
+    const messageData: { 
+      content: string; 
+      replyToId?: string; 
+      replyToSenderId?: string; 
+      replyToSenderName?: string; 
+      replyToPreview?: string 
+    } = {
+      content: messageText.trim()
+    };
+    
+    if (replyToMessage) {
+      messageData.replyToId = replyToMessage.id;
+      messageData.replyToSenderId = replyToMessage.senderId;
+      messageData.replyToSenderName = replyToMessage.senderName || "Unknown";
+      messageData.replyToPreview = replyToMessage.content?.substring(0, 100) || "";
+    }
+    
+    sendMessageMutation.mutate(messageData);
+  };
+
+  const handleReplyToMessage = (message: ChatMessage) => {
+    setReplyToMessage(message);
+  };
+
+  const handleForwardMessage = (message: ChatMessage) => {
+    setForwardingMessage(message);
+    setShowForwardDialog(true);
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    if (confirm("Are you sure you want to delete this message?")) {
+      deleteMessageMutation.mutate(messageId);
+    }
+  };
+
+  const canDeleteMessage = (message: ChatMessage) => {
+    if (!currentUser) return false;
+    const isOwn = message.senderId === currentUser.id;
+    if (isAppAdmin) return true;
+    if (!isOwn) return false;
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    return messageAge < twentyFourHours;
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -946,11 +1039,14 @@ export default function Chat() {
                   {[...messages].reverse().map((message, index, arr) => {
                     const isOwn = message.senderId === currentUser?.id;
                     const showAvatar = index === 0 || arr[index - 1]?.senderId !== message.senderId;
+                    const isDeleted = message.deletedAt !== null;
+                    const isForwarded = !!(message as any).forwardedFromMessageId;
+                    const isReply = !!(message as any).replyToId;
                     
                     return (
                       <div
                         key={message.id}
-                        className={`flex gap-3 ${isOwn ? "flex-row-reverse" : ""}`}
+                        className={`group flex gap-3 ${isOwn ? "flex-row-reverse" : ""}`}
                         data-testid={`message-${message.id}`}
                       >
                         {!isOwn && showAvatar ? (
@@ -963,21 +1059,97 @@ export default function Chat() {
                           <div className="w-8" />
                         ) : null}
                         
-                        <div className={`max-w-[70%] ${isOwn ? "items-end" : "items-start"}`}>
+                        <div className={`max-w-[70%] flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
                           {!isOwn && showAvatar && (
                             <p className="text-xs text-muted-foreground mb-1">
                               {message.senderName}
                             </p>
                           )}
-                          <div
-                            className={`rounded-2xl px-4 py-2 ${
-                              isOwn
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          
+                          {isForwarded && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                              <Forward className="h-3 w-3" />
+                              <span>Forwarded message</span>
+                            </div>
+                          )}
+                          
+                          {isReply && (message as any).replyToPreview && (
+                            <div 
+                              className={`text-xs px-3 py-1.5 rounded-t-xl mb-0.5 border-l-2 ${
+                                isOwn 
+                                  ? "bg-primary/20 border-primary-foreground/50 text-primary-foreground/80" 
+                                  : "bg-muted/80 border-muted-foreground/50"
+                              }`}
+                            >
+                              <p className="font-medium text-xs">{(message as any).replyToSenderName}</p>
+                              <p className="truncate max-w-[200px]">{(message as any).replyToPreview}</p>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-start gap-1">
+                            <div
+                              className={`rounded-2xl px-4 py-2 ${
+                                isDeleted
+                                  ? "bg-muted/50 text-muted-foreground italic"
+                                  : isOwn
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted"
+                              }`}
+                            >
+                              {isDeleted ? (
+                                <p className="text-sm">This message was deleted</p>
+                              ) : (
+                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                              )}
+                            </div>
+                            
+                            {!isDeleted && (
+                              <div className="invisible group-hover:visible flex items-center">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-6 w-6"
+                                      data-testid={`button-message-actions-${message.id}`}
+                                    >
+                                      <MoreVertical className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align={isOwn ? "end" : "start"}>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleReplyToMessage(message)}
+                                      data-testid={`button-reply-${message.id}`}
+                                    >
+                                      <Reply className="h-4 w-4 mr-2" />
+                                      Reply
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleForwardMessage(message)}
+                                      data-testid={`button-forward-${message.id}`}
+                                    >
+                                      <Forward className="h-4 w-4 mr-2" />
+                                      Forward
+                                    </DropdownMenuItem>
+                                    {canDeleteMessage(message) && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                          className="text-destructive"
+                                          onClick={() => handleDeleteMessage(message.id)}
+                                          data-testid={`button-delete-${message.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            )}
                           </div>
+                          
                           <div className={`flex items-center gap-1 mt-1 ${isOwn ? "justify-end" : ""}`}>
                             <span className="text-xs text-muted-foreground">
                               {formatMessageDate(message.createdAt)}
@@ -1008,9 +1180,32 @@ export default function Chat() {
 
             {/* Message Input */}
             <div className="p-4 border-t">
+              {replyToMessage && (
+                <div className="flex items-center justify-between bg-muted rounded-lg px-3 py-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Reply className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">Replying to {replyToMessage.senderName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {replyToMessage.content?.substring(0, 50)}
+                        {(replyToMessage.content?.length || 0) > 50 ? "..." : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    onClick={() => setReplyToMessage(null)}
+                    data-testid="button-cancel-reply"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Type a message..."
+                  placeholder={replyToMessage ? "Type your reply..." : "Type a message..."}
                   value={messageText}
                   onChange={handleMessageChange}
                   onKeyDown={handleKeyPress}
@@ -1337,6 +1532,100 @@ export default function Chat() {
             >
               <Shield className="h-4 w-4 mr-2" />
               Create Chat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Forward Message Dialog */}
+      <Dialog open={showForwardDialog} onOpenChange={(open) => {
+        setShowForwardDialog(open);
+        if (!open) {
+          setForwardingMessage(null);
+          setSelectedForwardRooms([]);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Forward className="h-5 w-5" />
+              Forward Message
+            </DialogTitle>
+            <DialogDescription>
+              Select one or more chats to forward this message to
+            </DialogDescription>
+          </DialogHeader>
+          
+          {forwardingMessage && (
+            <div className="bg-muted rounded-lg p-3 mb-4">
+              <p className="text-xs text-muted-foreground mb-1">Message from {forwardingMessage.senderName}</p>
+              <p className="text-sm">{forwardingMessage.content?.substring(0, 150)}{(forwardingMessage.content?.length || 0) > 150 ? "..." : ""}</p>
+            </div>
+          )}
+          
+          <ScrollArea className="max-h-[300px]">
+            <div className="space-y-2">
+              {rooms
+                .filter(room => room.id !== selectedRoomId)
+                .map((room) => (
+                  <div
+                    key={room.id}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
+                    onClick={() => {
+                      setSelectedForwardRooms(prev =>
+                        prev.includes(room.id)
+                          ? prev.filter(id => id !== room.id)
+                          : [...prev, room.id]
+                      );
+                    }}
+                    data-testid={`forward-room-${room.id}`}
+                  >
+                    <Checkbox
+                      checked={selectedForwardRooms.includes(room.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedForwardRooms(prev =>
+                          checked
+                            ? [...prev, room.id]
+                            : prev.filter(id => id !== room.id)
+                        );
+                      }}
+                    />
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className={getRoomBgColor(room)}>
+                        {getRoomAvatar(room)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{getRoomDisplayName(room)}</p>
+                      {room.type !== "direct" && (
+                        <p className="text-xs text-muted-foreground">
+                          {room.participants.length} members
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </ScrollArea>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowForwardDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (forwardingMessage && selectedForwardRooms.length > 0) {
+                  forwardMessageMutation.mutate({
+                    messageId: forwardingMessage.id,
+                    targetRoomIds: selectedForwardRooms
+                  });
+                }
+              }}
+              disabled={selectedForwardRooms.length === 0 || forwardMessageMutation.isPending}
+              data-testid="button-confirm-forward"
+            >
+              <Forward className="h-4 w-4 mr-2" />
+              Forward to {selectedForwardRooms.length} chat{selectedForwardRooms.length !== 1 ? "s" : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
