@@ -158,6 +158,8 @@ export default function Chat() {
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const [activeMentions, setActiveMentions] = useState<Array<{ id: string; name: string }>>([]);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [currentSearchResultIndex, setCurrentSearchResultIndex] = useState(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -216,6 +218,8 @@ export default function Chat() {
   useEffect(() => {
     setShowGifPicker(false);
     setGifSearchQuery("");
+    setMessageSearchQuery("");
+    setCurrentSearchResultIndex(0);
   }, [selectedRoomId]);
 
   useEffect(() => {
@@ -372,6 +376,17 @@ export default function Chat() {
     
     return filteredStaff;
   };
+
+  // Get messages that match search query
+  const searchResults = messageSearchQuery.trim().length > 0
+    ? messages
+        .map((msg, idx) => ({
+          message: msg,
+          index: idx,
+          matches: msg.content?.toLowerCase().includes(messageSearchQuery.toLowerCase()) || false
+        }))
+        .filter(item => item.matches)
+    : [];
 
   // Get color for sender name based on hash of sender ID
   const getSenderNameColor = (senderId: string): string => {
@@ -1247,6 +1262,50 @@ export default function Chat() {
                 </div>
               </div>
               
+              <div className="flex items-center gap-2">
+                {/* Message Search */}
+                <div className="hidden sm:flex items-center gap-1 bg-muted/50 rounded-lg px-3 h-9 min-w-0">
+                  <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Input
+                    placeholder="Search messages..."
+                    value={messageSearchQuery}
+                    onChange={(e) => {
+                      setMessageSearchQuery(e.target.value);
+                      setCurrentSearchResultIndex(0);
+                    }}
+                    className="border-0 bg-transparent text-sm focus-visible:ring-0 p-0 h-full w-32 placeholder:text-muted-foreground/50"
+                    data-testid="input-message-search"
+                  />
+                  {searchResults.length > 0 && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {currentSearchResultIndex + 1}/{searchResults.length}
+                    </span>
+                  )}
+                  {searchResults.length > 1 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded"
+                        onClick={() => setCurrentSearchResultIndex((currentSearchResultIndex - 1 + searchResults.length) % searchResults.length)}
+                        data-testid="button-search-prev"
+                      >
+                        <ArrowLeft className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded"
+                        onClick={() => setCurrentSearchResultIndex((currentSearchResultIndex + 1) % searchResults.length)}
+                        data-testid="button-search-next"
+                      >
+                        <ArrowLeft className="h-3 w-3 rotate-180" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              
               {(isRoomAdmin || isAppAdmin) && selectedRoom.type !== "direct" && (
                 <Sheet open={showRoomSettings} onOpenChange={setShowRoomSettings}>
                   <SheetTrigger asChild>
@@ -1424,11 +1483,13 @@ export default function Chat() {
                     const isDeleted = message.deletedAt !== null;
                     const isForwarded = !!(message as any).forwardedFromMessageId;
                     const isReply = !!(message as any).replyToId;
+                    const isSearchMatch = searchResults.some(r => r.message.id === message.id);
+                    const isCurrentSearchResult = isSearchMatch && searchResults[currentSearchResultIndex]?.message.id === message.id;
                     
                     return (
                       <div
                         key={message.id}
-                        className={`group flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}
+                        className={`group flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""} ${isCurrentSearchResult ? "bg-yellow-200/40 dark:bg-yellow-900/20 rounded-lg px-2 py-1 -mx-2" : ""}`}
                         data-testid={`message-${message.id}`}
                       >
                         {!isOwn && showAvatar ? (
