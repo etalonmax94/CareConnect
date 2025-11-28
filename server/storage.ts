@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { encryptMessage, decryptMessage, isEncryptionEnabled, isEncryptedFormat } from "./services/encryption";
 import { 
   clients, progressNotes, invoices, budgets, settings, activityLog, auditLog, incidentReports, privacyConsents,
   staff, supportCoordinators, planManagers, ndisServices, users, generalPractitioners, pharmacies,
@@ -627,6 +628,8 @@ export interface IStorage {
   // Client Chat Auto-Creation
   createClientChatRoom(clientId: string, clientName: string, createdById: string, createdByName: string): Promise<ChatRoom>;
   syncClientChatParticipants(clientId: string, assignedStaffIds: { id: string; name: string; email?: string }[]): Promise<void>;
+  archiveClientChatRooms(clientId: string, archivedById: string, archivedByName: string): Promise<number>;
+  unarchiveClientChatRooms(clientId: string): Promise<number>;
   
   // Chat Room Participants
   getChatRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]>;
@@ -639,7 +642,8 @@ export interface IStorage {
   isRoomParticipant(roomId: string, staffId: string): Promise<boolean>;
   
   // Chat Messages
-  getChatMessages(roomId: string, limit?: number, before?: string): Promise<ChatMessage[]>;
+  getChatMessages(roomId: string, limit?: number, before?: string, userId?: string): Promise<ChatMessage[]>;
+  getParticipantJoinDate(roomId: string, staffId: string): Promise<Date | null>;
   getChatMessageById(id: string): Promise<ChatMessage | undefined>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   updateChatMessage(id: string, content: string): Promise<ChatMessage | undefined>;
@@ -652,6 +656,13 @@ export interface IStorage {
   createChatMessageAttachment(attachment: InsertChatMessageAttachment): Promise<ChatMessageAttachment>;
   updateChatMessageAttachmentStatus(id: string, status: string, error?: string): Promise<ChatMessageAttachment | undefined>;
   deleteChatMessageAttachment(id: string): Promise<boolean>;
+  
+  // Media Retention
+  getExpiredMediaAttachments(limit?: number): Promise<ChatMessageAttachment[]>;
+  getUpcomingExpiryAttachments(daysBeforeExpiry: number, limit?: number): Promise<ChatMessageAttachment[]>;
+  markAttachmentAsExpired(id: string, reason: string): Promise<ChatMessageAttachment | undefined>;
+  setAttachmentExpiry(id: string, expiresAt: Date): Promise<ChatMessageAttachment | undefined>;
+  cleanupExpiredMedia(): Promise<{ cleaned: number; errors: string[] }>;
   
   // Chat Audit Logs
   createChatAuditLog(log: InsertChatAuditLog): Promise<ChatAuditLog>;
@@ -3828,7 +3839,15 @@ export class DbStorage implements IStorage {
   }
 
   async createChatMessageAttachment(attachment: InsertChatMessageAttachment): Promise<ChatMessageAttachment> {
-    const result = await db.insert(chatMessageAttachments).values(attachment).returning();
+    // Set expiry date to 30 days from now for all media attachments
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    
+    const result = await db.insert(chatMessageAttachments).values({
+      ...attachment,
+      expiresAt,
+      isExpired: "no",
+    }).returning();
     return result[0];
   }
 
@@ -3848,6 +3867,77 @@ export class DbStorage implements IStorage {
       .where(eq(chatMessageAttachments.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // Media Retention Methods
+  async getExpiredMediaAttachments(limit: number = 100): Promise<ChatMessageAttachment[]> {
+    const now = new Date();
+    return await db.select().from(chatMessageAttachments)
+      .where(and(
+        lte(chatMessageAttachments.expiresAt, now),
+        eq(chatMessageAttachments.isExpired, "no")
+      ))
+      .orderBy(chatMessageAttachments.expiresAt)
+      .limit(limit);
+  }
+
+  async getUpcomingExpiryAttachments(daysBeforeExpiry: number, limit: number = 100): Promise<ChatMessageAttachment[]> {
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + daysBeforeExpiry * 24 * 60 * 60 * 1000);
+    return await db.select().from(chatMessageAttachments)
+      .where(and(
+        gte(chatMessageAttachments.expiresAt, now),
+        lte(chatMessageAttachments.expiresAt, futureDate),
+        eq(chatMessageAttachments.isExpired, "no")
+      ))
+      .orderBy(chatMessageAttachments.expiresAt)
+      .limit(limit);
+  }
+
+  async markAttachmentAsExpired(id: string, reason: string): Promise<ChatMessageAttachment | undefined> {
+    const result = await db.update(chatMessageAttachments)
+      .set({
+        isExpired: "yes",
+        expiredAt: new Date(),
+        deletedReason: reason,
+        storageKey: "", // Clear the actual file reference
+        thumbnailKey: null,
+      })
+      .where(eq(chatMessageAttachments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async setAttachmentExpiry(id: string, expiresAt: Date): Promise<ChatMessageAttachment | undefined> {
+    const result = await db.update(chatMessageAttachments)
+      .set({ expiresAt })
+      .where(eq(chatMessageAttachments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async cleanupExpiredMedia(): Promise<{ cleaned: number; errors: string[] }> {
+    const errors: string[] = [];
+    let cleaned = 0;
+    
+    const expiredAttachments = await this.getExpiredMediaAttachments(500);
+    
+    for (const attachment of expiredAttachments) {
+      try {
+        // Mark as expired (soft delete with audit trail)
+        await this.markAttachmentAsExpired(attachment.id, "30-day retention policy");
+        cleaned++;
+        
+        console.log(`[MEDIA CLEANUP] Expired attachment ${attachment.id} (${attachment.fileName})`);
+      } catch (error) {
+        const errorMsg = `Failed to cleanup attachment ${attachment.id}: ${error}`;
+        errors.push(errorMsg);
+        console.error(`[MEDIA CLEANUP ERROR] ${errorMsg}`);
+      }
+    }
+    
+    console.log(`[MEDIA CLEANUP] Completed: ${cleaned} attachments cleaned, ${errors.length} errors`);
+    return { cleaned, errors };
   }
 
   // Chat Audit Logs
@@ -3916,6 +4006,68 @@ export class DbStorage implements IStorage {
         });
       }
     }
+  }
+
+  // Archive all chat rooms associated with a client when client is archived
+  async archiveClientChatRooms(clientId: string, archivedById: string, archivedByName: string): Promise<number> {
+    const clientRooms = await db.select().from(chatRooms)
+      .where(and(
+        eq(chatRooms.clientId, clientId),
+        eq(chatRooms.isArchived, "no")
+      ));
+    
+    let archivedCount = 0;
+    for (const room of clientRooms) {
+      await this.archiveChatRoom(room.id, archivedById, archivedByName);
+      
+      // Create audit log entry
+      await this.createChatAuditLog({
+        roomId: room.id,
+        action: "room_archived_with_client",
+        actorId: archivedById,
+        actorName: archivedByName,
+        details: {
+          clientId,
+          reason: "Client archived - chat room auto-archived per compliance policy"
+        }
+      });
+      
+      archivedCount++;
+    }
+    
+    console.log(`[CLIENT ARCHIVE] Archived ${archivedCount} chat rooms for client ${clientId}`);
+    return archivedCount;
+  }
+
+  // Unarchive all chat rooms associated with a client when client is restored
+  async unarchiveClientChatRooms(clientId: string): Promise<number> {
+    const archivedRooms = await db.select().from(chatRooms)
+      .where(and(
+        eq(chatRooms.clientId, clientId),
+        eq(chatRooms.isArchived, "yes")
+      ));
+    
+    let unarchivedCount = 0;
+    for (const room of archivedRooms) {
+      await this.unarchiveChatRoom(room.id);
+      
+      // Create audit log entry
+      await this.createChatAuditLog({
+        roomId: room.id,
+        action: "room_unarchived_with_client",
+        actorId: "system",
+        actorName: "System",
+        details: {
+          clientId,
+          reason: "Client restored - chat room auto-unarchived"
+        }
+      });
+      
+      unarchivedCount++;
+    }
+    
+    console.log(`[CLIENT RESTORE] Unarchived ${unarchivedCount} chat rooms for client ${clientId}`);
+    return unarchivedCount;
   }
 
   // Chat Room Participants
@@ -3989,7 +4141,66 @@ export class DbStorage implements IStorage {
   }
 
   // Chat Messages
-  async getChatMessages(roomId: string, limit: number = 50, before?: string): Promise<ChatMessage[]> {
+  async getParticipantJoinDate(roomId: string, staffId: string): Promise<Date | null> {
+    const result = await db.select({ joinedAt: chatRoomParticipants.joinedAt })
+      .from(chatRoomParticipants)
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ));
+    return result[0]?.joinedAt || null;
+  }
+
+  async getChatMessages(roomId: string, limit: number = 50, before?: string, userId?: string): Promise<ChatMessage[]> {
+    // Get participant's join date to limit message visibility for new members
+    let joinDate: Date | null = null;
+    if (userId) {
+      joinDate = await this.getParticipantJoinDate(roomId, userId);
+    }
+
+    // If user has a join date, we need special handling:
+    // - Show all messages after their join date
+    // - Show only 5 messages before their join date
+    if (joinDate) {
+      // Get messages after join date (all of them up to limit)
+      const messagesAfterJoin = await db.select().from(chatMessages)
+        .where(and(
+          eq(chatMessages.roomId, roomId),
+          eq(chatMessages.isDeleted, "no"),
+          gte(chatMessages.createdAt, joinDate)
+        ))
+        .orderBy(desc(chatMessages.createdAt))
+        .limit(limit);
+
+      // Get only 5 messages before join date (historical context)
+      const messagesBeforeJoin = await db.select().from(chatMessages)
+        .where(and(
+          eq(chatMessages.roomId, roomId),
+          eq(chatMessages.isDeleted, "no"),
+          lte(chatMessages.createdAt, joinDate)
+        ))
+        .orderBy(desc(chatMessages.createdAt))
+        .limit(5);
+
+      // Combine and sort by date (newest first)
+      const allMessages = [...messagesAfterJoin, ...messagesBeforeJoin];
+      allMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // Apply the before cursor if provided
+      if (before) {
+        const beforeMessage = await db.select().from(chatMessages).where(eq(chatMessages.id, before));
+        if (beforeMessage[0]) {
+          const beforeDate = new Date(beforeMessage[0].createdAt).getTime();
+          const filtered = allMessages.filter(m => new Date(m.createdAt).getTime() <= beforeDate).slice(0, limit);
+          return filtered.map(msg => this.decryptChatMessage(msg));
+        }
+      }
+      
+      // Decrypt messages that are encrypted
+      return allMessages.slice(0, limit).map(msg => this.decryptChatMessage(msg));
+    }
+
+    // Default behavior for users without join date tracking (e.g., room creators)
     let query = db.select().from(chatMessages)
       .where(and(
         eq(chatMessages.roomId, roomId),
@@ -4008,19 +4219,48 @@ export class DbStorage implements IStorage {
       }
     }
     
-    return await query.orderBy(desc(chatMessages.createdAt)).limit(limit);
+    const messages = await query.orderBy(desc(chatMessages.createdAt)).limit(limit);
+    
+    // Decrypt messages that are encrypted
+    return messages.map(msg => this.decryptChatMessage(msg));
+  }
+
+  private decryptChatMessage(message: ChatMessage): ChatMessage {
+    if (message.isEncrypted === "yes" && isEncryptionEnabled()) {
+      try {
+        return {
+          ...message,
+          content: decryptMessage(message.content, message.id)
+        };
+      } catch (error) {
+        console.error(`[ENCRYPTION] Failed to decrypt message ${message.id}:`, error);
+        return { ...message, content: "[Encrypted message - decryption failed]" };
+      }
+    }
+    return message;
   }
 
   async getChatMessageById(id: string): Promise<ChatMessage | undefined> {
     const result = await db.select().from(chatMessages)
       .where(eq(chatMessages.id, id));
-    return result[0];
+    if (result[0]) {
+      return this.decryptChatMessage(result[0]);
+    }
+    return undefined;
   }
 
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const result = await db.insert(chatMessages).values(message).returning();
+    // Encrypt message content if encryption is enabled
+    const encryptedContent = isEncryptionEnabled() ? encryptMessage(message.content) : message.content;
+    const isEncrypted = isEncryptionEnabled() ? "yes" : "no";
     
-    // Update room's last message info
+    const result = await db.insert(chatMessages).values({
+      ...message,
+      content: encryptedContent,
+      isEncrypted,
+    }).returning();
+    
+    // Update room's last message info (use original unencrypted preview)
     const preview = message.content.substring(0, 100);
     await db.update(chatRooms)
       .set({
@@ -4030,19 +4270,33 @@ export class DbStorage implements IStorage {
       })
       .where(eq(chatRooms.id, message.roomId));
     
-    return result[0];
+    // Return with decrypted content for immediate use
+    const returnMessage = result[0];
+    if (returnMessage.isEncrypted === "yes") {
+      return { ...returnMessage, content: message.content };
+    }
+    return returnMessage;
   }
 
   async updateChatMessage(id: string, content: string): Promise<ChatMessage | undefined> {
+    // Encrypt updated content if encryption is enabled
+    const encryptedContent = isEncryptionEnabled() ? encryptMessage(content) : content;
+    
     const result = await db.update(chatMessages)
       .set({
-        content,
+        content: encryptedContent,
+        isEncrypted: isEncryptionEnabled() ? "yes" : "no",
         isEdited: "yes",
         editedAt: new Date()
       })
       .where(eq(chatMessages.id, id))
       .returning();
-    return result[0];
+    
+    // Return with decrypted content
+    if (result[0]) {
+      return { ...result[0], content };
+    }
+    return undefined;
   }
 
   async deleteChatMessage(id: string): Promise<boolean> {

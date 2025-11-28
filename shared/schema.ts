@@ -3056,6 +3056,9 @@ export const chatMessages = pgTable("chat_messages", {
   content: text("content").notNull(),
   messageType: text("message_type").$type<ChatMessageType>().default("text"),
   
+  // Encryption flag for sensitive data
+  isEncrypted: text("is_encrypted").default("yes").$type<"yes" | "no">(),
+  
   // File attachment (if any) - legacy single attachment
   attachmentUrl: text("attachment_url"),
   attachmentName: text("attachment_name"),
@@ -3174,6 +3177,15 @@ export const chatMessageAttachments = pgTable("chat_message_attachments", {
   // Processing status
   processingStatus: text("processing_status").$type<"pending" | "processing" | "completed" | "failed">().default("pending"),
   processingError: text("processing_error"),
+  
+  // Media retention - expires 30 days after creation
+  expiresAt: timestamp("expires_at"),
+  isExpired: text("is_expired").default("no").$type<"yes" | "no">(),
+  expiredAt: timestamp("expired_at"),
+  
+  // Audit metadata for deleted media
+  fileHash: text("file_hash"), // SHA-256 hash for audit trail
+  deletedReason: text("deleted_reason"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

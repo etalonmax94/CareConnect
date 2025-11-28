@@ -55,6 +55,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -358,6 +363,27 @@ export default function Chat() {
     }
     
     return filteredStaff;
+  };
+
+  // Get color for sender name based on hash of sender ID
+  const getSenderNameColor = (senderId: string): string => {
+    const colors = [
+      "text-blue-600 dark:text-blue-400",
+      "text-purple-600 dark:text-purple-400",
+      "text-pink-600 dark:text-pink-400",
+      "text-indigo-600 dark:text-indigo-400",
+      "text-rose-600 dark:text-rose-400",
+      "text-cyan-600 dark:text-cyan-400",
+      "text-teal-600 dark:text-teal-400",
+      "text-orange-600 dark:text-orange-400",
+    ];
+    
+    let hash = 0;
+    for (let i = 0; i < senderId.length; i++) {
+      hash = ((hash << 5) - hash) + senderId.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return colors[Math.abs(hash) % colors.length];
   };
 
   const handleMentionSelect = (selectedStaff: { id: string; name: string; isAllMention?: boolean }) => {
@@ -1365,7 +1391,7 @@ export default function Chat() {
             </div>
 
             {/* Messages Area - Premium Design */}
-            <ScrollArea className="flex-1 px-3 py-4 md:px-6">
+            <ScrollArea className="flex-1 px-3 py-4 md:px-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
               {messagesLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex flex-col items-center gap-3">
@@ -1410,7 +1436,7 @@ export default function Chat() {
                         
                         <div className={`max-w-[75%] md:max-w-[65%] flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
                           {!isOwn && showAvatar && (
-                            <p className="text-[11px] font-medium text-muted-foreground mb-1 ml-1">
+                            <p className={`text-[11px] font-semibold mb-1 ml-1 ${getSenderNameColor(message.senderId)}`}>
                               {message.senderName}
                             </p>
                           )}
@@ -1426,8 +1452,8 @@ export default function Chat() {
                             <div 
                               className={`text-[11px] px-3 py-1.5 rounded-xl mb-1 border-l-2 ${
                                 isOwn 
-                                  ? "bg-primary/15 border-primary text-foreground" 
-                                  : "bg-muted/60 border-muted-foreground/30"
+                                  ? "bg-slate-300 dark:bg-slate-600 border-slate-400 text-foreground" 
+                                  : "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700"
                               }`}
                             >
                               <p className="font-medium">{(message as any).replyToSenderName}</p>
@@ -1435,20 +1461,22 @@ export default function Chat() {
                             </div>
                           )}
                           
-                          <div className="flex items-end gap-1">
+                          <div className="flex items-end gap-1" title={isDeleted && (message as any).deletedByName ? `Deleted by ${(message as any).deletedByName} on ${format(new Date((message as any).deletedAt), 'MMM d, yyyy HH:mm')}` : undefined}>
                             <div
                               className={`rounded-2xl shadow-sm ${
                                 isDeleted
-                                  ? "bg-muted/30 text-muted-foreground italic px-4 py-2.5"
+                                  ? "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 italic px-4 py-2.5"
                                   : (message as any).attachmentUrl && ((message as any).messageType === "gif" || (message as any).messageType === "image" || (message as any).messageType === "video")
                                     ? "overflow-hidden p-1"
-                                    : isOwn
-                                      ? "bg-primary text-primary-foreground rounded-br-md px-4 py-2.5"
-                                      : "bg-white dark:bg-muted border border-border/40 rounded-bl-md px-4 py-2.5"
+                                    : isForwarded
+                                      ? "bg-green-100 dark:bg-green-900/30 text-foreground rounded-bl-md px-4 py-2.5"
+                                      : isOwn
+                                        ? "bg-slate-300 dark:bg-slate-600 text-foreground rounded-br-md px-4 py-2.5"
+                                        : "bg-blue-500 dark:bg-blue-600 text-white rounded-bl-md px-4 py-2.5"
                               }`}
                             >
                               {isDeleted ? (
-                                <p className="text-sm">This message was deleted</p>
+                                <p className="text-sm">This message was deleted by {(message as any).deletedByName || 'someone'}</p>
                               ) : (message as any).attachmentUrl && (message as any).messageType === "gif" ? (
                                 <img 
                                   src={(message as any).attachmentUrl} 

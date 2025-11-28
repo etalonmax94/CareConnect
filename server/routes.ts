@@ -1633,18 +1633,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = req.session.userId || 'system';
+      const userName = (req.session as any)?.user?.displayName || userId;
       const client = await storage.archiveClient(req.params.id, userId, reason.trim());
       
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
       
+      // Archive associated chat rooms (Task 4: Link chat archive to client archive)
+      const archivedChatRooms = await storage.archiveClientChatRooms(req.params.id, userId, userName);
+      
       // Log the archive action
       await storage.logActivity({
         clientId: client.id,
         action: "client_archived",
-        description: `Client archived. Reason: ${reason.trim()}. Retention until: ${client.retentionUntil}`,
-        performedBy: (req.session as any)?.user?.displayName || userId,
+        description: `Client archived. Reason: ${reason.trim()}. Retention until: ${client.retentionUntil}. ${archivedChatRooms} chat room(s) archived.`,
+        performedBy: userName,
       });
       
       // Create audit log for archive
@@ -1653,7 +1657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: client.id,
         entityName: client.participantName,
         operation: "archive",
-        newValues: { archiveReason: reason.trim(), retentionUntil: client.retentionUntil },
+        newValues: { archiveReason: reason.trim(), retentionUntil: client.retentionUntil, archivedChatRooms },
         clientId: client.id,
         req
       });
@@ -1675,13 +1679,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = req.session.userId || 'system';
+      const userName = (req.session as any)?.user?.displayName || userId;
+      
+      // Unarchive associated chat rooms (Task 4: Link chat archive to client archive)
+      const unarchivedChatRooms = await storage.unarchiveClientChatRooms(req.params.id);
       
       // Log the restore action
       await storage.logActivity({
         clientId: client.id,
         action: "client_restored",
-        description: "Client restored from archive",
-        performedBy: (req.session as any)?.user?.displayName || userId,
+        description: `Client restored from archive. ${unarchivedChatRooms} chat room(s) restored.`,
+        performedBy: userName,
       });
       
       // Create audit log for restore
@@ -1690,6 +1698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: client.id,
         entityName: client.participantName,
         operation: "restore",
+        newValues: { unarchivedChatRooms },
         clientId: client.id,
         req
       });
@@ -8876,14 +8885,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get messages for a room
+  // Get messages for a room (new members only see 5 messages before their join date)
   app.get("/api/chat/rooms/:roomId/messages", requireAuth, async (req: any, res) => {
     try {
       const { roomId } = req.params;
+      const userId = req.session?.user?.id;
       const limit = parseInt(req.query.limit as string) || 50;
       const before = req.query.before as string | undefined;
 
-      const messages = await storage.getChatMessages(roomId, limit, before);
+      const messages = await storage.getChatMessages(roomId, limit, before, userId);
       res.json(messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -10460,6 +10470,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching message attachments:", error);
       res.status(500).json({ error: "Failed to fetch attachments" });
+    }
+  });
+
+  // ============================================
+  // MEDIA RETENTION & CLEANUP ROUTES
+  // ============================================
+
+  // Manual media cleanup trigger (admin only) - useful for testing or immediate cleanup
+  app.post("/api/chat/admin/media-cleanup", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Only admin can trigger manual cleanup
+      if (!chatAuthorizationService.isPrivilegedUser(userContext)) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      console.log(`[MEDIA CLEANUP] Manual cleanup triggered by ${userContext.userName}`);
+      
+      const result = await storage.cleanupExpiredMedia();
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        action: "media_cleanup_manual",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: {
+          cleaned: result.cleaned,
+          errors: result.errors.length,
+          triggeredAt: new Date().toISOString()
+        }
+      });
+
+      res.json({
+        success: true,
+        cleaned: result.cleaned,
+        errors: result.errors,
+        message: `Cleaned up ${result.cleaned} expired media attachments`
+      });
+    } catch (error) {
+      console.error("Error during manual media cleanup:", error);
+      res.status(500).json({ error: "Failed to cleanup expired media" });
+    }
+  });
+
+  // Get expired media statistics (admin only)
+  app.get("/api/chat/admin/media-stats", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      if (!chatAuthorizationService.isPrivilegedUser(userContext)) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const expired = await storage.getExpiredMediaAttachments(1000);
+      const expiringSoon = await storage.getUpcomingExpiryAttachments(7, 1000); // 7 days
+
+      res.json({
+        expiredCount: expired.length,
+        expiringSoonCount: expiringSoon.length,
+        expiringSoonDays: 7,
+        retentionPolicyDays: 30,
+        message: `${expired.length} attachments ready for cleanup, ${expiringSoon.length} expiring within 7 days`
+      });
+    } catch (error) {
+      console.error("Error fetching media stats:", error);
+      res.status(500).json({ error: "Failed to fetch media statistics" });
+    }
+  });
+
+  // Get attachments expiring soon for notifications (admin only)
+  app.get("/api/chat/admin/expiring-attachments", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      if (!chatAuthorizationService.isPrivilegedUser(userContext)) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { days = "7", limit = "100" } = req.query;
+      const daysNum = Math.max(1, Math.min(30, parseInt(days as string) || 7));
+      const limitNum = Math.max(1, Math.min(500, parseInt(limit as string) || 100));
+
+      const expiring = await storage.getUpcomingExpiryAttachments(daysNum, limitNum);
+
+      res.json({
+        attachments: expiring,
+        count: expiring.length,
+        daysBeforeExpiry: daysNum
+      });
+    } catch (error) {
+      console.error("Error fetching expiring attachments:", error);
+      res.status(500).json({ error: "Failed to fetch expiring attachments" });
+    }
+  });
+
+  // Scheduled cleanup endpoint - designed to be called by Cloud Scheduler or cron
+  // This endpoint uses a shared secret for authentication instead of user auth
+  app.post("/api/internal/media-cleanup", async (req, res) => {
+    try {
+      // Validate internal API key for scheduled tasks
+      const authHeader = req.headers.authorization;
+      const internalApiKey = process.env.INTERNAL_API_KEY;
+      
+      if (!internalApiKey) {
+        console.warn("[MEDIA CLEANUP] INTERNAL_API_KEY not configured - scheduled cleanup disabled");
+        return res.status(503).json({ error: "Scheduled cleanup not configured" });
+      }
+
+      if (!authHeader || authHeader !== `Bearer ${internalApiKey}`) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      console.log(`[MEDIA CLEANUP] Scheduled cleanup triggered at ${new Date().toISOString()}`);
+      
+      const result = await storage.cleanupExpiredMedia();
+
+      // Create system audit log entry
+      await storage.createChatAuditLog({
+        action: "media_cleanup_scheduled",
+        actorId: "system",
+        actorName: "Scheduled Task",
+        details: {
+          cleaned: result.cleaned,
+          errors: result.errors.length,
+          triggeredAt: new Date().toISOString()
+        }
+      });
+
+      res.json({
+        success: true,
+        cleaned: result.cleaned,
+        errors: result.errors,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error during scheduled media cleanup:", error);
+      res.status(500).json({ error: "Failed to cleanup expired media" });
     }
   });
 
