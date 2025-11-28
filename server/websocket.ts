@@ -256,13 +256,11 @@ function broadcastPresence(userId: string, status: "online" | "offline") {
   };
 
   clients.forEach((userClients, clientUserId) => {
-    if (clientUserId !== userId) {
-      userClients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(message));
-        }
-      });
-    }
+    userClients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
   });
 }
 

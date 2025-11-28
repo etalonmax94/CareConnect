@@ -229,6 +229,14 @@ export default function Chat() {
 
     ws.onopen = () => {
       console.log("WebSocket connected");
+      // Mark the current user as online immediately
+      if (currentUser?.id) {
+        setOnlineUsers(prev => {
+          const newSet = new Set(prev);
+          newSet.add(currentUser.id);
+          return newSet;
+        });
+      }
     };
 
     ws.onmessage = (event) => {
