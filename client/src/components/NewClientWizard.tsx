@@ -1108,51 +1108,6 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 />
               </div>
             </div>
-
-            <Separator className="my-4" />
-            <h4 className="text-sm font-medium mb-3">Personal Preferences</h4>
-
-            <FormField
-              control={form.control}
-              name="culturalBackground"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cultural Background / Preferences</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value || ""} placeholder="Religious, cultural, language preferences..." data-testid="input-cultural" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="hobbiesInterests"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Hobbies & Interests</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} value={field.value || ""} placeholder="Favorite food, shows, activities (list at least 4)..." rows={3} data-testid="input-hobbies" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="intakeComments"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Other Comments</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} value={field.value || ""} placeholder="Any other relevant intake notes..." rows={3} data-testid="input-intake-comments" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </div>
         );
 
