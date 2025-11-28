@@ -1542,7 +1542,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   return (
     <>
       <Form {...form}>
-        <div className="max-w-4xl mx-auto px-2 sm:px-4">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4 pb-6">
           {/* Step labels and progress bar - compact layout */}
           <div className="mb-3">
             {/* Step labels row - compact */}
@@ -1567,15 +1567,15 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                     data-testid={`step-${step.id}`}
                   >
                     <div className={cn(
-                      "flex items-center justify-center w-5 h-5 rounded-full transition-all",
+                      "flex items-center justify-center w-6 h-6 rounded-full transition-all",
                       isCurrent && "bg-primary text-primary-foreground shadow-sm",
                       isComplete && "bg-primary/20 text-primary",
                       !isCurrent && !isComplete && "bg-muted text-muted-foreground"
                     )}>
                       {isComplete ? (
-                        <Check className="w-3 h-3" />
+                        <Check className="w-3.5 h-3.5" />
                       ) : (
-                        <StepIcon className="w-3 h-3" />
+                        <StepIcon className="w-3.5 h-3.5" />
                       )}
                     </div>
                     <span className="hidden sm:block text-[9px] leading-tight text-center">{step.title}</span>
@@ -1584,8 +1584,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               })}
             </div>
             
-            {/* Progress bar - thinner */}
-            <Progress value={progress} className="h-1" />
+            {/* Progress bar */}
+            <Progress value={progress} className="h-1.5" />
             
             {/* Progress text - more compact */}
             <div className="flex items-center justify-between mt-1">
@@ -1596,12 +1596,12 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
 
           {/* Main wizard layout with vertical side buttons - compact */}
           <div className="flex items-stretch gap-2">
-            {/* Left navigation button - Back/Cancel - slimmer */}
+            {/* Left navigation button - Back/Cancel */}
             <button
               type="button"
               onClick={currentStep === 0 ? onCancel : goBack}
               className={cn(
-                "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
+                "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] lg:min-h-[520px] rounded-lg border transition-all duration-200",
                 "bg-background hover:bg-muted/50 border-border hover:border-primary/30",
                 "text-muted-foreground hover:text-foreground",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
@@ -1614,8 +1614,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               </span>
             </button>
 
-            {/* Center Card - Dynamic height with min/max constraints */}
-            <Card className="flex-1 flex flex-col min-h-[380px] max-h-[500px] overflow-hidden">
+            {/* Center Card - Dynamic height with responsive max-height for large screens */}
+            <Card className="flex-1 flex flex-col min-h-[380px] max-h-[500px] lg:max-h-[600px] overflow-hidden">
               <CardHeader className="flex-shrink-0 py-2 px-4 border-b">
                 <div className="flex items-center gap-2">
                   {(() => {
@@ -1649,14 +1649,14 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               </CardContent>
             </Card>
 
-            {/* Right navigation button - Next/Create - slimmer */}
+            {/* Right navigation button - Next/Create */}
             {currentStep === WIZARD_STEPS.length - 1 ? (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] lg:min-h-[520px] rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
                   isSubmitting && "opacity-70 cursor-not-allowed"
@@ -1677,7 +1677,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 type="button"
                 onClick={goNext}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] lg:min-h-[520px] rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 )}

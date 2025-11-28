@@ -721,6 +721,12 @@ export default function ClientProfile() {
   const [editFallsRiskScore, setEditFallsRiskScore] = useState<string>("");
   const [editSubstanceUseNotes, setEditSubstanceUseNotes] = useState<string>("");
   
+  // Clinical tab editable fields
+  const [editClinicalNotes, setEditClinicalNotes] = useState<string>("");
+  const [editDietPatterns, setEditDietPatterns] = useState<string>("");
+  const [editExercisePatterns, setEditExercisePatterns] = useState<string>("");
+  const [editSleepPatterns, setEditSleepPatterns] = useState<string>("");
+  
   // Add New Provider modal states
   const [addGpOpen, setAddGpOpen] = useState(false);
   const [addPharmacyOpen, setAddPharmacyOpen] = useState(false);
@@ -924,6 +930,19 @@ export default function ClientProfile() {
         break;
       case "substanceUseNotes":
         setEditSubstanceUseNotes(client?.substanceUseNotes || "");
+        break;
+      // Clinical tab fields
+      case "clinicalNotes":
+        setEditClinicalNotes(client?.clinicalNotes || "");
+        break;
+      case "dietPatterns":
+        setEditDietPatterns(client?.dietPatterns || "");
+        break;
+      case "exercisePatterns":
+        setEditExercisePatterns(client?.exercisePatterns || "");
+        break;
+      case "sleepPatterns":
+        setEditSleepPatterns(client?.sleepPatterns || "");
         break;
     }
   };
@@ -1139,6 +1158,19 @@ export default function ClientProfile() {
         break;
       case "substanceUseNotes":
         updateFieldMutation.mutate({ substanceUseNotes: editSubstanceUseNotes || null });
+        break;
+      // Clinical tab fields
+      case "clinicalNotes":
+        updateFieldMutation.mutate({ clinicalNotes: editClinicalNotes || null });
+        break;
+      case "dietPatterns":
+        updateFieldMutation.mutate({ dietPatterns: editDietPatterns || null });
+        break;
+      case "exercisePatterns":
+        updateFieldMutation.mutate({ exercisePatterns: editExercisePatterns || null });
+        break;
+      case "sleepPatterns":
+        updateFieldMutation.mutate({ sleepPatterns: editSleepPatterns || null });
         break;
     }
   };
@@ -4141,26 +4173,27 @@ export default function ClientProfile() {
                         <p className="text-sm font-semibold">{supportCoordinatorDetails.name}</p>
                         <p className="text-xs text-muted-foreground">{supportCoordinatorDetails.organisation}</p>
                       </div>
-                      <Link 
-                        href={`/support-coordinators?highlight=${supportCoordinatorDetails.id}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-support-coordinator-team"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
                     </div>
-                    {supportCoordinatorDetails.phoneNumber && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        <a href={`tel:${supportCoordinatorDetails.phoneNumber}`} className="text-primary hover:underline">{supportCoordinatorDetails.phoneNumber}</a>
-                      </div>
-                    )}
-                    {supportCoordinatorDetails.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <a href={`mailto:${supportCoordinatorDetails.email}`} className="text-primary hover:underline">{supportCoordinatorDetails.email}</a>
-                      </div>
-                    )}
+                    <div className="space-y-2 text-sm">
+                      {supportCoordinatorDetails.phoneNumber && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`tel:${supportCoordinatorDetails.phoneNumber}`} className="text-primary hover:underline">{supportCoordinatorDetails.phoneNumber}</a>
+                        </div>
+                      )}
+                      {supportCoordinatorDetails.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`mailto:${supportCoordinatorDetails.email}`} className="text-primary hover:underline truncate">{supportCoordinatorDetails.email}</a>
+                        </div>
+                      )}
+                      {supportCoordinatorDetails.notes && (
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground text-xs">{supportCoordinatorDetails.notes}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : client.careTeam?.supportCoordinator ? (
                   <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -4254,20 +4287,33 @@ export default function ClientProfile() {
                         <p className="text-sm font-semibold">{gpDetails.name}</p>
                         <p className="text-xs text-muted-foreground">{gpDetails.practiceName}</p>
                       </div>
-                      <Link 
-                        href={`/gps?highlight=${gpDetails.id}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-gp-team"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
                     </div>
-                    {gpDetails.phoneNumber && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        <a href={`tel:${gpDetails.phoneNumber}`} className="text-primary hover:underline">{gpDetails.phoneNumber}</a>
-                      </div>
-                    )}
+                    <div className="space-y-2 text-sm">
+                      {gpDetails.phoneNumber && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`tel:${gpDetails.phoneNumber}`} className="text-primary hover:underline">{gpDetails.phoneNumber}</a>
+                        </div>
+                      )}
+                      {gpDetails.faxNumber && (
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-muted-foreground">Fax: {gpDetails.faxNumber}</span>
+                        </div>
+                      )}
+                      {gpDetails.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`mailto:${gpDetails.email}`} className="text-primary hover:underline truncate">{gpDetails.email}</a>
+                        </div>
+                      )}
+                      {gpDetails.address && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">{gpDetails.address}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -4353,20 +4399,39 @@ export default function ClientProfile() {
                           <Badge variant="secondary" className="text-xs">Delivery Available</Badge>
                         )}
                       </div>
-                      <Link 
-                        href={`/pharmacies?highlight=${pharmacyDetails.id}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-pharmacy-team"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
                     </div>
-                    {pharmacyDetails.phoneNumber && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        <a href={`tel:${pharmacyDetails.phoneNumber}`} className="text-primary hover:underline">{pharmacyDetails.phoneNumber}</a>
-                      </div>
-                    )}
+                    <div className="space-y-2 text-sm">
+                      {pharmacyDetails.phoneNumber && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`tel:${pharmacyDetails.phoneNumber}`} className="text-primary hover:underline">{pharmacyDetails.phoneNumber}</a>
+                        </div>
+                      )}
+                      {pharmacyDetails.faxNumber && (
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-muted-foreground">Fax: {pharmacyDetails.faxNumber}</span>
+                        </div>
+                      )}
+                      {pharmacyDetails.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`mailto:${pharmacyDetails.email}`} className="text-primary hover:underline truncate">{pharmacyDetails.email}</a>
+                        </div>
+                      )}
+                      {pharmacyDetails.address && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">{pharmacyDetails.address}</span>
+                        </div>
+                      )}
+                      {pharmacyDetails.notes && (
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground text-xs">{pharmacyDetails.notes}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -4450,26 +4515,27 @@ export default function ClientProfile() {
                         <p className="text-sm font-semibold">{planManagerDetails.name}</p>
                         <p className="text-xs text-muted-foreground">{planManagerDetails.organisation}</p>
                       </div>
-                      <Link 
-                        href={`/plan-managers?highlight=${planManagerDetails.id}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-plan-manager-team"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
                     </div>
-                    {planManagerDetails.phoneNumber && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        <a href={`tel:${planManagerDetails.phoneNumber}`} className="text-primary hover:underline">{planManagerDetails.phoneNumber}</a>
-                      </div>
-                    )}
-                    {planManagerDetails.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <a href={`mailto:${planManagerDetails.email}`} className="text-primary hover:underline">{planManagerDetails.email}</a>
-                      </div>
-                    )}
+                    <div className="space-y-2 text-sm">
+                      {planManagerDetails.phoneNumber && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`tel:${planManagerDetails.phoneNumber}`} className="text-primary hover:underline">{planManagerDetails.phoneNumber}</a>
+                        </div>
+                      )}
+                      {planManagerDetails.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`mailto:${planManagerDetails.email}`} className="text-primary hover:underline truncate">{planManagerDetails.email}</a>
+                        </div>
+                      )}
+                      {planManagerDetails.notes && (
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground text-xs">{planManagerDetails.notes}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -4553,26 +4619,27 @@ export default function ClientProfile() {
                         <p className="text-sm font-semibold">{alliedHealthDetails.name}</p>
                         <p className="text-xs text-muted-foreground">{alliedHealthDetails.specialty}</p>
                       </div>
-                      <Link 
-                        href={`/allied-health-professionals?highlight=${alliedHealthDetails.id}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
-                        data-testid="link-allied-health-team"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
                     </div>
-                    {alliedHealthDetails.phoneNumber && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        <a href={`tel:${alliedHealthDetails.phoneNumber}`} className="text-primary hover:underline">{alliedHealthDetails.phoneNumber}</a>
-                      </div>
-                    )}
-                    {alliedHealthDetails.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <a href={`mailto:${alliedHealthDetails.email}`} className="text-primary hover:underline">{alliedHealthDetails.email}</a>
-                      </div>
-                    )}
+                    <div className="space-y-2 text-sm">
+                      {alliedHealthDetails.phoneNumber && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`tel:${alliedHealthDetails.phoneNumber}`} className="text-primary hover:underline">{alliedHealthDetails.phoneNumber}</a>
+                        </div>
+                      )}
+                      {alliedHealthDetails.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <a href={`mailto:${alliedHealthDetails.email}`} className="text-primary hover:underline truncate">{alliedHealthDetails.email}</a>
+                        </div>
+                      )}
+                      {alliedHealthDetails.notes && (
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground text-xs">{alliedHealthDetails.notes}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -4881,17 +4948,42 @@ export default function ClientProfile() {
             clientId={client.id}
             zohoWorkdriveLink={client.zohoWorkdriveLink}
             clientCategory={client.category}
-            ndisDetails={client.ndisDetails}
+            ndisDetails={client.ndisDetails || undefined}
           />
         </TabsContent>
 
         <TabsContent value="clinical" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Clinical Notes</CardTitle>
+              {!isArchived && editingField !== "clinicalNotes" && (
+                <Button variant="ghost" size="sm" onClick={() => startEditing("clinicalNotes")} data-testid="button-edit-clinical-notes">
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{client.clinicalNotes || "No clinical notes recorded"}</p>
+              {editingField === "clinicalNotes" ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={editClinicalNotes}
+                    onChange={(e) => setEditClinicalNotes(e.target.value)}
+                    placeholder="Enter clinical notes..."
+                    className="min-h-[120px]"
+                    data-testid="input-clinical-notes"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={cancelEditing} data-testid="button-cancel-clinical-notes">
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={() => saveField("clinicalNotes")} disabled={updateFieldMutation.isPending} data-testid="button-save-clinical-notes">
+                      {updateFieldMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{client.clinicalNotes || "No clinical notes recorded"}</p>
+              )}
             </CardContent>
           </Card>
 
@@ -4958,44 +5050,119 @@ export default function ClientProfile() {
           {/* Lifestyle Patterns - Diet, Exercise, Sleep */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Utensils className="w-4 h-4 text-orange-500" />
                   Diet
                 </CardTitle>
+                {!isArchived && editingField !== "dietPatterns" && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEditing("dietPatterns")} data-testid="button-edit-diet">
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {client.dietPatterns || "No diet information recorded"}
-                </p>
+                {editingField === "dietPatterns" ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editDietPatterns}
+                      onChange={(e) => setEditDietPatterns(e.target.value)}
+                      placeholder="Enter diet information..."
+                      className="min-h-[80px] text-sm"
+                      data-testid="input-diet"
+                    />
+                    <div className="flex justify-end gap-1">
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={cancelEditing} data-testid="button-cancel-diet">
+                        Cancel
+                      </Button>
+                      <Button size="sm" className="h-7 text-xs" onClick={() => saveField("dietPatterns")} disabled={updateFieldMutation.isPending} data-testid="button-save-diet">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {client.dietPatterns || "No diet information recorded"}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Dumbbell className="w-4 h-4 text-blue-500" />
                   Exercise
                 </CardTitle>
+                {!isArchived && editingField !== "exercisePatterns" && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEditing("exercisePatterns")} data-testid="button-edit-exercise">
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {client.exercisePatterns || "No exercise information recorded"}
-                </p>
+                {editingField === "exercisePatterns" ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editExercisePatterns}
+                      onChange={(e) => setEditExercisePatterns(e.target.value)}
+                      placeholder="Enter exercise information..."
+                      className="min-h-[80px] text-sm"
+                      data-testid="input-exercise"
+                    />
+                    <div className="flex justify-end gap-1">
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={cancelEditing} data-testid="button-cancel-exercise">
+                        Cancel
+                      </Button>
+                      <Button size="sm" className="h-7 text-xs" onClick={() => saveField("exercisePatterns")} disabled={updateFieldMutation.isPending} data-testid="button-save-exercise">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {client.exercisePatterns || "No exercise information recorded"}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Moon className="w-4 h-4 text-indigo-500" />
                   Sleep
                 </CardTitle>
+                {!isArchived && editingField !== "sleepPatterns" && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEditing("sleepPatterns")} data-testid="button-edit-sleep">
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {client.sleepPatterns || "No sleep information recorded"}
-                </p>
+                {editingField === "sleepPatterns" ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editSleepPatterns}
+                      onChange={(e) => setEditSleepPatterns(e.target.value)}
+                      placeholder="Enter sleep information..."
+                      className="min-h-[80px] text-sm"
+                      data-testid="input-sleep"
+                    />
+                    <div className="flex justify-end gap-1">
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={cancelEditing} data-testid="button-cancel-sleep">
+                        Cancel
+                      </Button>
+                      <Button size="sm" className="h-7 text-xs" onClick={() => saveField("sleepPatterns")} disabled={updateFieldMutation.isPending} data-testid="button-save-sleep">
+                        {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {client.sleepPatterns || "No sleep information recorded"}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
