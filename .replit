@@ -105,4 +105,4 @@ integrations = ["javascript_mem_db:1.0.0"]
 
 [userenv.shared]
 VITE_API_URL = "https://careconnect-124485508170.australia-southeast1.run.app"
-GIPHY_API_KEY = "dc6zaTOxFJmzC"
+GIPHY_API_KEY = "IiVw19Zf8q2NKFSGyNrwSjQZGOl9y38H"
