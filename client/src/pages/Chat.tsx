@@ -964,103 +964,119 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-background" data-testid="chat-page">
-      {/* Sidebar */}
-      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col border-r`}>
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Messages</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Team communication and direct messaging</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {isAppAdmin && (
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  onClick={() => setShowCustomChatDialog(true)}
-                  title="Create Custom Chat"
-                  data-testid="button-admin-create-chat"
-                >
-                  <Shield className="h-5 w-5" />
-                </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="icon" variant="ghost" data-testid="button-new-chat">
-                    <Plus className="h-5 w-5" />
+    <div className="flex h-[calc(100vh-4rem)] bg-muted/30" data-testid="chat-page">
+      {/* Sidebar - Conversation List */}
+      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col bg-background md:border-r md:shadow-sm`}>
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="px-4 pt-4 pb-3 md:px-5 md:pt-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-xl md:text-2xl font-semibold tracking-tight" data-testid="text-page-title">Messages</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">Team communication</p>
+              </div>
+              <div className="flex items-center gap-1">
+                {isAppAdmin && (
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="rounded-full"
+                    onClick={() => setShowCustomChatDialog(true)}
+                    title="Create Custom Chat"
+                    data-testid="button-admin-create-chat"
+                  >
+                    <Shield className="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowNewChatDialog(true)} data-testid="menu-new-direct">
-                    <UserIcon className="h-4 w-4 mr-2" />
-                    Direct Message
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowGroupDialog(true)} data-testid="menu-new-group">
-                    <Users className="h-4 w-4 mr-2" />
-                    Group Chat
-                  </DropdownMenuItem>
-                  {isAppAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setShowCustomChatDialog(true)} data-testid="menu-custom-chat">
-                        <Shield className="h-4 w-4 mr-2" />
-                        Custom Team Chat
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" className="rounded-full" data-testid="button-new-chat">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => setShowNewChatDialog(true)} data-testid="menu-new-direct">
+                      <UserIcon className="h-4 w-4 mr-2" />
+                      Direct Message
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowGroupDialog(true)} data-testid="menu-new-group">
+                      <Users className="h-4 w-4 mr-2" />
+                      Group Chat
+                    </DropdownMenuItem>
+                    {isAppAdmin && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setShowCustomChatDialog(true)} data-testid="menu-custom-chat">
+                          <Shield className="h-4 w-4 mr-2" />
+                          Custom Team Chat
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-          </div>
-          
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-chats"
-            />
+            
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-ring rounded-xl"
+                data-testid="input-search-chats"
+              />
+            </div>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-4">
-              <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-              <TabsTrigger value="client" className="text-xs">
-                <Briefcase className="h-3 w-3 mr-1" />
-                Clients
-              </TabsTrigger>
-              <TabsTrigger value="direct" className="text-xs">
-                <UserIcon className="h-3 w-3 mr-1" />
-                Direct
-              </TabsTrigger>
-              <TabsTrigger value="group" className="text-xs">
-                <Users className="h-3 w-3 mr-1" />
-                Teams
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {/* Filter Tabs */}
+          <div className="px-4 pb-2 md:px-5">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full h-9 p-0.5 bg-muted/50 rounded-lg grid grid-cols-4">
+                <TabsTrigger value="all" className="text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">All</TabsTrigger>
+                <TabsTrigger value="client" className="text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Briefcase className="h-3 w-3 mr-1" />
+                  Clients
+                </TabsTrigger>
+                <TabsTrigger value="direct" className="text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <UserIcon className="h-3 w-3 mr-1" />
+                  Direct
+                </TabsTrigger>
+                <TabsTrigger value="group" className="text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Users className="h-3 w-3 mr-1" />
+                  Teams
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
+        {/* Conversation List */}
         <ScrollArea className="flex-1">
           {roomsLoading ? (
-            <div className="p-4 text-center text-muted-foreground">Loading...</div>
+            <div className="flex items-center justify-center h-32">
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-muted-foreground">Loading chats...</p>
+              </div>
+            </div>
           ) : filteredRooms.length === 0 ? (
-            <div className="p-8 text-center">
-              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="font-medium mb-2">No conversations yet</h3>
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+              <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                <MessageSquare className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+              <h3 className="font-medium mb-1">No conversations yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Start a new conversation with your team
               </p>
-              <Button variant="outline" size="sm" onClick={() => setShowNewChatDialog(true)}>
+              <Button onClick={() => setShowNewChatDialog(true)} className="rounded-full px-6">
                 <Plus className="h-4 w-4 mr-2" />
                 Start Chat
               </Button>
             </div>
           ) : (
-            <div className="divide-y">
+            <div className="px-2 py-1 space-y-0.5">
               {filteredRooms.map((room) => {
                 const isSelected = room.id === selectedRoomId;
                 const otherParticipant = room.participants.find(p => p.staffId !== currentUser?.id);
@@ -1073,19 +1089,21 @@ export default function Chat() {
                       setSelectedRoomId(room.id);
                       setIsMobileView(true);
                     }}
-                    className={`flex items-center gap-3 p-4 cursor-pointer hover-elevate transition-colors ${
-                      isSelected ? "bg-accent" : ""
+                    className={`flex items-center gap-3 p-3 cursor-pointer rounded-xl transition-all duration-200 ${
+                      isSelected 
+                        ? "bg-primary/10 shadow-sm" 
+                        : "hover:bg-muted/50 active:bg-muted"
                     }`}
                     data-testid={`chat-room-${room.id}`}
                   >
-                    <div className="relative">
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className={getRoomBgColor(room)}>
+                    <div className="relative shrink-0">
+                      <Avatar className="h-12 w-12 shadow-sm">
+                        <AvatarFallback className={`${getRoomBgColor(room)} text-sm font-medium`}>
                           {getRoomAvatar(room)}
                         </AvatarFallback>
                       </Avatar>
                       {room.type === "direct" && isOnline && (
-                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+                        <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background ring-2 ring-green-500/20" />
                       )}
                     </div>
                     
@@ -1093,33 +1111,35 @@ export default function Chat() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
                           {getRoomIcon(room)}
-                          <span className="font-medium truncate">{getRoomDisplayName(room)}</span>
+                          <span className={`font-medium truncate ${isSelected ? "text-primary" : ""}`}>
+                            {getRoomDisplayName(room)}
+                          </span>
                         </div>
                         {room.lastMessageAt && (
-                          <span className="text-xs text-muted-foreground shrink-0">
+                          <span className="text-[11px] text-muted-foreground shrink-0">
                             {formatDistanceToNow(new Date(room.lastMessageAt), { addSuffix: false })}
                           </span>
                         )}
                       </div>
                       {room.lastMessagePreview && (
-                        <p className="text-sm text-muted-foreground truncate">
+                        <p className="text-sm text-muted-foreground truncate mt-0.5">
                           {room.lastMessagePreview}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1.5">
                         {room.type === "client" && room.clientName && (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="secondary" className="text-[10px] h-5 px-2 rounded-full">
                             {room.clientName}
                           </Badge>
                         )}
                         {(room.type === "group" || room.type === "announcement") && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground">
                             {room.participants.length} members
                           </span>
                         )}
                         {room.isAnnouncement === "yes" && (
-                          <Badge variant="outline" className="text-xs">
-                            <Megaphone className="h-3 w-3 mr-1" />
+                          <Badge variant="outline" className="text-[10px] h-5 px-2 rounded-full">
+                            <Megaphone className="h-2.5 w-2.5 mr-1" />
                             Broadcast
                           </Badge>
                         )}
@@ -1134,16 +1154,16 @@ export default function Chat() {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col md:flex`}>
+      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col md:flex bg-background`}>
         {selectedRoom ? (
           <>
-            {/* Chat Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <div className="flex items-center gap-3">
+            {/* Chat Header - Premium Design */}
+            <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-3 md:px-5 md:py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b shadow-sm">
+              <div className="flex items-center gap-3 min-w-0">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden"
+                  className="md:hidden rounded-full shrink-0"
                   onClick={() => {
                     setSelectedRoomId(null);
                     setIsMobileView(false);
@@ -1151,18 +1171,18 @@ export default function Chat() {
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className={getRoomBgColor(selectedRoom)}>
+                <Avatar className="h-10 w-10 md:h-11 md:w-11 shadow-sm shrink-0">
+                  <AvatarFallback className={`${getRoomBgColor(selectedRoom)} text-sm font-medium`}>
                     {getRoomAvatar(selectedRoom)}
                   </AvatarFallback>
                 </Avatar>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     {getRoomIcon(selectedRoom)}
-                    <h2 className="font-semibold">{getRoomDisplayName(selectedRoom)}</h2>
+                    <h2 className="font-semibold truncate">{getRoomDisplayName(selectedRoom)}</h2>
                   </div>
                   {selectedRoom.type === "client" && selectedRoom.clientName && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       Care Team for {selectedRoom.clientName}
                     </p>
                   )}
@@ -1172,11 +1192,18 @@ export default function Chat() {
                     </p>
                   )}
                   {selectedRoom.type === "direct" && (
-                    <p className="text-xs text-muted-foreground">
-                      {onlineUsers.has(selectedRoom.participants.find(p => p.staffId !== currentUser?.id)?.staffId || "") 
-                        ? "Online" 
-                        : "Offline"}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full ${
+                        onlineUsers.has(selectedRoom.participants.find(p => p.staffId !== currentUser?.id)?.staffId || "") 
+                          ? "bg-green-500" 
+                          : "bg-muted-foreground/40"
+                      }`} />
+                      <p className="text-xs text-muted-foreground">
+                        {onlineUsers.has(selectedRoom.participants.find(p => p.staffId !== currentUser?.id)?.staffId || "") 
+                          ? "Online" 
+                          : "Offline"}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1184,8 +1211,8 @@ export default function Chat() {
               {(isRoomAdmin || isAppAdmin) && selectedRoom.type !== "direct" && (
                 <Sheet open={showRoomSettings} onOpenChange={setShowRoomSettings}>
                   <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" data-testid="button-room-settings">
-                      <Settings className="h-5 w-5" />
+                    <Button variant="ghost" size="icon" className="rounded-full shrink-0" data-testid="button-room-settings">
+                      <Settings className="h-4 w-4" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent>
@@ -1331,22 +1358,27 @@ export default function Chat() {
               )}
             </div>
 
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
+            {/* Messages Area - Premium Design */}
+            <ScrollArea className="flex-1 px-3 py-4 md:px-6">
               {messagesLoading ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">Loading messages...</p>
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-muted-foreground">Loading messages...</p>
+                  </div>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <MessageSquare className="h-16 w-16 text-muted-foreground/30 mb-4" />
-                  <h3 className="font-medium mb-2">No messages yet</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                  <div className="h-20 w-20 rounded-3xl bg-muted/30 flex items-center justify-center mb-4">
+                    <MessageSquare className="h-10 w-10 text-muted-foreground/40" />
+                  </div>
+                  <h3 className="font-medium mb-1">No messages yet</h3>
+                  <p className="text-sm text-muted-foreground max-w-[200px]">
                     Send a message to start the conversation
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {[...messages].reverse().map((message, index, arr) => {
                     const isOwn = message.senderId === currentUser?.id;
                     const showAvatar = index === 0 || arr[index - 1]?.senderId !== message.senderId;
@@ -1357,79 +1389,79 @@ export default function Chat() {
                     return (
                       <div
                         key={message.id}
-                        className={`group flex gap-3 ${isOwn ? "flex-row-reverse" : ""}`}
+                        className={`group flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}
                         data-testid={`message-${message.id}`}
                       >
                         {!isOwn && showAvatar ? (
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback>
+                          <Avatar className="h-8 w-8 shadow-sm shrink-0">
+                            <AvatarFallback className="text-xs font-medium bg-muted">
                               {message.senderName?.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                         ) : !isOwn ? (
-                          <div className="w-8" />
+                          <div className="w-8 shrink-0" />
                         ) : null}
                         
-                        <div className={`max-w-[70%] flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
+                        <div className={`max-w-[75%] md:max-w-[65%] flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
                           {!isOwn && showAvatar && (
-                            <p className="text-xs text-muted-foreground mb-1">
+                            <p className="text-[11px] font-medium text-muted-foreground mb-1 ml-1">
                               {message.senderName}
                             </p>
                           )}
                           
                           {isForwarded && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                              <Forward className="h-3 w-3" />
-                              <span>Forwarded message</span>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1 ml-1">
+                              <Forward className="h-2.5 w-2.5" />
+                              <span>Forwarded</span>
                             </div>
                           )}
                           
                           {isReply && (message as any).replyToPreview && (
                             <div 
-                              className={`text-xs px-3 py-1.5 rounded-t-xl mb-0.5 border-l-2 ${
+                              className={`text-[11px] px-3 py-1.5 rounded-xl mb-1 border-l-2 ${
                                 isOwn 
-                                  ? "bg-primary/20 border-primary-foreground/50 text-primary-foreground/80" 
-                                  : "bg-muted/80 border-muted-foreground/50"
+                                  ? "bg-primary/15 border-primary text-foreground" 
+                                  : "bg-muted/60 border-muted-foreground/30"
                               }`}
                             >
-                              <p className="font-medium text-xs">{(message as any).replyToSenderName}</p>
-                              <p className="truncate max-w-[200px]">{(message as any).replyToPreview}</p>
+                              <p className="font-medium">{(message as any).replyToSenderName}</p>
+                              <p className="truncate max-w-[180px] text-muted-foreground">{(message as any).replyToPreview}</p>
                             </div>
                           )}
                           
-                          <div className="flex items-start gap-1">
+                          <div className="flex items-end gap-1">
                             <div
-                              className={`rounded-2xl px-4 py-2 ${
+                              className={`rounded-2xl px-4 py-2.5 shadow-sm ${
                                 isDeleted
-                                  ? "bg-muted/50 text-muted-foreground italic"
+                                  ? "bg-muted/30 text-muted-foreground italic"
                                   : isOwn
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted"
+                                    ? "bg-primary text-primary-foreground rounded-br-md"
+                                    : "bg-white dark:bg-muted border border-border/40 rounded-bl-md"
                               }`}
                             >
                               {isDeleted ? (
                                 <p className="text-sm">This message was deleted</p>
                               ) : (
-                                <p className="text-sm whitespace-pre-wrap">
+                                <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
                                   {renderMessageContent(message.content || "", isOwn)}
                                 </p>
                               )}
                             </div>
                             
                             {!isDeleted && (
-                              <div className="invisible group-hover:visible flex items-center">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className="h-6 w-6"
+                                      className="rounded-full"
                                       data-testid={`button-message-actions-${message.id}`}
                                     >
-                                      <MoreVertical className="h-3 w-3" />
+                                      <MoreVertical className="h-3.5 w-3.5" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align={isOwn ? "end" : "start"}>
+                                  <DropdownMenuContent align={isOwn ? "end" : "start"} className="w-40">
                                     <DropdownMenuItem 
                                       onClick={() => handleReplyToMessage(message)}
                                       data-testid={`button-reply-${message.id}`}
@@ -1463,12 +1495,12 @@ export default function Chat() {
                             )}
                           </div>
                           
-                          <div className={`flex items-center gap-1 mt-1 ${isOwn ? "justify-end" : ""}`}>
-                            <span className="text-xs text-muted-foreground">
+                          <div className={`flex items-center gap-1.5 mt-1 px-1 ${isOwn ? "justify-end" : ""}`}>
+                            <span className="text-[10px] text-muted-foreground/70">
                               {formatMessageDate(message.createdAt)}
                             </span>
                             {message.isEdited === "yes" && (
-                              <span className="text-xs text-muted-foreground">(edited)</span>
+                              <span className="text-[10px] text-muted-foreground/70">(edited)</span>
                             )}
                           </div>
                         </div>
@@ -1479,26 +1511,28 @@ export default function Chat() {
                 </div>
               )}
               
+              {/* Typing Indicator */}
               {getTypingText() && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
-                  <div className="flex gap-1">
-                    <span className="animate-bounce">.</span>
-                    <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
-                    <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-4 ml-10">
+                  <div className="flex gap-0.5">
+                    <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce" />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
                   </div>
                   <span>{getTypingText()}</span>
                 </div>
               )}
             </ScrollArea>
 
-            {/* Message Input */}
-            <div className="p-4 border-t">
+            {/* Message Input - Premium Design */}
+            <div className="sticky bottom-0 p-3 md:p-4 bg-background border-t shadow-lg">
+              {/* Reply Preview */}
               {replyToMessage && (
-                <div className="flex items-center justify-between bg-muted rounded-lg px-3 py-2 mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Reply className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex items-center justify-between bg-muted/50 rounded-xl px-4 py-2.5 mb-3 border-l-4 border-primary">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Reply className="h-4 w-4 text-primary shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-xs font-medium">Replying to {replyToMessage.senderName}</p>
+                      <p className="text-xs font-medium text-primary">Replying to {replyToMessage.senderName}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         {replyToMessage.content?.substring(0, 50)}
                         {(replyToMessage.content?.length || 0) > 50 ? "..." : ""}
@@ -1508,15 +1542,17 @@ export default function Chat() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 shrink-0"
+                    className="rounded-full shrink-0"
                     onClick={() => setReplyToMessage(null)}
                     data-testid="button-cancel-reply"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               )}
-              <div className="flex items-center gap-2">
+              
+              {/* Input Row */}
+              <div className="flex items-end gap-2">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -1526,74 +1562,83 @@ export default function Chat() {
                   disabled={!selectedRoomId}
                   data-testid="input-file-upload"
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => selectedRoomId && fileInputRef.current?.click()}
-                  disabled={!selectedRoomId || uploadAttachmentMutation.isPending}
-                  data-testid="button-attach-file"
-                  title={!selectedRoomId ? "Select a chat first" : "Attach file"}
-                >
-                  {uploadAttachmentMutation.isPending ? (
-                    <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Paperclip className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => selectedRoomId && setShowGifPicker(true)}
-                  disabled={!selectedRoomId || sendGifMutation.isPending}
-                  data-testid="button-gif-picker"
-                  title={!selectedRoomId ? "Select a chat first" : "Send GIF"}
-                >
-                  <ImageIcon className="h-4 w-4" />
-                </Button>
+                
+                {/* Attachment Buttons */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={() => selectedRoomId && fileInputRef.current?.click()}
+                    disabled={!selectedRoomId || uploadAttachmentMutation.isPending}
+                    data-testid="button-attach-file"
+                    title={!selectedRoomId ? "Select a chat first" : "Attach file"}
+                  >
+                    {uploadAttachmentMutation.isPending ? (
+                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Paperclip className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={() => selectedRoomId && setShowGifPicker(true)}
+                    disabled={!selectedRoomId || sendGifMutation.isPending}
+                    data-testid="button-gif-picker"
+                    title={!selectedRoomId ? "Select a chat first" : "Send GIF"}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {/* Message Input Field */}
                 <div className="relative flex-1">
                   <Input
                     ref={messageInputRef}
-                    placeholder={replyToMessage ? "Type your reply... (use @ to mention)" : "Type a message... (use @ to mention)"}
+                    placeholder={replyToMessage ? "Type your reply..." : "Type a message..."}
                     value={messageText}
                     onChange={handleMessageChange}
                     onKeyDown={handleKeyPress}
-                    className="w-full"
+                    className="w-full bg-muted/40 border-0 rounded-full focus-visible:ring-1 focus-visible:ring-ring"
                     data-testid="input-message"
                   />
+                  {/* Mentions Popover - Premium Design */}
                   {showMentionPopover && getFilteredMentionStaff().length > 0 && (
                     <div 
-                      className="absolute bottom-full left-0 right-0 mb-1 bg-popover border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto"
+                      className="absolute bottom-full left-0 right-0 mb-2 bg-background border border-border/50 rounded-xl shadow-xl z-50 max-h-[220px] overflow-y-auto"
                       data-testid="mention-popover"
                     >
-                      <div className="p-1">
-                        <p className="text-xs text-muted-foreground px-2 py-1">Mention a team member</p>
+                      <div className="p-2">
+                        <p className="text-[11px] text-muted-foreground px-2 py-1.5 font-medium uppercase tracking-wide">Mention</p>
                         {getFilteredMentionStaff().map((member, index) => (
                           <div
                             key={member.id}
                             onClick={() => handleMentionSelect(member)}
-                            className={`flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer ${
+                            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-colors ${
                               index === selectedMentionIndex 
-                                ? "bg-accent text-accent-foreground" 
-                                : "hover:bg-accent/50"
+                                ? "bg-primary/10 text-foreground" 
+                                : "hover:bg-muted/50"
                             }`}
                             data-testid={`mention-option-${member.id}`}
                           >
                             {member.isAllMention ? (
-                              <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center">
-                                <Users className="h-3.5 w-3.5 text-primary" />
+                              <div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center">
+                                <Users className="h-4 w-4 text-primary" />
                               </div>
                             ) : (
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">
+                              <Avatar className="h-8 w-8 shadow-sm">
+                                <AvatarFallback className="text-xs font-medium bg-muted">
                                   {member.name?.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
                             )}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">
-                                {member.isAllMention ? "@all" : member.name}
+                                {member.isAllMention ? "@all - Everyone" : member.name}
                               </p>
-                              <p className="text-xs text-muted-foreground truncate">{member.role}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{member.role}</p>
                             </div>
                           </div>
                         ))}
@@ -1601,8 +1646,11 @@ export default function Chat() {
                     </div>
                   )}
                 </div>
+                
+                {/* Send Button */}
                 <Button
                   size="icon"
+                  className="rounded-full shrink-0 shadow-sm"
                   onClick={handleSendMessage}
                   disabled={!messageText.trim() || sendMessageMutation.isPending}
                   data-testid="button-send-message"
@@ -1613,14 +1661,17 @@ export default function Chat() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <MessageSquare className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+          /* Empty State - Premium Design */
+          <div className="flex-1 flex items-center justify-center bg-muted/20">
+            <div className="text-center px-6 max-w-md">
+              <div className="h-24 w-24 rounded-3xl bg-muted/30 flex items-center justify-center mx-auto mb-6">
+                <MessageSquare className="h-12 w-12 text-muted-foreground/40" />
+              </div>
               <h2 className="text-xl font-semibold mb-2">Select a conversation</h2>
-              <p className="text-muted-foreground mb-4">
-                Choose a chat from the list or start a new one
+              <p className="text-muted-foreground mb-6">
+                Choose a chat from the list or start a new conversation with your team
               </p>
-              <Button onClick={() => setShowNewChatDialog(true)}>
+              <Button onClick={() => setShowNewChatDialog(true)} className="rounded-full px-6">
                 <Plus className="h-4 w-4 mr-2" />
                 New Message
               </Button>
@@ -1629,18 +1680,18 @@ export default function Chat() {
         )}
       </div>
 
-      {/* New Direct Message Dialog */}
+      {/* New Direct Message Dialog - Premium Design */}
       <Dialog open={showNewChatDialog} onOpenChange={setShowNewChatDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Message</DialogTitle>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-lg">New Message</DialogTitle>
             <DialogDescription>
               Start a conversation with a team member
             </DialogDescription>
           </DialogHeader>
           
-          <ScrollArea className="max-h-[300px]">
-            <div className="space-y-2">
+          <ScrollArea className="max-h-[350px] -mx-4 px-4">
+            <div className="space-y-1">
               {activeStaff
                 .filter(s => s.id !== currentUser?.id)
                 .map((member) => (
@@ -1653,15 +1704,15 @@ export default function Chat() {
                         targetUserEmail: member.email || undefined,
                       });
                     }}
-                    className="flex items-center gap-3 p-3 rounded-lg hover-elevate cursor-pointer"
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 active:bg-muted cursor-pointer transition-colors"
                     data-testid={`staff-option-${member.id}`}
                   >
-                    <Avatar>
-                      <AvatarFallback>{member.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                    <Avatar className="h-10 w-10 shadow-sm">
+                      <AvatarFallback className="text-sm font-medium bg-muted">{member.name?.charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="font-medium">{member.name}</p>
-                      <p className="text-sm text-muted-foreground">{member.role}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{member.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{member.role}</p>
                     </div>
                   </div>
                 ))}
@@ -2020,47 +2071,58 @@ export default function Chat() {
         </DialogContent>
       </Dialog>
 
-      {/* GIF Picker Dialog */}
+      {/* GIF Picker Dialog - Premium Design */}
       <Dialog open={showGifPicker} onOpenChange={(open) => {
         setShowGifPicker(open);
         if (!open) {
           setGifSearchQuery("");
         }
       }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ImageIcon className="h-5 w-5" />
+        <DialogContent className="max-w-lg sm:max-w-xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ImageIcon className="h-4 w-4 text-primary" />
+              </div>
               Send a GIF
             </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
+            {/* Search Input */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search for GIFs..."
                 value={gifSearchQuery}
                 onChange={(e) => setGifSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-10 h-11 bg-muted/40 border-0 rounded-xl focus-visible:ring-1"
                 data-testid="input-gif-search"
               />
             </div>
             
-            <div className="text-xs text-muted-foreground">
-              {gifSearchQuery.length >= 2 
-                ? `Showing results for "${gifSearchQuery}"`
-                : "Trending GIFs"}
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">
+                {gifSearchQuery.length >= 2 
+                  ? `Results for "${gifSearchQuery}"`
+                  : "Trending"}
+              </div>
             </div>
             
-            <ScrollArea className="h-[300px]">
+            {/* GIF Grid */}
+            <ScrollArea className="h-[320px] -mx-2 px-2">
               {gifSearchLoading ? (
                 <div className="flex items-center justify-center h-full">
-                  <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs text-muted-foreground">Loading GIFs...</p>
+                  </div>
                 </div>
               ) : displayedGifs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
-                  <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-2" />
+                  <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-3">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {gifSearchQuery.length >= 2 
                       ? "No GIFs found. Try a different search."
@@ -2068,22 +2130,24 @@ export default function Chat() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {displayedGifs.map((gif) => (
                     <button
                       key={gif.id}
                       onClick={() => handleGifSelect(gif)}
-                      className="relative group rounded-lg overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                      className="relative group rounded-xl overflow-hidden hover:ring-2 hover:ring-primary transition-all shadow-sm"
                       data-testid={`gif-${gif.id}`}
                     >
                       <img
                         src={gif.previewUrl}
                         alt={gif.title}
-                        className="w-full h-24 object-cover"
+                        className="w-full h-28 object-cover"
                         loading="lazy"
                       />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-xs">Send</span>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="bg-white/90 dark:bg-black/90 px-3 py-1 rounded-full">
+                          <span className="text-foreground text-xs font-medium">Send</span>
+                        </div>
                       </div>
                     </button>
                   ))}
