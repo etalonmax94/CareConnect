@@ -1542,9 +1542,9 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   return (
     <>
       <Form {...form}>
-        <div className="max-w-4xl mx-auto px-2 sm:px-4 pb-6">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4 h-[calc(100vh-120px)] flex flex-col">
           {/* Step labels and progress bar - compact layout */}
-          <div className="mb-3">
+          <div className="mb-3 flex-shrink-0">
             {/* Step labels row - compact */}
             <div className="flex justify-between mb-1.5">
               {WIZARD_STEPS.map((step, index) => {
@@ -1594,14 +1594,14 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
             </div>
           </div>
 
-          {/* Main wizard layout with vertical side buttons - compact */}
-          <div className="flex items-stretch gap-2">
+          {/* Main wizard layout with vertical side buttons - fills available height */}
+          <div className="flex items-stretch gap-2 flex-1 min-h-0">
             {/* Left navigation button - Back/Cancel */}
             <button
               type="button"
               onClick={currentStep === 0 ? onCancel : goBack}
               className={cn(
-                "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
+                "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 rounded-lg border transition-all duration-200",
                 "bg-background hover:bg-muted/50 border-border hover:border-primary/30",
                 "text-muted-foreground hover:text-foreground",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
@@ -1614,8 +1614,8 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               </span>
             </button>
 
-            {/* Center Card - Unified fixed height */}
-            <Card className="flex-1 flex flex-col min-h-[380px] max-h-[500px] overflow-hidden">
+            {/* Center Card - Fills available height */}
+            <Card className="flex-1 flex flex-col overflow-hidden">
               <CardHeader className="flex-shrink-0 py-2 px-4 border-b">
                 <div className="flex items-center gap-2">
                   {(() => {
@@ -1656,7 +1656,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
                   isSubmitting && "opacity-70 cursor-not-allowed"
@@ -1677,7 +1677,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 type="button"
                 onClick={goNext}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 )}
@@ -1690,7 +1690,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
           </div>
 
           {/* Mobile navigation buttons - shown only on small screens */}
-          <div className="flex sm:hidden justify-between mt-4 gap-3">
+          <div className="flex sm:hidden justify-between mt-4 gap-3 flex-shrink-0">
             <Button
               type="button"
               variant="outline"
