@@ -21,6 +21,7 @@ import {
   insertSilHouseSchema, insertSilHouseAuditLogSchema,
   // Notifications, tickets, and announcements
   insertNotificationSchema, insertSupportTicketSchema, insertTicketCommentSchema, insertAnnouncementSchema,
+  insertTaskSchema, insertTaskCommentSchema, insertTaskChecklistSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { 
@@ -7756,6 +7757,409 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting announcement:", error);
       res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  // ============================================
+  // TASKS API
+  // ============================================
+
+  // Get all tasks
+  app.get("/api/tasks", requireAuth, async (req: any, res) => {
+    try {
+      const tasks = await storage.getAllTasks();
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get tasks created by current user
+  app.get("/api/tasks/my", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      const tasks = await storage.getTasksByUser(userId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching user tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get tasks assigned to current user
+  app.get("/api/tasks/assigned", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      const tasks = await storage.getTasksAssignedToUser(userId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching assigned tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get tasks for a specific client
+  app.get("/api/tasks/client/:clientId", requireAuth, async (req: any, res) => {
+    try {
+      const { clientId } = req.params;
+      const tasks = await storage.getTasksByClient(clientId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching client tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get single task
+  app.get("/api/tasks/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const task = await storage.getTaskById(id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      console.error("Error fetching task:", error);
+      res.status(500).json({ error: "Failed to fetch task" });
+    }
+  });
+
+  // Create new task
+  app.post("/api/tasks", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const validatedData = insertTaskSchema.parse({
+        ...req.body,
+        createdById: userId,
+        createdByName: userName
+      });
+
+      const task = await storage.createTask(validatedData);
+
+      // If assigned to someone else, create notification
+      if (task.assignedToId && task.assignedToId !== userId) {
+        await storage.createNotification({
+          userId: task.assignedToId,
+          type: "task_assigned",
+          title: "New Task Assigned",
+          message: `${userName} assigned you a task: ${task.title}`,
+          relatedType: "task",
+          relatedId: task.id
+        });
+      }
+
+      res.status(201).json(task);
+    } catch (error) {
+      console.error("Error creating task:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to create task" });
+    }
+  });
+
+  // Update task
+  app.patch("/api/tasks/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      
+      const existingTask = await storage.getTaskById(id);
+      if (!existingTask) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const task = await storage.updateTask(id, req.body);
+
+      // If status changed to completed, record who completed it
+      if (req.body.status === "completed" && existingTask.status !== "completed") {
+        await storage.updateTask(id, {
+          completedAt: new Date(),
+          completedById: userId,
+          completedByName: userName
+        } as any);
+        
+        // Notify task creator if different from completer
+        if (existingTask.createdById !== userId) {
+          await storage.createNotification({
+            userId: existingTask.createdById,
+            type: "task_completed",
+            title: "Task Completed",
+            message: `${userName} completed the task: ${existingTask.title}`,
+            relatedType: "task",
+            relatedId: id
+          });
+        }
+      }
+
+      // If task was reassigned, notify new assignee
+      if (req.body.assignedToId && req.body.assignedToId !== existingTask.assignedToId && req.body.assignedToId !== userId) {
+        await storage.createNotification({
+          userId: req.body.assignedToId,
+          type: "task_assigned",
+          title: "Task Assigned to You",
+          message: `${userName} assigned you a task: ${existingTask.title}`,
+          relatedType: "task",
+          relatedId: id
+        });
+      }
+
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  // Assign task
+  app.post("/api/tasks/:id/assign", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { assignedToId, assignedToName } = req.body;
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+
+      if (!assignedToId || !assignedToName) {
+        return res.status(400).json({ error: "Missing assignee information" });
+      }
+
+      const task = await storage.assignTask(id, assignedToId, assignedToName);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Notify the assignee
+      if (assignedToId !== userId) {
+        await storage.createNotification({
+          userId: assignedToId,
+          type: "task_assigned",
+          title: "Task Assigned to You",
+          message: `${userName} assigned you a task: ${task.title}`,
+          relatedType: "task",
+          relatedId: id
+        });
+      }
+
+      res.json(task);
+    } catch (error) {
+      console.error("Error assigning task:", error);
+      res.status(500).json({ error: "Failed to assign task" });
+    }
+  });
+
+  // Complete task
+  app.post("/api/tasks/:id/complete", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const existingTask = await storage.getTaskById(id);
+      if (!existingTask) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const task = await storage.completeTask(id, userId, userName, notes);
+
+      // Notify task creator if different from completer
+      if (existingTask.createdById !== userId) {
+        await storage.createNotification({
+          userId: existingTask.createdById,
+          type: "task_completed",
+          title: "Task Completed",
+          message: `${userName} completed the task: ${existingTask.title}`,
+          relatedType: "task",
+          relatedId: id
+        });
+      }
+
+      res.json(task);
+    } catch (error) {
+      console.error("Error completing task:", error);
+      res.status(500).json({ error: "Failed to complete task" });
+    }
+  });
+
+  // Delete task
+  app.delete("/api/tasks/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteTask(id);
+      if (!success) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Get task comments
+  app.get("/api/tasks/:taskId/comments", requireAuth, async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      const comments = await storage.getTaskComments(taskId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching task comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Add task comment
+  app.post("/api/tasks/:taskId/comments", requireAuth, async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const validatedData = insertTaskCommentSchema.parse({
+        ...req.body,
+        taskId,
+        authorId: userId,
+        authorName: userName
+      });
+
+      const comment = await storage.createTaskComment(validatedData);
+
+      // Notify relevant users
+      const usersToNotify = new Set<string>();
+      
+      if (task.createdById !== userId) {
+        usersToNotify.add(task.createdById);
+      }
+      
+      if (task.assignedToId && task.assignedToId !== userId) {
+        usersToNotify.add(task.assignedToId);
+      }
+
+      for (const notifyUserId of usersToNotify) {
+        await storage.createNotification({
+          userId: notifyUserId,
+          type: "task_comment",
+          title: "New Comment on Task",
+          message: `${userName} commented on task: ${task.title}`,
+          relatedType: "task",
+          relatedId: task.id
+        });
+      }
+
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Error creating task comment:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // Get task checklists
+  app.get("/api/tasks/:taskId/checklists", requireAuth, async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      const checklists = await storage.getTaskChecklists(taskId);
+      res.json(checklists);
+    } catch (error) {
+      console.error("Error fetching task checklists:", error);
+      res.status(500).json({ error: "Failed to fetch checklists" });
+    }
+  });
+
+  // Add checklist item
+  app.post("/api/tasks/:taskId/checklists", requireAuth, async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const validatedData = insertTaskChecklistSchema.parse({
+        ...req.body,
+        taskId
+      });
+
+      const checklist = await storage.createTaskChecklist(validatedData);
+      res.status(201).json(checklist);
+    } catch (error) {
+      console.error("Error creating checklist item:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to create checklist item" });
+    }
+  });
+
+  // Update checklist item
+  app.patch("/api/tasks/:taskId/checklists/:checklistId", requireAuth, async (req: any, res) => {
+    try {
+      const { checklistId } = req.params;
+      const userId = req.user?.id || req.session?.userId;
+
+      // Handle completion
+      if (req.body.isCompleted === "yes") {
+        req.body.completedAt = new Date();
+        req.body.completedById = userId;
+      } else if (req.body.isCompleted === "no") {
+        req.body.completedAt = null;
+        req.body.completedById = null;
+      }
+
+      const checklist = await storage.updateTaskChecklist(checklistId, req.body);
+      if (!checklist) {
+        return res.status(404).json({ error: "Checklist item not found" });
+      }
+      res.json(checklist);
+    } catch (error) {
+      console.error("Error updating checklist item:", error);
+      res.status(500).json({ error: "Failed to update checklist item" });
+    }
+  });
+
+  // Delete checklist item
+  app.delete("/api/tasks/:taskId/checklists/:checklistId", requireAuth, async (req: any, res) => {
+    try {
+      const { checklistId } = req.params;
+      const success = await storage.deleteTaskChecklist(checklistId);
+      if (!success) {
+        return res.status(404).json({ error: "Checklist item not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting checklist item:", error);
+      res.status(500).json({ error: "Failed to delete checklist item" });
     }
   });
 
