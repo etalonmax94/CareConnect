@@ -7650,13 +7650,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NOTIFICATIONS API
   // ============================================
 
-  // Get notifications for current user
+  // Get notifications for current user - archives inaccessible chat notifications first
   app.get("/api/notifications", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.session?.userId;
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
+      
+      // Archive inaccessible chat notifications first for accurate results
+      const memberships = await storage.getChatRoomParticipantsByUser(userId);
+      const accessibleRoomIds = memberships.map(m => m.roomId);
+      await storage.archiveInaccessibleChatNotifications(userId, accessibleRoomIds);
+      
+      // Now fetch notifications - inaccessible ones are already archived
       const notifs = await storage.getNotificationsByUser(userId);
       res.json(notifs);
     } catch (error) {
@@ -7665,13 +7672,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get unread notification count
+  // Get unread notification count - archives inaccessible chat notifications first
   app.get("/api/notifications/unread-count", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.session?.userId;
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
+      
+      // Archive inaccessible chat notifications first for accurate count
+      const memberships = await storage.getChatRoomParticipantsByUser(userId);
+      const accessibleRoomIds = memberships.map(m => m.roomId);
+      await storage.archiveInaccessibleChatNotifications(userId, accessibleRoomIds);
+      
+      // Now get count - inaccessible ones are already archived
       const count = await storage.getUnreadNotificationCount(userId);
       res.json({ count });
     } catch (error) {
@@ -7725,7 +7739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get paginated notifications with filters
+  // Get paginated notifications with filters - archives inaccessible chat notifications first
   app.get("/api/notifications/paginated", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.session?.userId;
@@ -7739,6 +7753,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const type = req.query.type as string | undefined;
       const includeArchived = req.query.includeArchived === "true";
       
+      // Archive inaccessible chat notifications first for accurate pagination
+      const memberships = await storage.getChatRoomParticipantsByUser(userId);
+      const accessibleRoomIds = memberships.map(m => m.roomId);
+      await storage.archiveInaccessibleChatNotifications(userId, accessibleRoomIds);
+      
+      // Now fetch paginated results - inaccessible ones are already archived
       const result = await storage.getNotificationsByUserPaginated(userId, {
         limit,
         offset,
@@ -8831,7 +8851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Remove participant from room
+  // Remove participant from room - also auto-archives their chat notifications
   app.delete("/api/chat/rooms/:roomId/participants/:staffId", requireAuth, async (req: any, res) => {
     try {
       const { roomId, staffId } = req.params;
@@ -8839,6 +8859,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!success) {
         return res.status(404).json({ error: "Participant not found" });
+      }
+
+      // Auto-archive chat notifications for this room when user is removed
+      try {
+        await storage.archiveChatNotificationsForRoom(staffId, roomId);
+      } catch (archiveErr) {
+        console.error("Error auto-archiving chat notifications:", archiveErr);
+        // Don't fail the request - this is a cleanup operation
       }
 
       res.json({ success: true });

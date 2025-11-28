@@ -3043,7 +3043,10 @@ export class DbStorage implements IStorage {
 
   async getNotificationsByUser(userId: string): Promise<Notification[]> {
     return await db.select().from(notifications)
-      .where(eq(notifications.userId, userId))
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isArchived, "no")
+      ))
       .orderBy(desc(notifications.createdAt))
       .limit(50);
   }
@@ -3053,7 +3056,8 @@ export class DbStorage implements IStorage {
       .from(notifications)
       .where(and(
         eq(notifications.userId, userId),
-        eq(notifications.isRead, "no")
+        eq(notifications.isRead, "no"),
+        eq(notifications.isArchived, "no")
       ));
     return Number(result[0]?.count || 0);
   }
@@ -3138,6 +3142,70 @@ export class DbStorage implements IStorage {
       .where(eq(notifications.id, id))
       .returning();
     return result[0];
+  }
+
+  async archiveChatNotificationsForRoom(userId: string, roomId: string): Promise<number> {
+    const result = await db.update(notifications)
+      .set({ isArchived: "yes", archivedAt: new Date() })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.relatedType, "chat"),
+        eq(notifications.relatedId, roomId),
+        eq(notifications.isArchived, "no")
+      ))
+      .returning();
+    return result.length;
+  }
+
+  async archiveInaccessibleChatNotifications(userId: string, accessibleRoomIds: string[]): Promise<number> {
+    // Archive all chat notifications for rooms the user no longer has access to
+    // Use a subquery approach to avoid SQL parameter limits
+    
+    if (accessibleRoomIds.length === 0) {
+      // No accessible rooms - archive all chat notifications for this user
+      const result = await db.update(notifications)
+        .set({ isArchived: "yes", archivedAt: new Date() })
+        .where(and(
+          eq(notifications.userId, userId),
+          eq(notifications.relatedType, "chat"),
+          eq(notifications.isArchived, "no")
+        ))
+        .returning();
+      return result.length;
+    }
+    
+    // Get all unarchived chat notifications for this user
+    const chatNotifs = await db.select()
+      .from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.relatedType, "chat"),
+        eq(notifications.isArchived, "no")
+      ));
+    
+    // Find those that are for inaccessible rooms
+    const accessibleSet = new Set(accessibleRoomIds);
+    const toArchive = chatNotifs.filter(n => n.relatedId && !accessibleSet.has(n.relatedId));
+    
+    if (toArchive.length === 0) return 0;
+    
+    // Archive in batches to avoid SQL parameter limits (max ~500 per batch to be safe)
+    const BATCH_SIZE = 500;
+    let totalArchived = 0;
+    
+    for (let i = 0; i < toArchive.length; i += BATCH_SIZE) {
+      const batch = toArchive.slice(i, i + BATCH_SIZE);
+      const batchIds = batch.map(n => n.id);
+      
+      const result = await db.update(notifications)
+        .set({ isArchived: "yes", archivedAt: new Date() })
+        .where(sql`${notifications.id} IN (${sql.join(batchIds.map(id => sql`${id}`), sql`, `)})`)
+        .returning();
+      
+      totalArchived += result.length;
+    }
+    
+    return totalArchived;
   }
 
   async markNotificationAsDelivered(id: string, method: string = "websocket"): Promise<Notification | undefined> {
