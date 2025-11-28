@@ -177,6 +177,8 @@ interface AuditLogOptions {
 async function logAudit(options: AuditLogOptions): Promise<void> {
   try {
     const user = (options.req.session as any)?.user;
+    // Determine environment: "production" if NODE_ENV is production, otherwise "development"
+    const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
     
     await storage.createAuditLog({
       entityType: options.entityType,
@@ -192,6 +194,7 @@ async function logAudit(options: AuditLogOptions): Promise<void> {
       ipAddress: options.req.ip || options.req.headers['x-forwarded-for'] as string || null,
       userAgent: options.req.headers['user-agent'] || null,
       clientId: options.clientId,
+      environment: environment,
     });
   } catch (error) {
     console.error("Failed to create audit log:", error);

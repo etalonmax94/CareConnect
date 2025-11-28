@@ -722,6 +722,7 @@ export const auditLog = pgTable("audit_log", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }), // Related client if applicable
+  environment: text("environment").default("production"), // "production" or "development" to identify source
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -730,6 +731,7 @@ export const insertAuditLogSchema = createInsertSchema(auditLog, {
   changedFields: z.array(z.string()).optional().nullable(),
   oldValues: z.record(z.unknown()).optional().nullable(),
   newValues: z.record(z.unknown()).optional().nullable(),
+  environment: z.enum(["production", "development"]).optional(),
 }).omit({
   id: true,
   createdAt: true,
