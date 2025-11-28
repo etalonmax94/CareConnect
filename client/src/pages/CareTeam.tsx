@@ -124,7 +124,7 @@ export default function CareTeam() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-care-team-title">Care Team Directory</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Care Team Directory</h1>
           <p className="text-muted-foreground">Manage all healthcare providers and external services</p>
         </div>
         <div className="flex items-center gap-2">

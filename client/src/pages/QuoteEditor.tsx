@@ -484,7 +484,7 @@ export default function QuoteEditor() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{quote.quoteNumber}</h1>
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">{quote.quoteNumber}</h1>
             <Badge variant="secondary" className={`${statusConfig.className} gap-1`}>
               {statusConfig.icon}
               {statusConfig.label}

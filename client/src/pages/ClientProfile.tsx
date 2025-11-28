@@ -1462,7 +1462,7 @@ export default function ClientProfile() {
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
-              <h1 className="text-lg sm:text-2xl font-bold truncate text-foreground">{client.participantName}</h1>
+              <h1 className="text-xl sm:text-2xl font-semibold truncate text-foreground" data-testid="text-page-title">{client.participantName}</h1>
               {/* Interactive Status Badge - Click to view/change status */}
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -57,7 +57,7 @@ export default function AddClient() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-lg sm:text-2xl font-semibold">Add New Client</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Add New Client</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Create a new client record step by step
           </p>

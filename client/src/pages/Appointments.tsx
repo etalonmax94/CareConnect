@@ -158,7 +158,7 @@ export default function Appointments() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Appointments</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Appointments</h1>
           <p className="text-muted-foreground">Manage client appointments and scheduling</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

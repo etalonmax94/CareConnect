@@ -184,7 +184,7 @@ export default function LeadershipMeeting() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground flex items-center gap-2" data-testid="text-page-title">
               <Users className="w-6 h-6" />
               Leadership Meeting
             </h1>
