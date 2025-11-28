@@ -39,6 +39,7 @@ import UserApprovals from "@/pages/UserApprovals";
 import HelpDesk from "@/pages/HelpDesk";
 import Tasks from "@/pages/Tasks";
 import Chat from "@/pages/Chat";
+import AdminChat from "@/pages/AdminChat";
 import Notifications from "@/pages/Notifications";
 import SchedulingConflicts from "@/pages/SchedulingConflicts";
 import NotFound from "@/pages/not-found";
@@ -90,6 +91,7 @@ function ProtectedRouter() {
       <Route path="/help-desk" component={HelpDesk} />
       <Route path="/tasks" component={Tasks} />
       <Route path="/chat" component={Chat} />
+      <Route path="/admin/chat" component={AdminChat} />
       <Route path="/notifications" component={Notifications} />
       <Route path="/scheduling-conflicts" component={SchedulingConflicts} />
       <Route component={NotFound} />
