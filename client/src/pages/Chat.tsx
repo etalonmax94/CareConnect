@@ -565,7 +565,10 @@ export default function Chat() {
       <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col border-r`}>
         <div className="p-4 border-b">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold" data-testid="text-chat-title">Messages</h1>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Messages</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Team communication and direct messaging</p>
+            </div>
             <div className="flex items-center gap-2">
               {isAppAdmin && (
                 <Button 

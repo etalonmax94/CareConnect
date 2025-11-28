@@ -394,9 +394,9 @@ export default function Tasks() {
       <div className="w-[400px] border-r flex flex-col bg-background">
         <div className="p-4 border-b space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ListTodo className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold text-lg">Tasks</h2>
+            <div className="text-left">
+              <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Tasks</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage and track team tasks</p>
             </div>
             <Button size="sm" onClick={() => setShowCreateDialog(true)} data-testid="button-create-task">
               <Plus className="h-4 w-4 mr-1" />
