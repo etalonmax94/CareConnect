@@ -1129,7 +1129,6 @@ export default function Chat() {
                     key={room.id}
                     onClick={() => {
                       setSelectedRoomId(room.id);
-                      setIsMobileView(true);
                     }}
                     className={`flex items-center gap-3 p-3 cursor-pointer rounded-xl transition-all duration-200 ${
                       isSelected 
