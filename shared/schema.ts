@@ -2673,3 +2673,131 @@ export const insertTaskChecklistSchema = createInsertSchema(taskChecklists, {
 
 export type InsertTaskChecklist = z.infer<typeof insertTaskChecklistSchema>;
 export type TaskChecklist = typeof taskChecklists.$inferSelect;
+
+// ============================================
+// CHAT SYSTEM
+// ============================================
+
+export type ChatRoomType = "direct" | "group" | "client";
+
+export const chatRooms = pgTable("chat_rooms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  name: text("name"), // For group chats, null for direct messages
+  type: text("type").$type<ChatRoomType>().notNull().default("direct"),
+  
+  // For client-linked conversations
+  clientId: varchar("client_id"),
+  clientName: text("client_name"),
+  
+  // Room metadata
+  description: text("description"),
+  avatarUrl: text("avatar_url"),
+  
+  // Created by
+  createdById: varchar("created_by_id").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  
+  // Last activity for sorting
+  lastMessageAt: timestamp("last_message_at"),
+  lastMessagePreview: text("last_message_preview"),
+  
+  isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertChatRoomSchema = createInsertSchema(chatRooms, {
+  name: z.string().optional(),
+  type: z.enum(["direct", "group", "client"]).optional().default("direct"),
+  description: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastMessageAt: true,
+  lastMessagePreview: true,
+});
+
+export type InsertChatRoom = z.infer<typeof insertChatRoomSchema>;
+export type ChatRoom = typeof chatRooms.$inferSelect;
+
+// Chat Room Participants
+export const chatRoomParticipants = pgTable("chat_room_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  roomId: varchar("room_id").notNull().references(() => chatRooms.id, { onDelete: "cascade" }),
+  
+  staffId: varchar("staff_id").notNull(),
+  staffName: text("staff_name").notNull(),
+  staffEmail: text("staff_email"),
+  
+  // Role in the room
+  role: text("role").$type<"admin" | "member">().default("member"),
+  
+  // Read tracking
+  lastReadAt: timestamp("last_read_at"),
+  
+  // Notification preferences
+  isMuted: text("is_muted").default("no").$type<"yes" | "no">(),
+  
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+export const insertChatRoomParticipantSchema = createInsertSchema(chatRoomParticipants, {
+  role: z.enum(["admin", "member"]).optional().default("member"),
+}).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export type InsertChatRoomParticipant = z.infer<typeof insertChatRoomParticipantSchema>;
+export type ChatRoomParticipant = typeof chatRoomParticipants.$inferSelect;
+
+// Chat Messages
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  roomId: varchar("room_id").notNull().references(() => chatRooms.id, { onDelete: "cascade" }),
+  
+  // Sender info
+  senderId: varchar("sender_id").notNull(),
+  senderName: text("sender_name").notNull(),
+  
+  // Message content
+  content: text("content").notNull(),
+  messageType: text("message_type").$type<"text" | "system" | "file">().default("text"),
+  
+  // File attachment (if any)
+  attachmentUrl: text("attachment_url"),
+  attachmentName: text("attachment_name"),
+  attachmentType: text("attachment_type"),
+  
+  // Reply to another message
+  replyToId: varchar("reply_to_id"),
+  replyToPreview: text("reply_to_preview"),
+  
+  // Edit/delete tracking
+  isEdited: text("is_edited").default("no").$type<"yes" | "no">(),
+  editedAt: timestamp("edited_at"),
+  isDeleted: text("is_deleted").default("no").$type<"yes" | "no">(),
+  deletedAt: timestamp("deleted_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages, {
+  content: z.string().min(1, "Message cannot be empty"),
+  messageType: z.enum(["text", "system", "file"]).optional().default("text"),
+}).omit({
+  id: true,
+  createdAt: true,
+  isEdited: true,
+  editedAt: true,
+  isDeleted: true,
+  deletedAt: true,
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;

@@ -35,6 +35,8 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 -   **Falls Risk Assessment Tool (FRAT)**: Peninsula Health standard 4-category scoring system with auto-high-risk triggers and score calculation.
 -   **NDIS Consent Form Tracking**: Independent compliance tracking for NDIS-specific consent forms.
 -   **Help Desk & Support Tickets**: In-app issue reporting system with ticket creation, assignment, commenting, resolution workflow. Includes floating help widget for quick access and notification bell for real-time updates.
+-   **Task Management System**: Comprehensive task tracking with categories (general, client_care, documentation, compliance, training, meeting, follow_up), priorities (low, medium, high, urgent), status workflow (not_started, in_progress, completed, cancelled), due dates, staff assignment, comments, and checklists.
+-   **Real-Time Chat System**: Team messaging with direct messages and group chats. Features WebSocket-powered real-time messaging, typing indicators, online/offline presence, read receipts, and message history. Integrated with staff directory for easy conversation creation.
 
 ### System Design Choices
 -   **Database Schema**: PostgreSQL with Drizzle ORM, comprehensive tables for clients, goals, notes, incidents, documents, staff, appointments, care plans, quotes, and customizable forms.

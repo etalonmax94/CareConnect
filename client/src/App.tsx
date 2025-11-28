@@ -38,6 +38,7 @@ import PendingApproval from "@/pages/PendingApproval";
 import UserApprovals from "@/pages/UserApprovals";
 import HelpDesk from "@/pages/HelpDesk";
 import Tasks from "@/pages/Tasks";
+import Chat from "@/pages/Chat";
 import NotFound from "@/pages/not-found";
 import NotificationBell from "@/components/NotificationBell";
 import HelpWidget from "@/components/HelpWidget";
@@ -86,6 +87,7 @@ function ProtectedRouter() {
       <Route path="/user-approvals" component={UserApprovals} />
       <Route path="/help-desk" component={HelpDesk} />
       <Route path="/tasks" component={Tasks} />
+      <Route path="/chat" component={Chat} />
       <Route component={NotFound} />
     </Switch>
   );

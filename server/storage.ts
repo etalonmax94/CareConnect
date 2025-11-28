@@ -22,6 +22,8 @@ import {
   notifications, supportTickets, ticketComments, announcements,
   // Tasks
   tasks, taskComments, taskChecklists,
+  // Chat
+  chatRooms, chatRoomParticipants, chatMessages,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -83,9 +85,13 @@ import {
   // Task types
   type InsertTask, type Task,
   type InsertTaskComment, type TaskComment,
-  type InsertTaskChecklist, type TaskChecklist
+  type InsertTaskChecklist, type TaskChecklist,
+  // Chat types
+  type InsertChatRoom, type ChatRoom,
+  type InsertChatRoomParticipant, type ChatRoomParticipant,
+  type InsertChatMessage, type ChatMessage
 } from "@shared/schema";
-import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Clients
@@ -583,6 +589,28 @@ export interface IStorage {
   createTaskChecklist(item: InsertTaskChecklist): Promise<TaskChecklist>;
   updateTaskChecklist(id: string, updates: Partial<InsertTaskChecklist>): Promise<TaskChecklist | undefined>;
   deleteTaskChecklist(id: string): Promise<boolean>;
+  
+  // Chat Rooms
+  getChatRooms(userId: string): Promise<ChatRoom[]>;
+  getChatRoomById(id: string): Promise<ChatRoom | undefined>;
+  getDirectChatRoom(userId1: string, userId2: string): Promise<ChatRoom | undefined>;
+  createChatRoom(room: InsertChatRoom): Promise<ChatRoom>;
+  updateChatRoom(id: string, updates: Partial<InsertChatRoom>): Promise<ChatRoom | undefined>;
+  deleteChatRoom(id: string): Promise<boolean>;
+  
+  // Chat Room Participants
+  getChatRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]>;
+  addChatRoomParticipant(participant: InsertChatRoomParticipant): Promise<ChatRoomParticipant>;
+  removeChatRoomParticipant(roomId: string, staffId: string): Promise<boolean>;
+  updateLastRead(roomId: string, staffId: string): Promise<void>;
+  getUnreadCount(userId: string): Promise<number>;
+  
+  // Chat Messages
+  getChatMessages(roomId: string, limit?: number, before?: string): Promise<ChatMessage[]>;
+  getChatMessageById(id: string): Promise<ChatMessage | undefined>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  updateChatMessage(id: string, content: string): Promise<ChatMessage | undefined>;
+  deleteChatMessage(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -3180,7 +3208,7 @@ export class DbStorage implements IStorage {
         assignedToId,
         assignedToName,
         assignedAt: new Date(),
-        status: "pending",
+        status: "not_started",
         updatedAt: new Date()
       })
       .where(eq(tasks.id, id))
@@ -3245,6 +3273,189 @@ export class DbStorage implements IStorage {
   async deleteTaskChecklist(id: string): Promise<boolean> {
     const result = await db.delete(taskChecklists)
       .where(eq(taskChecklists.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Chat Rooms
+  async getChatRooms(userId: string): Promise<ChatRoom[]> {
+    const participantRooms = await db.select({ roomId: chatRoomParticipants.roomId })
+      .from(chatRoomParticipants)
+      .where(eq(chatRoomParticipants.staffId, userId));
+    
+    const roomIds = participantRooms.map(p => p.roomId);
+    if (roomIds.length === 0) return [];
+
+    return await db.select().from(chatRooms)
+      .where(and(
+        inArray(chatRooms.id, roomIds),
+        eq(chatRooms.isArchived, "no")
+      ))
+      .orderBy(desc(chatRooms.lastMessageAt));
+  }
+
+  async getChatRoomById(id: string): Promise<ChatRoom | undefined> {
+    const result = await db.select().from(chatRooms)
+      .where(eq(chatRooms.id, id));
+    return result[0];
+  }
+
+  async getDirectChatRoom(userId1: string, userId2: string): Promise<ChatRoom | undefined> {
+    const user1Rooms = await db.select({ roomId: chatRoomParticipants.roomId })
+      .from(chatRoomParticipants)
+      .where(eq(chatRoomParticipants.staffId, userId1));
+    
+    const user2Rooms = await db.select({ roomId: chatRoomParticipants.roomId })
+      .from(chatRoomParticipants)
+      .where(eq(chatRoomParticipants.staffId, userId2));
+    
+    const user1RoomIds = new Set(user1Rooms.map(r => r.roomId));
+    const commonRoomIds = user2Rooms.filter(r => user1RoomIds.has(r.roomId)).map(r => r.roomId);
+    
+    if (commonRoomIds.length === 0) return undefined;
+    
+    const rooms = await db.select().from(chatRooms)
+      .where(and(
+        inArray(chatRooms.id, commonRoomIds),
+        eq(chatRooms.type, "direct")
+      ));
+    
+    return rooms[0];
+  }
+
+  async createChatRoom(room: InsertChatRoom): Promise<ChatRoom> {
+    const result = await db.insert(chatRooms).values(room).returning();
+    return result[0];
+  }
+
+  async updateChatRoom(id: string, updates: Partial<InsertChatRoom>): Promise<ChatRoom | undefined> {
+    const result = await db.update(chatRooms)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(chatRooms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteChatRoom(id: string): Promise<boolean> {
+    const result = await db.delete(chatRooms)
+      .where(eq(chatRooms.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Chat Room Participants
+  async getChatRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]> {
+    return await db.select().from(chatRoomParticipants)
+      .where(eq(chatRoomParticipants.roomId, roomId));
+  }
+
+  async addChatRoomParticipant(participant: InsertChatRoomParticipant): Promise<ChatRoomParticipant> {
+    const result = await db.insert(chatRoomParticipants).values(participant).returning();
+    return result[0];
+  }
+
+  async removeChatRoomParticipant(roomId: string, staffId: string): Promise<boolean> {
+    const result = await db.delete(chatRoomParticipants)
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async updateLastRead(roomId: string, staffId: string): Promise<void> {
+    await db.update(chatRoomParticipants)
+      .set({ lastReadAt: new Date() })
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ));
+  }
+
+  async getUnreadCount(userId: string): Promise<number> {
+    const participants = await db.select().from(chatRoomParticipants)
+      .where(eq(chatRoomParticipants.staffId, userId));
+    
+    let totalUnread = 0;
+    for (const participant of participants) {
+      const lastRead = participant.lastReadAt || new Date(0);
+      const unreadMessages = await db.select({ count: sql<number>`count(*)` })
+        .from(chatMessages)
+        .where(and(
+          eq(chatMessages.roomId, participant.roomId),
+          gte(chatMessages.createdAt, lastRead),
+          sql`${chatMessages.senderId} != ${userId}`
+        ));
+      totalUnread += Number(unreadMessages[0]?.count || 0);
+    }
+    return totalUnread;
+  }
+
+  // Chat Messages
+  async getChatMessages(roomId: string, limit: number = 50, before?: string): Promise<ChatMessage[]> {
+    let query = db.select().from(chatMessages)
+      .where(and(
+        eq(chatMessages.roomId, roomId),
+        eq(chatMessages.isDeleted, "no")
+      ));
+    
+    if (before) {
+      const beforeMessage = await db.select().from(chatMessages).where(eq(chatMessages.id, before));
+      if (beforeMessage[0]) {
+        query = db.select().from(chatMessages)
+          .where(and(
+            eq(chatMessages.roomId, roomId),
+            eq(chatMessages.isDeleted, "no"),
+            lte(chatMessages.createdAt, beforeMessage[0].createdAt)
+          ));
+      }
+    }
+    
+    return await query.orderBy(desc(chatMessages.createdAt)).limit(limit);
+  }
+
+  async getChatMessageById(id: string): Promise<ChatMessage | undefined> {
+    const result = await db.select().from(chatMessages)
+      .where(eq(chatMessages.id, id));
+    return result[0];
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const result = await db.insert(chatMessages).values(message).returning();
+    
+    // Update room's last message info
+    const preview = message.content.substring(0, 100);
+    await db.update(chatRooms)
+      .set({
+        lastMessageAt: new Date(),
+        lastMessagePreview: preview,
+        updatedAt: new Date()
+      })
+      .where(eq(chatRooms.id, message.roomId));
+    
+    return result[0];
+  }
+
+  async updateChatMessage(id: string, content: string): Promise<ChatMessage | undefined> {
+    const result = await db.update(chatMessages)
+      .set({
+        content,
+        isEdited: "yes",
+        editedAt: new Date()
+      })
+      .where(eq(chatMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteChatMessage(id: string): Promise<boolean> {
+    const result = await db.update(chatMessages)
+      .set({
+        isDeleted: "yes",
+        deletedAt: new Date()
+      })
+      .where(eq(chatMessages.id, id))
       .returning();
     return result.length > 0;
   }
