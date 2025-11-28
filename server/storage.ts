@@ -17,6 +17,7 @@ import {
   nonFaceToFaceServiceLogs, diagnoses, clientDiagnoses,
   clientStatusLogs,
   silHouses, silHouseAuditLog,
+  serviceSubtypes,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -68,7 +69,8 @@ import {
   type InsertClientDiagnosis, type ClientDiagnosis,
   type InsertClientStatusLog, type ClientStatusLog,
   type InsertSilHouse, type SilHouse,
-  type InsertSilHouseAuditLog, type SilHouseAuditLog
+  type InsertSilHouseAuditLog, type SilHouseAuditLog,
+  type InsertServiceSubtype, type ServiceSubtype
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
@@ -506,6 +508,16 @@ export interface IStorage {
   // SIL House Audit Log
   getSilHouseAuditLogs(houseId?: string): Promise<SilHouseAuditLog[]>;
   createSilHouseAuditLog(log: InsertSilHouseAuditLog): Promise<SilHouseAuditLog>;
+
+  // ============================================
+  // SERVICE SUBTYPES
+  // ============================================
+  
+  getAllServiceSubtypes(): Promise<ServiceSubtype[]>;
+  getServiceSubtypesByType(serviceType: "Support Work" | "Nursing"): Promise<ServiceSubtype[]>;
+  createServiceSubtype(subtype: InsertServiceSubtype): Promise<ServiceSubtype>;
+  updateServiceSubtype(id: string, updates: Partial<InsertServiceSubtype>): Promise<ServiceSubtype | undefined>;
+  deleteServiceSubtype(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -2803,6 +2815,46 @@ export class DbStorage implements IStorage {
   async createSilHouseAuditLog(log: InsertSilHouseAuditLog): Promise<SilHouseAuditLog> {
     const result = await db.insert(silHouseAuditLog).values(log).returning();
     return result[0];
+  }
+
+  // ============================================
+  // SERVICE SUBTYPES
+  // ============================================
+
+  async getAllServiceSubtypes(): Promise<ServiceSubtype[]> {
+    return await db.select().from(serviceSubtypes)
+      .where(eq(serviceSubtypes.isActive, "yes"))
+      .orderBy(serviceSubtypes.serviceType, serviceSubtypes.name);
+  }
+
+  async getServiceSubtypesByType(serviceType: "Support Work" | "Nursing"): Promise<ServiceSubtype[]> {
+    return await db.select().from(serviceSubtypes)
+      .where(and(
+        eq(serviceSubtypes.serviceType, serviceType),
+        eq(serviceSubtypes.isActive, "yes")
+      ))
+      .orderBy(serviceSubtypes.name);
+  }
+
+  async createServiceSubtype(subtype: InsertServiceSubtype): Promise<ServiceSubtype> {
+    const result = await db.insert(serviceSubtypes).values(subtype).returning();
+    return result[0];
+  }
+
+  async updateServiceSubtype(id: string, updates: Partial<InsertServiceSubtype>): Promise<ServiceSubtype | undefined> {
+    const result = await db.update(serviceSubtypes)
+      .set(updates as any)
+      .where(eq(serviceSubtypes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteServiceSubtype(id: string): Promise<boolean> {
+    const result = await db.update(serviceSubtypes)
+      .set({ isActive: "no" })
+      .where(eq(serviceSubtypes.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 

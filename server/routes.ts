@@ -6796,6 +6796,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // SERVICE SUBTYPES API
+  // ============================================
+
+  // Get all active service subtypes
+  app.get("/api/service-subtypes", async (req, res) => {
+    try {
+      const subtypes = await storage.getAllServiceSubtypes();
+      res.json(subtypes);
+    } catch (error) {
+      console.error("Error fetching service subtypes:", error);
+      res.status(500).json({ error: "Failed to fetch service subtypes" });
+    }
+  });
+
+  // Get service subtypes by type
+  app.get("/api/service-subtypes/:type", async (req, res) => {
+    try {
+      const serviceType = req.params.type as "Support Work" | "Nursing";
+      if (serviceType !== "Support Work" && serviceType !== "Nursing") {
+        return res.status(400).json({ error: "Invalid service type. Must be 'Support Work' or 'Nursing'" });
+      }
+      const subtypes = await storage.getServiceSubtypesByType(serviceType);
+      res.json(subtypes);
+    } catch (error) {
+      console.error("Error fetching service subtypes by type:", error);
+      res.status(500).json({ error: "Failed to fetch service subtypes" });
+    }
+  });
+
+  // Create service subtype (admin/manager only)
+  app.post("/api/service-subtypes", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      if (!user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const userRoles = user.roles || [];
+      const isAdminOrManager = userRoles.some((role: string) => 
+        ["superadmin", "admin", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      if (!isAdminOrManager) {
+        return res.status(403).json({ error: "Access denied. Admin or Manager role required." });
+      }
+      
+      const { name, serviceType } = req.body;
+      if (!name || !serviceType) {
+        return res.status(400).json({ error: "Name and serviceType are required" });
+      }
+      
+      if (serviceType !== "Support Work" && serviceType !== "Nursing") {
+        return res.status(400).json({ error: "Invalid service type. Must be 'Support Work' or 'Nursing'" });
+      }
+      
+      const subtype = await storage.createServiceSubtype({
+        name,
+        serviceType,
+        isActive: "yes"
+      });
+      
+      res.status(201).json(subtype);
+    } catch (error) {
+      console.error("Error creating service subtype:", error);
+      res.status(500).json({ error: "Failed to create service subtype" });
+    }
+  });
+
+  // Update service subtype (admin/manager only)
+  app.patch("/api/service-subtypes/:id", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      if (!user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const userRoles = user.roles || [];
+      const isAdminOrManager = userRoles.some((role: string) => 
+        ["superadmin", "admin", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      if (!isAdminOrManager) {
+        return res.status(403).json({ error: "Access denied. Admin or Manager role required." });
+      }
+      
+      const { name, serviceType, isActive } = req.body;
+      const updates: any = {};
+      
+      if (name !== undefined) updates.name = name;
+      if (serviceType !== undefined) {
+        if (serviceType !== "Support Work" && serviceType !== "Nursing") {
+          return res.status(400).json({ error: "Invalid service type. Must be 'Support Work' or 'Nursing'" });
+        }
+        updates.serviceType = serviceType;
+      }
+      if (isActive !== undefined) {
+        if (isActive !== "yes" && isActive !== "no") {
+          return res.status(400).json({ error: "Invalid isActive value. Must be 'yes' or 'no'" });
+        }
+        updates.isActive = isActive;
+      }
+      
+      const subtype = await storage.updateServiceSubtype(req.params.id, updates);
+      if (!subtype) {
+        return res.status(404).json({ error: "Service subtype not found" });
+      }
+      
+      res.json(subtype);
+    } catch (error) {
+      console.error("Error updating service subtype:", error);
+      res.status(500).json({ error: "Failed to update service subtype" });
+    }
+  });
+
+  // Delete (soft delete) service subtype (admin/manager only)
+  app.delete("/api/service-subtypes/:id", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      if (!user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const userRoles = user.roles || [];
+      const isAdminOrManager = userRoles.some((role: string) => 
+        ["superadmin", "admin", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      if (!isAdminOrManager) {
+        return res.status(403).json({ error: "Access denied. Admin or Manager role required." });
+      }
+      
+      const deleted = await storage.deleteServiceSubtype(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Service subtype not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting service subtype:", error);
+      res.status(500).json({ error: "Failed to delete service subtype" });
+    }
+  });
+
+  // Seed default service subtypes endpoint
+  app.post("/api/service-subtypes/seed", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      if (!user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const userRoles = user.roles || [];
+      const isAdmin = userRoles.some((role: string) => 
+        ["superadmin", "admin"].includes(role)
+      );
+      
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Access denied. Admin role required." });
+      }
+      
+      const defaultSubtypes = [
+        { name: "Self-Care", serviceType: "Support Work" as const, isActive: "yes" as const },
+        { name: "Community Access", serviceType: "Support Work" as const, isActive: "yes" as const },
+        { name: "Capacity Building", serviceType: "Support Work" as const, isActive: "yes" as const },
+        { name: "Welfare Nursing", serviceType: "Nursing" as const, isActive: "yes" as const },
+        { name: "Medx Admin", serviceType: "Nursing" as const, isActive: "yes" as const },
+        { name: "Assessment", serviceType: "Nursing" as const, isActive: "yes" as const },
+        { name: "Wound Care", serviceType: "Nursing" as const, isActive: "yes" as const },
+      ];
+      
+      const createdSubtypes = [];
+      for (const subtype of defaultSubtypes) {
+        const existing = await storage.getAllServiceSubtypes();
+        const alreadyExists = existing.some(s => 
+          s.name === subtype.name && s.serviceType === subtype.serviceType
+        );
+        
+        if (!alreadyExists) {
+          const created = await storage.createServiceSubtype(subtype);
+          createdSubtypes.push(created);
+        }
+      }
+      
+      res.json({ 
+        message: `Seeded ${createdSubtypes.length} service subtypes`,
+        created: createdSubtypes 
+      });
+    } catch (error) {
+      console.error("Error seeding service subtypes:", error);
+      res.status(500).json({ error: "Failed to seed service subtypes" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

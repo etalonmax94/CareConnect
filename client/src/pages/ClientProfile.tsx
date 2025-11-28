@@ -26,8 +26,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator, ClientStaffPreference, ClientStaffRestriction, ClientStatusLog, PlanManager, AlliedHealthProfessional } from "@shared/schema";
+import type { Client, Budget, ProgressNote, Staff, ClientStaffAssignment, IncidentReport, ClientGoal, ServiceDelivery, GP, Pharmacy, ClientContact, Document, NonFaceToFaceServiceLog, SupportCoordinator, ClientStaffPreference, ClientStaffRestriction, ClientStatusLog, PlanManager, AlliedHealthProfessional, ServiceSubtype, FallsRiskAssessment } from "@shared/schema";
 import { calculateAge, formatClientNumber } from "@shared/schema";
+import { FRAT_LABELS, getRiskCategoryColor } from "@shared/fallsRisk";
 import ClientLocationMap from "@/components/ClientLocationMap";
 import CarePlanTab from "@/components/CarePlanTab";
 import GoalsTab from "@/components/GoalsTab";
@@ -321,6 +322,10 @@ export default function ClientProfile() {
 
   const { data: alliedHealthList = [] } = useQuery<AlliedHealthProfessional[]>({
     queryKey: ["/api/allied-health-professionals"],
+  });
+
+  const { data: serviceSubtypes = [] } = useQuery<ServiceSubtype[]>({
+    queryKey: ["/api/service-subtypes"],
   });
 
   // Fetch Plan Manager details if client has one assigned
@@ -1968,6 +1973,28 @@ export default function ClientProfile() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Service Subtypes Display */}
+              {client.serviceSubTypeIds && client.serviceSubTypeIds.length > 0 && (
+                <Card className="bg-card">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Settings className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-xs text-muted-foreground font-medium">Service Subtypes</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {client.serviceSubTypeIds.map((subtypeId) => {
+                        const subtype = serviceSubtypes.find(s => s.id === subtypeId);
+                        return subtype ? (
+                          <Badge key={subtypeId} variant="outline" className="text-xs">
+                            {subtype.name}
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Main Content Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -4853,6 +4880,8 @@ export default function ClientProfile() {
             documents={client.clinicalDocuments} 
             clientId={client.id}
             zohoWorkdriveLink={client.zohoWorkdriveLink}
+            clientCategory={client.category}
+            ndisDetails={client.ndisDetails}
           />
         </TabsContent>
 
@@ -4865,6 +4894,66 @@ export default function ClientProfile() {
               <p className="text-sm whitespace-pre-wrap">{client.clinicalNotes || "No clinical notes recorded"}</p>
             </CardContent>
           </Card>
+
+          {/* Falls Risk Assessment (FRAT) Display */}
+          {client.fallsRiskAssessment && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    Falls Risk Assessment (FRAT)
+                  </div>
+                  <Badge className={getRiskCategoryColor(client.fallsRiskAssessment.riskCategory)}>
+                    Score: {client.fallsRiskAssessment.totalScore} - {client.fallsRiskAssessment.riskCategory} Risk
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">Recent Falls:</span>
+                      <span className="font-medium">{FRAT_LABELS.recentFalls[client.fallsRiskAssessment.recentFalls as keyof typeof FRAT_LABELS.recentFalls] || 'Not assessed'}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">Medications:</span>
+                      <span className="font-medium">{FRAT_LABELS.medications[client.fallsRiskAssessment.medications as keyof typeof FRAT_LABELS.medications] || 'Not assessed'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">Psychological:</span>
+                      <span className="font-medium">{FRAT_LABELS.psychological[client.fallsRiskAssessment.psychological as keyof typeof FRAT_LABELS.psychological] || 'Not assessed'}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">Cognitive Status:</span>
+                      <span className="font-medium">{FRAT_LABELS.cognitiveStatus[client.fallsRiskAssessment.cognitiveStatus as keyof typeof FRAT_LABELS.cognitiveStatus] || 'Not assessed'}</span>
+                    </div>
+                  </div>
+                </div>
+                {(client.fallsRiskAssessment.autoHighRiskDizziness || client.fallsRiskAssessment.autoHighRiskFunctionalChange) && (
+                  <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                    <p className="text-sm font-medium text-red-700 dark:text-red-300">Auto High Risk Triggers:</p>
+                    <ul className="text-sm text-red-600 dark:text-red-400 mt-1 space-y-1">
+                      {client.fallsRiskAssessment.autoHighRiskDizziness && (
+                        <li>• Dizziness / Postural Hypotension</li>
+                      )}
+                      {client.fallsRiskAssessment.autoHighRiskFunctionalChange && (
+                        <li>• Significant Functional Changes</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+                {client.fallsRiskAssessment.assessedAt && (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Assessed: {new Date(client.fallsRiskAssessment.assessedAt).toLocaleDateString()}
+                    {client.fallsRiskAssessment.assessedBy && ` by ${client.fallsRiskAssessment.assessedBy}`}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Lifestyle Patterns - Diet, Exercise, Sleep */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

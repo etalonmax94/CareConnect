@@ -101,6 +101,40 @@ export function hasPermission(userRoles: UserRole[], permission: keyof typeof RO
 // Client types
 export type ClientCategory = "NDIS" | "Support at Home" | "Private";
 
+// Falls Risk Assessment type for FRAT scoring
+export type FallsRiskAssessment = {
+  recentFalls: number; // 2, 4, 6, or 8
+  medications: number; // 1, 2, 3, or 4
+  psychological: number; // 1, 2, 3, or 4
+  cognitiveStatus: number; // 1, 2, 3, or 4
+  autoHighRiskDizziness: boolean;
+  autoHighRiskFunctionalChange: boolean;
+  totalScore: number; // 5-20
+  riskCategory: "Low" | "Medium" | "High";
+  assessedAt?: string;
+  assessedBy?: string;
+};
+
+// Service Subtypes - categories within Support Work and Nursing
+export const serviceSubtypes = pgTable("service_subtypes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  serviceType: text("service_type").notNull().$type<"Support Work" | "Nursing">(),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertServiceSubtypeSchema = createInsertSchema(serviceSubtypes, {
+  serviceType: z.enum(["Support Work", "Nursing"]),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertServiceSubtype = z.infer<typeof insertServiceSubtypeSchema>;
+export type ServiceSubtype = typeof serviceSubtypes.$inferSelect;
+
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientNumber: serial("client_number").notNull(),
@@ -150,8 +184,11 @@ export const clients = pgTable("clients", {
     smsSchedule?: boolean;
     callArrival?: boolean;
     callSchedule?: boolean;
+    emailArrival?: boolean;
+    emailSchedule?: boolean;
     none?: boolean;
   }>(),
+  fallsRiskAssessment: json("falls_risk_assessment").$type<FallsRiskAssessment>(),
   zohoWorkdriveLink: text("zoho_workdrive_link"),
   isPinned: text("is_pinned").default("no").$type<"yes" | "no">(),
   
@@ -172,6 +209,7 @@ export const clients = pgTable("clients", {
   
   // New profile fields for Overview page
   serviceType: text("service_type").$type<"Support Work" | "Nursing" | "Both" | null>(),
+  serviceSubTypeIds: text("service_sub_type_ids").array(),
   parkingInstructions: text("parking_instructions"),
   attentionNotes: text("attention_notes"),
   latitude: text("latitude"),
@@ -277,6 +315,8 @@ export const insertClientSchema = createInsertSchema(clients, {
   riskAssessmentDate: z.string().optional().nullable(),
   riskAssessmentNotes: z.string().optional().nullable(),
   serviceType: z.enum(["Support Work", "Nursing", "Both"]).optional().nullable(),
+  serviceSubTypeIds: z.array(z.string()).optional().nullable(),
+  fallsRiskAssessment: z.any().optional().nullable(),
   parkingInstructions: z.string().optional().nullable(),
   attentionNotes: z.string().optional().nullable(),
   latitude: z.string().optional().nullable(),

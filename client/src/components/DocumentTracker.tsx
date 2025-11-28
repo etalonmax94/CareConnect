@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,15 @@ type ClinicalDocuments = {
   carePlanDate?: string;
   healthSummaryDate?: string;
   woundCarePlanDate?: string;
+};
+
+type NdisDetails = {
+  ndisNumber?: string;
+  ndisFundingType?: string;
+  ndisPlanStartDate?: string;
+  ndisPlanEndDate?: string;
+  scheduleOfSupports?: string;
+  ndisConsentFormDate?: string;
 };
 
 interface TrackedDocument {
@@ -168,9 +177,11 @@ interface DocumentTrackerProps {
   documents: ClinicalDocuments;
   clientId: string;
   zohoWorkdriveLink?: string | null;
+  clientCategory?: "NDIS" | "Support at Home" | "Private";
+  ndisDetails?: NdisDetails;
 }
 
-export default function DocumentTracker({ documents, clientId }: DocumentTrackerProps) {
+export default function DocumentTracker({ documents, clientId, clientCategory, ndisDetails }: DocumentTrackerProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["service-agreement", "assessment-support-plan"]));
   const [expandedSubFolders, setExpandedSubFolders] = useState<Set<string>>(new Set());
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -218,6 +229,50 @@ export default function DocumentTracker({ documents, clientId }: DocumentTracker
     queryKey: ["/api/clients", clientId, "document-folders"],
     enabled: !!clientId,
   });
+
+  // Create folder list with NDIS Consent Form for NDIS clients
+  const documentFolders = useMemo(() => {
+    if (clientCategory !== "NDIS") {
+      return defaultDocumentFolders;
+    }
+    
+    // Insert NDIS Consent Form folder after regular Consent Form for NDIS clients
+    const ndisConsentFolder: DocumentFolder = {
+      id: "ndis-consent-form",
+      name: "NDIS Consent Form",
+      icon: FileText,
+      color: "text-emerald-600",
+      description: "NDIS-specific consent documentation",
+      trackedDocuments: [
+        { 
+          name: "NDIS Consent Form", 
+          key: "ndisConsentFormDate" as keyof ClinicalDocuments, 
+          frequency: "annual" 
+        }
+      ]
+    };
+    
+    const folders = [...defaultDocumentFolders];
+    const consentIndex = folders.findIndex(f => f.id === "consent-form");
+    if (consentIndex !== -1) {
+      folders.splice(consentIndex + 1, 0, ndisConsentFolder);
+    } else {
+      folders.splice(3, 0, ndisConsentFolder); // Insert after first few folders
+    }
+    
+    return folders;
+  }, [clientCategory]);
+
+  // Combined documents including NDIS consent form date
+  const combinedDocuments = useMemo(() => {
+    if (ndisDetails?.ndisConsentFormDate) {
+      return {
+        ...documents,
+        ndisConsentFormDate: ndisDetails.ndisConsentFormDate
+      };
+    }
+    return documents;
+  }, [documents, ndisDetails]);
 
   const uploadMutation = useMutation({
     mutationFn: async (data: { documentType: string; fileName: string; fileUrl: string; folderId?: string; customTitle?: string }) => {
@@ -447,6 +502,46 @@ export default function DocumentTracker({ documents, clientId }: DocumentTracker
     return uploadedDocs.find(d => d.documentType === docType && d.isArchived !== "yes");
   };
 
+  // Get the date for a tracked document from combinedDocuments (for dates stored in client record)
+  const getTrackedDocDate = (doc: TrackedDocument): string | null => {
+    if (!doc.key) return null;
+    const dateValue = combinedDocuments[doc.key as keyof typeof combinedDocuments];
+    return typeof dateValue === 'string' ? dateValue : null;
+  };
+
+  // Check if a tracked document has a valid date (either uploaded or from client record)
+  const getEffectiveDocDate = (doc: TrackedDocument): { hasDate: boolean; date: string | null; expiryDate: string | null } => {
+    // First check uploaded documents
+    const uploadedDoc = getUploadedDoc(doc.name);
+    if (uploadedDoc) {
+      return { 
+        hasDate: true, 
+        date: uploadedDoc.uploadDate, 
+        expiryDate: uploadedDoc.expiryDate || null 
+      };
+    }
+    
+    // Then check client record dates (from combinedDocuments)
+    const recordDate = getTrackedDocDate(doc);
+    if (recordDate) {
+      // Calculate expiry based on frequency
+      const dateObj = new Date(recordDate);
+      let expiryDate: string | null = null;
+      if (doc.frequency === "annual") {
+        const expiry = new Date(dateObj);
+        expiry.setFullYear(expiry.getFullYear() + 1);
+        expiryDate = expiry.toISOString().split('T')[0];
+      } else if (doc.frequency === "6-monthly") {
+        const expiry = new Date(dateObj);
+        expiry.setMonth(expiry.getMonth() + 6);
+        expiryDate = expiry.toISOString().split('T')[0];
+      }
+      return { hasDate: true, date: recordDate, expiryDate };
+    }
+    
+    return { hasDate: false, date: null, expiryDate: null };
+  };
+
   const isDocNotRequired = (docType: string) => {
     const override = complianceOverrides.find(c => c.documentType === docType);
     return override?.isNotRequired === "yes";
@@ -481,12 +576,12 @@ export default function DocumentTracker({ documents, clientId }: DocumentTracker
   };
 
   const getFolderNameById = (folderId: string): string => {
-    const folder = defaultDocumentFolders.find(f => f.id === folderId);
+    const folder = documentFolders.find(f => f.id === folderId);
     return folder?.name || folderId;
   };
 
   const getFrequencyForDoc = (docType: string): "annual" | "6-monthly" | "as-needed" => {
-    for (const folder of defaultDocumentFolders) {
+    for (const folder of documentFolders) {
       if (folder.trackedDocuments) {
         const found = folder.trackedDocuments.find(d => d.name === docType);
         if (found) return found.frequency;
@@ -525,12 +620,13 @@ export default function DocumentTracker({ documents, clientId }: DocumentTracker
       }
       allNotRequired = false;
       
-      const uploadedDoc = getUploadedDoc(doc.name);
-      if (!uploadedDoc) {
+      // Use getEffectiveDocDate to check both uploaded docs and client record dates
+      const effectiveDoc = getEffectiveDocDate(doc);
+      if (!effectiveDoc.hasDate) {
         hasOverdue = true;
         return;
       }
-      const expiryDate = uploadedDoc?.expiryDate || undefined;
+      const expiryDate = effectiveDoc.expiryDate || undefined;
       const status = getComplianceStatus(expiryDate);
       if (status === "overdue") hasOverdue = true;
       else if (status === "due-soon") hasDueSoon = true;
@@ -631,10 +727,11 @@ export default function DocumentTracker({ documents, clientId }: DocumentTracker
 
   const renderTrackedDocument = (doc: TrackedDocument, parentFolderId: string) => {
     const uploadedDoc = getUploadedDoc(doc.name);
+    const effectiveDoc = getEffectiveDocDate(doc);
     const isNotRequired = isDocNotRequired(doc.name);
     const notRequiredReasonText = getNotRequiredReason(doc.name);
-    const expiryDate = uploadedDoc?.expiryDate || undefined;
-    const status = isNotRequired ? "not-required" : (uploadedDoc ? getComplianceStatus(expiryDate) : "overdue");
+    const expiryDate = effectiveDoc.expiryDate || undefined;
+    const status = isNotRequired ? "not-required" : (effectiveDoc.hasDate ? getComplianceStatus(expiryDate) : "overdue");
 
     return (
       <div 
@@ -823,7 +920,7 @@ export default function DocumentTracker({ documents, clientId }: DocumentTracker
     );
   };
 
-  const visibleFolders = defaultDocumentFolders.filter(f => !isFolderHidden(f.id));
+  const visibleFolders = documentFolders.filter(f => !isFolderHidden(f.id));
 
   return (
     <div className="space-y-3">

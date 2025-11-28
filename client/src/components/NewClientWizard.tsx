@@ -3,7 +3,9 @@ import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { insertClientSchema, type InsertClient, type ClientCategory, type SupportCoordinator, type PlanManager, type Staff, type GP, type Pharmacy, type AlliedHealthProfessional } from "@shared/schema";
+import { insertClientSchema, type InsertClient, type ClientCategory, type SupportCoordinator, type PlanManager, type Staff, type GP, type Pharmacy, type AlliedHealthProfessional, type ServiceSubtype, type FallsRiskAssessment } from "@shared/schema";
+import { FRAT_LABELS, calculateFRATScore, getRiskCategoryColor, createDefaultFallsRiskAssessment } from "@shared/fallsRisk";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AddProviderDialog } from "@/components/AddProviderDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +22,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Loader2, Upload, X, Camera, ArrowLeft, ArrowRight, Check, Plus,
   User, Phone, Heart, Settings, Briefcase, Users, Target, FileCheck,
-  MapPin, Calendar, Mail, Stethoscope, Pill, UserCog, Building2, Shield
+  MapPin, Calendar, Mail, Stethoscope, Pill, UserCog, Building2, Shield,
+  AlertTriangle
 } from "lucide-react";
 import { SuburbAutocomplete } from "@/components/AddressAutocomplete";
 import { useToast } from "@/hooks/use-toast";
@@ -75,6 +78,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   const { data: gps = [] } = useQuery<GP[]>({ queryKey: ["/api/gps"] });
   const { data: pharmacies = [] } = useQuery<Pharmacy[]>({ queryKey: ["/api/pharmacies"] });
   const { data: alliedHealthProfessionals = [] } = useQuery<AlliedHealthProfessional[]>({ queryKey: ["/api/allied-health-professionals"] });
+  const { data: serviceSubtypes = [] } = useQuery<ServiceSubtype[]>({ queryKey: ["/api/service-subtypes"] });
 
   const careManagers = allStaff.filter(s => (s.role === "care_manager" || s.role === "admin") && s.isActive === "yes");
 
@@ -100,6 +104,9 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   const [epoaName, setEpoaName] = useState("");
   const [epoaRelationship, setEpoaRelationship] = useState("");
   const [epoaPhone, setEpoaPhone] = useState("");
+
+  const [fratAssessment, setFratAssessment] = useState<FallsRiskAssessment>(createDefaultFallsRiskAssessment());
+  const [selectedSubtypes, setSelectedSubtypes] = useState<string[]>([]);
 
   const selectedCategory = form.watch("category") as ClientCategory;
 
@@ -173,6 +180,12 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     try {
       const data = form.getValues();
       data.participantName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(" ");
+      
+      data.fallsRiskAssessment = fratAssessment;
+      data.fallsRiskScore = fratAssessment.totalScore;
+      
+      data.serviceSubTypeIds = selectedSubtypes;
+      
       await onSubmit(data, photoFile);
     } finally {
       setIsSubmitting(false);
@@ -634,43 +647,19 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               )}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="fallsRiskScore"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Falls Risk Score (5-20)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number" 
-                        min={5} 
-                        max={20} 
-                        value={field.value || ""} 
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                        placeholder="5-20" 
-                        data-testid="input-falls-risk" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="substanceUseNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Substance Use Notes</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="Alcohol, drugs, smoking..." data-testid="input-substance-use" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="substanceUseNotes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Substance Use Notes</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="Alcohol, drugs, smoking..." data-testid="input-substance-use" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <Separator className="my-4" />
             <h4 className="text-sm font-medium mb-3">Lifestyle Patterns</h4>
@@ -716,6 +705,135 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               />
             </div>
 
+            <Separator className="my-4" />
+            <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  <h4 className="font-medium text-orange-900 dark:text-orange-100">Falls Risk Assessment (FRAT)</h4>
+                </div>
+                <Badge className={getRiskCategoryColor(fratAssessment.riskCategory)}>
+                  Score: {fratAssessment.totalScore} - {fratAssessment.riskCategory} Risk
+                </Badge>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Recent Falls History</Label>
+                  <RadioGroup
+                    value={String(fratAssessment.recentFalls)}
+                    onValueChange={(value) => {
+                      const updated = { ...fratAssessment, recentFalls: parseInt(value) };
+                      const { totalScore, riskCategory } = calculateFRATScore(updated);
+                      setFratAssessment({ ...updated, totalScore, riskCategory });
+                    }}
+                    className="grid gap-2"
+                  >
+                    {Object.entries(FRAT_LABELS.recentFalls).map(([score, label]) => (
+                      <div key={score} className="flex items-center space-x-2">
+                        <RadioGroupItem value={score} id={`falls-${score}`} />
+                        <Label htmlFor={`falls-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Medications (sedatives, antipsychotics, blood pressure)</Label>
+                  <RadioGroup
+                    value={String(fratAssessment.medications)}
+                    onValueChange={(value) => {
+                      const updated = { ...fratAssessment, medications: parseInt(value) };
+                      const { totalScore, riskCategory } = calculateFRATScore(updated);
+                      setFratAssessment({ ...updated, totalScore, riskCategory });
+                    }}
+                    className="grid gap-2"
+                  >
+                    {Object.entries(FRAT_LABELS.medications).map(([score, label]) => (
+                      <div key={score} className="flex items-center space-x-2">
+                        <RadioGroupItem value={score} id={`meds-${score}`} />
+                        <Label htmlFor={`meds-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Psychological Status</Label>
+                  <RadioGroup
+                    value={String(fratAssessment.psychological)}
+                    onValueChange={(value) => {
+                      const updated = { ...fratAssessment, psychological: parseInt(value) };
+                      const { totalScore, riskCategory } = calculateFRATScore(updated);
+                      setFratAssessment({ ...updated, totalScore, riskCategory });
+                    }}
+                    className="grid gap-2"
+                  >
+                    {Object.entries(FRAT_LABELS.psychological).map(([score, label]) => (
+                      <div key={score} className="flex items-center space-x-2">
+                        <RadioGroupItem value={score} id={`psych-${score}`} />
+                        <Label htmlFor={`psych-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Cognitive Status</Label>
+                  <RadioGroup
+                    value={String(fratAssessment.cognitiveStatus)}
+                    onValueChange={(value) => {
+                      const updated = { ...fratAssessment, cognitiveStatus: parseInt(value) };
+                      const { totalScore, riskCategory } = calculateFRATScore(updated);
+                      setFratAssessment({ ...updated, totalScore, riskCategory });
+                    }}
+                    className="grid gap-2"
+                  >
+                    {Object.entries(FRAT_LABELS.cognitiveStatus).map(([score, label]) => (
+                      <div key={score} className="flex items-center space-x-2">
+                        <RadioGroupItem value={score} id={`cog-${score}`} />
+                        <Label htmlFor={`cog-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-orange-200 dark:border-orange-700">
+                  <Label className="text-sm font-medium text-red-600 dark:text-red-400">Auto High Risk Triggers</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="dizziness"
+                        checked={fratAssessment.autoHighRiskDizziness}
+                        onCheckedChange={(checked) => {
+                          const updated = { ...fratAssessment, autoHighRiskDizziness: checked as boolean };
+                          const { totalScore, riskCategory } = calculateFRATScore(updated);
+                          setFratAssessment({ ...updated, totalScore, riskCategory });
+                        }}
+                      />
+                      <Label htmlFor="dizziness" className="text-sm font-normal cursor-pointer">
+                        Dizziness / Postural Hypotension
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="functional"
+                        checked={fratAssessment.autoHighRiskFunctionalChange}
+                        onCheckedChange={(checked) => {
+                          const updated = { ...fratAssessment, autoHighRiskFunctionalChange: checked as boolean };
+                          const { totalScore, riskCategory } = calculateFRATScore(updated);
+                          setFratAssessment({ ...updated, totalScore, riskCategory });
+                        }}
+                      />
+                      <Label htmlFor="functional" className="text-sm font-normal cursor-pointer">
+                        Significant Functional Changes (mobility, continence, cognition)
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <FormField
               control={form.control}
               name="clinicalNotes"
@@ -758,6 +876,47 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               )}
             />
 
+            {form.watch("serviceType") && (
+              <div className="space-y-3">
+                <Label>Service Subtypes</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {serviceSubtypes
+                    .filter(st => {
+                      const sType = form.watch("serviceType");
+                      if (sType === "Both") return true;
+                      return st.serviceType === sType;
+                    })
+                    .map((subtype) => (
+                      <div key={subtype.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`subtype-${subtype.id}`}
+                          checked={selectedSubtypes.includes(subtype.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedSubtypes(prev => 
+                              checked 
+                                ? [...prev, subtype.id]
+                                : prev.filter(id => id !== subtype.id)
+                            );
+                          }}
+                          data-testid={`checkbox-subtype-${subtype.id}`}
+                        />
+                        <Label htmlFor={`subtype-${subtype.id}`} className="text-sm font-normal cursor-pointer">
+                          {subtype.name}
+                          <Badge variant="outline" className="ml-2 text-xs">{subtype.serviceType}</Badge>
+                        </Label>
+                      </div>
+                    ))}
+                </div>
+                {serviceSubtypes.filter(st => {
+                  const sType = form.watch("serviceType");
+                  if (sType === "Both") return true;
+                  return st.serviceType === sType;
+                }).length === 0 && (
+                  <p className="text-sm text-muted-foreground">No subtypes available for this service type.</p>
+                )}
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="frequencyOfServices"
@@ -788,7 +947,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
 
             <div className="space-y-3">
               <Label>Notification Preferences</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <FormField
                   control={form.control}
                   name="notificationPreferences.smsSchedule"
@@ -834,6 +993,42 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                         <Checkbox checked={field.value || false} onCheckedChange={field.onChange} data-testid="checkbox-call-arrival" />
                       </FormControl>
                       <FormLabel className="font-normal cursor-pointer">Call Arrival</FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="notificationPreferences.emailSchedule"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value || false} onCheckedChange={field.onChange} data-testid="checkbox-email-schedule" />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer">Email Schedule</FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="notificationPreferences.emailArrival"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value || false} onCheckedChange={field.onChange} data-testid="checkbox-email-arrival" />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer">Email Arrival</FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="notificationPreferences.none"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2 space-y-0 col-span-2 sm:col-span-1">
+                      <FormControl>
+                        <Checkbox checked={field.value || false} onCheckedChange={field.onChange} data-testid="checkbox-none" />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer text-muted-foreground">No Notifications</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -960,6 +1155,19 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                     )}
                   />
                 </div>
+                <FormField
+                  control={form.control}
+                  name="ndisDetails.ndisConsentFormDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>NDIS Consent Form Date</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} type="date" data-testid="input-ndis-consent-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </>
             )}
 
