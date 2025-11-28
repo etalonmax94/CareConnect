@@ -8901,14 +8901,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { roomId } = req.params;
+      const { mentions, ...messageBody } = req.body;
+      
       const validatedData = insertChatMessageSchema.parse({
-        ...req.body,
+        ...messageBody,
         roomId,
         senderId: userId,
-        senderName: userName
+        senderName: userName,
+        mentions: mentions || null
       });
 
       const message = await storage.createChatMessage(validatedData);
+      
+      if (mentions && Array.isArray(mentions) && mentions.length > 0) {
+        const room = await storage.getChatRoomById(roomId);
+        const roomName = room?.name || "a chat";
+        
+        for (const mention of mentions) {
+          if (mention.id && mention.id !== userId) {
+            try {
+              await storage.createNotification({
+                userId: mention.id,
+                type: "chat_mention",
+                title: "You were mentioned in a message",
+                message: `${userName} mentioned you in ${roomName}: "${(message.content || "").substring(0, 50)}${(message.content || "").length > 50 ? "..." : ""}"`,
+                priority: "high",
+                relatedId: roomId,
+                relatedType: "chat_room",
+                metadata: {
+                  roomId,
+                  messageId: message.id,
+                  senderId: userId,
+                  senderName: userName
+                }
+              });
+            } catch (notifErr) {
+              console.error("Error creating mention notification:", notifErr);
+            }
+          }
+        }
+      }
+      
       res.status(201).json(message);
     } catch (error) {
       console.error("Error sending message:", error);

@@ -148,9 +148,15 @@ export default function Chat() {
   const [selectedForwardRooms, setSelectedForwardRooms] = useState<string[]>([]);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [gifSearchQuery, setGifSearchQuery] = useState("");
+  const [showMentionPopover, setShowMentionPopover] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionCursorPos, setMentionCursorPos] = useState(0);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const [activeMentions, setActiveMentions] = useState<Array<{ id: string; name: string }>>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -293,7 +299,22 @@ export default function Chat() {
   }, [selectedRoomId]);
 
   const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMessageText(e.target.value);
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
+    setMessageText(value);
+    
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1].toLowerCase());
+      setMentionCursorPos(cursorPos);
+      setShowMentionPopover(true);
+      setSelectedMentionIndex(0);
+    } else {
+      setShowMentionPopover(false);
+      setMentionQuery("");
+    }
     
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -304,6 +325,64 @@ export default function Chat() {
     typingTimeoutRef.current = setTimeout(() => {
       sendTypingIndicator(false);
     }, 2000);
+  };
+
+  const getFilteredMentionStaff = () => {
+    if (!selectedRoom) return [];
+    
+    const participantIds = selectedRoom.participants.map(p => p.staffId);
+    return staff.filter(s => 
+      participantIds.includes(s.id) && 
+      s.id !== currentUser?.id &&
+      s.name?.toLowerCase().includes(mentionQuery)
+    ).slice(0, 5);
+  };
+
+  const handleMentionSelect = (selectedStaff: { id: string; name: string }) => {
+    const textBeforeMention = messageText.slice(0, mentionCursorPos).replace(/@\w*$/, "");
+    const textAfterMention = messageText.slice(mentionCursorPos);
+    const newText = `${textBeforeMention}@${selectedStaff.name} ${textAfterMention}`;
+    
+    setMessageText(newText);
+    setActiveMentions(prev => {
+      if (prev.find(m => m.id === selectedStaff.id)) return prev;
+      return [...prev, { id: selectedStaff.id, name: selectedStaff.name }];
+    });
+    setShowMentionPopover(false);
+    setMentionQuery("");
+    messageInputRef.current?.focus();
+  };
+
+  const handleMentionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showMentionPopover) return;
+    
+    const filteredStaff = getFilteredMentionStaff();
+    if (filteredStaff.length === 0) return;
+    
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setSelectedMentionIndex(prev => 
+          prev < filteredStaff.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setSelectedMentionIndex(prev => 
+          prev > 0 ? prev - 1 : filteredStaff.length - 1
+        );
+        break;
+      case "Enter":
+        if (showMentionPopover && filteredStaff[selectedMentionIndex]) {
+          e.preventDefault();
+          handleMentionSelect(filteredStaff[selectedMentionIndex]);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        setShowMentionPopover(false);
+        break;
+    }
   };
 
   const createDirectRoomMutation = useMutation({
@@ -589,7 +668,8 @@ export default function Chat() {
       replyToId?: string; 
       replyToSenderId?: string; 
       replyToSenderName?: string; 
-      replyToPreview?: string 
+      replyToPreview?: string;
+      mentions?: Array<{ id: string; name: string }>;
     } = {
       content: messageText.trim()
     };
@@ -601,7 +681,19 @@ export default function Chat() {
       messageData.replyToPreview = replyToMessage.content?.substring(0, 100) || "";
     }
     
+    if (activeMentions.length > 0) {
+      const mentionPattern = /@(\w+(?:\s+\w+)*)/g;
+      const messageMentions = [...messageText.matchAll(mentionPattern)].map(m => m[1].toLowerCase());
+      const validMentions = activeMentions.filter(m => 
+        messageMentions.some(mention => m.name.toLowerCase().startsWith(mention))
+      );
+      if (validMentions.length > 0) {
+        messageData.mentions = validMentions;
+      }
+    }
+    
     sendMessageMutation.mutate(messageData);
+    setActiveMentions([]);
   };
 
   const handleReplyToMessage = (message: ChatMessage) => {
@@ -629,7 +721,13 @@ export default function Chat() {
     return messageAge < twentyFourHours;
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showMentionPopover) {
+      handleMentionKeyDown(e);
+      if (["ArrowDown", "ArrowUp", "Escape"].includes(e.key)) return;
+      if (e.key === "Enter" && getFilteredMentionStaff().length > 0) return;
+    }
+    
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -742,6 +840,48 @@ export default function Chat() {
   };
 
   const activeStaff = staff.filter(s => s.isActive === "yes");
+
+  const renderMessageContent = (content: string, isOwn: boolean) => {
+    const mentionPattern = /@(\w+(?:\s+\w+)*)/g;
+    const parts: (string | JSX.Element)[] = [];
+    let lastIndex = 0;
+    let match;
+    let keyIndex = 0;
+
+    while ((match = mentionPattern.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.slice(lastIndex, match.index));
+      }
+      
+      const mentionName = match[1];
+      const mentionedStaff = staff.find(s => 
+        s.name?.toLowerCase() === mentionName.toLowerCase() ||
+        s.name?.toLowerCase().startsWith(mentionName.toLowerCase())
+      );
+      
+      parts.push(
+        <span 
+          key={`mention-${keyIndex++}`}
+          className={`font-medium ${
+            isOwn 
+              ? "text-primary-foreground bg-primary-foreground/20 rounded px-0.5" 
+              : "text-primary bg-primary/20 rounded px-0.5"
+          }`}
+          data-testid={mentionedStaff ? `mention-${mentionedStaff.id}` : undefined}
+        >
+          @{mentionName}
+        </span>
+      );
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    if (lastIndex < content.length) {
+      parts.push(content.slice(lastIndex));
+    }
+    
+    return parts.length > 0 ? parts : content;
+  };
 
   const handleCreateCustomChat = () => {
     if (!groupName.trim()) {
@@ -1233,7 +1373,9 @@ export default function Chat() {
                               {isDeleted ? (
                                 <p className="text-sm">This message was deleted</p>
                               ) : (
-                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                <p className="text-sm whitespace-pre-wrap">
+                                  {renderMessageContent(message.content || "", isOwn)}
+                                </p>
                               )}
                             </div>
                             
@@ -1371,14 +1513,49 @@ export default function Chat() {
                 >
                   <ImageIcon className="h-4 w-4" />
                 </Button>
-                <Input
-                  placeholder={replyToMessage ? "Type your reply..." : "Type a message..."}
-                  value={messageText}
-                  onChange={handleMessageChange}
-                  onKeyDown={handleKeyPress}
-                  className="flex-1"
-                  data-testid="input-message"
-                />
+                <div className="relative flex-1">
+                  <Input
+                    ref={messageInputRef}
+                    placeholder={replyToMessage ? "Type your reply... (use @ to mention)" : "Type a message... (use @ to mention)"}
+                    value={messageText}
+                    onChange={handleMessageChange}
+                    onKeyDown={handleKeyPress}
+                    className="w-full"
+                    data-testid="input-message"
+                  />
+                  {showMentionPopover && getFilteredMentionStaff().length > 0 && (
+                    <div 
+                      className="absolute bottom-full left-0 right-0 mb-1 bg-popover border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto"
+                      data-testid="mention-popover"
+                    >
+                      <div className="p-1">
+                        <p className="text-xs text-muted-foreground px-2 py-1">Mention a team member</p>
+                        {getFilteredMentionStaff().map((member, index) => (
+                          <div
+                            key={member.id}
+                            onClick={() => handleMentionSelect(member)}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer ${
+                              index === selectedMentionIndex 
+                                ? "bg-accent text-accent-foreground" 
+                                : "hover:bg-accent/50"
+                            }`}
+                            data-testid={`mention-option-${member.id}`}
+                          >
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">
+                                {member.name?.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{member.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{member.role}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <Button
                   size="icon"
                   onClick={handleSendMessage}
