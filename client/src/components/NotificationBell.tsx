@@ -322,22 +322,18 @@ export default function NotificationBell({ className, userId, userName }: Notifi
           </ScrollArea>
         )}
         
-        {notifications.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="justify-center text-sm text-primary cursor-pointer"
-              onClick={() => {
-                setLocation("/notifications");
-                setOpen(false);
-              }}
-              data-testid="link-view-all-notifications"
-            >
-              <ExternalLink className="h-3 w-3 mr-1" />
-              View All Notifications
-            </DropdownMenuItem>
-          </>
-        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem 
+          className="justify-center text-sm text-primary cursor-pointer"
+          onClick={() => {
+            setLocation("/notifications");
+            setOpen(false);
+          }}
+          data-testid="link-view-all-notifications"
+        >
+          <ExternalLink className="h-3 w-3 mr-1" />
+          View All Notifications
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
