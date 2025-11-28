@@ -1,0 +1,57 @@
+Enhance the internal EmpowerLink chat system with role-based access, lifecycle controls, and improved administration functions. Chats are used only by EmpowerLink staff.
+
+Requirements:
+
+1. Role-Based Permissions:
+   - Admins: full visibility of all chats across the organisation.
+   - Admins can archive, delete, lock, unlock, and export chats.
+   - Support Workers: can only access chats they are added to, or chats linked to clients they are assigned to.
+   - Non-admin office staff: same permissions as support workers unless explicitly added to a chat.
+   - No external users, clients, or health professionals participate in chats.
+
+2. Chat Lifecycle Management:
+   - Automatic creation of a “Client Chat Room” for each new client.
+   - Lock/Unlock feature:
+     - Locked chats serve as announcement-only channels.
+     - Admins can post in locked chats, all others are read-only.
+   - Archive function:
+     - Archived chats become read-only for everyone.
+     - Admins retain the ability to unarchive.
+   - Delete function:
+     - Admin-only.
+     - Removes chat and messages permanently.
+
+3. Message Permissions:
+   - Admins may delete any message.
+   - Users may delete only their own messages within a configurable time window.
+   - Edited messages must retain an edit marker.
+
+4. Access Validation:
+   - Support workers gain access to a client’s chat automatically if they are allocated to that client.
+   - When staff are removed from a client’s team, revoke access to the corresponding client chat.
+   - Manual addition to group chats where required.
+   - Permission check middleware to validate all chat interactions.
+
+5. Audit & Logging:
+   - Log all chat creation, deletion, archiving, locking, membership changes, and message deletions.
+   - Include timestamps, user IDs, chat IDs, and affected data.
+
+6. Admin Dashboard Enhancements:
+   - List all chats, including filters:
+       - Client chats
+       - Group chats
+       - Announcement chats
+       - Archived chats
+   - Display active participants, last message timestamp, and unresolved flags.
+   - Quick actions: archive, delete, lock/unlock.
+
+7. Notification Rules:
+   - Users only receive notifications for chats where they currently have permission.
+   - Automatic removal from notifications when access is revoked due to client reassignment.
+
+8. Deliverables:
+   - Updated database structures for Chat, ChatMembership, ChatAuditLog.
+   - Revised permission system and validation middleware.
+   - Endpoints for archive, delete, lock/unlock actions.
+   - Admin dashboard endpoints.
+   - Unit tests covering permission rules, lifecycle controls, and audit logging.

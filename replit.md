@@ -36,7 +36,14 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 -   **NDIS Consent Form Tracking**: Independent compliance tracking for NDIS-specific consent forms.
 -   **Help Desk & Support Tickets**: In-app issue reporting system with ticket creation, assignment, commenting, resolution workflow. Includes floating help widget for quick access and notification bell for real-time updates.
 -   **Task Management System**: Comprehensive task tracking with categories (general, client_care, documentation, compliance, training, meeting, follow_up), priorities (low, medium, high, urgent), status workflow (not_started, in_progress, completed, cancelled), due dates, staff assignment, comments, and checklists.
--   **Real-Time Chat System**: Team messaging with direct messages and group chats. Features WebSocket-powered real-time messaging, typing indicators, online/offline presence, read receipts, and message history. Integrated with staff directory for easy conversation creation.
+-   **Real-Time Chat System**: Team messaging with direct messages and group chats. Features WebSocket-powered real-time messaging, typing indicators, online/offline presence, read receipts, and message history. Integrated with staff directory for easy conversation creation. Enhanced features include:
+    -   **Message Replies**: iMessage-style threaded replies with quote bubbles showing original message preview
+    -   **Message Forwarding**: Forward messages between rooms with source attribution and permission validation
+    -   **Lifecycle Controls**: Admin lock/unlock, archive/unarchive, and soft delete for chat rooms
+    -   **Role-Based Permissions**: Centralized ChatAuthorizationService checking user roles (admin, director, operations_manager, clinical_manager, etc.) and room membership
+    -   **Audit Logging**: Comprehensive chat_audit_logs table tracking all chat events for HIPAA/privacy compliance
+    -   **Media Attachments**: Support for photos (up to 15MB), videos (up to 60MB), and GIFs with chat_message_attachments table
+    -   **Admin Dashboard**: Filtered view of all chat rooms with search, pagination, and quick lifecycle actions
 -   **Notifications & Alerts System**: Comprehensive real-time notification system with 19+ notification types (appointments, tasks, compliance, chat, tickets, client updates, etc.). Features WebSocket-powered instant delivery with polling fallback, per-user notification preferences with quiet hours, priority levels (normal, high, urgent), notification archiving, and full Notifications page with filtering and pagination. NotificationBell component in header shows unread badge with dropdown panel for quick access.
 
 ### System Design Choices

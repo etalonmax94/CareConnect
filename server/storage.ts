@@ -23,7 +23,7 @@ import {
   // Tasks
   tasks, taskComments, taskChecklists,
   // Chat
-  chatRooms, chatRoomParticipants, chatMessages,
+  chatRooms, chatRoomParticipants, chatMessages, chatMessageAttachments, chatAuditLogs,
   // Scheduling Conflicts
   schedulingConflicts,
   computeFullName,
@@ -92,6 +92,8 @@ import {
   type InsertChatRoom, type ChatRoom,
   type InsertChatRoomParticipant, type ChatRoomParticipant,
   type InsertChatMessage, type ChatMessage,
+  type InsertChatMessageAttachment, type ChatMessageAttachment,
+  type InsertChatAuditLog, type ChatAuditLog,
   // Scheduling Conflicts types
   type InsertSchedulingConflict, type SchedulingConflict,
   type SchedulingConflictType, type ConflictSeverity, type ConflictStatus
@@ -603,9 +605,22 @@ export interface IStorage {
   getClientChatRoom(clientId: string): Promise<ChatRoom | undefined>;
   getChatRoomsByType(userId: string, type: string): Promise<ChatRoom[]>;
   getAllChatRooms(): Promise<ChatRoom[]>; // Admin only
+  getAllChatRoomsWithFilters(filters?: {
+    type?: string;
+    status?: string;
+    isArchived?: string;
+    isLocked?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ rooms: ChatRoom[]; total: number }>; // Admin dashboard
   createChatRoom(room: InsertChatRoom): Promise<ChatRoom>;
   updateChatRoom(id: string, updates: Partial<InsertChatRoom>): Promise<ChatRoom | undefined>;
-  archiveChatRoom(id: string, archivedById: string): Promise<ChatRoom | undefined>;
+  archiveChatRoom(id: string, archivedById: string, archivedByName: string): Promise<ChatRoom | undefined>;
+  unarchiveChatRoom(id: string): Promise<ChatRoom | undefined>;
+  lockChatRoom(id: string, lockedById: string, lockedByName: string): Promise<ChatRoom | undefined>;
+  unlockChatRoom(id: string): Promise<ChatRoom | undefined>;
+  softDeleteChatRoom(id: string, deletedById: string, deletedByName: string): Promise<ChatRoom | undefined>;
   deleteChatRoom(id: string): Promise<boolean>;
   
   // Client Chat Auto-Creation
@@ -620,6 +635,7 @@ export interface IStorage {
   updateLastRead(roomId: string, staffId: string): Promise<void>;
   getUnreadCount(userId: string): Promise<number>;
   isRoomAdmin(roomId: string, staffId: string): Promise<boolean>;
+  isRoomParticipant(roomId: string, staffId: string): Promise<boolean>;
   
   // Chat Messages
   getChatMessages(roomId: string, limit?: number, before?: string): Promise<ChatMessage[]>;
@@ -627,6 +643,18 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   updateChatMessage(id: string, content: string): Promise<ChatMessage | undefined>;
   deleteChatMessage(id: string): Promise<boolean>;
+  softDeleteChatMessage(id: string, deletedById: string, deletedByName: string): Promise<ChatMessage | undefined>;
+  forwardChatMessage(originalMessageId: string, targetRoomId: string, forwarderId: string, forwarderName: string, comment?: string): Promise<ChatMessage | undefined>;
+  
+  // Chat Message Attachments
+  getChatMessageAttachments(messageId: string): Promise<ChatMessageAttachment[]>;
+  createChatMessageAttachment(attachment: InsertChatMessageAttachment): Promise<ChatMessageAttachment>;
+  updateChatMessageAttachmentStatus(id: string, status: string, error?: string): Promise<ChatMessageAttachment | undefined>;
+  deleteChatMessageAttachment(id: string): Promise<boolean>;
+  
+  // Chat Audit Logs
+  createChatAuditLog(log: InsertChatAuditLog): Promise<ChatAuditLog>;
+  getChatAuditLogs(roomId?: string, limit?: number): Promise<ChatAuditLog[]>;
   
   // Scheduling Conflicts
   getSchedulingConflicts(filters?: {
@@ -3516,17 +3544,252 @@ export class DbStorage implements IStorage {
       .orderBy(desc(chatRooms.lastMessageAt));
   }
 
-  async archiveChatRoom(id: string, archivedById: string): Promise<ChatRoom | undefined> {
+  async archiveChatRoom(id: string, archivedById: string, archivedByName: string): Promise<ChatRoom | undefined> {
     const result = await db.update(chatRooms)
       .set({
         isArchived: "yes",
+        status: "archived",
         archivedAt: new Date(),
         archivedById,
+        archivedByName,
         updatedAt: new Date()
-      })
+      } as any)
       .where(eq(chatRooms.id, id))
       .returning();
     return result[0];
+  }
+
+  async unarchiveChatRoom(id: string): Promise<ChatRoom | undefined> {
+    const result = await db.update(chatRooms)
+      .set({
+        isArchived: "no",
+        status: "active",
+        archivedAt: null,
+        archivedById: null,
+        archivedByName: null,
+        updatedAt: new Date()
+      } as any)
+      .where(eq(chatRooms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async lockChatRoom(id: string, lockedById: string, lockedByName: string): Promise<ChatRoom | undefined> {
+    const result = await db.update(chatRooms)
+      .set({
+        isLocked: "yes",
+        lockedAt: new Date(),
+        lockedById,
+        lockedByName,
+        updatedAt: new Date()
+      } as any)
+      .where(eq(chatRooms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async unlockChatRoom(id: string): Promise<ChatRoom | undefined> {
+    const result = await db.update(chatRooms)
+      .set({
+        isLocked: "no",
+        lockedAt: null,
+        lockedById: null,
+        lockedByName: null,
+        updatedAt: new Date()
+      } as any)
+      .where(eq(chatRooms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async softDeleteChatRoom(id: string, deletedById: string, deletedByName: string): Promise<ChatRoom | undefined> {
+    const result = await db.update(chatRooms)
+      .set({
+        isDeleted: "yes",
+        status: "deleted",
+        deletedAt: new Date(),
+        deletedById,
+        deletedByName,
+        updatedAt: new Date()
+      } as any)
+      .where(eq(chatRooms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAllChatRoomsWithFilters(filters?: {
+    type?: string;
+    status?: string;
+    isArchived?: string;
+    isLocked?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ rooms: ChatRoom[]; total: number }> {
+    const conditions = [];
+    
+    // Filter out deleted rooms by default unless specifically requested
+    if (filters?.status === "deleted") {
+      conditions.push(eq(chatRooms.status as any, "deleted"));
+    } else if (filters?.status) {
+      conditions.push(eq(chatRooms.status as any, filters.status));
+    } else {
+      conditions.push(sql`${chatRooms.isDeleted} = 'no' OR ${chatRooms.isDeleted} IS NULL`);
+    }
+    
+    if (filters?.type) {
+      conditions.push(eq(chatRooms.type, filters.type as any));
+    }
+    if (filters?.isArchived) {
+      conditions.push(eq(chatRooms.isArchived, filters.isArchived as any));
+    }
+    if (filters?.isLocked) {
+      conditions.push(eq(chatRooms.isLocked as any, filters.isLocked));
+    }
+    if (filters?.search) {
+      conditions.push(or(
+        ilike(chatRooms.name as any, `%${filters.search}%`),
+        ilike(chatRooms.clientName as any, `%${filters.search}%`)
+      ));
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    // Get total count
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(chatRooms)
+      .where(whereClause);
+    const total = Number(countResult[0]?.count || 0);
+    
+    // Get paginated results
+    let query = db.select().from(chatRooms);
+    if (whereClause) {
+      query = query.where(whereClause) as any;
+    }
+    
+    const rooms = await query
+      .orderBy(desc(chatRooms.lastMessageAt), desc(chatRooms.createdAt))
+      .limit(filters?.limit || 50)
+      .offset(filters?.offset || 0);
+    
+    return { rooms, total };
+  }
+
+  async isRoomParticipant(roomId: string, staffId: string): Promise<boolean> {
+    const result = await db.select()
+      .from(chatRoomParticipants)
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ));
+    return result.length > 0;
+  }
+
+  async softDeleteChatMessage(id: string, deletedById: string, deletedByName: string): Promise<ChatMessage | undefined> {
+    const result = await db.update(chatMessages)
+      .set({
+        isDeleted: "yes",
+        deletedAt: new Date(),
+        deletedById,
+        deletedByName
+      } as any)
+      .where(eq(chatMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async forwardChatMessage(
+    originalMessageId: string, 
+    targetRoomId: string, 
+    forwarderId: string, 
+    forwarderName: string, 
+    comment?: string
+  ): Promise<ChatMessage | undefined> {
+    const original = await this.getChatMessageById(originalMessageId);
+    if (!original) return undefined;
+    
+    const sourceRoom = await this.getChatRoomById(original.roomId);
+    
+    const result = await db.insert(chatMessages).values({
+      roomId: targetRoomId,
+      senderId: forwarderId,
+      senderName: forwarderName,
+      content: comment || original.content,
+      messageType: comment ? "text" : original.messageType,
+      isForwarded: "yes",
+      forwardedFromMessageId: originalMessageId,
+      forwardedFromRoomId: original.roomId,
+      forwardedFromRoomName: sourceRoom?.name || "Unknown",
+      forwardedById: forwarderId,
+      forwardedByName: forwarderName,
+      forwardedAt: new Date(),
+      forwardedPreview: {
+        originalSenderId: original.senderId,
+        originalSenderName: original.senderName,
+        originalContent: original.content,
+        originalMessageType: original.messageType || "text",
+        originalCreatedAt: original.createdAt.toISOString()
+      }
+    } as any).returning();
+    
+    // Update last message in target room
+    if (result[0]) {
+      await this.updateChatRoom(targetRoomId, {
+        lastMessageAt: new Date(),
+        lastMessagePreview: `Forwarded: ${original.content.substring(0, 50)}...`
+      } as any);
+    }
+    
+    return result[0];
+  }
+
+  // Chat Message Attachments
+  async getChatMessageAttachments(messageId: string): Promise<ChatMessageAttachment[]> {
+    return await db.select()
+      .from(chatMessageAttachments)
+      .where(eq(chatMessageAttachments.messageId, messageId))
+      .orderBy(chatMessageAttachments.createdAt);
+  }
+
+  async createChatMessageAttachment(attachment: InsertChatMessageAttachment): Promise<ChatMessageAttachment> {
+    const result = await db.insert(chatMessageAttachments).values(attachment).returning();
+    return result[0];
+  }
+
+  async updateChatMessageAttachmentStatus(id: string, status: string, error?: string): Promise<ChatMessageAttachment | undefined> {
+    const result = await db.update(chatMessageAttachments)
+      .set({
+        processingStatus: status,
+        processingError: error
+      } as any)
+      .where(eq(chatMessageAttachments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteChatMessageAttachment(id: string): Promise<boolean> {
+    const result = await db.delete(chatMessageAttachments)
+      .where(eq(chatMessageAttachments.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Chat Audit Logs
+  async createChatAuditLog(log: InsertChatAuditLog): Promise<ChatAuditLog> {
+    const result = await db.insert(chatAuditLogs).values(log).returning();
+    return result[0];
+  }
+
+  async getChatAuditLogs(roomId?: string, limit?: number): Promise<ChatAuditLog[]> {
+    let query = db.select().from(chatAuditLogs);
+    
+    if (roomId) {
+      query = query.where(eq(chatAuditLogs.roomId, roomId)) as any;
+    }
+    
+    return await query
+      .orderBy(desc(chatAuditLogs.createdAt))
+      .limit(limit || 100);
   }
 
   async createClientChatRoom(clientId: string, clientName: string, createdById: string, createdByName: string): Promise<ChatRoom> {

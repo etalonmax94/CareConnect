@@ -2906,6 +2906,7 @@ export type TaskChecklist = typeof taskChecklists.$inferSelect;
 // ============================================
 
 export type ChatRoomType = "direct" | "group" | "client" | "announcement";
+export type ChatRoomStatus = "active" | "archived" | "deleted";
 
 // Filter criteria for creating group chats based on staff attributes
 export type ChatStaffFilter = {
@@ -2920,6 +2921,9 @@ export const chatRooms = pgTable("chat_rooms", {
   name: text("name"), // For group chats, null for direct messages
   type: text("type").$type<ChatRoomType>().notNull().default("direct"),
   
+  // Room lifecycle status
+  status: text("status").$type<ChatRoomStatus>().notNull().default("active"),
+  
   // For client-linked conversations
   clientId: varchar("client_id"),
   clientName: text("client_name"),
@@ -2930,6 +2934,12 @@ export const chatRooms = pgTable("chat_rooms", {
   
   // Announcement channel (broadcast only - only admins can post)
   isAnnouncement: text("is_announcement").default("no").$type<"yes" | "no">(),
+  
+  // Lock feature (locked = announcement-only, admins can post, others read-only)
+  isLocked: text("is_locked").default("no").$type<"yes" | "no">(),
+  lockedAt: timestamp("locked_at"),
+  lockedById: varchar("locked_by_id"),
+  lockedByName: text("locked_by_name"),
   
   // Staff filter criteria used to create this group (for auto-sync)
   staffFilter: json("staff_filter").$type<ChatStaffFilter>(),
@@ -2942,9 +2952,17 @@ export const chatRooms = pgTable("chat_rooms", {
   lastMessageAt: timestamp("last_message_at"),
   lastMessagePreview: text("last_message_preview"),
   
+  // Archive tracking
   isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
   archivedAt: timestamp("archived_at"),
   archivedById: varchar("archived_by_id"),
+  archivedByName: text("archived_by_name"),
+  
+  // Soft delete tracking
+  isDeleted: text("is_deleted").default("no").$type<"yes" | "no">(),
+  deletedAt: timestamp("deleted_at"),
+  deletedById: varchar("deleted_by_id"),
+  deletedByName: text("deleted_by_name"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -2953,8 +2971,10 @@ export const chatRooms = pgTable("chat_rooms", {
 export const insertChatRoomSchema = createInsertSchema(chatRooms, {
   name: z.string().optional(),
   type: z.enum(["direct", "group", "client", "announcement"]).optional().default("direct"),
+  status: z.enum(["active", "archived", "deleted"]).optional().default("active"),
   description: z.string().optional(),
   isAnnouncement: z.enum(["yes", "no"]).optional(),
+  isLocked: z.enum(["yes", "no"]).optional(),
   staffFilter: z.object({
     roles: z.array(z.string()).optional(),
     skills: z.array(z.string()).optional(),
@@ -2968,6 +2988,14 @@ export const insertChatRoomSchema = createInsertSchema(chatRooms, {
   lastMessagePreview: true,
   archivedAt: true,
   archivedById: true,
+  archivedByName: true,
+  lockedAt: true,
+  lockedById: true,
+  lockedByName: true,
+  deletedAt: true,
+  deletedById: true,
+  deletedByName: true,
+  isDeleted: true,
 });
 
 export type InsertChatRoom = z.infer<typeof insertChatRoomSchema>;
@@ -3013,6 +3041,8 @@ export type InsertChatRoomParticipant = z.infer<typeof insertChatRoomParticipant
 export type ChatRoomParticipant = typeof chatRoomParticipants.$inferSelect;
 
 // Chat Messages
+export type ChatMessageType = "text" | "system" | "file" | "image" | "video" | "gif";
+
 export const chatMessages = pgTable("chat_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   
@@ -3024,29 +3054,66 @@ export const chatMessages = pgTable("chat_messages", {
   
   // Message content
   content: text("content").notNull(),
-  messageType: text("message_type").$type<"text" | "system" | "file">().default("text"),
+  messageType: text("message_type").$type<ChatMessageType>().default("text"),
   
-  // File attachment (if any)
+  // File attachment (if any) - legacy single attachment
   attachmentUrl: text("attachment_url"),
   attachmentName: text("attachment_name"),
   attachmentType: text("attachment_type"),
   
-  // Reply to another message
+  // Reply to another message (iMessage-style threading)
   replyToId: varchar("reply_to_id"),
   replyToPreview: text("reply_to_preview"),
+  replyToSenderId: varchar("reply_to_sender_id"),
+  replyToSenderName: text("reply_to_sender_name"),
+  
+  // Forwarded message tracking
+  isForwarded: text("is_forwarded").default("no").$type<"yes" | "no">(),
+  forwardedFromMessageId: varchar("forwarded_from_message_id"),
+  forwardedFromRoomId: varchar("forwarded_from_room_id"),
+  forwardedFromRoomName: text("forwarded_from_room_name"),
+  forwardedById: varchar("forwarded_by_id"),
+  forwardedByName: text("forwarded_by_name"),
+  forwardedAt: timestamp("forwarded_at"),
+  forwardedPreview: json("forwarded_preview").$type<{
+    originalSenderId: string;
+    originalSenderName: string;
+    originalContent: string;
+    originalMessageType: string;
+    originalCreatedAt: string;
+  }>(),
   
   // Edit/delete tracking
   isEdited: text("is_edited").default("no").$type<"yes" | "no">(),
   editedAt: timestamp("edited_at"),
   isDeleted: text("is_deleted").default("no").$type<"yes" | "no">(),
   deletedAt: timestamp("deleted_at"),
+  deletedById: varchar("deleted_by_id"),
+  deletedByName: text("deleted_by_name"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertChatMessageSchema = createInsertSchema(chatMessages, {
   content: z.string().min(1, "Message cannot be empty"),
-  messageType: z.enum(["text", "system", "file"]).optional().default("text"),
+  messageType: z.enum(["text", "system", "file", "image", "video", "gif"]).optional().default("text"),
+  replyToId: z.string().optional(),
+  replyToPreview: z.string().optional(),
+  replyToSenderId: z.string().optional(),
+  replyToSenderName: z.string().optional(),
+  isForwarded: z.enum(["yes", "no"]).optional(),
+  forwardedFromMessageId: z.string().optional(),
+  forwardedFromRoomId: z.string().optional(),
+  forwardedFromRoomName: z.string().optional(),
+  forwardedById: z.string().optional(),
+  forwardedByName: z.string().optional(),
+  forwardedPreview: z.object({
+    originalSenderId: z.string(),
+    originalSenderName: z.string(),
+    originalContent: z.string(),
+    originalMessageType: z.string(),
+    originalCreatedAt: z.string(),
+  }).optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -3054,7 +3121,126 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages, {
   editedAt: true,
   isDeleted: true,
   deletedAt: true,
+  deletedById: true,
+  deletedByName: true,
+  forwardedAt: true,
 });
 
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// Chat Message Attachments (for multiple attachments per message)
+export type ChatAttachmentType = "image" | "video" | "gif" | "file" | "audio";
+
+export const chatMessageAttachments = pgTable("chat_message_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  messageId: varchar("message_id").notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  
+  // Attachment details
+  type: text("type").$type<ChatAttachmentType>().notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(), // in bytes
+  mimeType: text("mime_type").notNull(),
+  
+  // Storage
+  storageKey: text("storage_key").notNull(), // Path in storage
+  thumbnailKey: text("thumbnail_key"), // Path to thumbnail for images/videos
+  
+  // Media metadata
+  width: integer("width"), // For images/videos
+  height: integer("height"), // For images/videos
+  duration: integer("duration"), // For videos/audio in seconds
+  
+  // For GIFs from external sources (like Tenor)
+  externalUrl: text("external_url"),
+  externalProvider: text("external_provider"), // "tenor", "giphy", etc.
+  externalId: text("external_id"),
+  
+  // Processing status
+  processingStatus: text("processing_status").$type<"pending" | "processing" | "completed" | "failed">().default("pending"),
+  processingError: text("processing_error"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertChatMessageAttachmentSchema = createInsertSchema(chatMessageAttachments, {
+  type: z.enum(["image", "video", "gif", "file", "audio"]),
+  fileName: z.string().min(1),
+  fileSize: z.number().positive(),
+  mimeType: z.string().min(1),
+  storageKey: z.string().min(1),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatMessageAttachment = z.infer<typeof insertChatMessageAttachmentSchema>;
+export type ChatMessageAttachment = typeof chatMessageAttachments.$inferSelect;
+
+// Chat Audit Log
+export type ChatAuditAction = 
+  | "room_created" 
+  | "room_archived" 
+  | "room_unarchived" 
+  | "room_deleted" 
+  | "room_locked" 
+  | "room_unlocked"
+  | "participant_added" 
+  | "participant_removed" 
+  | "participant_role_changed"
+  | "message_deleted" 
+  | "message_edited"
+  | "message_forwarded"
+  | "attachment_uploaded"
+  | "attachment_deleted";
+
+export const chatAuditLogs = pgTable("chat_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Action details
+  action: text("action").$type<ChatAuditAction>().notNull(),
+  
+  // Actor (who performed the action)
+  actorId: varchar("actor_id").notNull(),
+  actorName: text("actor_name").notNull(),
+  actorRole: text("actor_role"),
+  
+  // Affected entities
+  roomId: varchar("room_id").references(() => chatRooms.id, { onDelete: "set null" }),
+  roomName: text("room_name"),
+  messageId: varchar("message_id"),
+  attachmentId: varchar("attachment_id"),
+  
+  // For participant changes
+  targetUserId: varchar("target_user_id"),
+  targetUserName: text("target_user_name"),
+  
+  // Additional context
+  details: json("details").$type<Record<string, any>>(),
+  
+  // For forwarding
+  sourceRoomId: varchar("source_room_id"),
+  sourceRoomName: text("source_room_name"),
+  
+  // IP and session info for compliance
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertChatAuditLogSchema = createInsertSchema(chatAuditLogs, {
+  action: z.enum([
+    "room_created", "room_archived", "room_unarchived", "room_deleted", 
+    "room_locked", "room_unlocked", "participant_added", "participant_removed",
+    "participant_role_changed", "message_deleted", "message_edited",
+    "message_forwarded", "attachment_uploaded", "attachment_deleted"
+  ]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatAuditLog = z.infer<typeof insertChatAuditLogSchema>;
+export type ChatAuditLog = typeof chatAuditLogs.$inferSelect;

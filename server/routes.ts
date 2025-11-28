@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupWebSocket, broadcastNotification } from "./websocket";
 import { storage } from "./storage";
+import { chatAuthorizationService, type ChatAction, type UserContext } from "./services/chatAuthorization";
 import { 
   insertClientSchema, updateClientSchema, insertProgressNoteSchema, 
   insertInvoiceSchema, calculateAge, insertBudgetSchema,
@@ -24,6 +25,7 @@ import {
   insertNotificationSchema, insertSupportTicketSchema, insertTicketCommentSchema, insertAnnouncementSchema,
   insertTaskSchema, insertTaskCommentSchema, insertTaskChecklistSchema,
   insertChatRoomSchema, insertChatRoomParticipantSchema, insertChatMessageSchema,
+  insertChatMessageAttachmentSchema, insertChatAuditLogSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { 
@@ -9053,6 +9055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/chat/rooms/:roomId/archive", requireAuth, async (req: any, res) => {
     try {
       const userId = req.session?.user?.id;
+      const userName = req.session?.user?.displayName || req.session?.user?.email || "Unknown User";
       const userRoles = req.session?.user?.roles || [];
       
       if (!userId) {
@@ -9079,10 +9082,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Only room creator or app admins can archive this room" });
       }
 
-      const archivedRoom = await storage.archiveChatRoom(roomId, userId);
+      const archivedRoom = await storage.archiveChatRoom(roomId, userId, userName);
       if (!archivedRoom) {
         return res.status(500).json({ error: "Failed to archive chat room" });
       }
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        roomId,
+        action: "room_archived",
+        actorId: userId,
+        actorName: userName,
+        details: { reason: req.body.reason }
+      });
 
       res.json(archivedRoom);
     } catch (error) {
@@ -9182,6 +9194,503 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching client chat room:", error);
       res.status(500).json({ error: "Failed to fetch client chat room" });
+    }
+  });
+
+  // ==================== ENHANCED CHAT ROUTES ====================
+  // These routes use the centralized chatAuthorizationService for permission checks
+
+  // Helper function to get user context for chat authorization
+  function getUserContext(req: any): UserContext | null {
+    const userId = req.session?.user?.id;
+    const userName = req.session?.user?.displayName || req.session?.user?.email;
+    const userRoles = req.session?.user?.roles || [];
+    const email = req.session?.user?.email;
+    
+    if (!userId) return null;
+    
+    return {
+      userId,
+      userName: userName || "Unknown User",
+      roles: userRoles.length > 0 ? userRoles : ["staff"],
+      email
+    };
+  }
+
+  // Lock chat room - Admin only
+  app.post("/api/chat/rooms/:roomId/lock", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const permission = await chatAuthorizationService.checkPermission("lock_room", userContext, roomId);
+      
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const room = await storage.lockChatRoom(roomId, userContext.userId, userContext.userName);
+      if (!room) {
+        return res.status(500).json({ error: "Failed to lock chat room" });
+      }
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        roomId,
+        action: "room_locked",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: { reason: req.body.reason }
+      });
+
+      res.json(room);
+    } catch (error) {
+      console.error("Error locking chat room:", error);
+      res.status(500).json({ error: "Failed to lock chat room" });
+    }
+  });
+
+  // Unlock chat room - Admin only
+  app.post("/api/chat/rooms/:roomId/unlock", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const permission = await chatAuthorizationService.checkPermission("unlock_room", userContext, roomId);
+      
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const room = await storage.unlockChatRoom(roomId);
+      if (!room) {
+        return res.status(500).json({ error: "Failed to unlock chat room" });
+      }
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        roomId,
+        action: "room_unlocked",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: { reason: req.body.reason }
+      });
+
+      res.json(room);
+    } catch (error) {
+      console.error("Error unlocking chat room:", error);
+      res.status(500).json({ error: "Failed to unlock chat room" });
+    }
+  });
+
+  // Unarchive chat room
+  app.post("/api/chat/rooms/:roomId/unarchive", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const permission = await chatAuthorizationService.checkPermission("unarchive_room", userContext, roomId);
+      
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const room = await storage.unarchiveChatRoom(roomId);
+      if (!room) {
+        return res.status(500).json({ error: "Failed to unarchive chat room" });
+      }
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        roomId,
+        action: "room_unarchived",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: {}
+      });
+
+      res.json(room);
+    } catch (error) {
+      console.error("Error unarchiving chat room:", error);
+      res.status(500).json({ error: "Failed to unarchive chat room" });
+    }
+  });
+
+  // Soft delete chat room - Admin only
+  app.delete("/api/chat/rooms/:roomId/soft-delete", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const permission = await chatAuthorizationService.checkPermission("delete_room", userContext, roomId);
+      
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const room = await storage.softDeleteChatRoom(roomId, userContext.userId, userContext.userName);
+      if (!room) {
+        return res.status(500).json({ error: "Failed to delete chat room" });
+      }
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        roomId,
+        action: "room_deleted",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: { reason: req.body.reason }
+      });
+
+      res.json({ success: true, room });
+    } catch (error) {
+      console.error("Error soft deleting chat room:", error);
+      res.status(500).json({ error: "Failed to delete chat room" });
+    }
+  });
+
+  // Forward message to another room
+  app.post("/api/chat/messages/:messageId/forward", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId } = req.params;
+      const { targetRoomId, comment } = req.body;
+
+      if (!targetRoomId) {
+        return res.status(400).json({ error: "Target room ID is required" });
+      }
+
+      // Get the original message to find source room
+      const originalMessage = await storage.getChatMessageById(messageId);
+      if (!originalMessage) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+
+      // Check permission for forwarding (source and target)
+      const permission = await chatAuthorizationService.checkPermission(
+        "forward_message", 
+        userContext, 
+        originalMessage.roomId, 
+        targetRoomId
+      );
+      
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      // Forward the message
+      const forwardedMessage = await storage.forwardChatMessage(
+        messageId,
+        targetRoomId,
+        userContext.userId,
+        userContext.userName,
+        comment
+      );
+
+      if (!forwardedMessage) {
+        return res.status(500).json({ error: "Failed to forward message" });
+      }
+
+      // Create audit log entries for both source and target rooms
+      await storage.createChatAuditLog({
+        roomId: originalMessage.roomId,
+        messageId: messageId,
+        action: "message_forwarded_from",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: { 
+          targetRoomId,
+          newMessageId: forwardedMessage.id
+        }
+      });
+
+      await storage.createChatAuditLog({
+        roomId: targetRoomId,
+        messageId: forwardedMessage.id,
+        action: "message_forwarded_to",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: { 
+          sourceRoomId: originalMessage.roomId,
+          originalMessageId: messageId
+        }
+      });
+
+      res.status(201).json(forwardedMessage);
+    } catch (error) {
+      console.error("Error forwarding message:", error);
+      res.status(500).json({ error: "Failed to forward message" });
+    }
+  });
+
+  // Reply to a message with quote
+  app.post("/api/chat/rooms/:roomId/messages/reply", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const { replyToId, content, messageType = "text" } = req.body;
+
+      if (!content) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+
+      const permission = await chatAuthorizationService.checkPermission("reply_to_message", userContext, roomId);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      // Get the message being replied to (if specified)
+      let replyToMessage = null;
+      if (replyToId) {
+        replyToMessage = await storage.getChatMessageById(replyToId);
+        if (!replyToMessage) {
+          return res.status(404).json({ error: "Reply-to message not found" });
+        }
+        // Verify the message being replied to is in the same room
+        if (replyToMessage.roomId !== roomId) {
+          return res.status(400).json({ error: "Can only reply to messages in the same room" });
+        }
+      }
+
+      const messageData: any = {
+        roomId,
+        senderId: userContext.userId,
+        senderName: userContext.userName,
+        content,
+        messageType,
+        isReply: replyToMessage ? "yes" : "no"
+      };
+
+      if (replyToMessage) {
+        messageData.replyToId = replyToId;
+        messageData.replyToSenderId = replyToMessage.senderId;
+        messageData.replyToSenderName = replyToMessage.senderName;
+        messageData.replyToPreview = replyToMessage.content.substring(0, 200);
+      }
+
+      const message = await storage.createChatMessage(messageData);
+
+      // Update last message in room
+      await storage.updateChatRoom(roomId, {
+        lastMessageAt: new Date(),
+        lastMessagePreview: content.substring(0, 100)
+      } as any);
+
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error creating reply message:", error);
+      res.status(500).json({ error: "Failed to create reply message" });
+    }
+  });
+
+  // Soft delete own message (within time window)
+  app.delete("/api/chat/messages/:messageId/soft-delete", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId } = req.params;
+      const message = await storage.getChatMessageById(messageId);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+
+      // Check if user can delete this message
+      let permission;
+      if (message.senderId === userContext.userId) {
+        permission = await chatAuthorizationService.checkPermission(
+          "delete_own_message", 
+          userContext, 
+          message.roomId, 
+          messageId
+        );
+      } else {
+        permission = await chatAuthorizationService.checkPermission(
+          "delete_any_message", 
+          userContext, 
+          message.roomId
+        );
+      }
+      
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const deletedMessage = await storage.softDeleteChatMessage(
+        messageId, 
+        userContext.userId, 
+        userContext.userName
+      );
+      
+      if (!deletedMessage) {
+        return res.status(500).json({ error: "Failed to delete message" });
+      }
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        roomId: message.roomId,
+        messageId,
+        action: "message_deleted",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: { 
+          originalSenderId: message.senderId,
+          originalSenderName: message.senderName,
+          contentPreview: message.content.substring(0, 50)
+        }
+      });
+
+      res.json({ success: true, message: deletedMessage });
+    } catch (error) {
+      console.error("Error soft deleting message:", error);
+      res.status(500).json({ error: "Failed to delete message" });
+    }
+  });
+
+  // Get chat audit logs for a room
+  app.get("/api/chat/rooms/:roomId/audit-logs", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const { limit } = req.query;
+      
+      const permission = await chatAuthorizationService.checkPermission("view_audit_log", userContext, roomId);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const logs = await storage.getChatAuditLogs(roomId, limit ? parseInt(limit as string, 10) : 100);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching chat audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Get all chat audit logs (admin only)
+  app.get("/api/chat/audit-logs", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const permission = await chatAuthorizationService.checkPermission("view_audit_log", userContext);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const { limit } = req.query;
+      const logs = await storage.getChatAuditLogs(undefined, limit ? parseInt(limit as string, 10) : 100);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching all chat audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Admin chat dashboard - get all rooms with filters
+  app.get("/api/chat/admin/dashboard", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const permission = await chatAuthorizationService.checkPermission("view_audit_log", userContext);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const { type, status, isArchived, isLocked, search, limit, offset } = req.query;
+      
+      const result = await storage.getAllChatRoomsWithFilters({
+        type: type as string,
+        status: status as string,
+        isArchived: isArchived as string,
+        isLocked: isLocked as string,
+        search: search as string,
+        limit: limit ? parseInt(limit as string, 10) : 50,
+        offset: offset ? parseInt(offset as string, 10) : 0
+      });
+
+      // Get participant counts and last message info for each room
+      const roomsWithDetails = await Promise.all(
+        result.rooms.map(async (room) => {
+          const participants = await storage.getChatRoomParticipants(room.id);
+          return {
+            ...room,
+            participantCount: participants.length,
+            participants: participants.slice(0, 5) // Preview of first 5 participants
+          };
+        })
+      );
+
+      res.json({
+        rooms: roomsWithDetails,
+        total: result.total,
+        limit: limit ? parseInt(limit as string, 10) : 50,
+        offset: offset ? parseInt(offset as string, 10) : 0
+      });
+    } catch (error) {
+      console.error("Error fetching admin chat dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch chat dashboard" });
+    }
+  });
+
+  // Get message attachments
+  app.get("/api/chat/messages/:messageId/attachments", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId } = req.params;
+      const message = await storage.getChatMessageById(messageId);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+
+      // Check if user has access to the room
+      const permission = await chatAuthorizationService.checkPermission("view_room", userContext, message.roomId);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      const attachments = await storage.getChatMessageAttachments(messageId);
+      res.json(attachments);
+    } catch (error) {
+      console.error("Error fetching message attachments:", error);
+      res.status(500).json({ error: "Failed to fetch attachments" });
     }
   });
 
