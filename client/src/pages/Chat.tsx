@@ -82,17 +82,19 @@ interface ChatRoomWithParticipants extends ChatRoom {
   participants: ChatRoomParticipant[];
 }
 
-interface TenorGif {
+interface GiphyGif {
   id: string;
   title: string;
+  url: string;
   previewUrl: string;
-  originalUrl: string;
+  mp4Url?: string;
   width: number;
   height: number;
+  size?: number;
 }
 
 interface GifSearchResult {
-  results: TenorGif[];
+  results: GiphyGif[];
   next?: string;
 }
 
@@ -532,13 +534,13 @@ export default function Chat() {
   });
 
   const sendGifMutation = useMutation({
-    mutationFn: async ({ gif, roomId }: { gif: TenorGif; roomId: string }) => {
+    mutationFn: async ({ gif, roomId }: { gif: GiphyGif; roomId: string }) => {
       if (!roomId) throw new Error("No room selected");
       
       const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/messages`, {
         content: "",
         attachmentType: "gif",
-        gifUrl: gif.originalUrl,
+        gifUrl: gif.url,
         gifPreviewUrl: gif.previewUrl,
         gifTitle: gif.title,
       });
@@ -574,7 +576,7 @@ export default function Chat() {
     e.target.value = "";
   };
 
-  const handleGifSelect = (gif: TenorGif) => {
+  const handleGifSelect = (gif: GiphyGif) => {
     if (!selectedRoomId) return;
     sendGifMutation.mutate({ gif, roomId: selectedRoomId });
   };
@@ -1868,7 +1870,7 @@ export default function Chat() {
             </ScrollArea>
             
             <p className="text-xs text-center text-muted-foreground">
-              Powered by Tenor
+              Powered by GIPHY
             </p>
           </div>
         </DialogContent>

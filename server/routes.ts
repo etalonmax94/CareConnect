@@ -9646,10 +9646,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============= TENOR GIF API INTEGRATION =============
+  // ============= GIPHY GIF API INTEGRATION =============
   
-  // Simple in-memory cache for GIF search results (short-lived, public Tenor content)
-  // Note: GIF search results are public content from Tenor - same for all users
+  // Simple in-memory cache for GIF search results (short-lived, public Giphy content)
+  // Note: GIF search results are public content from Giphy - same for all users
   // Cache is query-based since results don't contain user-specific data
   const gifCache: Map<string, { data: any; timestamp: number }> = new Map();
   const GIF_CACHE_TTL = 2 * 60 * 1000; // 2 minutes - short TTL for safety
@@ -9671,7 +9671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
   
-  // Search GIFs via Tenor API proxy
+  // Search GIFs via Giphy API proxy
   app.get("/api/chat/gifs/search", requireAuth, async (req: any, res) => {
     try {
       const userContext = getUserContext(req);
@@ -9679,7 +9679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       
-      const { q, limit = "20", pos } = req.query;
+      const { q, limit = "20", offset = "0" } = req.query;
       
       if (!q || typeof q !== "string" || q.trim().length === 0) {
         return res.status(400).json({ error: "Search query is required" });
@@ -9687,20 +9687,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const searchQuery = q.trim().toLowerCase();
       const limitNum = Math.min(Math.max(parseInt(limit as string) || 20, 1), 50);
+      const offsetNum = Math.max(parseInt(offset as string) || 0, 0);
       
       // Clean cache periodically
       cleanGifCache();
       
       // Check cache first (public content, same for all authenticated users)
-      const cacheKey = `search:${searchQuery}:${limitNum}:${pos || ""}`;
+      const cacheKey = `search:${searchQuery}:${limitNum}:${offsetNum}`;
       const cached = gifCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < GIF_CACHE_TTL) {
         return res.json(cached.data);
       }
       
-      // Get Tenor API key from environment
-      const tenorApiKey = process.env.TENOR_API_KEY;
-      if (!tenorApiKey) {
+      // Get Giphy API key from environment
+      const giphyApiKey = process.env.GIPHY_API_KEY;
+      if (!giphyApiKey) {
         return res.status(503).json({ 
           error: "GIF service not configured. Please contact administrator.",
           results: [],
@@ -9708,24 +9709,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Build Tenor API request
+      // Build Giphy API request
       const params = new URLSearchParams({
-        key: tenorApiKey,
+        api_key: giphyApiKey,
         q: searchQuery,
         limit: limitNum.toString(),
-        contentfilter: "high", // Strict content filter for healthcare environment
-        media_filter: "gif,tinygif,mp4", // Reduce response size
-        client_key: "empowerlink_crm"
+        offset: offsetNum.toString(),
+        rating: "g", // G-rated content for healthcare environment
+        lang: "en"
       });
       
-      if (pos) {
-        params.append("pos", pos as string);
-      }
-      
-      const response = await fetch(`https://tenor.googleapis.com/v2/search?${params}`);
+      const response = await fetch(`https://api.giphy.com/v1/gifs/search?${params}`);
       
       if (!response.ok) {
-        console.error("Tenor API error:", response.status, await response.text());
+        console.error("Giphy API error:", response.status, await response.text());
         return res.status(502).json({ error: "Failed to fetch GIFs from external service" });
       }
       
@@ -9733,17 +9730,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Transform response for frontend consumption
       const result = {
-        results: (data.results || []).map((gif: any) => ({
+        results: (data.data || []).map((gif: any) => ({
           id: gif.id,
           title: gif.title || "",
-          url: gif.media_formats?.gif?.url || "",
-          previewUrl: gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url || "",
-          mp4Url: gif.media_formats?.mp4?.url || "",
-          width: gif.media_formats?.gif?.dims?.[0] || 0,
-          height: gif.media_formats?.gif?.dims?.[1] || 0,
-          size: gif.media_formats?.gif?.size || 0
+          url: gif.images?.original?.url || "",
+          previewUrl: gif.images?.fixed_width_small?.url || gif.images?.preview_gif?.url || "",
+          mp4Url: gif.images?.original_mp4?.mp4 || "",
+          width: parseInt(gif.images?.original?.width) || 0,
+          height: parseInt(gif.images?.original?.height) || 0,
+          size: parseInt(gif.images?.original?.size) || 0
         })),
-        next: data.next || ""
+        next: data.pagination?.offset + limitNum < data.pagination?.total_count 
+          ? String(offsetNum + limitNum) 
+          : ""
       };
       
       // Cache the result
@@ -9764,21 +9763,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       
-      const { limit = "20", pos } = req.query;
+      const { limit = "20", offset = "0" } = req.query;
       const limitNum = Math.min(Math.max(parseInt(limit as string) || 20, 1), 50);
+      const offsetNum = Math.max(parseInt(offset as string) || 0, 0);
       
       // Clean cache periodically
       cleanGifCache();
       
       // Check cache first (public content, same for all authenticated users)
-      const cacheKey = `trending:${limitNum}:${pos || ""}`;
+      const cacheKey = `trending:${limitNum}:${offsetNum}`;
       const cached = gifCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < GIF_CACHE_TTL) {
         return res.json(cached.data);
       }
       
-      const tenorApiKey = process.env.TENOR_API_KEY;
-      if (!tenorApiKey) {
+      const giphyApiKey = process.env.GIPHY_API_KEY;
+      if (!giphyApiKey) {
         return res.status(503).json({ 
           error: "GIF service not configured. Please contact administrator.",
           results: [],
@@ -9787,38 +9787,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const params = new URLSearchParams({
-        key: tenorApiKey,
+        api_key: giphyApiKey,
         limit: limitNum.toString(),
-        contentfilter: "high",
-        media_filter: "gif,tinygif,mp4",
-        client_key: "empowerlink_crm"
+        offset: offsetNum.toString(),
+        rating: "g" // G-rated content for healthcare environment
       });
       
-      if (pos) {
-        params.append("pos", pos as string);
-      }
-      
-      const response = await fetch(`https://tenor.googleapis.com/v2/featured?${params}`);
+      const response = await fetch(`https://api.giphy.com/v1/gifs/trending?${params}`);
       
       if (!response.ok) {
-        console.error("Tenor API error:", response.status, await response.text());
+        console.error("Giphy API error:", response.status, await response.text());
         return res.status(502).json({ error: "Failed to fetch trending GIFs" });
       }
       
       const data = await response.json();
       
       const result = {
-        results: (data.results || []).map((gif: any) => ({
+        results: (data.data || []).map((gif: any) => ({
           id: gif.id,
           title: gif.title || "",
-          url: gif.media_formats?.gif?.url || "",
-          previewUrl: gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url || "",
-          mp4Url: gif.media_formats?.mp4?.url || "",
-          width: gif.media_formats?.gif?.dims?.[0] || 0,
-          height: gif.media_formats?.gif?.dims?.[1] || 0,
-          size: gif.media_formats?.gif?.size || 0
+          url: gif.images?.original?.url || "",
+          previewUrl: gif.images?.fixed_width_small?.url || gif.images?.preview_gif?.url || "",
+          mp4Url: gif.images?.original_mp4?.mp4 || "",
+          width: parseInt(gif.images?.original?.width) || 0,
+          height: parseInt(gif.images?.original?.height) || 0,
+          size: parseInt(gif.images?.original?.size) || 0
         })),
-        next: data.next || ""
+        next: data.pagination?.offset + limitNum < data.pagination?.total_count 
+          ? String(offsetNum + limitNum) 
+          : ""
       };
       
       gifCache.set(cacheKey, { data: result, timestamp: Date.now() });
@@ -9830,7 +9827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get GIF categories/suggestions
+  // Get GIF categories/suggestions - Common categories for healthcare environment
   app.get("/api/chat/gifs/categories", requireAuth, async (req: any, res) => {
     try {
       const userContext = getUserContext(req);
@@ -9838,49 +9835,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       
-      // Clean cache periodically
-      cleanGifCache();
-      
-      // Check cache (public content, same for all authenticated users)
-      const cacheKey = "categories";
-      const cached = gifCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < GIF_CACHE_TTL) {
-        return res.json(cached.data);
-      }
-      
-      const tenorApiKey = process.env.TENOR_API_KEY;
-      if (!tenorApiKey) {
-        return res.status(503).json({ 
-          error: "GIF service not configured",
-          categories: []
-        });
-      }
-      
-      const params = new URLSearchParams({
-        key: tenorApiKey,
-        contentfilter: "high",
-        client_key: "empowerlink_crm"
-      });
-      
-      const response = await fetch(`https://tenor.googleapis.com/v2/categories?${params}`);
-      
-      if (!response.ok) {
-        console.error("Tenor API error:", response.status, await response.text());
-        return res.status(502).json({ error: "Failed to fetch GIF categories" });
-      }
-      
-      const data = await response.json();
-      
+      // Return curated categories suitable for healthcare/professional environment
+      // These are static as Giphy doesn't have a categories endpoint like Tenor
       const result = {
-        categories: (data.tags || []).map((tag: any) => ({
-          searchterm: tag.searchterm,
-          path: tag.path,
-          image: tag.image,
-          name: tag.name || tag.searchterm
-        }))
+        categories: [
+          { searchterm: "thank you", name: "Thank You" },
+          { searchterm: "great job", name: "Great Job" },
+          { searchterm: "congratulations", name: "Congratulations" },
+          { searchterm: "thumbs up", name: "Thumbs Up" },
+          { searchterm: "happy", name: "Happy" },
+          { searchterm: "welcome", name: "Welcome" },
+          { searchterm: "good morning", name: "Good Morning" },
+          { searchterm: "celebration", name: "Celebration" },
+          { searchterm: "high five", name: "High Five" },
+          { searchterm: "applause", name: "Applause" },
+          { searchterm: "love", name: "Love" },
+          { searchterm: "laughing", name: "Laughing" }
+        ]
       };
-      
-      gifCache.set(cacheKey, { data: result, timestamp: Date.now() });
       
       res.json(result);
     } catch (error) {

@@ -3091,6 +3091,14 @@ export const chatMessages = pgTable("chat_messages", {
   deletedById: varchar("deleted_by_id"),
   deletedByName: text("deleted_by_name"),
   
+  // Staff mentions (@mentions)
+  mentions: json("mentions").$type<{
+    staffId: string;
+    staffName: string;
+    startIndex: number;
+    endIndex: number;
+  }[]>(),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -3114,6 +3122,12 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages, {
     originalMessageType: z.string(),
     originalCreatedAt: z.string(),
   }).optional(),
+  mentions: z.array(z.object({
+    staffId: z.string(),
+    staffName: z.string(),
+    startIndex: z.number(),
+    endIndex: z.number(),
+  })).optional(),
 }).omit({
   id: true,
   createdAt: true,
