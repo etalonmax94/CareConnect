@@ -1543,10 +1543,10 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     <>
       <Form {...form}>
         <div className="max-w-4xl mx-auto px-2 sm:px-4">
-          {/* Step labels and progress bar - inline layout */}
-          <div className="mb-4">
-            {/* Step labels row - aligned with progress bar segments */}
-            <div className="flex justify-between mb-2">
+          {/* Step labels and progress bar - compact layout */}
+          <div className="mb-3">
+            {/* Step labels row - compact */}
+            <div className="flex justify-between mb-1.5">
               {WIZARD_STEPS.map((step, index) => {
                 const StepIcon = step.icon;
                 const isComplete = index < currentStep;
@@ -1559,7 +1559,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                     onClick={() => goToStep(index)}
                     disabled={index > currentStep}
                     className={cn(
-                      "flex flex-col items-center gap-1 px-1 py-1 rounded-lg text-xs transition-all flex-1",
+                      "flex flex-col items-center gap-0.5 px-0.5 py-0.5 rounded-md text-xs transition-all flex-1",
                       isCurrent && "text-primary font-semibold",
                       isComplete && "text-primary cursor-pointer hover:bg-primary/10",
                       !isCurrent && !isComplete && "text-muted-foreground cursor-not-allowed opacity-50"
@@ -1567,72 +1567,72 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                     data-testid={`step-${step.id}`}
                   >
                     <div className={cn(
-                      "flex items-center justify-center w-7 h-7 rounded-full transition-all",
-                      isCurrent && "bg-primary text-primary-foreground shadow-md",
+                      "flex items-center justify-center w-5 h-5 rounded-full transition-all",
+                      isCurrent && "bg-primary text-primary-foreground shadow-sm",
                       isComplete && "bg-primary/20 text-primary",
                       !isCurrent && !isComplete && "bg-muted text-muted-foreground"
                     )}>
                       {isComplete ? (
-                        <Check className="w-4 h-4" />
+                        <Check className="w-3 h-3" />
                       ) : (
-                        <StepIcon className="w-4 h-4" />
+                        <StepIcon className="w-3 h-3" />
                       )}
                     </div>
-                    <span className="hidden sm:block text-[10px] leading-tight text-center">{step.title}</span>
+                    <span className="hidden sm:block text-[9px] leading-tight text-center">{step.title}</span>
                   </button>
                 );
               })}
             </div>
             
-            {/* Progress bar */}
-            <Progress value={progress} className="h-2" />
+            {/* Progress bar - thinner */}
+            <Progress value={progress} className="h-1" />
             
-            {/* Progress text */}
-            <div className="flex items-center justify-between mt-1.5">
-              <span className="text-xs text-muted-foreground">Step {currentStep + 1} of {WIZARD_STEPS.length}</span>
-              <span className="text-xs text-muted-foreground">{Math.round(progress)}% complete</span>
+            {/* Progress text - more compact */}
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-[10px] text-muted-foreground">Step {currentStep + 1}/{WIZARD_STEPS.length}</span>
+              <span className="text-[10px] text-muted-foreground">{Math.round(progress)}%</span>
             </div>
           </div>
 
-          {/* Main wizard layout with vertical side buttons */}
-          <div className="flex items-stretch gap-3">
-            {/* Left navigation button - Back/Cancel */}
+          {/* Main wizard layout with vertical side buttons - compact */}
+          <div className="flex items-stretch gap-2">
+            {/* Left navigation button - Back/Cancel - slimmer */}
             <button
               type="button"
               onClick={currentStep === 0 ? onCancel : goBack}
               className={cn(
-                "hidden sm:flex flex-col items-center justify-center gap-2 w-14 min-h-[480px] rounded-xl border-2 transition-all duration-200",
+                "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
                 "bg-background hover:bg-muted/50 border-border hover:border-primary/30",
                 "text-muted-foreground hover:text-foreground",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
               )}
               data-testid="button-back"
             >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="text-xs font-medium [writing-mode:vertical-rl] rotate-180">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-[10px] font-medium [writing-mode:vertical-rl] rotate-180">
                 {currentStep === 0 ? "Cancel" : "Back"}
               </span>
             </button>
 
-            {/* Center Card - Fixed height with scrollable content */}
-            <Card className="flex-1 flex flex-col h-[480px] overflow-hidden">
-              <CardHeader className="flex-shrink-0 pb-3 border-b">
-                <div className="flex items-center gap-3">
+            {/* Center Card - Dynamic height with min/max constraints */}
+            <Card className="flex-1 flex flex-col min-h-[380px] max-h-[500px] overflow-hidden">
+              <CardHeader className="flex-shrink-0 py-2 px-4 border-b">
+                <div className="flex items-center gap-2">
                   {(() => {
                     const StepIcon = WIZARD_STEPS[currentStep].icon;
                     return (
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <StepIcon className="w-5 h-5 text-primary" />
+                      <div className="p-1.5 rounded-md bg-primary/10">
+                        <StepIcon className="w-4 h-4 text-primary" />
                       </div>
                     );
                   })()}
                   <div>
-                    <CardTitle className="text-lg">{WIZARD_STEPS[currentStep].title}</CardTitle>
-                    <CardDescription className="text-xs">{WIZARD_STEPS[currentStep].description}</CardDescription>
+                    <CardTitle className="text-base">{WIZARD_STEPS[currentStep].title}</CardTitle>
+                    <CardDescription className="text-[10px]">{WIZARD_STEPS[currentStep].description}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto pt-4 pb-4">
+              <CardContent className="flex-1 overflow-y-auto py-3 px-4">
                 <AnimatePresence mode="wait" custom={direction}>
                   <motion.div
                     key={currentStep}
@@ -1649,14 +1649,14 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
               </CardContent>
             </Card>
 
-            {/* Right navigation button - Next/Create */}
+            {/* Right navigation button - Next/Create - slimmer */}
             {currentStep === WIZARD_STEPS.length - 1 ? (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-2 w-14 min-h-[480px] rounded-xl border-2 transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
                   isSubmitting && "opacity-70 cursor-not-allowed"
@@ -1664,12 +1664,12 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 data-testid="button-create-client"
               >
                 {isSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Check className="w-5 h-5" />
+                  <Check className="w-4 h-4" />
                 )}
-                <span className="text-xs font-medium [writing-mode:vertical-rl] rotate-180">
-                  {isSubmitting ? "Creating..." : "Create"}
+                <span className="text-[10px] font-medium [writing-mode:vertical-rl] rotate-180">
+                  {isSubmitting ? "..." : "Create"}
                 </span>
               </button>
             ) : (
@@ -1677,14 +1677,14 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 type="button"
                 onClick={goNext}
                 className={cn(
-                  "hidden sm:flex flex-col items-center justify-center gap-2 w-14 min-h-[480px] rounded-xl border-2 transition-all duration-200",
+                  "hidden sm:flex flex-col items-center justify-center gap-1.5 w-10 min-h-[420px] rounded-lg border transition-all duration-200",
                   "bg-primary hover:bg-primary/90 border-primary text-primary-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 )}
                 data-testid="button-next"
               >
-                <ArrowRight className="w-5 h-5" />
-                <span className="text-xs font-medium [writing-mode:vertical-rl] rotate-180">Next</span>
+                <ArrowRight className="w-4 h-4" />
+                <span className="text-[10px] font-medium [writing-mode:vertical-rl] rotate-180">Next</span>
               </button>
             )}
           </div>
