@@ -1438,6 +1438,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req
       });
       
+      // Auto-create client chat room for the new client with retry
+      const createChatRoomWithRetry = async (maxRetries = 3) => {
+        const createdById = (req.session as any)?.user?.id || "system";
+        const createdByName = (req.session as any)?.user?.displayName || "System";
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            await storage.createClientChatRoom(
+              client.id, 
+              client.participantName, 
+              createdById, 
+              createdByName
+            );
+            console.log(`Auto-created chat room for client ${client.participantName}`);
+            return true;
+          } catch (chatError) {
+            console.warn(`Chat room creation attempt ${attempt}/${maxRetries} failed:`, chatError);
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+            }
+          }
+        }
+        console.error(`Failed to auto-create client chat room after ${maxRetries} attempts`);
+        return false;
+      };
+      
+      // Run async but don't block client creation
+      createChatRoomWithRetry().catch(err => 
+        console.error("Chat room creation error:", err)
+      );
+      
       const clientWithAge = {
         ...client,
         age: calculateAge(client.dateOfBirth)
@@ -3854,6 +3885,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         performedBy: "System"
       });
       
+      // Auto-sync client chat room participants after new assignment
+      try {
+        // Ensure client chat room exists (lazy creation with retry)
+        const client = await storage.getClientById(req.params.clientId);
+        if (client) {
+          const performedBy = (req.session as any)?.user?.displayName || "System";
+          const performedById = (req.session as any)?.user?.id || "system";
+          let roomCreated = false;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              await storage.createClientChatRoom(req.params.clientId, client.participantName, performedById, performedBy);
+              roomCreated = true;
+              break;
+            } catch (roomError) {
+              console.warn(`Lazy chat room creation attempt ${attempt}/3 failed:`, roomError);
+              if (attempt < 3) await new Promise(r => setTimeout(r, 100 * attempt));
+            }
+          }
+          if (!roomCreated) {
+            console.error("Could not create/verify chat room for sync - skipping sync");
+            throw new Error("Chat room not available");
+          }
+        }
+        
+        const allAssignments = await storage.getAssignmentsByClient(req.params.clientId);
+        // Fetch staff details - skip staff that can't be resolved
+        const assignedStaff: { id: string; name: string; email?: string }[] = [];
+        for (const a of allAssignments) {
+          try {
+            const staffMember = await storage.getStaffById(a.staffId);
+            if (staffMember?.name) {
+              assignedStaff.push({
+                id: a.staffId,
+                name: staffMember.name,
+                email: staffMember.email
+              });
+            } else {
+              console.warn(`Staff ${a.staffId} has no name - skipping from sync`);
+            }
+          } catch (staffError) {
+            console.warn(`Failed to fetch staff ${a.staffId} - skipping from sync:`, staffError);
+          }
+        }
+        await storage.syncClientChatParticipants(req.params.clientId, assignedStaff);
+        console.log(`Synced ${assignedStaff.length} chat participants for client ${req.params.clientId}`);
+      } catch (chatError) {
+        console.error("Failed to sync chat participants:", chatError);
+      }
+      
       res.status(201).json(assignment);
     } catch (error) {
       console.error("Error creating assignment:", error);
@@ -3878,10 +3958,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete assignment
   app.delete("/api/assignments/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteAssignment(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Assignment not found" });
+      // First get the assignment to know which client it belongs to (for sync purposes)
+      const assignment = await storage.getAssignmentById(req.params.id);
+      
+      // If assignment doesn't exist, return 204 for idempotent behavior
+      if (!assignment) {
+        return res.status(204).send();
       }
+      
+      const clientId = assignment.clientId;
+      
+      const deleted = await storage.deleteAssignment(req.params.id);
+      // Already checked existence above, so deleted should be true
+      // But if somehow it fails, still return 204 for idempotency
+      if (!deleted) {
+        return res.status(204).send();
+      }
+      
+      // Auto-sync client chat room participants after assignment removal
+      try {
+        const remainingAssignments = await storage.getAssignmentsByClient(clientId);
+        // Fetch staff details - skip staff that can't be resolved
+        const assignedStaff: { id: string; name: string; email?: string }[] = [];
+        for (const a of remainingAssignments) {
+          try {
+            const staffMember = await storage.getStaffById(a.staffId);
+            if (staffMember?.name) {
+              assignedStaff.push({
+                id: a.staffId,
+                name: staffMember.name,
+                email: staffMember.email
+              });
+            } else {
+              console.warn(`Staff ${a.staffId} has no name - skipping from sync`);
+            }
+          } catch (staffError) {
+            console.warn(`Failed to fetch staff ${a.staffId} - skipping from sync:`, staffError);
+          }
+        }
+        await storage.syncClientChatParticipants(clientId, assignedStaff);
+        console.log(`Synced ${assignedStaff.length} chat participants for client ${clientId} after removal`);
+      } catch (chatError) {
+        console.error("Failed to sync chat participants:", chatError);
+      }
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting assignment:", error);
