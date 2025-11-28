@@ -1843,7 +1843,23 @@ export type CarePlanEmergencyProcedure = typeof carePlanEmergencyProcedures.$inf
 
 // Form Template Status
 export type FormTemplateStatus = "draft" | "active" | "archived";
-export type FormFieldType = "text" | "textarea" | "number" | "date" | "time" | "datetime" | "checkbox" | "radio" | "select" | "multiselect" | "signature" | "file" | "section_header" | "paragraph";
+// Field types for customizable forms
+// Basic inputs: text, textarea, email, number
+// Date/time: date, time, datetime
+// Selection: yes_no (boolean), checkbox, radio, select, multiselect
+// Advanced: signature, file, image_upload, video_upload, audio
+// Interactive: rating, slider, scanner, location, image_selection
+// Computed: formula (calculated fields)
+// Layout: section_header, paragraph, group (field grouping)
+// Tasks: task (assignable checklist item)
+export type FormFieldType = 
+  | "text" | "textarea" | "email" | "number"
+  | "date" | "time" | "datetime"
+  | "yes_no" | "checkbox" | "radio" | "select" | "multiselect"
+  | "signature" | "file" | "image_upload" | "video_upload" | "audio"
+  | "rating" | "slider" | "scanner" | "location" | "image_selection"
+  | "formula" | "task"
+  | "section_header" | "paragraph" | "group";
 export type FormSubmissionStatus = "draft" | "submitted" | "voided";
 
 // Form Templates - Reusable form definitions
@@ -1904,12 +1920,43 @@ export const formTemplateFields = pgTable("form_template_fields", {
   maxValue: text("max_value"),
   pattern: text("pattern"), // Regex pattern
   
-  // For select/radio/checkbox options
+  // For select/radio/checkbox/yes_no options
   options: json("options").$type<{ value: string; label: string }[]>(),
   
-  // For file uploads
+  // For file/image/video/audio uploads
   acceptedFileTypes: text("accepted_file_types"), // e.g., ".pdf,.jpg,.png"
   maxFileSize: text("max_file_size"), // in MB
+  
+  // For rating fields
+  ratingMax: text("rating_max"), // Max rating value (e.g., "5" for 5-star rating)
+  ratingStyle: text("rating_style").$type<"stars" | "numbers" | "emoji">(), // Visual style
+  
+  // For slider fields
+  sliderMin: text("slider_min"),
+  sliderMax: text("slider_max"),
+  sliderStep: text("slider_step"),
+  sliderUnit: text("slider_unit"), // e.g., "%", "kg", "cm"
+  
+  // For formula/computed fields
+  formula: text("formula"), // Expression using other fieldKeys, e.g., "field1 + field2"
+  formulaFormat: text("formula_format"), // Output format: number, currency, percentage
+  
+  // For image_selection fields
+  imageOptions: json("image_options").$type<{ value: string; label: string; imageUrl: string }[]>(),
+  
+  // For task fields
+  taskAssignedTo: text("task_assigned_to"), // Staff ID or role
+  taskDueOffset: text("task_due_offset"), // Days from form submission
+  
+  // For scanner fields
+  scannerType: text("scanner_type").$type<"barcode" | "qrcode" | "both">(),
+  
+  // For yes_no fields - optional labels
+  yesLabel: text("yes_label"), // Custom label for "Yes" option
+  noLabel: text("no_label"), // Custom label for "No" option
+  
+  // For group fields - contains child fieldKeys
+  groupFieldKeys: json("group_field_keys").$type<string[]>(),
   
   // Layout
   section: text("section"),
@@ -1919,16 +1966,33 @@ export const formTemplateFields = pgTable("form_template_fields", {
   // Conditional display
   conditionalOn: text("conditional_on"), // fieldKey to depend on
   conditionalValue: text("conditional_value"), // value that triggers display
+  conditionalOperator: text("conditional_operator").$type<"equals" | "not_equals" | "contains" | "greater_than" | "less_than">(), // Condition operator
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// All valid form field types for validation
+const formFieldTypeValues = [
+  "text", "textarea", "email", "number",
+  "date", "time", "datetime",
+  "yes_no", "checkbox", "radio", "select", "multiselect",
+  "signature", "file", "image_upload", "video_upload", "audio",
+  "rating", "slider", "scanner", "location", "image_selection",
+  "formula", "task",
+  "section_header", "paragraph", "group"
+] as const;
+
 export const insertFormTemplateFieldSchema = createInsertSchema(formTemplateFields, {
-  fieldType: z.enum(["text", "textarea", "number", "date", "time", "datetime", "checkbox", "radio", "select", "multiselect", "signature", "file", "section_header", "paragraph"]),
+  fieldType: z.enum(formFieldTypeValues),
   isRequired: z.enum(["yes", "no"]).optional(),
   width: z.enum(["full", "half", "third"]).optional(),
   options: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+  ratingStyle: z.enum(["stars", "numbers", "emoji"]).optional().nullable(),
+  scannerType: z.enum(["barcode", "qrcode", "both"]).optional().nullable(),
+  conditionalOperator: z.enum(["equals", "not_equals", "contains", "greater_than", "less_than"]).optional().nullable(),
+  imageOptions: z.array(z.object({ value: z.string(), label: z.string(), imageUrl: z.string() })).optional(),
+  groupFieldKeys: z.array(z.string()).optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -1960,6 +2024,20 @@ export const formSubmissions = pgTable("form_submissions", {
   // Link to appointment if applicable
   appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
   
+  // Expiry/validity tracking for compliance
+  expiryDate: text("expiry_date"), // Date when form expires and needs renewal
+  validityPeriod: text("validity_period").$type<"annual" | "6-monthly" | "as-needed">(), // How long form is valid
+  
+  // Australian Privacy Act compliant archiving (7-year retention)
+  isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
+  archivedAt: timestamp("archived_at"),
+  archivedById: varchar("archived_by_id").references(() => users.id, { onDelete: "set null" }),
+  archivedByName: text("archived_by_name"),
+  retentionExpiresAt: timestamp("retention_expires_at"), // 7 years from submission date
+  
+  // Document type link for auto-updating client compliance dates
+  linkedDocumentType: text("linked_document_type"), // e.g., "serviceAgreement", "consentForm", "riskAssessment"
+  
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1967,6 +2045,8 @@ export const formSubmissions = pgTable("form_submissions", {
 
 export const insertFormSubmissionSchema = createInsertSchema(formSubmissions, {
   status: z.enum(["draft", "submitted", "voided"]).optional(),
+  validityPeriod: z.enum(["annual", "6-monthly", "as-needed"]).optional().nullable(),
+  isArchived: z.enum(["yes", "no"]).optional(),
 }).omit({
   id: true,
   createdAt: true,
