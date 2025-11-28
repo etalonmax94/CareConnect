@@ -1437,16 +1437,55 @@ export default function Chat() {
                           
                           <div className="flex items-end gap-1">
                             <div
-                              className={`rounded-2xl px-4 py-2.5 shadow-sm ${
+                              className={`rounded-2xl shadow-sm ${
                                 isDeleted
-                                  ? "bg-muted/30 text-muted-foreground italic"
-                                  : isOwn
-                                    ? "bg-primary text-primary-foreground rounded-br-md"
-                                    : "bg-white dark:bg-muted border border-border/40 rounded-bl-md"
+                                  ? "bg-muted/30 text-muted-foreground italic px-4 py-2.5"
+                                  : (message as any).attachmentUrl && ((message as any).messageType === "gif" || (message as any).messageType === "image" || (message as any).messageType === "video")
+                                    ? "overflow-hidden p-1"
+                                    : isOwn
+                                      ? "bg-primary text-primary-foreground rounded-br-md px-4 py-2.5"
+                                      : "bg-white dark:bg-muted border border-border/40 rounded-bl-md px-4 py-2.5"
                               }`}
                             >
                               {isDeleted ? (
                                 <p className="text-sm">This message was deleted</p>
+                              ) : (message as any).attachmentUrl && (message as any).messageType === "gif" ? (
+                                <img 
+                                  src={(message as any).attachmentUrl} 
+                                  alt={(message as any).attachmentName || "GIF"}
+                                  className="max-w-[280px] max-h-[200px] rounded-xl object-contain"
+                                  loading="lazy"
+                                  data-testid={`gif-message-${message.id}`}
+                                />
+                              ) : (message as any).attachmentUrl && (message as any).messageType === "image" ? (
+                                <img 
+                                  src={(message as any).attachmentUrl} 
+                                  alt={(message as any).attachmentName || "Image"}
+                                  className="max-w-[280px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                  loading="lazy"
+                                  onClick={() => window.open((message as any).attachmentUrl, '_blank')}
+                                  data-testid={`image-message-${message.id}`}
+                                />
+                              ) : (message as any).attachmentUrl && (message as any).messageType === "video" ? (
+                                <video 
+                                  src={(message as any).attachmentUrl} 
+                                  controls
+                                  className="max-w-[280px] max-h-[200px] rounded-xl"
+                                  data-testid={`video-message-${message.id}`}
+                                >
+                                  Your browser does not support the video tag.
+                                </video>
+                              ) : (message as any).attachmentUrl && (message as any).messageType === "file" ? (
+                                <a 
+                                  href={(message as any).attachmentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 text-[14px] hover:underline"
+                                  data-testid={`file-message-${message.id}`}
+                                >
+                                  <Paperclip className="h-4 w-4" />
+                                  {(message as any).attachmentName || "Download file"}
+                                </a>
                               ) : (
                                 <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
                                   {renderMessageContent(message.content || "", isOwn)}

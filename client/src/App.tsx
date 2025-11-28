@@ -44,6 +44,7 @@ import Notifications from "@/pages/Notifications";
 import SchedulingConflicts from "@/pages/SchedulingConflicts";
 import NotFound from "@/pages/not-found";
 import NotificationBell from "@/components/NotificationBell";
+import QuickChatPanel from "@/components/QuickChatPanel";
 import HelpWidget from "@/components/HelpWidget";
 import { Loader2, ExternalLink, Calendar, Mail } from "lucide-react";
 
@@ -183,6 +184,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
                   <p>Open Connecteam</p>
                 </TooltipContent>
               </Tooltip>
+              <QuickChatPanel userId={user.id} userName={user.displayName} />
               <NotificationBell userId={user.id} userName={user.displayName} />
               <UserProfileDropdown user={user} />
             </div>

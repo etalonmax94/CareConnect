@@ -64,7 +64,10 @@ export default function HelpWidget() {
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  // Hide widget on chat page to avoid overlapping with chat controls
+  const isOnChatPage = location.startsWith("/chat");
 
   // Form state
   const [title, setTitle] = useState("");
@@ -172,6 +175,22 @@ export default function HelpWidget() {
   const formatStatus = (status: string) => {
     return status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
+
+  // Don't render the floating button on chat page to avoid overlap with chat controls
+  // Dialogs can still be triggered from elsewhere if needed
+  if (isOnChatPage) {
+    return (
+      <>
+        {/* Dialogs still available if triggered externally */}
+        <Dialog open={showTicketDialog} onOpenChange={setShowTicketDialog}>
+          {/* ... dialog content remains available ... */}
+        </Dialog>
+        <Dialog open={showMyTicketsDialog} onOpenChange={setShowMyTicketsDialog}>
+          {/* ... dialog content remains available ... */}
+        </Dialog>
+      </>
+    );
+  }
 
   return (
     <>
