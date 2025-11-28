@@ -863,11 +863,12 @@ export default function Tasks() {
 
       {/* Create Task Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
             <DialogDescription>Add a new task to track</DialogDescription>
           </DialogHeader>
+          <ScrollArea className="flex-1 max-h-[60vh] pr-4">
           <div className="space-y-4 py-4">
             <div>
               <Label htmlFor="task-title">Title *</Label>
@@ -1062,6 +1063,7 @@ export default function Tasks() {
               </Select>
             </div>
           </div>
+          </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
               Cancel
