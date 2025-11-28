@@ -8890,7 +8890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { roomId } = req.params;
       const userId = req.session?.user?.id;
-      const limit = parseInt(req.query.limit as string) || 50;
+      const limit = Math.min(parseInt(req.query.limit as string) || 100, 100); // Cap at 100 to prevent overwhelming browser
       const before = req.query.before as string | undefined;
 
       const messages = await storage.getChatMessages(roomId, limit, before, userId);
@@ -8900,6 +8900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
+
 
   // Send message (fallback for non-WebSocket clients)
   app.post("/api/chat/rooms/:roomId/messages", requireAuth, async (req: any, res) => {

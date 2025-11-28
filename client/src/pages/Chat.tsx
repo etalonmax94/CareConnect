@@ -201,6 +201,19 @@ export default function Chat() {
     enabled: !!selectedRoomId,
   });
 
+  // Auto-scroll to current search result
+  useEffect(() => {
+    if (searchResults.length > 0 && currentSearchResultIndex >= 0) {
+      const currentMessageId = searchResults[currentSearchResultIndex]?.message.id;
+      if (currentMessageId) {
+        setTimeout(() => {
+          const element = document.querySelector(`[data-testid="message-${currentMessageId}"]`);
+          element?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
+      }
+    }
+  }, [currentSearchResultIndex, searchResults]);
+
   const { data: gifSearchResults = { results: [] }, isFetching: gifSearchLoading } = useQuery<GifSearchResult>({
     queryKey: ["/api/chat/gifs/search", gifSearchQuery],
     enabled: showGifPicker && !!selectedRoomId && gifSearchQuery.length >= 2,
