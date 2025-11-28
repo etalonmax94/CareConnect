@@ -43,10 +43,14 @@ type WizardStep = {
 
 const WIZARD_STEPS: WizardStep[] = [
   { id: "identity", title: "Identity", description: "Name & basic info", icon: User },
-  { id: "contact", title: "Contact", description: "Phone, email & address", icon: Phone },
-  { id: "clinical", title: "Clinical", description: "Medical details", icon: Heart },
-  { id: "services", title: "Services", description: "Service preferences", icon: Settings },
-  { id: "program", title: "Program", description: "Funding details", icon: Briefcase },
+  { id: "contact", title: "Contact", description: "Phone & address", icon: Phone },
+  { id: "emergency", title: "Emergency", description: "Next of Kin & EPOA", icon: Shield },
+  { id: "medical", title: "Medical", description: "Diagnosis & allergies", icon: Heart },
+  { id: "lifestyle", title: "Lifestyle", description: "Patterns & notes", icon: Settings },
+  { id: "frat", title: "Falls Risk", description: "FRAT assessment", icon: AlertTriangle },
+  { id: "preferences", title: "Preferences", description: "Cultural & hobbies", icon: Target },
+  { id: "services", title: "Services", description: "Service type", icon: Briefcase },
+  { id: "program", title: "Program", description: "Funding details", icon: Building2 },
   { id: "team", title: "Care Team", description: "Assign providers", icon: Users },
   { id: "review", title: "Review", description: "Confirm details", icon: FileCheck },
 ];
@@ -134,7 +138,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     const fieldsToValidate = getFieldsForStep(currentStep);
     const isValid = await form.trigger(fieldsToValidate as any);
     
-    if (currentStep === 1) {
+    if (currentStep === 2) {
       const nokValue = [nokName, nokRelationship, nokPhone].filter(Boolean).join(" - ");
       const epoaValue = [epoaName, epoaRelationship, epoaPhone].filter(Boolean).join(" - ");
       form.setValue("nokEpoa", nokValue || null);
@@ -162,15 +166,16 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
   const getFieldsForStep = (step: number): string[] => {
     switch (step) {
       case 0: return ["firstName", "lastName", "category", "dateOfBirth"];
-      case 1: return ["phoneNumber", "email", "streetAddress", "suburb", "state", "postcode"];
-      case 2: return ["mainDiagnosis", "allergies", "advancedCareDirective"];
-      case 3: return ["serviceType", "frequencyOfServices", "communicationNeeds"];
-      case 4: return selectedCategory === "NDIS" 
-        ? ["ndisDetails.ndisNumber", "ndisDetails.ndisFundingType"] 
-        : selectedCategory === "Support at Home" 
-          ? ["supportAtHomeDetails.sahNumber"] 
-          : ["privateClientDetails.paymentMethod"];
+      case 1: return [];
+      case 2: return [];
+      case 3: return [];
+      case 4: return [];
       case 5: return [];
+      case 6: return [];
+      case 7: return [];
+      case 8: return [];
+      case 9: return [];
+      case 10: return [];
       default: return [];
     }
   };
@@ -399,7 +404,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
 
       case "contact":
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -508,9 +513,12 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 )}
               />
             </div>
+          </div>
+        );
 
-            <Separator className="my-4" />
-
+      case "emergency":
+        return (
+          <div className="space-y-4">
             <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-center gap-2 mb-3">
                 <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -593,9 +601,9 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
           </div>
         );
 
-      case "clinical":
+      case "medical":
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <FormField
               control={form.control}
               name="mainDiagnosis"
@@ -660,9 +668,12 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                 </FormItem>
               )}
             />
+          </div>
+        );
 
-            <Separator className="my-4" />
-            <h4 className="text-sm font-medium mb-3">Lifestyle Patterns</h4>
+      case "lifestyle":
+        return (
+          <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
@@ -671,7 +682,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   <FormItem>
                     <FormLabel>Diet</FormLabel>
                     <FormControl>
-                      <Textarea {...field} value={field.value || ""} placeholder="Dietary patterns, restrictions..." rows={2} data-testid="input-diet" />
+                      <Textarea {...field} value={field.value || ""} placeholder="Dietary patterns, restrictions..." rows={3} data-testid="input-diet" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -684,7 +695,7 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   <FormItem>
                     <FormLabel>Exercise</FormLabel>
                     <FormControl>
-                      <Textarea {...field} value={field.value || ""} placeholder="Physical activity levels..." rows={2} data-testid="input-exercise" />
+                      <Textarea {...field} value={field.value || ""} placeholder="Physical activity levels..." rows={3} data-testid="input-exercise" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -697,141 +708,12 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   <FormItem>
                     <FormLabel>Sleep</FormLabel>
                     <FormControl>
-                      <Textarea {...field} value={field.value || ""} placeholder="Sleep patterns, issues..." rows={2} data-testid="input-sleep" />
+                      <Textarea {...field} value={field.value || ""} placeholder="Sleep patterns, issues..." rows={3} data-testid="input-sleep" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-
-            <Separator className="my-4" />
-            <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                  <h4 className="font-medium text-orange-900 dark:text-orange-100">Falls Risk Assessment (FRAT)</h4>
-                </div>
-                <Badge className={getRiskCategoryColor(fratAssessment.riskCategory)}>
-                  Score: {fratAssessment.totalScore} - {fratAssessment.riskCategory} Risk
-                </Badge>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Recent Falls History</Label>
-                  <RadioGroup
-                    value={String(fratAssessment.recentFalls)}
-                    onValueChange={(value) => {
-                      const updated = { ...fratAssessment, recentFalls: parseInt(value) };
-                      const { totalScore, riskCategory } = calculateFRATScore(updated);
-                      setFratAssessment({ ...updated, totalScore, riskCategory });
-                    }}
-                    className="grid gap-2"
-                  >
-                    {Object.entries(FRAT_LABELS.recentFalls).map(([score, label]) => (
-                      <div key={score} className="flex items-center space-x-2">
-                        <RadioGroupItem value={score} id={`falls-${score}`} />
-                        <Label htmlFor={`falls-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Medications (sedatives, antipsychotics, blood pressure)</Label>
-                  <RadioGroup
-                    value={String(fratAssessment.medications)}
-                    onValueChange={(value) => {
-                      const updated = { ...fratAssessment, medications: parseInt(value) };
-                      const { totalScore, riskCategory } = calculateFRATScore(updated);
-                      setFratAssessment({ ...updated, totalScore, riskCategory });
-                    }}
-                    className="grid gap-2"
-                  >
-                    {Object.entries(FRAT_LABELS.medications).map(([score, label]) => (
-                      <div key={score} className="flex items-center space-x-2">
-                        <RadioGroupItem value={score} id={`meds-${score}`} />
-                        <Label htmlFor={`meds-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Psychological Status</Label>
-                  <RadioGroup
-                    value={String(fratAssessment.psychological)}
-                    onValueChange={(value) => {
-                      const updated = { ...fratAssessment, psychological: parseInt(value) };
-                      const { totalScore, riskCategory } = calculateFRATScore(updated);
-                      setFratAssessment({ ...updated, totalScore, riskCategory });
-                    }}
-                    className="grid gap-2"
-                  >
-                    {Object.entries(FRAT_LABELS.psychological).map(([score, label]) => (
-                      <div key={score} className="flex items-center space-x-2">
-                        <RadioGroupItem value={score} id={`psych-${score}`} />
-                        <Label htmlFor={`psych-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Cognitive Status</Label>
-                  <RadioGroup
-                    value={String(fratAssessment.cognitiveStatus)}
-                    onValueChange={(value) => {
-                      const updated = { ...fratAssessment, cognitiveStatus: parseInt(value) };
-                      const { totalScore, riskCategory } = calculateFRATScore(updated);
-                      setFratAssessment({ ...updated, totalScore, riskCategory });
-                    }}
-                    className="grid gap-2"
-                  >
-                    {Object.entries(FRAT_LABELS.cognitiveStatus).map(([score, label]) => (
-                      <div key={score} className="flex items-center space-x-2">
-                        <RadioGroupItem value={score} id={`cog-${score}`} />
-                        <Label htmlFor={`cog-${score}`} className="text-sm font-normal cursor-pointer">{label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-orange-200 dark:border-orange-700">
-                  <Label className="text-sm font-medium text-red-600 dark:text-red-400">Auto High Risk Triggers</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="dizziness"
-                        checked={fratAssessment.autoHighRiskDizziness}
-                        onCheckedChange={(checked) => {
-                          const updated = { ...fratAssessment, autoHighRiskDizziness: checked as boolean };
-                          const { totalScore, riskCategory } = calculateFRATScore(updated);
-                          setFratAssessment({ ...updated, totalScore, riskCategory });
-                        }}
-                      />
-                      <Label htmlFor="dizziness" className="text-sm font-normal cursor-pointer">
-                        Dizziness / Postural Hypotension
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="functional"
-                        checked={fratAssessment.autoHighRiskFunctionalChange}
-                        onCheckedChange={(checked) => {
-                          const updated = { ...fratAssessment, autoHighRiskFunctionalChange: checked as boolean };
-                          const { totalScore, riskCategory } = calculateFRATScore(updated);
-                          setFratAssessment({ ...updated, totalScore, riskCategory });
-                        }}
-                      />
-                      <Label htmlFor="functional" className="text-sm font-normal cursor-pointer">
-                        Significant Functional Changes (mobility, continence, cognition)
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <FormField
@@ -842,6 +724,198 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   <FormLabel>Clinical Notes</FormLabel>
                   <FormControl>
                     <Textarea {...field} value={field.value || ""} placeholder="Additional clinical information..." rows={3} data-testid="input-clinical-notes" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        );
+
+      case "frat":
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                <h4 className="font-medium">Falls Risk Assessment (FRAT)</h4>
+              </div>
+              <Badge className={getRiskCategoryColor(fratAssessment.riskCategory)}>
+                Score: {fratAssessment.totalScore} - {fratAssessment.riskCategory} Risk
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                <Label className="text-sm font-medium">Recent Falls History</Label>
+                <RadioGroup
+                  value={String(fratAssessment.recentFalls)}
+                  onValueChange={(value) => {
+                    const updated = { ...fratAssessment, recentFalls: parseInt(value) };
+                    const { totalScore, riskCategory } = calculateFRATScore(updated);
+                    setFratAssessment({ ...updated, totalScore, riskCategory });
+                  }}
+                  className="grid gap-1"
+                >
+                  {Object.entries(FRAT_LABELS.recentFalls).map(([score, label]) => (
+                    <div key={score} className="flex items-center space-x-2">
+                      <RadioGroupItem value={score} id={`falls-${score}`} />
+                      <Label htmlFor={`falls-${score}`} className="text-xs font-normal cursor-pointer">{label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                <Label className="text-sm font-medium">Medications</Label>
+                <RadioGroup
+                  value={String(fratAssessment.medications)}
+                  onValueChange={(value) => {
+                    const updated = { ...fratAssessment, medications: parseInt(value) };
+                    const { totalScore, riskCategory } = calculateFRATScore(updated);
+                    setFratAssessment({ ...updated, totalScore, riskCategory });
+                  }}
+                  className="grid gap-1"
+                >
+                  {Object.entries(FRAT_LABELS.medications).map(([score, label]) => (
+                    <div key={score} className="flex items-center space-x-2">
+                      <RadioGroupItem value={score} id={`meds-${score}`} />
+                      <Label htmlFor={`meds-${score}`} className="text-xs font-normal cursor-pointer">{label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                <Label className="text-sm font-medium">Psychological Status</Label>
+                <RadioGroup
+                  value={String(fratAssessment.psychological)}
+                  onValueChange={(value) => {
+                    const updated = { ...fratAssessment, psychological: parseInt(value) };
+                    const { totalScore, riskCategory } = calculateFRATScore(updated);
+                    setFratAssessment({ ...updated, totalScore, riskCategory });
+                  }}
+                  className="grid gap-1"
+                >
+                  {Object.entries(FRAT_LABELS.psychological).map(([score, label]) => (
+                    <div key={score} className="flex items-center space-x-2">
+                      <RadioGroupItem value={score} id={`psych-${score}`} />
+                      <Label htmlFor={`psych-${score}`} className="text-xs font-normal cursor-pointer">{label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                <Label className="text-sm font-medium">Cognitive Status</Label>
+                <RadioGroup
+                  value={String(fratAssessment.cognitiveStatus)}
+                  onValueChange={(value) => {
+                    const updated = { ...fratAssessment, cognitiveStatus: parseInt(value) };
+                    const { totalScore, riskCategory } = calculateFRATScore(updated);
+                    setFratAssessment({ ...updated, totalScore, riskCategory });
+                  }}
+                  className="grid gap-1"
+                >
+                  {Object.entries(FRAT_LABELS.cognitiveStatus).map(([score, label]) => (
+                    <div key={score} className="flex items-center space-x-2">
+                      <RadioGroupItem value={score} id={`cog-${score}`} />
+                      <Label htmlFor={`cog-${score}`} className="text-xs font-normal cursor-pointer">{label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            </div>
+
+            <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+              <Label className="text-sm font-medium text-red-600 dark:text-red-400">Auto High Risk Triggers</Label>
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="dizziness"
+                    checked={fratAssessment.autoHighRiskDizziness}
+                    onCheckedChange={(checked) => {
+                      const updated = { ...fratAssessment, autoHighRiskDizziness: checked as boolean };
+                      const { totalScore, riskCategory } = calculateFRATScore(updated);
+                      setFratAssessment({ ...updated, totalScore, riskCategory });
+                    }}
+                  />
+                  <Label htmlFor="dizziness" className="text-sm font-normal cursor-pointer">
+                    Dizziness / Postural Hypotension
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="functional"
+                    checked={fratAssessment.autoHighRiskFunctionalChange}
+                    onCheckedChange={(checked) => {
+                      const updated = { ...fratAssessment, autoHighRiskFunctionalChange: checked as boolean };
+                      const { totalScore, riskCategory } = calculateFRATScore(updated);
+                      setFratAssessment({ ...updated, totalScore, riskCategory });
+                    }}
+                  />
+                  <Label htmlFor="functional" className="text-sm font-normal cursor-pointer">
+                    Significant Functional Changes
+                  </Label>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "preferences":
+        return (
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="culturalBackground"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cultural Background</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="e.g., Australian, Italian, Vietnamese..." data-testid="input-cultural-background" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="preferredLanguage"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Preferred Language</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="e.g., English, Mandarin, Greek..." data-testid="input-preferred-language" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="hobbies"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hobbies & Interests</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value || ""} placeholder="Reading, gardening, music, sports..." rows={3} data-testid="input-hobbies" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="religiousPreferences"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Religious/Spiritual Preferences</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="e.g., Catholic, Buddhist, No preference..." data-testid="input-religious-preferences" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1247,173 +1321,28 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
 
       case "team":
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Assign care team members (all optional - can be added later)</p>
             
-            <FormField
-              control={form.control}
-              name="careTeam.careManagerId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <User className="w-4 h-4" /> Care Manager
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-care-manager">
-                        <SelectValue placeholder="Select care manager..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {careManagers.map((cm) => (
-                        <SelectItem key={cm.id} value={cm.id}>{cm.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="careTeam.supportCoordinatorId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center justify-between">
-                    <span className="flex items-center gap-2"><UserCog className="w-4 h-4" /> Support Coordinator</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddScOpen(true)}>
-                      <Plus className="w-3 h-3 mr-1" /> Add New
-                    </Button>
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-support-coordinator">
-                        <SelectValue placeholder="Select coordinator..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {supportCoordinators.map((sc) => (
-                        <SelectItem key={sc.id} value={sc.id}>{sc.name} {sc.organisation && `(${sc.organisation})`}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="generalPractitionerId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center justify-between">
-                    <span className="flex items-center gap-2"><Stethoscope className="w-4 h-4" /> General Practitioner</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddGpOpen(true)}>
-                      <Plus className="w-3 h-3 mr-1" /> Add New
-                    </Button>
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-gp">
-                        <SelectValue placeholder="Select GP..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {gps.map((gp) => (
-                        <SelectItem key={gp.id} value={gp.id}>{gp.name} {gp.practiceName && `(${gp.practiceName})`}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="pharmacyId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center justify-between">
-                    <span className="flex items-center gap-2"><Pill className="w-4 h-4" /> Pharmacy</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddPharmacyOpen(true)}>
-                      <Plus className="w-3 h-3 mr-1" /> Add New
-                    </Button>
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-pharmacy">
-                        <SelectValue placeholder="Select pharmacy..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {pharmacies.map((pharmacy) => (
-                        <SelectItem key={pharmacy.id} value={pharmacy.id}>{pharmacy.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="careTeam.alliedHealthProfessionalId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center justify-between">
-                    <span className="flex items-center gap-2"><Heart className="w-4 h-4" /> Allied Health Professional</span>
-                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddAhOpen(true)}>
-                      <Plus className="w-3 h-3 mr-1" /> Add New
-                    </Button>
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-allied-health">
-                        <SelectValue placeholder="Select professional..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {alliedHealthProfessionals.map((ah) => (
-                        <SelectItem key={ah.id} value={ah.id}>{ah.name} {ah.specialty && `(${ah.specialty})`}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {selectedCategory === "NDIS" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="careTeam.planManagerId"
+                name="careTeam.careManagerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center justify-between">
-                      <span className="flex items-center gap-2"><Briefcase className="w-4 h-4" /> Plan Manager</span>
-                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAddPmOpen(true)}>
-                        <Plus className="w-3 h-3 mr-1" /> Add New
-                      </Button>
+                    <FormLabel className="flex items-center gap-2">
+                      <User className="w-4 h-4" /> Care Manager
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-plan-manager">
-                          <SelectValue placeholder="Select plan manager..." />
+                        <SelectTrigger data-testid="select-care-manager">
+                          <SelectValue placeholder="Select..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {planManagers.map((pm) => (
-                          <SelectItem key={pm.id} value={pm.id}>{pm.name} {pm.organisation && `(${pm.organisation})`}</SelectItem>
+                        {careManagers.map((cm) => (
+                          <SelectItem key={cm.id} value={cm.id}>{cm.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1421,7 +1350,154 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
                   </FormItem>
                 )}
               />
-            )}
+
+              <FormField
+                control={form.control}
+                name="careTeam.supportCoordinatorId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between">
+                      <span className="flex items-center gap-2"><UserCog className="w-4 h-4" /> Support Coordinator</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => setAddScOpen(true)}>
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-support-coordinator">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {supportCoordinators.map((sc) => (
+                          <SelectItem key={sc.id} value={sc.id}>{sc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="generalPractitionerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Stethoscope className="w-4 h-4" /> GP</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => setAddGpOpen(true)}>
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-gp">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {gps.map((gp) => (
+                          <SelectItem key={gp.id} value={gp.id}>{gp.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="pharmacyId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Pill className="w-4 h-4" /> Pharmacy</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => setAddPharmacyOpen(true)}>
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-pharmacy">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {pharmacies.map((pharmacy) => (
+                          <SelectItem key={pharmacy.id} value={pharmacy.id}>{pharmacy.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="careTeam.alliedHealthProfessionalId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Heart className="w-4 h-4" /> Allied Health</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => setAddAhOpen(true)}>
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-allied-health">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {alliedHealthProfessionals.map((ah) => (
+                          <SelectItem key={ah.id} value={ah.id}>{ah.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {selectedCategory === "NDIS" && (
+                <FormField
+                  control={form.control}
+                  name="careTeam.planManagerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center justify-between">
+                        <span className="flex items-center gap-2"><Briefcase className="w-4 h-4" /> Plan Manager</span>
+                        <Button type="button" variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => setAddPmOpen(true)}>
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-plan-manager">
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {planManagers.map((pm) => (
+                            <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
           </div>
         );
 
