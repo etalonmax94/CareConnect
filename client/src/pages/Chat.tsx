@@ -649,11 +649,11 @@ export default function Chat() {
       if (!roomId) throw new Error("No room selected");
       
       const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/messages`, {
-        content: "",
+        content: gif.title || "GIF",
+        messageType: "gif",
+        attachmentUrl: gif.url,
+        attachmentName: gif.title || "GIF",
         attachmentType: "gif",
-        gifUrl: gif.url,
-        gifPreviewUrl: gif.previewUrl,
-        gifTitle: gif.title,
       });
       return response.json();
     },

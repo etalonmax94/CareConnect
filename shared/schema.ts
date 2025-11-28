@@ -3103,7 +3103,7 @@ export const chatMessages = pgTable("chat_messages", {
 });
 
 export const insertChatMessageSchema = createInsertSchema(chatMessages, {
-  content: z.string().min(1, "Message cannot be empty"),
+  content: z.string().default(""),
   messageType: z.enum(["text", "system", "file", "image", "video", "gif"]).optional().default("text"),
   replyToId: z.string().optional(),
   replyToPreview: z.string().optional(),
