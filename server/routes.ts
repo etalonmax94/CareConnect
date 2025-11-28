@@ -9023,6 +9023,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle pin status for a chat room
+  app.post("/api/chat/rooms/:roomId/pin", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const participant = await storage.togglePinRoom(roomId, userId);
+      
+      if (!participant) {
+        return res.status(404).json({ error: "Room participant not found" });
+      }
+      
+      res.json({ 
+        success: true, 
+        isPinned: participant.isPinned === "yes" 
+      });
+    } catch (error) {
+      console.error("Error toggling pin:", error);
+      res.status(500).json({ error: "Failed to toggle pin" });
+    }
+  });
+
+  // Toggle mute status for a chat room
+  app.post("/api/chat/rooms/:roomId/mute", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const participant = await storage.toggleMuteRoom(roomId, userId);
+      
+      if (!participant) {
+        return res.status(404).json({ error: "Room participant not found" });
+      }
+      
+      res.json({ 
+        success: true, 
+        isMuted: participant.isMuted === "yes" 
+      });
+    } catch (error) {
+      console.error("Error toggling mute:", error);
+      res.status(500).json({ error: "Failed to toggle mute" });
+    }
+  });
+
   // Get unread count
   app.get("/api/chat/unread", requireAuth, async (req: any, res) => {
     try {

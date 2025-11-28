@@ -637,6 +637,8 @@ export interface IStorage {
   removeChatRoomParticipant(roomId: string, staffId: string): Promise<boolean>;
   updateParticipantRole(roomId: string, staffId: string, role: "admin" | "member"): Promise<ChatRoomParticipant | undefined>;
   updateLastRead(roomId: string, staffId: string): Promise<void>;
+  togglePinRoom(roomId: string, staffId: string): Promise<ChatRoomParticipant | undefined>;
+  toggleMuteRoom(roomId: string, staffId: string): Promise<ChatRoomParticipant | undefined>;
   getUnreadCount(userId: string): Promise<number>;
   isRoomAdmin(roomId: string, staffId: string): Promise<boolean>;
   isRoomParticipant(roomId: string, staffId: string): Promise<boolean>;
@@ -4119,6 +4121,52 @@ export class DbStorage implements IStorage {
         eq(chatRoomParticipants.roomId, roomId),
         eq(chatRoomParticipants.staffId, staffId)
       ));
+  }
+
+  async togglePinRoom(roomId: string, staffId: string): Promise<ChatRoomParticipant | undefined> {
+    // First get current pinned status
+    const [participant] = await db.select().from(chatRoomParticipants)
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ));
+    
+    if (!participant) return undefined;
+    
+    const newPinnedStatus = participant.isPinned === "yes" ? "no" : "yes";
+    
+    const [updated] = await db.update(chatRoomParticipants)
+      .set({ isPinned: newPinnedStatus })
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ))
+      .returning();
+    
+    return updated;
+  }
+
+  async toggleMuteRoom(roomId: string, staffId: string): Promise<ChatRoomParticipant | undefined> {
+    // First get current muted status
+    const [participant] = await db.select().from(chatRoomParticipants)
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ));
+    
+    if (!participant) return undefined;
+    
+    const newMutedStatus = participant.isMuted === "yes" ? "no" : "yes";
+    
+    const [updated] = await db.update(chatRoomParticipants)
+      .set({ isMuted: newMutedStatus })
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ))
+      .returning();
+    
+    return updated;
   }
 
   async getUnreadCount(userId: string): Promise<number> {
