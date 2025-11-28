@@ -1479,7 +1479,7 @@ export default function Chat() {
                                     : isForwarded
                                       ? "bg-green-100 dark:bg-green-900/30 text-foreground rounded-bl-md px-4 py-2.5"
                                       : isOwn
-                                        ? "bg-slate-300 dark:bg-slate-600 text-foreground rounded-br-md px-4 py-2.5"
+                                        ? "bg-white dark:bg-slate-200 text-black dark:text-black rounded-br-md px-4 py-2.5"
                                         : "bg-blue-500 dark:bg-blue-600 text-white rounded-bl-md px-4 py-2.5"
                               }`}
                             >
