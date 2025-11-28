@@ -6234,7 +6234,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validationResult.success) {
         return res.status(400).json({ error: fromZodError(validationResult.error).toString() });
       }
-      const submission = await storage.createFormSubmission(validationResult.data);
+      
+      // Calculate expiry date based on validity period
+      let expiryDate: string | undefined;
+      if (validationResult.data.validityPeriod) {
+        const baseDate = new Date();
+        if (validationResult.data.validityPeriod === "annual") {
+          baseDate.setFullYear(baseDate.getFullYear() + 1);
+        } else if (validationResult.data.validityPeriod === "6-monthly") {
+          baseDate.setMonth(baseDate.getMonth() + 6);
+        }
+        expiryDate = baseDate.toISOString().split('T')[0];
+      }
+      
+      const submission = await storage.createFormSubmission({
+        ...validationResult.data,
+        expiryDate,
+      });
+      
+      // If form has a linked document type, update the client's compliance date
+      if (submission.linkedDocumentType && submission.clientId && submission.status === "submitted") {
+        // Map linked document types to client schema field names
+        const DOCUMENT_TYPE_TO_CLIENT_FIELD: Record<string, string> = {
+          "serviceAgreement": "serviceAgreementDate",
+          "consentForm": "consentFormDate",
+          "riskAssessment": "riskAssessmentDate",
+          "selfAssessmentMedx": "selfAssessmentMedxDate",
+          "medicationConsent": "medicationConsentDate",
+          "personalEmergencyPlan": "personalEmergencyPlanDate",
+          "carePlan": "carePlanDate",
+          "healthSummary": "healthSummaryDate",
+          "woundCarePlan": "woundCarePlanDate",
+          "ndisConsentForm": "ndisConsentFormDate",
+        };
+        
+        const clientField = DOCUMENT_TYPE_TO_CLIENT_FIELD[submission.linkedDocumentType];
+        if (clientField) {
+          try {
+            const client = await storage.getClient(submission.clientId);
+            if (client) {
+              const todayDate = new Date().toISOString().split('T')[0];
+              const updateData: Record<string, string> = {};
+              updateData[clientField] = todayDate;
+              await storage.updateClient(submission.clientId, updateData);
+              
+              // Log the compliance update
+              const user = req.user as any;
+              await storage.createAuditLogEntry({
+                userId: user?.id,
+                userName: user?.fullName || user?.email || "System",
+                action: "COMPLIANCE_DATE_UPDATED",
+                resourceType: "client",
+                resourceId: submission.clientId,
+                changes: {
+                  documentType: submission.linkedDocumentType,
+                  clientField: clientField,
+                  newDate: todayDate,
+                  sourceSubmissionId: submission.id,
+                },
+                ipAddress: req.ip || req.socket.remoteAddress,
+              });
+            }
+          } catch (updateError) {
+            console.error("Error updating client compliance date:", updateError);
+            // Continue - the form was created successfully, just the compliance update failed
+          }
+        }
+      }
+      
       res.status(201).json(submission);
     } catch (error) {
       console.error("Error creating form submission:", error);
@@ -6329,6 +6396,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating form signature:", error);
       res.status(500).json({ error: "Failed to create form signature" });
+    }
+  });
+
+  // ==================== FORM SUBMISSION ARCHIVE ROUTES ====================
+
+  // Archive a form submission (7-year retention for Australian Privacy Act compliance)
+  app.post("/api/form-submissions/:id/archive", async (req, res) => {
+    try {
+      const submission = await storage.getSubmissionById(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: "Form submission not found" });
+      }
+      
+      if (submission.isArchived === "yes") {
+        return res.status(400).json({ error: "Form submission is already archived" });
+      }
+
+      const user = req.user as any;
+      const retentionExpiresAt = new Date();
+      retentionExpiresAt.setFullYear(retentionExpiresAt.getFullYear() + 7); // 7-year retention
+      
+      const archivedSubmission = await storage.updateFormSubmission(req.params.id, {
+        isArchived: "yes",
+        archivedAt: new Date(),
+        archivedById: user?.id,
+        archivedByName: user?.fullName || user?.email || "System",
+        retentionExpiresAt,
+      });
+
+      // Log the archive action
+      if (archivedSubmission) {
+        await storage.createAuditLogEntry({
+          userId: user?.id,
+          userName: user?.fullName || user?.email || "System",
+          action: "FORM_ARCHIVED",
+          resourceType: "form_submission",
+          resourceId: req.params.id,
+          changes: {
+            submissionId: req.params.id,
+            templateId: submission.templateId,
+            clientId: submission.clientId,
+            retentionExpiresAt: retentionExpiresAt.toISOString(),
+          },
+          ipAddress: req.ip || req.socket.remoteAddress,
+        });
+      }
+
+      res.json(archivedSubmission);
+    } catch (error) {
+      console.error("Error archiving form submission:", error);
+      res.status(500).json({ error: "Failed to archive form submission" });
+    }
+  });
+
+  // Unarchive a form submission
+  app.post("/api/form-submissions/:id/unarchive", async (req, res) => {
+    try {
+      const submission = await storage.getSubmissionById(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: "Form submission not found" });
+      }
+      
+      if (submission.isArchived !== "yes") {
+        return res.status(400).json({ error: "Form submission is not archived" });
+      }
+
+      const user = req.user as any;
+      
+      const unarchivedSubmission = await storage.updateFormSubmission(req.params.id, {
+        isArchived: "no",
+        archivedAt: null,
+        archivedById: null,
+        archivedByName: null,
+      });
+
+      // Log the unarchive action
+      if (unarchivedSubmission) {
+        await storage.createAuditLogEntry({
+          userId: user?.id,
+          userName: user?.fullName || user?.email || "System",
+          action: "FORM_UNARCHIVED",
+          resourceType: "form_submission",
+          resourceId: req.params.id,
+          changes: {
+            submissionId: req.params.id,
+            templateId: submission.templateId,
+            clientId: submission.clientId,
+          },
+          ipAddress: req.ip || req.socket.remoteAddress,
+        });
+      }
+
+      res.json(unarchivedSubmission);
+    } catch (error) {
+      console.error("Error unarchiving form submission:", error);
+      res.status(500).json({ error: "Failed to unarchive form submission" });
     }
   });
 

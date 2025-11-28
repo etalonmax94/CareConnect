@@ -12,16 +12,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
+import FormFiller from "./FormFiller";
 import { 
   Upload, Eye, FileText, Trash2, Loader2, File, Link, Calendar, Pencil, 
   FolderOpen, Folder, ChevronDown, ChevronRight, Plus, FolderArchive, 
   ClipboardList, FileWarning, ScrollText, AlertTriangle, FileCheck, 
-  MoreVertical, Archive, RotateCcw, X, Check, Settings2, EyeOff
+  MoreVertical, Archive, RotateCcw, X, Check, Settings2, EyeOff, Pen
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Document, ClientDocumentCompliance, ClientDocumentFolder } from "@shared/schema";
+import type { Document, ClientDocumentCompliance, ClientDocumentFolder, FormTemplate } from "@shared/schema";
 
 type ClinicalDocuments = {
   serviceAgreementDate?: string;
@@ -190,9 +192,12 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
   const [fileUrl, setFileUrl] = useState("");
   const [fileName, setFileName] = useState("");
   const [customTitle, setCustomTitle] = useState("");
-  const [uploadMode, setUploadMode] = useState<"file" | "link">("file");
+  const [uploadMode, setUploadMode] = useState<"file" | "link" | "form">("file");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedFormTemplate, setSelectedFormTemplate] = useState<string>("");
+  const [formFillerDialogOpen, setFormFillerDialogOpen] = useState(false);
+  const [trackedDocKey, setTrackedDocKey] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -228,6 +233,10 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
   const { data: folderOverrides = [] } = useQuery<ClientDocumentFolder[]>({
     queryKey: ["/api/clients", clientId, "document-folders"],
     enabled: !!clientId,
+  });
+
+  const { data: formTemplates = [] } = useQuery<FormTemplate[]>({
+    queryKey: ["/api/form-templates"],
   });
 
   // Create folder list with NDIS Consent Form for NDIS clients
@@ -387,6 +396,9 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
     setSelectedDocType("");
     setSelectedFolderId("");
     setSelectedFile(null);
+    setSelectedFormTemplate("");
+    setTrackedDocKey("");
+    setUploadMode("file");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -828,6 +840,8 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
                 onClick={() => {
                   setSelectedDocType(doc.name);
                   setSelectedFolderId(parentFolderId);
+                  const docKeyWithoutDate = doc.key.replace(/Date$/, '');
+                  setTrackedDocKey(docKeyWithoutDate);
                   setUploadDialogOpen(true);
                 }}
                 className="flex items-center gap-2"
@@ -1057,25 +1071,92 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
 
       {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
+            <DialogTitle>Add Document</DialogTitle>
             <DialogDescription>
-              {selectedDocType ? `Upload or link a ${selectedDocType} document` : "Add a new document"}
+              {selectedDocType ? `Add ${selectedDocType} document` : "Add a new document"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as "file" | "link")}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="file" className="gap-2">
+            <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as "file" | "link" | "form")}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="form" className="gap-2" data-testid="tab-form">
+                  <Pen className="w-4 h-4" />
+                  Complete Form
+                </TabsTrigger>
+                <TabsTrigger value="file" className="gap-2" data-testid="tab-upload">
                   <File className="w-4 h-4" />
                   Upload PDF
                 </TabsTrigger>
-                <TabsTrigger value="link" className="gap-2">
+                <TabsTrigger value="link" className="gap-2" data-testid="tab-link">
                   <Link className="w-4 h-4" />
-                  External Link
+                  Link
                 </TabsTrigger>
               </TabsList>
+              
+              <TabsContent value="form" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Select Form Template</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Complete this document directly in EmpowerLink with digital signature
+                  </p>
+                </div>
+                <ScrollArea className="h-[200px] border rounded-lg p-2">
+                  <div className="space-y-2">
+                    {formTemplates.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No form templates available
+                      </p>
+                    ) : (
+                      formTemplates
+                        .filter(t => t.status === "active")
+                        .map(template => (
+                          <div
+                            key={template.id}
+                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                              selectedFormTemplate === template.id 
+                                ? "border-primary bg-primary/5" 
+                                : "hover:bg-muted/50"
+                            }`}
+                            onClick={() => setSelectedFormTemplate(template.id)}
+                            data-testid={`template-${template.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-primary" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm">{template.name}</p>
+                                {template.description && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {template.description}
+                                  </p>
+                                )}
+                              </div>
+                              {selectedFormTemplate === template.id && (
+                                <Check className="w-4 h-4 text-primary" />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </ScrollArea>
+                <Button
+                  onClick={() => {
+                    if (selectedFormTemplate) {
+                      setUploadDialogOpen(false);
+                      setFormFillerDialogOpen(true);
+                    }
+                  }}
+                  disabled={!selectedFormTemplate}
+                  className="w-full"
+                  data-testid="button-open-form"
+                >
+                  <Pen className="w-4 h-4 mr-2" />
+                  Open Form
+                </Button>
+              </TabsContent>
+              
               <TabsContent value="file" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>Select PDF File</Label>
@@ -1098,7 +1179,26 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
                     </span>
                   </div>
                 )}
+                <div className="space-y-2">
+                  <Label>Custom Title (Optional)</Label>
+                  <Input 
+                    value={customTitle}
+                    onChange={(e) => setCustomTitle(e.target.value)}
+                    placeholder="Optional display name for this document"
+                    data-testid="input-doc-custom-title"
+                  />
+                </div>
+                <Button 
+                  onClick={handleUpload} 
+                  disabled={!selectedFile || isUploading}
+                  className="w-full"
+                  data-testid="button-submit-upload"
+                >
+                  {isUploading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Upload PDF
+                </Button>
               </TabsContent>
+              
               <TabsContent value="link" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>File Name</Label>
@@ -1118,33 +1218,54 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
                     data-testid="input-doc-url"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Custom Title (Optional)</Label>
+                  <Input 
+                    value={customTitle}
+                    onChange={(e) => setCustomTitle(e.target.value)}
+                    placeholder="Optional display name for this document"
+                    data-testid="input-doc-custom-title-link"
+                  />
+                </div>
+                <Button 
+                  onClick={handleUpload} 
+                  disabled={!fileName || !fileUrl || uploadMutation.isPending}
+                  className="w-full"
+                  data-testid="button-save-link"
+                >
+                  {uploadMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Save Link
+                </Button>
               </TabsContent>
             </Tabs>
-            
-            <div className="space-y-2">
-              <Label>Custom Title (Optional)</Label>
-              <Input 
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-                placeholder="Optional display name for this document"
-                data-testid="input-doc-custom-title"
-              />
-            </div>
-
-            <Button 
-              onClick={handleUpload} 
-              disabled={
-                uploadMode === "file" 
-                  ? !selectedFile || isUploading
-                  : !fileName || !fileUrl || uploadMutation.isPending
-              }
-              className="w-full"
-              data-testid="button-submit-upload"
-            >
-              {(isUploading || uploadMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {uploadMode === "file" ? "Upload PDF" : "Save Link"}
-            </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Form Filler Dialog */}
+      <Dialog open={formFillerDialogOpen} onOpenChange={setFormFillerDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Complete Form</DialogTitle>
+            <DialogDescription>
+              Fill out the form below and sign digitally
+            </DialogDescription>
+          </DialogHeader>
+          {selectedFormTemplate && (
+            <FormFiller
+              templateId={selectedFormTemplate}
+              clientId={clientId}
+              linkedDocumentType={trackedDocKey || undefined}
+              onComplete={(submission) => {
+                setFormFillerDialogOpen(false);
+                resetUploadState();
+                queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId, "form-submissions"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId] });
+                toast({ title: "Form submitted", description: "The form has been completed and saved" });
+              }}
+              onCancel={() => setFormFillerDialogOpen(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
