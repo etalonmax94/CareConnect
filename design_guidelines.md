@@ -1,163 +1,203 @@
-# Design Guidelines: Multi-Category Healthcare CRM System
+# Design Guidelines: EmpowerLink Healthcare CRM
 
 ## Design Approach
 
-**Selected Framework:** Ant Design System
-**Rationale:** Healthcare data management systems require professional, information-dense interfaces with robust table components, form handling, and dashboard layouts. Ant Design excels at enterprise applications with complex data structures.
+**Selected Framework:** Ant Design System with Mobile-First Enhancements
+**Rationale:** Enterprise-grade data management with enhanced mobile usability for support workers in the field. Professional healthcare aesthetic balanced with approachable, encouraging interactions.
 
-**Key Design Principles:**
-- Clinical Clarity: Information hierarchy optimized for quick scanning and decision-making
-- Professional Trust: Healthcare-appropriate visual language that conveys competence
-- Efficiency First: Minimize clicks and cognitive load for busy care staff
-- Status Visibility: Clear visual indicators for compliance, urgency, and document states
+**Core Principles:**
+- **Simplicity First:** One primary action per screen, progressive disclosure for complexity
+- **Mobile-Native:** Touch-optimized interactions, bottom navigation, thumb-friendly zones
+- **Encouraging Support:** Friendly confirmations, progress celebrations, helpful empty states
+- **Efficiency:** Smart defaults, quick actions, minimal clicks to complete tasks
+- **Professional Warmth:** Navy blue professional foundation with approachable micro-interactions
 
 ---
 
-## Core Design Elements
+## Typography
 
-### Typography
-- **Primary Font:** Inter or System UI Stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto`)
-- **Headings:** 
-  - Page titles: text-2xl font-semibold
-  - Section headers: text-lg font-medium
-  - Card headers: text-base font-medium
-- **Body Text:** text-sm with text-gray-700 for optimal readability in data-dense views
-- **Labels:** text-xs font-medium uppercase tracking-wide text-gray-500
-- **Monospace:** For IDs, numbers (NDIS numbers, Medicare): `font-mono text-sm`
+**Font Stack:** Inter or System UI (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto`)
 
-### Layout System
+**Hierarchy:**
+- **Mobile Headers:** text-xl font-semibold (larger touch targets for navigation)
+- **Desktop Page Titles:** text-2xl font-semibold
+- **Section Headers:** text-lg font-medium
+- **Body Text:** text-base (mobile), text-sm (desktop) - larger for mobile readability
+- **Labels:** text-sm font-medium with subtle spacing
+- **Helper Text:** text-xs for secondary information
+- **Monospace:** Client IDs, NDIS numbers - `font-mono text-sm`
 
-**Spacing Primitives:** Use Tailwind units of **2, 4, 6, 8, 12, 16**
-- Tight spacing (2, 4): Within cards, between form labels and inputs
-- Medium spacing (6, 8): Between form sections, card padding
-- Large spacing (12, 16): Between major sections, page padding
+---
 
-**Grid Structure:**
-- Main content: `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`
-- Dashboard cards: 3-column grid on desktop (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3`)
-- Data tables: Full-width responsive containers with horizontal scroll on mobile
+## Layout System
+
+**Spacing Primitives:** Tailwind units **4, 6, 8, 12, 16, 20**
+- **Mobile padding:** p-4 to p-6 (thumb-friendly spacing)
+- **Desktop padding:** p-6 to p-8
+- **Section spacing:** space-y-6 (mobile), space-y-8 (desktop)
+- **Card internal:** p-6 with gap-4 for content
+- **Touch targets:** Minimum h-12 (48px) for all interactive elements
+
+**Container Strategy:**
+- **Mobile:** Full width with px-4 side padding
+- **Desktop:** max-w-7xl mx-auto px-6 lg:px-8
+- **Dashboard grids:** grid-cols-1 (mobile) → grid-cols-2 (tablet) → grid-cols-3 (desktop)
 
 ---
 
 ## Component Library
 
 ### Navigation
-**Top Navigation Bar:**
-- Fixed header with logo left, main navigation center, user profile/notifications right
-- Height: h-16 with shadow-sm
-- Category badges: Small pills showing NDIS/Support at Home/Private with distinct colors
-- Search bar: Always visible with icon, placeholder "Search clients, NDIS numbers..."
 
-**Sidebar Navigation (Left):**
-- Width: w-64 on desktop, collapsible on mobile
-- Sections: Dashboard, Clients (with category filters), Documents, Reports, Settings
-- Active state: bg-blue-50 with left border-l-4 border-blue-600
+**Mobile Bottom Navigation (Primary):**
+- Fixed bottom bar with h-16, safe-area padding
+- 4-5 main tabs: Dashboard, Clients, Tasks, Documents, More
+- Large icons (w-6 h-6) with text-xs labels below
+- Active state: Navy blue with subtle scale animation
+- Tab badges for pending items (small pill counters)
+
+**Desktop Sidebar:**
+- Fixed left sidebar w-64 with collapsible states
+- Grouped navigation: Dashboard, Client Management, Documents, Reports, Settings
+- Category filters as nested items under Clients
+- Active state: Navy blue background with left accent border
+
+**Top Bar (Both):**
+- Mobile: Logo + notification bell + user avatar (h-14)
+- Desktop: Logo + search + quick actions + user profile (h-16)
+- Search: Expandable on mobile, always-visible on desktop
 
 ### Dashboard Components
 
-**Statistics Cards:**
-- Grid layout with key metrics (Total Clients, Compliance Rate, Upcoming Renewals, At-Risk Clients)
-- Structure: Icon (top-left) + Large number + Label + Trend indicator
-- Padding: p-6, rounded-lg, shadow borders
-
-**Compliance Overview:**
-- Timeline-style visualization showing documents due this month
-- Color-coded status dots: Green (compliant), Yellow (due soon), Red (overdue)
-- Grouped by client category with expandable sections
+**Stats Cards (Welcome Screen):**
+- Large, friendly greeting: "Good morning, [Name]!" with time-based messaging
+- Key metrics grid: 2 columns mobile, 3-4 columns desktop
+- Card structure: Large number + icon + label + encouraging micro-copy ("Great job!" for compliance)
+- Padding: p-6 with rounded-xl and subtle shadows
 
 **Quick Actions Panel:**
-- Prominent buttons: "Add New Client", "Upload Document", "Generate Report"
-- Secondary actions in dropdown menus
+- Prominent FAB-style primary action on mobile (bottom-right, navy blue)
+- Desktop: Action button row with "Add Client", "Log Visit", "Upload Document"
+- Touch target: min-h-12 with px-6 spacing
+
+**Today's Tasks/Visits:**
+- Timeline card showing today's scheduled visits
+- Client photo + name + time + location + quick "Start Visit" button
+- Empty state: Friendly illustration + "No visits today - time to catch up on notes!"
 
 ### Client Management
 
-**Client List/Table:**
-- Sortable, filterable table with: Photo thumbnail, Name, Category badge, Care Manager, NDIS/ID number, Status indicators
-- Inline quick actions: View, Edit, Documents icons
-- Pagination: 25 items per page with page size selector
-- Category filter tabs above table (All, NDIS, Support at Home, Private)
+**Client List (Mobile):**
+- Card-based layout (not table)
+- Each card: Photo (w-12 h-12) + Name + Category badge + compliance status dot + chevron
+- Swipe actions: Quick call, message, view documents
+- Search/filter: Sticky header with category chips (NDIS, Aged Care, Private)
 
-**Client Profile View:**
-- Two-column layout: Left 2/3 for details, Right 1/3 for quick info sidebar
-- Profile header: Photo (large), Name, Category badge, key identifiers
-- Tabbed sections: Personal Details, NDIS/Program Info, Care Team, Documents, Service History, Financial
-- Status indicator ribbons for compliance status
+**Client List (Desktop):**
+- Sortable table with photo, name, category, care manager, status, last visit
+- Inline actions: View, Edit, Documents
+- Bulk actions: Checkbox select with action bar
 
-**Document Tracker Grid:**
-- Card-based layout showing each document type
-- Card content: Document name, Last updated date, Status badge, Due date (if applicable), Upload/View buttons
-- Color-coded borders: Green (current), Yellow (due within 30 days), Red (overdue)
-- Annual/6-monthly frequency labels
+**Client Profile:**
+- Mobile: Single column with tabbed sections (Details, Documents, Visits, Notes)
+- Desktop: 2-column (70/30 split) - main content + sidebar quick info
+- Profile header: Large photo, name, category badge, key identifiers
+- Floating action button: "Log New Visit" (mobile) or primary button (desktop)
 
-### Forms
+### Visit Logging (Mobile-Critical)
 
-**Input Fields:**
-- Labels above inputs with required asterisk (*)
-- Input height: h-10 with px-3 py-2
-- Date pickers: Calendar icon suffix
-- File uploads: Drag-and-drop zones with file type indicators
-- Multi-select for team members: Checkbox dropdowns with avatars
+**Visit Entry Flow:**
+- Step indicator showing progress (1 of 3)
+- Single-question per screen approach
+- Large touch-friendly inputs: Time picker, service type selector, notes field
+- Voice-to-text option for notes entry
+- Photo upload: Large drop zone with camera integration
+- Success screen: Celebration animation + "Visit logged! Great work 👍"
 
-**Form Layout:**
-- Group related fields in cards with subtle backgrounds (bg-gray-50)
-- Two-column responsive grid for efficiency (`grid-cols-1 md:grid-cols-2 gap-6`)
-- Sticky action bar at bottom: Save, Cancel, Delete (if editing)
+### Document Management
 
-### Data Visualization
+**Document Grid:**
+- Mobile: Stacked cards with document icon + name + status + due date
+- Desktop: Grid view with 3-4 columns
+- Status indicators: Large, clear icons (check, clock, alert) with navy blue coding
+- Upload: Full-screen modal on mobile, sidebar panel on desktop
+- Progress bars: Visual upload progress with encouraging messages
 
-**Budget/Funding Display:**
-- Progress bars showing spent vs. available funding per support category
-- Stacked bar charts for multi-category budget overview
-- Numeric summaries with large, clear typography
+### Forms & Inputs
 
-**Timeline Views:**
-- Vertical timeline for service delivery history and progress notes
-- Date markers on left, content cards on right
-- Icon indicators for event types (service, incident, note, review)
+**Mobile-Optimized Inputs:**
+- Large touch targets: h-12 inputs with text-base
+- Full-width inputs on mobile, smart 2-column on desktop
+- Date/time pickers: Native mobile pickers, calendar widgets on desktop
+- Dropdowns: Bottom sheet on mobile, standard dropdown on desktop
+- File upload: Camera/gallery integration on mobile, drag-drop on desktop
 
-### Status & Alert System
+**Form Patterns:**
+- Single-column stacking on mobile
+- Grouped sections with bg-gray-50 cards
+- Sticky bottom action bar: Primary button + secondary link
+- Inline validation: Friendly error messages with icons
+- Auto-save indicators: "Saving..." → "All changes saved ✓"
+
+### Status & Feedback
 
 **Category Badges:**
-- NDIS: blue-600 background
-- Support at Home: green-600 background  
-- Private: purple-600 background
-- Small rounded-full pills with white text, px-3 py-1
+- Rounded-full pills with clear labels
+- Touch-friendly size: px-4 py-1.5
+- NDIS, Aged Care, Private with distinct navy blue variations
 
-**Compliance Status:**
-- Icons + text combinations
-- Compliant: Check icon, text-green-700
-- Due Soon: Clock icon, text-yellow-700
-- Overdue: Alert icon, text-red-700
+**Success States:**
+- Toast notifications with icons and friendly copy: "Client added successfully! 🎉"
+- Confetti animation for milestones (100% compliance achieved)
+- Progress celebrations: "5 visits logged this week - you're on fire!"
 
-**Alerts/Notifications:**
-- Toast notifications top-right for actions (save, upload, etc.)
-- In-page alert banners for critical compliance issues
-- Badge counts on navigation items for pending items
+**Empty States:**
+- Friendly illustrations (not stock photos)
+- Encouraging copy: "No documents overdue - keep up the great work!"
+- Clear call-to-action button
 
----
-
-## Images
-
-**Client Profile Photos:**
-- Circular avatars: w-12 h-12 in lists, w-24 h-24 in profile headers
-- Placeholder: Initials on colored background if no photo
-- Upload interface: Drag-drop with preview
-
-**No Hero Section Required:** This is a data management application, not a marketing site. Lead with functional dashboard.
+**Loading States:**
+- Skeleton screens for content loading
+- Spinner with encouraging messages: "Loading your clients..."
 
 ---
 
 ## Responsive Behavior
 
-- **Desktop (lg+):** Full sidebar, multi-column layouts, expanded tables
-- **Tablet (md):** Collapsible sidebar, 2-column grids, horizontal scroll tables
-- **Mobile (base):** Bottom navigation, single-column stacked layouts, simplified tables with essential columns
+**Mobile-First Breakpoints:**
+- **Base (mobile):** Single column, bottom nav, full-screen modals, card layouts
+- **md (tablet):** 2-column grids, sidebar peek, larger touch targets maintained
+- **lg (desktop):** 3-column grids, full sidebar, table views, split panels
+
+**Touch Considerations:**
+- All buttons: min-h-12 with min-w-12
+- Spacing between interactive elements: minimum gap-4
+- Bottom navigation: Elevated z-50 above all content
+- Thumb zone optimization: Critical actions in bottom 2/3 of screen (mobile)
 
 ---
 
-## Accessibility
+## Accessibility & Tone
 
-- WCAG AA compliant color contrasts for all text and status indicators
-- Keyboard navigation for all interactive elements with visible focus states (ring-2 ring-blue-500)
-- Screen reader labels for icon-only buttons
-- Form validation with clear error messages below inputs
+**Interactions:**
+- Focus states: Navy blue ring with ring-2
+- Keyboard navigation: Full support with visible focus
+- Screen reader labels: Descriptive text for all icons
+- Color contrast: WCAG AA compliant throughout
+
+**Friendly Microcopy:**
+- Button labels: "Save Changes" not "Submit"
+- Confirmations: "Client saved! What's next?"
+- Errors: "Oops! Let's fix that together" with helpful guidance
+- Progress: "Almost there!" on multi-step forms
+
+---
+
+## Images
+
+**Profile Photos:**
+- Circular avatars: w-12 h-12 (lists), w-16 h-16 (cards), w-24 h-24 (profiles)
+- Fallback: Colored circle with initials (professional navy blue palette)
+- Upload: Camera/gallery on mobile with crop interface
+
+**No Hero Section:** Application leads with functional dashboard and personalized greeting.

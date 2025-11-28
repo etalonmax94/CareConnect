@@ -2355,3 +2355,191 @@ export const insertSilHouseAuditLogSchema = createInsertSchema(silHouseAuditLog,
 
 export type InsertSilHouseAuditLog = z.infer<typeof insertSilHouseAuditLogSchema>;
 export type SilHouseAuditLog = typeof silHouseAuditLog.$inferSelect;
+
+// ============================================
+// NOTIFICATIONS SYSTEM
+// ============================================
+
+export type NotificationType = 
+  | "ticket_created"
+  | "ticket_updated"
+  | "ticket_assigned"
+  | "ticket_comment"
+  | "announcement"
+  | "task_assigned"
+  | "task_due"
+  | "approval_required"
+  | "system";
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  userId: varchar("user_id").notNull(), // Recipient user
+  type: text("type").$type<NotificationType>().notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  
+  // Link to related entity
+  relatedType: text("related_type"), // "ticket", "announcement", "task", etc.
+  relatedId: varchar("related_id"),
+  
+  isRead: text("is_read").default("no").$type<"yes" | "no">(),
+  readAt: timestamp("read_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications, {
+  type: z.enum(["ticket_created", "ticket_updated", "ticket_assigned", "ticket_comment", "announcement", "task_assigned", "task_due", "approval_required", "system"]),
+  isRead: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+// ============================================
+// HELP DESK / SUPPORT TICKETS
+// ============================================
+
+export type TicketPriority = "low" | "medium" | "high" | "urgent";
+export type TicketStatus = "open" | "in_progress" | "waiting_response" | "resolved" | "closed";
+export type TicketCategory = "bug" | "feature_request" | "question" | "access_issue" | "data_issue" | "other";
+
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  ticketNumber: serial("ticket_number").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  
+  category: text("category").$type<TicketCategory>().notNull().default("other"),
+  priority: text("priority").$type<TicketPriority>().notNull().default("medium"),
+  status: text("status").$type<TicketStatus>().notNull().default("open"),
+  
+  // Error details (optional)
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  pageUrl: text("page_url"),
+  
+  // Screenshots/attachments stored as JSON array of URLs
+  screenshots: json("screenshots").$type<string[]>().default([]),
+  
+  // Creator info
+  createdById: varchar("created_by_id").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  createdByEmail: text("created_by_email"),
+  
+  // Assignment
+  assignedToId: varchar("assigned_to_id"),
+  assignedToName: text("assigned_to_name"),
+  assignedAt: timestamp("assigned_at"),
+  
+  // Resolution
+  resolvedAt: timestamp("resolved_at"),
+  resolvedById: varchar("resolved_by_id"),
+  resolvedByName: text("resolved_by_name"),
+  resolutionNotes: text("resolution_notes"),
+  
+  closedAt: timestamp("closed_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSupportTicketSchema = createInsertSchema(supportTickets, {
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  category: z.enum(["bug", "feature_request", "question", "access_issue", "data_issue", "other"]),
+  priority: z.enum(["low", "medium", "high", "urgent"]),
+  status: z.enum(["open", "in_progress", "waiting_response", "resolved", "closed"]),
+  screenshots: z.array(z.string()).optional(),
+}).omit({
+  id: true,
+  ticketNumber: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
+// Ticket Comments
+export const ticketComments = pgTable("ticket_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  ticketId: varchar("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  
+  content: text("content").notNull(),
+  
+  // Is this an internal note (only visible to support staff)?
+  isInternal: text("is_internal").default("no").$type<"yes" | "no">(),
+  
+  authorId: varchar("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTicketCommentSchema = createInsertSchema(ticketComments, {
+  content: z.string().min(1, "Comment content is required"),
+  isInternal: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTicketComment = z.infer<typeof insertTicketCommentSchema>;
+export type TicketComment = typeof ticketComments.$inferSelect;
+
+// ============================================
+// ANNOUNCEMENTS
+// ============================================
+
+export type AnnouncementType = "info" | "success" | "warning" | "alert";
+export type AnnouncementAudience = "all" | "support_workers" | "nurses" | "admin" | "managers";
+
+export const announcements = pgTable("announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  type: text("type").$type<AnnouncementType>().notNull().default("info"),
+  
+  // Target audience
+  audience: text("audience").$type<AnnouncementAudience>().notNull().default("all"),
+  
+  // Scheduling
+  startsAt: timestamp("starts_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  
+  // Pinned announcements stay at top
+  isPinned: text("is_pinned").default("no").$type<"yes" | "no">(),
+  
+  // Author
+  createdById: varchar("created_by_id").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAnnouncementSchema = createInsertSchema(announcements, {
+  title: z.string().min(1, "Title is required"),
+  content: z.string().min(1, "Content is required"),
+  type: z.enum(["info", "success", "warning", "alert"]),
+  audience: z.enum(["all", "support_workers", "nurses", "admin", "managers"]),
+  isPinned: z.enum(["yes", "no"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;

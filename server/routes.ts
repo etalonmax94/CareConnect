@@ -19,6 +19,8 @@ import {
   insertFormSubmissionValueSchema, insertFormSignatureSchema, insertAppointmentTypeRequiredFormSchema,
   insertNonFaceToFaceServiceLogSchema, insertDiagnosisSchema, insertClientDiagnosisSchema,
   insertSilHouseSchema, insertSilHouseAuditLogSchema,
+  // Notifications, tickets, and announcements
+  insertNotificationSchema, insertSupportTicketSchema, insertTicketCommentSchema, insertAnnouncementSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
 import { 
@@ -7309,6 +7311,451 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error seeding form templates:", error);
       res.status(500).json({ error: "Failed to seed form templates" });
+    }
+  });
+
+  // ============================================
+  // NOTIFICATIONS API
+  // ============================================
+
+  // Get notifications for current user
+  app.get("/api/notifications", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      const notifs = await storage.getNotificationsByUser(userId);
+      res.json(notifs);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Get unread notification count
+  app.get("/api/notifications/unread-count", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      res.status(500).json({ error: "Failed to fetch unread count" });
+    }
+  });
+
+  // Mark notification as read
+  app.patch("/api/notifications/:id/read", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const notification = await storage.markNotificationAsRead(id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/notifications/mark-all-read", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      const count = await storage.markAllNotificationsAsRead(userId);
+      res.json({ markedAsRead: count });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Delete notification
+  app.delete("/api/notifications/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteNotification(id);
+      if (!success) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  // ============================================
+  // SUPPORT TICKETS API
+  // ============================================
+
+  // Get all tickets (for help desk staff)
+  app.get("/api/tickets", requireAuth, async (req: any, res) => {
+    try {
+      const tickets = await storage.getAllTickets();
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching tickets:", error);
+      res.status(500).json({ error: "Failed to fetch tickets" });
+    }
+  });
+
+  // Get tickets for current user (my tickets)
+  app.get("/api/tickets/my", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      const tickets = await storage.getTicketsByUser(userId);
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching user tickets:", error);
+      res.status(500).json({ error: "Failed to fetch tickets" });
+    }
+  });
+
+  // Get single ticket
+  app.get("/api/tickets/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.getTicketById(id);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error fetching ticket:", error);
+      res.status(500).json({ error: "Failed to fetch ticket" });
+    }
+  });
+
+  // Create new ticket
+  app.post("/api/tickets", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      const userEmail = req.user?.email || req.session?.userEmail;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const validatedData = insertSupportTicketSchema.parse({
+        ...req.body,
+        createdById: userId,
+        createdByName: userName,
+        createdByEmail: userEmail
+      });
+
+      const ticket = await storage.createTicket(validatedData);
+
+      // Create notification for help desk staff (admins, directors, operations_managers)
+      const staffToNotify = await storage.getAllStaff();
+      for (const staff of staffToNotify) {
+        const user = staff.userId ? await storage.getUser(staff.userId) : null;
+        if (user && user.roles && (
+          user.roles.includes("admin") || 
+          user.roles.includes("director") || 
+          user.roles.includes("operations_manager")
+        )) {
+          await storage.createNotification({
+            userId: user.id,
+            type: "ticket_created",
+            title: "New Support Ticket",
+            message: `${userName} submitted a new ticket: ${ticket.title}`,
+            relatedType: "ticket",
+            relatedId: ticket.id
+          });
+        }
+      }
+
+      res.status(201).json(ticket);
+    } catch (error) {
+      console.error("Error creating ticket:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to create ticket" });
+    }
+  });
+
+  // Update ticket
+  app.patch("/api/tickets/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.updateTicket(id, req.body);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error updating ticket:", error);
+      res.status(500).json({ error: "Failed to update ticket" });
+    }
+  });
+
+  // Assign ticket
+  app.post("/api/tickets/:id/assign", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { assignedToId, assignedToName } = req.body;
+      
+      const ticket = await storage.assignTicket(id, assignedToId, assignedToName);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // Notify the assigned user
+      await storage.createNotification({
+        userId: assignedToId,
+        type: "ticket_assigned",
+        title: "Ticket Assigned to You",
+        message: `You have been assigned to ticket #${ticket.ticketNumber}: ${ticket.title}`,
+        relatedType: "ticket",
+        relatedId: ticket.id
+      });
+
+      // Notify the ticket creator
+      if (ticket.createdById !== assignedToId) {
+        await storage.createNotification({
+          userId: ticket.createdById,
+          type: "ticket_updated",
+          title: "Your Ticket Has Been Assigned",
+          message: `Your ticket #${ticket.ticketNumber} has been assigned to ${assignedToName}`,
+          relatedType: "ticket",
+          relatedId: ticket.id
+        });
+      }
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error assigning ticket:", error);
+      res.status(500).json({ error: "Failed to assign ticket" });
+    }
+  });
+
+  // Resolve ticket
+  app.post("/api/tickets/:id/resolve", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      const { resolutionNotes } = req.body;
+      
+      const ticket = await storage.resolveTicket(id, userId, userName, resolutionNotes);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // Notify the ticket creator
+      await storage.createNotification({
+        userId: ticket.createdById,
+        type: "ticket_updated",
+        title: "Your Ticket Has Been Resolved",
+        message: `Your ticket #${ticket.ticketNumber} has been resolved by ${userName}`,
+        relatedType: "ticket",
+        relatedId: ticket.id
+      });
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error resolving ticket:", error);
+      res.status(500).json({ error: "Failed to resolve ticket" });
+    }
+  });
+
+  // Close ticket
+  app.post("/api/tickets/:id/close", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.closeTicket(id);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error closing ticket:", error);
+      res.status(500).json({ error: "Failed to close ticket" });
+    }
+  });
+
+  // Get ticket comments
+  app.get("/api/tickets/:id/comments", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const comments = await storage.getTicketComments(id);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching ticket comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Add ticket comment
+  app.post("/api/tickets/:id/comments", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Verify ticket exists
+      const ticket = await storage.getTicketById(id);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      const validatedData = insertTicketCommentSchema.parse({
+        ...req.body,
+        ticketId: id,
+        authorId: userId,
+        authorName: userName
+      });
+
+      const comment = await storage.createTicketComment(validatedData);
+
+      // Notify relevant users about the new comment
+      const usersToNotify = new Set<string>();
+      
+      // Notify ticket creator if not the commenter
+      if (ticket.createdById !== userId) {
+        usersToNotify.add(ticket.createdById);
+      }
+      
+      // Notify assigned user if not the commenter
+      if (ticket.assignedToId && ticket.assignedToId !== userId) {
+        usersToNotify.add(ticket.assignedToId);
+      }
+
+      for (const notifyUserId of usersToNotify) {
+        await storage.createNotification({
+          userId: notifyUserId,
+          type: "ticket_comment",
+          title: "New Comment on Ticket",
+          message: `${userName} commented on ticket #${ticket.ticketNumber}`,
+          relatedType: "ticket",
+          relatedId: ticket.id
+        });
+      }
+
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Error creating ticket comment:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // ============================================
+  // ANNOUNCEMENTS API
+  // ============================================
+
+  // Get all announcements (for admins)
+  app.get("/api/announcements", requireAuth, async (req: any, res) => {
+    try {
+      const announcements = await storage.getAllAnnouncements();
+      res.json(announcements);
+    } catch (error) {
+      console.error("Error fetching announcements:", error);
+      res.status(500).json({ error: "Failed to fetch announcements" });
+    }
+  });
+
+  // Get active announcements for current user
+  app.get("/api/announcements/active", requireAuth, async (req: any, res) => {
+    try {
+      const userRoles = req.user?.roles || req.session?.userRoles || [];
+      const announcements = await storage.getActiveAnnouncements(userRoles);
+      res.json(announcements);
+    } catch (error) {
+      console.error("Error fetching active announcements:", error);
+      res.status(500).json({ error: "Failed to fetch announcements" });
+    }
+  });
+
+  // Get single announcement
+  app.get("/api/announcements/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const announcement = await storage.getAnnouncementById(id);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+      res.json(announcement);
+    } catch (error) {
+      console.error("Error fetching announcement:", error);
+      res.status(500).json({ error: "Failed to fetch announcement" });
+    }
+  });
+
+  // Create announcement
+  app.post("/api/announcements", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const validatedData = insertAnnouncementSchema.parse({
+        ...req.body,
+        createdById: userId,
+        createdByName: userName
+      });
+
+      const announcement = await storage.createAnnouncement(validatedData);
+      res.status(201).json(announcement);
+    } catch (error) {
+      console.error("Error creating announcement:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: fromZodError(error).message });
+      }
+      res.status(500).json({ error: "Failed to create announcement" });
+    }
+  });
+
+  // Update announcement
+  app.patch("/api/announcements/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const announcement = await storage.updateAnnouncement(id, req.body);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+      res.json(announcement);
+    } catch (error) {
+      console.error("Error updating announcement:", error);
+      res.status(500).json({ error: "Failed to update announcement" });
+    }
+  });
+
+  // Delete announcement (soft delete)
+  app.delete("/api/announcements/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteAnnouncement(id);
+      if (!success) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting announcement:", error);
+      res.status(500).json({ error: "Failed to delete announcement" });
     }
   });
 

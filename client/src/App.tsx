@@ -36,7 +36,10 @@ import Login from "@/pages/Login";
 import SelectRole from "@/pages/SelectRole";
 import PendingApproval from "@/pages/PendingApproval";
 import UserApprovals from "@/pages/UserApprovals";
+import HelpDesk from "@/pages/HelpDesk";
 import NotFound from "@/pages/not-found";
+import NotificationBell from "@/components/NotificationBell";
+import HelpWidget from "@/components/HelpWidget";
 import { Loader2, ExternalLink, Calendar, Mail } from "lucide-react";
 
 interface AuthResponse {
@@ -80,6 +83,7 @@ function ProtectedRouter() {
       <Route path="/leadership-meeting" component={LeadershipMeeting} />
       <Route path="/settings" component={Settings} />
       <Route path="/user-approvals" component={UserApprovals} />
+      <Route path="/help-desk" component={HelpDesk} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -169,12 +173,14 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
                   <p>Open Connecteam</p>
                 </TooltipContent>
               </Tooltip>
+              <NotificationBell />
               <UserProfileDropdown user={user} />
             </div>
           </header>
           <main className="flex-1 overflow-y-auto p-6">
             <ProtectedRouter />
           </main>
+          <HelpWidget />
         </div>
       </div>
     </SidebarProvider>

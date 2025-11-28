@@ -34,6 +34,7 @@ The system features a professional navy blue theme, utilizes Shadcn UI component
 -   **Service Subtypes**: Admin-managed service subtypes associated with clients.
 -   **Falls Risk Assessment Tool (FRAT)**: Peninsula Health standard 4-category scoring system with auto-high-risk triggers and score calculation.
 -   **NDIS Consent Form Tracking**: Independent compliance tracking for NDIS-specific consent forms.
+-   **Help Desk & Support Tickets**: In-app issue reporting system with ticket creation, assignment, commenting, resolution workflow. Includes floating help widget for quick access and notification bell for real-time updates.
 
 ### System Design Choices
 -   **Database Schema**: PostgreSQL with Drizzle ORM, comprehensive tables for clients, goals, notes, incidents, documents, staff, appointments, care plans, quotes, and customizable forms.

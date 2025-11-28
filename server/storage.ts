@@ -18,6 +18,8 @@ import {
   clientStatusLogs,
   silHouses, silHouseAuditLog,
   serviceSubtypes,
+  // Notifications, tickets, and announcements
+  notifications, supportTickets, ticketComments, announcements,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -70,7 +72,12 @@ import {
   type InsertClientStatusLog, type ClientStatusLog,
   type InsertSilHouse, type SilHouse,
   type InsertSilHouseAuditLog, type SilHouseAuditLog,
-  type InsertServiceSubtype, type ServiceSubtype
+  type InsertServiceSubtype, type ServiceSubtype,
+  // Notifications, tickets, and announcements types
+  type InsertNotification, type Notification,
+  type InsertSupportTicket, type SupportTicket,
+  type InsertTicketComment, type TicketComment,
+  type InsertAnnouncement, type Announcement
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
@@ -518,6 +525,36 @@ export interface IStorage {
   createServiceSubtype(subtype: InsertServiceSubtype): Promise<ServiceSubtype>;
   updateServiceSubtype(id: string, updates: Partial<InsertServiceSubtype>): Promise<ServiceSubtype | undefined>;
   deleteServiceSubtype(id: string): Promise<boolean>;
+  
+  // Notifications
+  getNotificationsByUser(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: string): Promise<Notification | undefined>;
+  markAllNotificationsAsRead(userId: string): Promise<number>;
+  deleteNotification(id: string): Promise<boolean>;
+  
+  // Support Tickets
+  getAllTickets(): Promise<SupportTicket[]>;
+  getTicketsByUser(userId: string): Promise<SupportTicket[]>;
+  getTicketById(id: string): Promise<SupportTicket | undefined>;
+  createTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  updateTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined>;
+  assignTicket(id: string, assignedToId: string, assignedToName: string): Promise<SupportTicket | undefined>;
+  resolveTicket(id: string, resolvedById: string, resolvedByName: string, resolutionNotes?: string): Promise<SupportTicket | undefined>;
+  closeTicket(id: string): Promise<SupportTicket | undefined>;
+  
+  // Ticket Comments
+  getTicketComments(ticketId: string): Promise<TicketComment[]>;
+  createTicketComment(comment: InsertTicketComment): Promise<TicketComment>;
+  
+  // Announcements
+  getAllAnnouncements(): Promise<Announcement[]>;
+  getActiveAnnouncements(userRoles?: string[]): Promise<Announcement[]>;
+  getAnnouncementById(id: string): Promise<Announcement | undefined>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  updateAnnouncement(id: string, updates: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
+  deleteAnnouncement(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -2853,6 +2890,212 @@ export class DbStorage implements IStorage {
     const result = await db.update(serviceSubtypes)
       .set({ isActive: "no" })
       .where(eq(serviceSubtypes.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ============================================
+  // NOTIFICATIONS
+  // ============================================
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(50);
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, "no")
+      ));
+    return Number(result[0]?.count || 0);
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const result = await db.insert(notifications).values(notification).returning();
+    return result[0];
+  }
+
+  async markNotificationAsRead(id: string): Promise<Notification | undefined> {
+    const result = await db.update(notifications)
+      .set({ isRead: "yes", readAt: new Date() })
+      .where(eq(notifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<number> {
+    const result = await db.update(notifications)
+      .set({ isRead: "yes", readAt: new Date() })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, "no")
+      ))
+      .returning();
+    return result.length;
+  }
+
+  async deleteNotification(id: string): Promise<boolean> {
+    const result = await db.delete(notifications)
+      .where(eq(notifications.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ============================================
+  // SUPPORT TICKETS
+  // ============================================
+
+  async getAllTickets(): Promise<SupportTicket[]> {
+    return await db.select().from(supportTickets)
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getTicketsByUser(userId: string): Promise<SupportTicket[]> {
+    return await db.select().from(supportTickets)
+      .where(eq(supportTickets.createdById, userId))
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getTicketById(id: string): Promise<SupportTicket | undefined> {
+    const result = await db.select().from(supportTickets)
+      .where(eq(supportTickets.id, id));
+    return result[0];
+  }
+
+  async createTicket(ticket: InsertSupportTicket): Promise<SupportTicket> {
+    const result = await db.insert(supportTickets).values(ticket).returning();
+    return result[0];
+  }
+
+  async updateTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined> {
+    const result = await db.update(supportTickets)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async assignTicket(id: string, assignedToId: string, assignedToName: string): Promise<SupportTicket | undefined> {
+    const result = await db.update(supportTickets)
+      .set({
+        assignedToId,
+        assignedToName,
+        assignedAt: new Date(),
+        status: "in_progress",
+        updatedAt: new Date()
+      })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async resolveTicket(id: string, resolvedById: string, resolvedByName: string, resolutionNotes?: string): Promise<SupportTicket | undefined> {
+    const result = await db.update(supportTickets)
+      .set({
+        status: "resolved",
+        resolvedAt: new Date(),
+        resolvedById,
+        resolvedByName,
+        resolutionNotes: resolutionNotes || null,
+        updatedAt: new Date()
+      })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async closeTicket(id: string): Promise<SupportTicket | undefined> {
+    const result = await db.update(supportTickets)
+      .set({
+        status: "closed",
+        closedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // ============================================
+  // TICKET COMMENTS
+  // ============================================
+
+  async getTicketComments(ticketId: string): Promise<TicketComment[]> {
+    return await db.select().from(ticketComments)
+      .where(eq(ticketComments.ticketId, ticketId))
+      .orderBy(ticketComments.createdAt);
+  }
+
+  async createTicketComment(comment: InsertTicketComment): Promise<TicketComment> {
+    const result = await db.insert(ticketComments).values(comment).returning();
+    return result[0];
+  }
+
+  // ============================================
+  // ANNOUNCEMENTS
+  // ============================================
+
+  async getAllAnnouncements(): Promise<Announcement[]> {
+    return await db.select().from(announcements)
+      .orderBy(desc(announcements.isPinned), desc(announcements.createdAt));
+  }
+
+  async getActiveAnnouncements(userRoles?: string[]): Promise<Announcement[]> {
+    const now = new Date();
+    const result = await db.select().from(announcements)
+      .where(and(
+        eq(announcements.isActive, "yes"),
+        lte(announcements.startsAt, now),
+        or(
+          sql`${announcements.expiresAt} IS NULL`,
+          gte(announcements.expiresAt, now)
+        )
+      ))
+      .orderBy(desc(announcements.isPinned), desc(announcements.createdAt));
+    
+    // Filter by audience if user roles provided
+    if (userRoles && userRoles.length > 0) {
+      return result.filter(a => {
+        if (a.audience === "all") return true;
+        if (a.audience === "support_workers" && userRoles.includes("support_worker")) return true;
+        if (a.audience === "nurses" && (userRoles.includes("enrolled_nurse") || userRoles.includes("registered_nurse"))) return true;
+        if (a.audience === "admin" && userRoles.includes("admin")) return true;
+        if (a.audience === "managers" && (userRoles.includes("operations_manager") || userRoles.includes("care_manager") || userRoles.includes("clinical_manager") || userRoles.includes("director"))) return true;
+        return false;
+      });
+    }
+    
+    return result;
+  }
+
+  async getAnnouncementById(id: string): Promise<Announcement | undefined> {
+    const result = await db.select().from(announcements)
+      .where(eq(announcements.id, id));
+    return result[0];
+  }
+
+  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
+    const result = await db.insert(announcements).values(announcement).returning();
+    return result[0];
+  }
+
+  async updateAnnouncement(id: string, updates: Partial<InsertAnnouncement>): Promise<Announcement | undefined> {
+    const result = await db.update(announcements)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(announcements.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAnnouncement(id: string): Promise<boolean> {
+    const result = await db.update(announcements)
+      .set({ isActive: "no" })
+      .where(eq(announcements.id, id))
       .returning();
     return result.length > 0;
   }
