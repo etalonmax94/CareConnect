@@ -327,27 +327,59 @@ export default function Chat() {
     }, 2000);
   };
 
-  const getFilteredMentionStaff = () => {
+  const getFilteredMentionStaff = (): Array<{ id: string; name: string; role?: string; isAllMention?: boolean }> => {
     if (!selectedRoom) return [];
     
     const participantIds = selectedRoom.participants.map(p => p.staffId);
-    return staff.filter(s => 
-      participantIds.includes(s.id) && 
-      s.id !== currentUser?.id &&
-      s.name?.toLowerCase().includes(mentionQuery)
-    ).slice(0, 5);
+    const filteredStaff = staff
+      .filter(s => 
+        participantIds.includes(s.id) && 
+        s.id !== currentUser?.id &&
+        s.name?.toLowerCase().includes(mentionQuery)
+      )
+      .slice(0, 5)
+      .map(s => ({ id: s.id, name: s.name, role: s.role || undefined }));
+    
+    // Add @all option for group chats (more than 2 participants)
+    const isGroupChat = selectedRoom.type === "group" || selectedRoom.participants.length > 2;
+    if (isGroupChat && "all".includes(mentionQuery)) {
+      return [
+        { id: "all", name: "all", role: "Notify everyone", isAllMention: true },
+        ...filteredStaff
+      ];
+    }
+    
+    return filteredStaff;
   };
 
-  const handleMentionSelect = (selectedStaff: { id: string; name: string }) => {
+  const handleMentionSelect = (selectedStaff: { id: string; name: string; isAllMention?: boolean }) => {
     const textBeforeMention = messageText.slice(0, mentionCursorPos).replace(/@\w*$/, "");
     const textAfterMention = messageText.slice(mentionCursorPos);
     const newText = `${textBeforeMention}@${selectedStaff.name} ${textAfterMention}`;
     
     setMessageText(newText);
-    setActiveMentions(prev => {
-      if (prev.find(m => m.id === selectedStaff.id)) return prev;
-      return [...prev, { id: selectedStaff.id, name: selectedStaff.name }];
-    });
+    
+    if (selectedStaff.isAllMention) {
+      // For @all, add all participants except current user to mentions
+      const allParticipants = selectedRoom?.participants
+        .filter(p => p.staffId !== currentUser?.id)
+        .map(p => ({ id: p.staffId, name: p.staffName })) || [];
+      setActiveMentions(prev => {
+        const newMentions = [...prev];
+        allParticipants.forEach(participant => {
+          if (!newMentions.find(m => m.id === participant.id)) {
+            newMentions.push(participant);
+          }
+        });
+        return newMentions;
+      });
+    } else {
+      setActiveMentions(prev => {
+        if (prev.find(m => m.id === selectedStaff.id)) return prev;
+        return [...prev, { id: selectedStaff.id, name: selectedStaff.name }];
+      });
+    }
+    
     setShowMentionPopover(false);
     setMentionQuery("");
     messageInputRef.current?.focus();
@@ -683,7 +715,11 @@ export default function Chat() {
     
     if (activeMentions.length > 0) {
       const mentionPattern = /@(\w+(?:\s+\w+)*)/g;
-      const messageMentions = [...messageText.matchAll(mentionPattern)].map(m => m[1].toLowerCase());
+      const messageMentions: string[] = [];
+      let match;
+      while ((match = mentionPattern.exec(messageText)) !== null) {
+        messageMentions.push(match[1].toLowerCase());
+      }
       const validMentions = activeMentions.filter(m => 
         messageMentions.some(mention => m.name.toLowerCase().startsWith(mention))
       );
@@ -854,10 +890,11 @@ export default function Chat() {
       }
       
       const mentionName = match[1];
-      const mentionedStaff = staff.find(s => 
+      const isAllMention = mentionName.toLowerCase() === "all";
+      const mentionedStaff = !isAllMention ? staff.find(s => 
         s.name?.toLowerCase() === mentionName.toLowerCase() ||
         s.name?.toLowerCase().startsWith(mentionName.toLowerCase())
-      );
+      ) : null;
       
       parts.push(
         <span 
@@ -867,7 +904,7 @@ export default function Chat() {
               ? "text-primary-foreground bg-primary-foreground/20 rounded px-0.5" 
               : "text-primary bg-primary/20 rounded px-0.5"
           }`}
-          data-testid={mentionedStaff ? `mention-${mentionedStaff.id}` : undefined}
+          data-testid={isAllMention ? "mention-all" : (mentionedStaff ? `mention-${mentionedStaff.id}` : undefined)}
         >
           @{mentionName}
         </span>
@@ -1541,13 +1578,21 @@ export default function Chat() {
                             }`}
                             data-testid={`mention-option-${member.id}`}
                           >
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {member.name?.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
+                            {member.isAllMention ? (
+                              <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center">
+                                <Users className="h-3.5 w-3.5 text-primary" />
+                              </div>
+                            ) : (
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {member.name?.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{member.name}</p>
+                              <p className="text-sm font-medium truncate">
+                                {member.isAllMention ? "@all" : member.name}
+                              </p>
                               <p className="text-xs text-muted-foreground truncate">{member.role}</p>
                             </div>
                           </div>
