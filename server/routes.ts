@@ -7778,7 +7778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get tasks created by current user
   app.get("/api/tasks/my", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user?.id || req.session?.userId;
+      const userId = req.user?.id || req.session?.user?.id;
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
@@ -7793,7 +7793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get tasks assigned to current user
   app.get("/api/tasks/assigned", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user?.id || req.session?.userId;
+      const userId = req.user?.id || req.session?.user?.id;
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
@@ -7835,8 +7835,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new task
   app.post("/api/tasks", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user?.id || req.session?.userId;
-      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      const userId = req.user?.id || req.session?.user?.id;
+      const userName = req.user?.displayName || req.session?.user?.displayName || "Unknown User";
       
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
@@ -7876,8 +7876,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tasks/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user?.id || req.session?.userId;
-      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      const userId = req.user?.id || req.session?.user?.id;
+      const userName = req.user?.displayName || req.session?.user?.displayName || "Unknown User";
       
       const existingTask = await storage.getTaskById(id);
       if (!existingTask) {
@@ -7931,8 +7931,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { assignedToId, assignedToName } = req.body;
-      const userId = req.user?.id || req.session?.userId;
-      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      const userId = req.user?.id || req.session?.user?.id;
+      const userName = req.user?.displayName || req.session?.user?.displayName || "Unknown User";
 
       if (!assignedToId || !assignedToName) {
         return res.status(400).json({ error: "Missing assignee information" });
@@ -7967,8 +7967,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { notes } = req.body;
-      const userId = req.user?.id || req.session?.userId;
-      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      const userId = req.user?.id || req.session?.user?.id;
+      const userName = req.user?.displayName || req.session?.user?.displayName || "Unknown User";
 
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
@@ -8031,8 +8031,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/:taskId/comments", requireAuth, async (req: any, res) => {
     try {
       const { taskId } = req.params;
-      const userId = req.user?.id || req.session?.userId;
-      const userName = req.user?.displayName || req.session?.userName || "Unknown User";
+      const userId = req.user?.id || req.session?.user?.id;
+      const userName = req.user?.displayName || req.session?.user?.displayName || "Unknown User";
 
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
@@ -8126,7 +8126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tasks/:taskId/checklists/:checklistId", requireAuth, async (req: any, res) => {
     try {
       const { checklistId } = req.params;
-      const userId = req.user?.id || req.session?.userId;
+      const userId = req.user?.id || req.session?.user?.id;
 
       // Handle completion
       if (req.body.isCompleted === "yes") {

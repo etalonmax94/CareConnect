@@ -67,7 +67,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 
 type TaskPriority = "low" | "medium" | "high" | "urgent";
-type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "on_hold";
+type TaskStatus = "not_started" | "in_progress" | "completed" | "cancelled";
 type TaskCategory = "general" | "client_care" | "documentation" | "compliance" | "training" | "meeting" | "follow_up" | "other";
 
 const priorityConfig: Record<TaskPriority, { label: string; color: string; icon: typeof Flag }> = {
@@ -78,10 +78,9 @@ const priorityConfig: Record<TaskPriority, { label: string; color: string; icon:
 };
 
 const statusConfig: Record<TaskStatus, { label: string; color: string; icon: typeof Circle }> = {
-  pending: { label: "Pending", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300", icon: Circle },
+  not_started: { label: "Not Started", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300", icon: Circle },
   in_progress: { label: "In Progress", color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300", icon: Clock },
   completed: { label: "Completed", color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300", icon: CheckCircle2 },
-  on_hold: { label: "On Hold", color: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300", icon: AlertCircle },
   cancelled: { label: "Cancelled", color: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400", icon: X },
 };
 
@@ -336,7 +335,7 @@ export default function Tasks() {
   // Stats
   const stats = {
     total: tasks.length,
-    pending: tasks.filter((t) => t.status === "pending").length,
+    notStarted: tasks.filter((t) => t.status === "not_started").length,
     inProgress: tasks.filter((t) => t.status === "in_progress").length,
     completed: tasks.filter((t) => t.status === "completed").length,
     overdue: tasks.filter((t) => t.dueDate && isBefore(new Date(t.dueDate), new Date()) && t.status !== "completed").length,
@@ -370,8 +369,8 @@ export default function Tasks() {
           {/* Quick Stats */}
           <div className="grid grid-cols-4 gap-2">
             <div className="text-center p-2 bg-muted/50 rounded-lg">
-              <div className="text-xl font-bold">{stats.pending}</div>
-              <div className="text-xs text-muted-foreground">Pending</div>
+              <div className="text-xl font-bold">{stats.notStarted}</div>
+              <div className="text-xs text-muted-foreground">Not Started</div>
             </div>
             <div className="text-center p-2 bg-blue-50 dark:bg-blue-950 rounded-lg">
               <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{stats.inProgress}</div>
@@ -418,10 +417,10 @@ export default function Tasks() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="not_started">Not Started</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -602,18 +601,18 @@ export default function Tasks() {
                       onClick={() => {
                         updateTaskMutation.mutate({
                           id: selectedTask.id,
-                          updates: { status: selectedTask.status === "in_progress" ? "pending" : "in_progress" }
+                          updates: { status: selectedTask.status === "in_progress" ? "not_started" : "in_progress" }
                         });
                       }}
                     >
                       <Clock className="h-4 w-4 mr-2" />
-                      {selectedTask.status === "in_progress" ? "Mark as Pending" : "Mark In Progress"}
+                      {selectedTask.status === "in_progress" ? "Mark Not Started" : "Mark In Progress"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => updateTaskMutation.mutate({ id: selectedTask.id, updates: { status: "on_hold" } })}
+                      onClick={() => updateTaskMutation.mutate({ id: selectedTask.id, updates: { status: "cancelled" } })}
                     >
-                      <AlertCircle className="h-4 w-4 mr-2" />
-                      Put On Hold
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel Task
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

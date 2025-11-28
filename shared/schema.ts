@@ -2549,7 +2549,7 @@ export type Announcement = typeof announcements.$inferSelect;
 // ============================================
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
-export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "on_hold";
+export type TaskStatus = "not_started" | "in_progress" | "completed" | "cancelled";
 export type TaskCategory = "general" | "client_care" | "documentation" | "compliance" | "training" | "meeting" | "follow_up" | "other";
 
 export const tasks = pgTable("tasks", {
@@ -2563,7 +2563,7 @@ export const tasks = pgTable("tasks", {
   description: text("description"),
   category: text("category").$type<TaskCategory>().notNull().default("general"),
   priority: text("priority").$type<TaskPriority>().notNull().default("medium"),
-  status: text("status").$type<TaskStatus>().notNull().default("pending"),
+  status: text("status").$type<TaskStatus>().notNull().default("not_started"),
   
   // Due date and reminders
   dueDate: timestamp("due_date"),
@@ -2601,9 +2601,9 @@ export const tasks = pgTable("tasks", {
 export const insertTaskSchema = createInsertSchema(tasks, {
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  category: z.enum(["general", "client_care", "documentation", "compliance", "training", "meeting", "follow_up", "other"]),
-  priority: z.enum(["low", "medium", "high", "urgent"]),
-  status: z.enum(["pending", "in_progress", "completed", "cancelled", "on_hold"]),
+  category: z.enum(["general", "client_care", "documentation", "compliance", "training", "meeting", "follow_up", "other"]).optional().default("general"),
+  priority: z.enum(["low", "medium", "high", "urgent"]).optional().default("medium"),
+  status: z.enum(["not_started", "in_progress", "completed", "cancelled"]).optional().default("not_started"),
   isRecurring: z.enum(["yes", "no"]).optional(),
 }).omit({
   id: true,
