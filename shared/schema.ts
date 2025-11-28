@@ -2543,3 +2543,133 @@ export const insertAnnouncementSchema = createInsertSchema(announcements, {
 
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Announcement = typeof announcements.$inferSelect;
+
+// ============================================
+// TASKS
+// ============================================
+
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
+export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "on_hold";
+export type TaskCategory = "general" | "client_care" | "documentation" | "compliance" | "training" | "meeting" | "follow_up" | "other";
+
+export const tasks = pgTable("tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Task number for easy reference
+  taskNumber: serial("task_number").notNull(),
+  
+  // Task details
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").$type<TaskCategory>().notNull().default("general"),
+  priority: text("priority").$type<TaskPriority>().notNull().default("medium"),
+  status: text("status").$type<TaskStatus>().notNull().default("pending"),
+  
+  // Due date and reminders
+  dueDate: timestamp("due_date"),
+  reminderDate: timestamp("reminder_date"),
+  
+  // Optional link to a client
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }),
+  clientName: text("client_name"),
+  
+  // Creator
+  createdById: varchar("created_by_id").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  
+  // Assignment (can be assigned to self or others)
+  assignedToId: varchar("assigned_to_id"),
+  assignedToName: text("assigned_to_name"),
+  assignedAt: timestamp("assigned_at"),
+  
+  // Completion
+  completedAt: timestamp("completed_at"),
+  completedById: varchar("completed_by_id"),
+  completedByName: text("completed_by_name"),
+  completionNotes: text("completion_notes"),
+  
+  // Recurrence (optional)
+  isRecurring: text("is_recurring").default("no").$type<"yes" | "no">(),
+  recurrencePattern: text("recurrence_pattern"), // daily, weekly, monthly, custom
+  recurrenceEndDate: timestamp("recurrence_end_date"),
+  parentTaskId: varchar("parent_task_id"), // For recurring task instances
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks, {
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  category: z.enum(["general", "client_care", "documentation", "compliance", "training", "meeting", "follow_up", "other"]),
+  priority: z.enum(["low", "medium", "high", "urgent"]),
+  status: z.enum(["pending", "in_progress", "completed", "cancelled", "on_hold"]),
+  isRecurring: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  taskNumber: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+
+// Task Comments/Updates
+export const taskComments = pgTable("task_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  
+  content: text("content").notNull(),
+  
+  // Type of update
+  commentType: text("comment_type").$type<"comment" | "status_change" | "assignment" | "due_date_change">().default("comment"),
+  
+  // For status changes, track old and new values
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  
+  authorId: varchar("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments, {
+  content: z.string().min(1, "Comment content is required"),
+  commentType: z.enum(["comment", "status_change", "assignment", "due_date_change"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+export type TaskComment = typeof taskComments.$inferSelect;
+
+// Task Checklists (sub-items within a task)
+export const taskChecklists = pgTable("task_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  
+  title: text("title").notNull(),
+  isCompleted: text("is_completed").default("no").$type<"yes" | "no">(),
+  completedAt: timestamp("completed_at"),
+  completedById: varchar("completed_by_id"),
+  
+  sortOrder: integer("sort_order").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskChecklistSchema = createInsertSchema(taskChecklists, {
+  title: z.string().min(1, "Title is required"),
+  isCompleted: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTaskChecklist = z.infer<typeof insertTaskChecklistSchema>;
+export type TaskChecklist = typeof taskChecklists.$inferSelect;
