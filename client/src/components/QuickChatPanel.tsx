@@ -48,12 +48,102 @@ interface QuickChatPanelProps {
   userName: string;
 }
 
+interface WebSocketMessage {
+  type: "message" | "typing" | "presence" | "read";
+  roomId?: string;
+  userId?: string;
+  message?: any;
+  isTyping?: boolean;
+  status?: "online" | "offline";
+}
+
 export default function QuickChatPanel({ userId, userName }: QuickChatPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [typingUsers, setTypingUsers] = useState<Map<string, Set<string>>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+
+  const handleWebSocketMessage = useCallback((data: WebSocketMessage) => {
+    switch (data.type) {
+      case "message":
+        if (data.message) {
+          queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms", data.roomId, "messages"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+        }
+        break;
+      case "typing":
+        if (data.roomId && data.userId) {
+          setTypingUsers(prev => {
+            const newMap = new Map(prev);
+            const roomTyping = newMap.get(data.roomId!) || new Set();
+            if (data.isTyping) {
+              roomTyping.add(data.userId!);
+            } else {
+              roomTyping.delete(data.userId!);
+            }
+            newMap.set(data.roomId!, roomTyping);
+            return newMap;
+          });
+        }
+        break;
+      case "read":
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+        break;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userId || !isOpen) {
+      setTypingUsers(new Map());
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      return;
+    }
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/chat?userId=${userId}&userName=${encodeURIComponent(userName)}`;
+    
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("QuickChat WebSocket connected");
+    };
+
+    ws.onmessage = (event) => {
+      const data: WebSocketMessage = JSON.parse(event.data);
+      handleWebSocketMessage(data);
+    };
+
+    ws.onerror = (error) => {
+      console.error("QuickChat WebSocket error:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("QuickChat WebSocket disconnected");
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [userId, userName, isOpen, handleWebSocketMessage]);
+
+  const sendTypingIndicator = useCallback((isTyping: boolean) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && selectedRoomId) {
+      wsRef.current.send(JSON.stringify({
+        type: "typing",
+        roomId: selectedRoomId,
+        userId: userId,
+        isTyping
+      }));
+    }
+  }, [selectedRoomId, userId]);
 
   const { data: rooms = [], isLoading: roomsLoading } = useQuery<ChatRoomWithParticipants[]>({
     queryKey: ["/api/chat/rooms"],
@@ -63,7 +153,6 @@ export default function QuickChatPanel({ userId, userName }: QuickChatPanelProps
   const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/rooms", selectedRoomId, "messages"],
     enabled: !!selectedRoomId && isOpen,
-    refetchInterval: isOpen && selectedRoomId ? 3000 : false,
   });
 
   const { data: staff = [] } = useQuery<Staff[]>({
@@ -74,14 +163,25 @@ export default function QuickChatPanel({ userId, userName }: QuickChatPanelProps
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ content, roomId }: { content: string; roomId: string }) => {
-      const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/messages`, {
-        content,
-        messageType: "text",
-      });
-      return response.json();
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "message",
+          roomId,
+          content,
+          messageType: "text",
+        }));
+        return { success: true };
+      } else {
+        const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/messages`, {
+          content,
+          messageType: "text",
+        });
+        return response.json();
+      }
     },
     onSuccess: () => {
       setMessageText("");
+      sendTypingIndicator(false);
       queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms", selectedRoomId, "messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
     },
@@ -93,6 +193,37 @@ export default function QuickChatPanel({ userId, userName }: QuickChatPanelProps
       });
     },
   });
+
+  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMessageText(e.target.value);
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    sendTypingIndicator(true);
+    
+    typingTimeoutRef.current = setTimeout(() => {
+      sendTypingIndicator(false);
+    }, 2000);
+  };
+
+  const getTypingText = () => {
+    if (!selectedRoomId) return null;
+    const roomTyping = typingUsers.get(selectedRoomId);
+    if (!roomTyping || roomTyping.size === 0) return null;
+    
+    const typingNames = Array.from(roomTyping)
+      .filter(id => id !== userId)
+      .map(id => {
+        const participant = selectedRoom?.participants.find(p => p.staffId === id);
+        return participant?.staffName?.split(" ")[0] || "Someone";
+      });
+    
+    if (typingNames.length === 0) return null;
+    if (typingNames.length === 1) return `${typingNames[0]} is typing...`;
+    return `${typingNames.join(", ")} are typing...`;
+  };
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -341,11 +472,16 @@ export default function QuickChatPanel({ userId, userName }: QuickChatPanelProps
             </ScrollArea>
 
             <div className="p-3 border-t">
+              {getTypingText() && (
+                <p className="text-xs text-muted-foreground mb-2 animate-pulse">
+                  {getTypingText()}
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <Input
                   placeholder="Type a message..."
                   value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
+                  onChange={handleMessageChange}
                   onKeyDown={handleKeyPress}
                   className="flex-1 bg-muted/40 border-0 rounded-full"
                   data-testid="input-quick-message"
