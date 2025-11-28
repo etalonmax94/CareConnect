@@ -9704,7 +9704,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
   
-  // Search GIFs via Giphy API proxy
+  // Search GIFs via Giphy API proxy (path parameter version)
+  app.get("/api/chat/gifs/search/:query", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const searchQuery = (req.params.query || "").trim().toLowerCase();
+      if (!searchQuery) {
+        return res.json({ results: [], next: "" });
+      }
+      
+      const { limit = "20", offset = "0" } = req.query;
+      const limitNum = Math.min(Math.max(parseInt(limit as string) || 20, 1), 50);
+      const offsetNum = Math.max(parseInt(offset as string) || 0, 0);
+      
+      cleanGifCache();
+      
+      const cacheKey = `search:${searchQuery}:${limitNum}:${offsetNum}`;
+      const cached = gifCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < GIF_CACHE_TTL) {
+        return res.json(cached.data);
+      }
+      
+      const giphyApiKey = process.env.GIPHY_API_KEY;
+      if (!giphyApiKey) {
+        return res.status(503).json({ 
+          error: "GIF service not configured",
+          results: [],
+          next: ""
+        });
+      }
+      
+      const params = new URLSearchParams({
+        api_key: giphyApiKey,
+        q: searchQuery,
+        limit: limitNum.toString(),
+        offset: offsetNum.toString(),
+        rating: "g",
+        lang: "en"
+      });
+      
+      const response = await fetch(`https://api.giphy.com/v1/gifs/search?${params}`);
+      
+      if (!response.ok) {
+        console.error("Giphy search error:", response.status, await response.text());
+        return res.status(502).json({ error: "Failed to fetch GIFs", results: [], next: "" });
+      }
+      
+      const data = await response.json();
+      
+      const result = {
+        results: (data.data || []).map((gif: any) => ({
+          id: gif.id,
+          title: gif.title || "",
+          url: gif.images?.original?.url || "",
+          previewUrl: gif.images?.fixed_width_small?.url || gif.images?.preview_gif?.url || "",
+          mp4Url: gif.images?.original_mp4?.mp4 || "",
+          width: parseInt(gif.images?.original?.width) || 0,
+          height: parseInt(gif.images?.original?.height) || 0,
+          size: parseInt(gif.images?.original?.size) || 0
+        })),
+        next: data.pagination?.offset + limitNum < data.pagination?.total_count 
+          ? String(offsetNum + limitNum) 
+          : ""
+      };
+      
+      gifCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching GIFs:", error);
+      res.status(500).json({ error: "Failed to search GIFs", results: [], next: "" });
+    }
+  });
+
+  // Search GIFs via Giphy API proxy (query parameter version)
   app.get("/api/chat/gifs/search", requireAuth, async (req: any, res) => {
     try {
       const userContext = getUserContext(req);
