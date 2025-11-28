@@ -7015,6 +7015,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seed default form templates endpoint (EmpowerLink Consent Form)
+  app.post("/api/form-templates/seed", async (req, res) => {
+    try {
+      const user = (req as any).session?.user;
+      if (!user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const userRoles = user.roles || [];
+      const isAdmin = userRoles.some((role: string) => 
+        ["superadmin", "admin", "director", "operations_manager"].includes(role)
+      );
+      
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Access denied. Admin role required." });
+      }
+      
+      // Check if EmpowerLink Consent Form already exists
+      const existingTemplates = await storage.getAllFormTemplates();
+      const consentFormExists = existingTemplates.some(t => 
+        t.name === "EmpowerLink Consent Form" && t.category === "consent"
+      );
+      
+      if (consentFormExists) {
+        return res.json({ message: "EmpowerLink Consent Form template already exists", created: [] });
+      }
+      
+      // Create the EmpowerLink Consent Form template
+      const consentForm = await storage.createFormTemplate({
+        name: "EmpowerLink Consent Form",
+        description: "Comprehensive consent form for EmpowerLink clients covering privacy, information sharing, and service agreements in accordance with Australian Privacy Principles.",
+        category: "consent",
+        status: "active",
+        version: "1.0",
+        requiresSignature: "yes",
+        allowDraft: "yes",
+        createdById: user.id,
+        createdByName: user.displayName
+      });
+      
+      // Define all fields for the consent form
+      const consentFormFields = [
+        // Section 1: Participant Information
+        { fieldKey: "section_participant", label: "Participant Information", fieldType: "section_header", order: "1", section: "Participant Details" },
+        { fieldKey: "participant_name", label: "Participant Full Name", fieldType: "text", isRequired: "yes", order: "2", section: "Participant Details", placeholder: "Enter participant's full legal name" },
+        { fieldKey: "date_of_birth", label: "Date of Birth", fieldType: "date", isRequired: "yes", order: "3", section: "Participant Details", width: "half" },
+        { fieldKey: "address", label: "Residential Address", fieldType: "textarea", isRequired: "yes", order: "4", section: "Participant Details", placeholder: "Full street address" },
+        { fieldKey: "phone", label: "Phone Number", fieldType: "text", isRequired: "yes", order: "5", section: "Participant Details", width: "half", pattern: "^[0-9\\s\\-\\+]+$" },
+        { fieldKey: "email", label: "Email Address", fieldType: "email", isRequired: "no", order: "6", section: "Participant Details", width: "half" },
+        
+        // Section 2: NDIS Information (conditional)
+        { fieldKey: "section_ndis", label: "NDIS Information", fieldType: "section_header", order: "10", section: "NDIS Details" },
+        { fieldKey: "is_ndis_participant", label: "Is the participant an NDIS client?", fieldType: "yes_no", isRequired: "yes", order: "11", section: "NDIS Details", yesLabel: "Yes - NDIS Participant", noLabel: "No - Not NDIS" },
+        { fieldKey: "ndis_number", label: "NDIS Number", fieldType: "text", isRequired: "no", order: "12", section: "NDIS Details", placeholder: "e.g., 123456789", conditionalOn: "is_ndis_participant", conditionalValue: "yes", conditionalOperator: "equals" },
+        { fieldKey: "ndis_plan_start", label: "Plan Start Date", fieldType: "date", isRequired: "no", order: "13", section: "NDIS Details", width: "half", conditionalOn: "is_ndis_participant", conditionalValue: "yes", conditionalOperator: "equals" },
+        { fieldKey: "ndis_plan_end", label: "Plan End Date", fieldType: "date", isRequired: "no", order: "14", section: "NDIS Details", width: "half", conditionalOn: "is_ndis_participant", conditionalValue: "yes", conditionalOperator: "equals" },
+        
+        // Section 3: Representative/Guardian (if applicable)
+        { fieldKey: "section_representative", label: "Representative / Guardian (if applicable)", fieldType: "section_header", order: "20", section: "Representative" },
+        { fieldKey: "has_representative", label: "Does someone else make decisions for the participant?", fieldType: "yes_no", isRequired: "yes", order: "21", section: "Representative" },
+        { fieldKey: "representative_name", label: "Representative Full Name", fieldType: "text", isRequired: "no", order: "22", section: "Representative", conditionalOn: "has_representative", conditionalValue: "yes", conditionalOperator: "equals" },
+        { fieldKey: "representative_relationship", label: "Relationship to Participant", fieldType: "select", isRequired: "no", order: "23", section: "Representative", conditionalOn: "has_representative", conditionalValue: "yes", conditionalOperator: "equals", options: [{ value: "parent", label: "Parent" }, { value: "guardian", label: "Legal Guardian" }, { value: "power_of_attorney", label: "Power of Attorney" }, { value: "family_member", label: "Family Member" }, { value: "other", label: "Other" }] },
+        { fieldKey: "representative_phone", label: "Representative Phone", fieldType: "text", isRequired: "no", order: "24", section: "Representative", width: "half", conditionalOn: "has_representative", conditionalValue: "yes", conditionalOperator: "equals" },
+        { fieldKey: "representative_email", label: "Representative Email", fieldType: "email", isRequired: "no", order: "25", section: "Representative", width: "half", conditionalOn: "has_representative", conditionalValue: "yes", conditionalOperator: "equals" },
+        
+        // Section 4: Privacy & Information Collection
+        { fieldKey: "section_privacy", label: "Privacy & Information Collection", fieldType: "section_header", order: "30", section: "Privacy Consent" },
+        { fieldKey: "privacy_intro", label: "EmpowerLink collects personal and health information to provide quality care and services. Your information will be handled in accordance with Australian Privacy Principles and the Privacy Act 1988.", fieldType: "paragraph", order: "31", section: "Privacy Consent" },
+        { fieldKey: "consent_personal_info", label: "I consent to EmpowerLink collecting my personal information (name, contact details, date of birth) for the purpose of providing services", fieldType: "checkbox", isRequired: "yes", order: "32", section: "Privacy Consent" },
+        { fieldKey: "consent_health_info", label: "I consent to EmpowerLink collecting my health information (medical history, diagnoses, medications) for the purpose of providing safe and appropriate care", fieldType: "checkbox", isRequired: "yes", order: "33", section: "Privacy Consent" },
+        { fieldKey: "consent_share_providers", label: "I consent to EmpowerLink sharing my information with relevant healthcare providers (GPs, specialists, hospitals) when necessary for my care", fieldType: "checkbox", isRequired: "yes", order: "34", section: "Privacy Consent" },
+        { fieldKey: "consent_share_ndis", label: "I consent to EmpowerLink sharing my information with the NDIA and my plan manager/support coordinator for NDIS purposes", fieldType: "checkbox", isRequired: "no", order: "35", section: "Privacy Consent", conditionalOn: "is_ndis_participant", conditionalValue: "yes", conditionalOperator: "equals" },
+        
+        // Section 5: Communication Preferences
+        { fieldKey: "section_communication", label: "Communication Preferences", fieldType: "section_header", order: "40", section: "Communication" },
+        { fieldKey: "preferred_contact", label: "Preferred method of contact", fieldType: "select", isRequired: "yes", order: "41", section: "Communication", options: [{ value: "phone", label: "Phone" }, { value: "sms", label: "SMS/Text" }, { value: "email", label: "Email" }, { value: "postal", label: "Postal Mail" }] },
+        { fieldKey: "consent_photos", label: "I consent to photos/videos being taken for progress documentation (internal use only)", fieldType: "checkbox", isRequired: "no", order: "42", section: "Communication" },
+        { fieldKey: "consent_marketing", label: "I consent to receiving information about EmpowerLink services and updates", fieldType: "checkbox", isRequired: "no", order: "43", section: "Communication" },
+        
+        // Section 6: Emergency Procedures
+        { fieldKey: "section_emergency", label: "Emergency & Medical Procedures", fieldType: "section_header", order: "50", section: "Emergency" },
+        { fieldKey: "consent_emergency", label: "In an emergency, I consent to EmpowerLink staff calling emergency services (000) and providing necessary information to paramedics/hospital staff", fieldType: "checkbox", isRequired: "yes", order: "51", section: "Emergency" },
+        { fieldKey: "consent_first_aid", label: "I consent to EmpowerLink staff providing first aid assistance if required", fieldType: "checkbox", isRequired: "yes", order: "52", section: "Emergency" },
+        { fieldKey: "emergency_contact_name", label: "Emergency Contact Name", fieldType: "text", isRequired: "yes", order: "53", section: "Emergency", width: "half" },
+        { fieldKey: "emergency_contact_phone", label: "Emergency Contact Phone", fieldType: "text", isRequired: "yes", order: "54", section: "Emergency", width: "half" },
+        { fieldKey: "emergency_contact_relationship", label: "Relationship", fieldType: "text", isRequired: "yes", order: "55", section: "Emergency", width: "half" },
+        
+        // Section 7: Rights & Acknowledgments
+        { fieldKey: "section_rights", label: "Your Rights", fieldType: "section_header", order: "60", section: "Rights" },
+        { fieldKey: "rights_info", label: "You have the right to: access your personal information held by EmpowerLink; request corrections to your information; make a complaint about how your information is handled; withdraw consent at any time (which may affect our ability to provide services).", fieldType: "paragraph", order: "61", section: "Rights" },
+        { fieldKey: "ack_rights", label: "I acknowledge that I have been informed of my rights regarding my personal information", fieldType: "checkbox", isRequired: "yes", order: "62", section: "Rights" },
+        { fieldKey: "ack_privacy_policy", label: "I acknowledge that I have received and understand the EmpowerLink Privacy Policy", fieldType: "checkbox", isRequired: "yes", order: "63", section: "Rights" },
+        { fieldKey: "ack_complaints", label: "I understand how to make a complaint if I am not satisfied with how my information is handled", fieldType: "checkbox", isRequired: "yes", order: "64", section: "Rights" },
+        
+        // Section 8: Service Agreement
+        { fieldKey: "section_service", label: "Service Agreement", fieldType: "section_header", order: "70", section: "Service Agreement" },
+        { fieldKey: "ack_service_terms", label: "I agree to the EmpowerLink service terms and conditions as outlined in the Service Agreement", fieldType: "checkbox", isRequired: "yes", order: "71", section: "Service Agreement" },
+        { fieldKey: "ack_cancellation", label: "I understand the cancellation policy (24 hours notice required)", fieldType: "checkbox", isRequired: "yes", order: "72", section: "Service Agreement" },
+        { fieldKey: "ack_feedback", label: "I understand I can provide feedback or raise concerns at any time", fieldType: "checkbox", isRequired: "yes", order: "73", section: "Service Agreement" },
+        
+        // Section 9: Additional Notes
+        { fieldKey: "section_additional", label: "Additional Information", fieldType: "section_header", order: "80", section: "Additional" },
+        { fieldKey: "additional_notes", label: "Any additional information or special requirements", fieldType: "textarea", isRequired: "no", order: "81", section: "Additional", placeholder: "Enter any other information you would like us to know..." },
+        
+        // Section 10: Signatures
+        { fieldKey: "section_signatures", label: "Signatures", fieldType: "section_header", order: "90", section: "Signatures" },
+        { fieldKey: "signature_date", label: "Date", fieldType: "date", isRequired: "yes", order: "91", section: "Signatures", width: "half" },
+        { fieldKey: "participant_signature", label: "Participant/Representative Signature", fieldType: "signature", isRequired: "yes", order: "92", section: "Signatures" },
+        { fieldKey: "witness_required", label: "Is a witness signature required?", fieldType: "yes_no", isRequired: "no", order: "93", section: "Signatures" },
+        { fieldKey: "witness_name", label: "Witness Name", fieldType: "text", isRequired: "no", order: "94", section: "Signatures", conditionalOn: "witness_required", conditionalValue: "yes", conditionalOperator: "equals" },
+        { fieldKey: "witness_signature", label: "Witness Signature", fieldType: "signature", isRequired: "no", order: "95", section: "Signatures", conditionalOn: "witness_required", conditionalValue: "yes", conditionalOperator: "equals" }
+      ];
+      
+      // Create all fields
+      const createdFields = [];
+      for (const fieldData of consentFormFields) {
+        const field = await storage.createTemplateField({
+          templateId: consentForm.id,
+          ...fieldData as any
+        });
+        createdFields.push(field);
+      }
+      
+      res.json({ 
+        message: `Created EmpowerLink Consent Form template with ${createdFields.length} fields`,
+        template: consentForm,
+        fieldsCount: createdFields.length
+      });
+    } catch (error) {
+      console.error("Error seeding form templates:", error);
+      res.status(500).json({ error: "Failed to seed form templates" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
