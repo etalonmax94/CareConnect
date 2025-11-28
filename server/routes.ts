@@ -9618,6 +9618,249 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= TENOR GIF API INTEGRATION =============
+  
+  // Simple in-memory cache for GIF search results (short-lived, public Tenor content)
+  // Note: GIF search results are public content from Tenor - same for all users
+  // Cache is query-based since results don't contain user-specific data
+  const gifCache: Map<string, { data: any; timestamp: number }> = new Map();
+  const GIF_CACHE_TTL = 2 * 60 * 1000; // 2 minutes - short TTL for safety
+  const GIF_CACHE_MAX_SIZE = 100; // Maximum cache entries
+  
+  // Helper to clean old cache entries (called on-demand, not via interval)
+  const cleanGifCache = () => {
+    const now = Date.now();
+    for (const [key, value] of gifCache.entries()) {
+      if (now - value.timestamp > GIF_CACHE_TTL) {
+        gifCache.delete(key);
+      }
+    }
+    // If still over limit, remove oldest entries
+    if (gifCache.size > GIF_CACHE_MAX_SIZE) {
+      const entries = Array.from(gifCache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp);
+      const toRemove = entries.slice(0, gifCache.size - GIF_CACHE_MAX_SIZE);
+      toRemove.forEach(([key]) => gifCache.delete(key));
+    }
+  };
+  
+  // Search GIFs via Tenor API proxy
+  app.get("/api/chat/gifs/search", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const { q, limit = "20", pos } = req.query;
+      
+      if (!q || typeof q !== "string" || q.trim().length === 0) {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+      
+      const searchQuery = q.trim().toLowerCase();
+      const limitNum = Math.min(Math.max(parseInt(limit as string) || 20, 1), 50);
+      
+      // Clean cache periodically
+      cleanGifCache();
+      
+      // Check cache first (public content, same for all authenticated users)
+      const cacheKey = `search:${searchQuery}:${limitNum}:${pos || ""}`;
+      const cached = gifCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < GIF_CACHE_TTL) {
+        return res.json(cached.data);
+      }
+      
+      // Get Tenor API key from environment
+      const tenorApiKey = process.env.TENOR_API_KEY;
+      if (!tenorApiKey) {
+        return res.status(503).json({ 
+          error: "GIF service not configured. Please contact administrator.",
+          results: [],
+          next: ""
+        });
+      }
+      
+      // Build Tenor API request
+      const params = new URLSearchParams({
+        key: tenorApiKey,
+        q: searchQuery,
+        limit: limitNum.toString(),
+        contentfilter: "high", // Strict content filter for healthcare environment
+        media_filter: "gif,tinygif,mp4", // Reduce response size
+        client_key: "empowerlink_crm"
+      });
+      
+      if (pos) {
+        params.append("pos", pos as string);
+      }
+      
+      const response = await fetch(`https://tenor.googleapis.com/v2/search?${params}`);
+      
+      if (!response.ok) {
+        console.error("Tenor API error:", response.status, await response.text());
+        return res.status(502).json({ error: "Failed to fetch GIFs from external service" });
+      }
+      
+      const data = await response.json();
+      
+      // Transform response for frontend consumption
+      const result = {
+        results: (data.results || []).map((gif: any) => ({
+          id: gif.id,
+          title: gif.title || "",
+          url: gif.media_formats?.gif?.url || "",
+          previewUrl: gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url || "",
+          mp4Url: gif.media_formats?.mp4?.url || "",
+          width: gif.media_formats?.gif?.dims?.[0] || 0,
+          height: gif.media_formats?.gif?.dims?.[1] || 0,
+          size: gif.media_formats?.gif?.size || 0
+        })),
+        next: data.next || ""
+      };
+      
+      // Cache the result
+      gifCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching GIFs:", error);
+      res.status(500).json({ error: "Failed to search GIFs" });
+    }
+  });
+  
+  // Get trending GIFs
+  app.get("/api/chat/gifs/trending", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const { limit = "20", pos } = req.query;
+      const limitNum = Math.min(Math.max(parseInt(limit as string) || 20, 1), 50);
+      
+      // Clean cache periodically
+      cleanGifCache();
+      
+      // Check cache first (public content, same for all authenticated users)
+      const cacheKey = `trending:${limitNum}:${pos || ""}`;
+      const cached = gifCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < GIF_CACHE_TTL) {
+        return res.json(cached.data);
+      }
+      
+      const tenorApiKey = process.env.TENOR_API_KEY;
+      if (!tenorApiKey) {
+        return res.status(503).json({ 
+          error: "GIF service not configured. Please contact administrator.",
+          results: [],
+          next: ""
+        });
+      }
+      
+      const params = new URLSearchParams({
+        key: tenorApiKey,
+        limit: limitNum.toString(),
+        contentfilter: "high",
+        media_filter: "gif,tinygif,mp4",
+        client_key: "empowerlink_crm"
+      });
+      
+      if (pos) {
+        params.append("pos", pos as string);
+      }
+      
+      const response = await fetch(`https://tenor.googleapis.com/v2/featured?${params}`);
+      
+      if (!response.ok) {
+        console.error("Tenor API error:", response.status, await response.text());
+        return res.status(502).json({ error: "Failed to fetch trending GIFs" });
+      }
+      
+      const data = await response.json();
+      
+      const result = {
+        results: (data.results || []).map((gif: any) => ({
+          id: gif.id,
+          title: gif.title || "",
+          url: gif.media_formats?.gif?.url || "",
+          previewUrl: gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url || "",
+          mp4Url: gif.media_formats?.mp4?.url || "",
+          width: gif.media_formats?.gif?.dims?.[0] || 0,
+          height: gif.media_formats?.gif?.dims?.[1] || 0,
+          size: gif.media_formats?.gif?.size || 0
+        })),
+        next: data.next || ""
+      };
+      
+      gifCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching trending GIFs:", error);
+      res.status(500).json({ error: "Failed to fetch trending GIFs" });
+    }
+  });
+  
+  // Get GIF categories/suggestions
+  app.get("/api/chat/gifs/categories", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      // Clean cache periodically
+      cleanGifCache();
+      
+      // Check cache (public content, same for all authenticated users)
+      const cacheKey = "categories";
+      const cached = gifCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < GIF_CACHE_TTL) {
+        return res.json(cached.data);
+      }
+      
+      const tenorApiKey = process.env.TENOR_API_KEY;
+      if (!tenorApiKey) {
+        return res.status(503).json({ 
+          error: "GIF service not configured",
+          categories: []
+        });
+      }
+      
+      const params = new URLSearchParams({
+        key: tenorApiKey,
+        contentfilter: "high",
+        client_key: "empowerlink_crm"
+      });
+      
+      const response = await fetch(`https://tenor.googleapis.com/v2/categories?${params}`);
+      
+      if (!response.ok) {
+        console.error("Tenor API error:", response.status, await response.text());
+        return res.status(502).json({ error: "Failed to fetch GIF categories" });
+      }
+      
+      const data = await response.json();
+      
+      const result = {
+        categories: (data.tags || []).map((tag: any) => ({
+          searchterm: tag.searchterm,
+          path: tag.path,
+          image: tag.image,
+          name: tag.name || tag.searchterm
+        }))
+      };
+      
+      gifCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching GIF categories:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
   // Lock chat room - Admin only
   app.post("/api/chat/rooms/:roomId/lock", requireAuth, async (req: any, res) => {
     try {
