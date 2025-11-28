@@ -1622,54 +1622,58 @@ export default function NewClientWizard({ onSubmit, onCancel }: NewClientWizardP
     <>
       <Form {...form}>
         <div className="max-w-4xl mx-auto px-2 sm:px-4">
-          {/* Step labels and progress bar - compact layout */}
+          {/* Block-based step progress indicator */}
           <div className="mb-3 flex-shrink-0">
-            {/* Step labels row - compact */}
-            <div className="flex justify-between mb-1.5">
-              {WIZARD_STEPS.map((step, index) => {
-                const StepIcon = step.icon;
-                const isComplete = index < currentStep;
-                const isCurrent = index === currentStep;
-                
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    onClick={() => goToStep(index)}
-                    disabled={index > currentStep}
-                    className={cn(
-                      "flex flex-col items-center gap-0.5 px-0.5 py-0.5 rounded-md text-xs transition-all flex-1",
-                      isCurrent && "text-primary font-semibold",
-                      isComplete && "text-primary cursor-pointer hover:bg-primary/10",
-                      !isCurrent && !isComplete && "text-muted-foreground cursor-not-allowed opacity-50"
-                    )}
-                    data-testid={`step-${step.id}`}
-                  >
-                    <div className={cn(
-                      "flex items-center justify-center w-6 h-6 rounded-full transition-all",
-                      isCurrent && "bg-primary text-primary-foreground shadow-sm",
-                      isComplete && "bg-primary/20 text-primary",
-                      !isCurrent && !isComplete && "bg-muted text-muted-foreground"
-                    )}>
-                      {isComplete ? (
-                        <Check className="w-3.5 h-3.5" />
-                      ) : (
-                        <StepIcon className="w-3.5 h-3.5" />
+            {/* Scrollable container for step blocks */}
+            <div className="overflow-x-auto pb-1 -mx-2 px-2">
+              <div className="flex gap-1 md:gap-1.5">
+                {WIZARD_STEPS.map((step, index) => {
+                  const StepIcon = step.icon;
+                  const isComplete = index < currentStep;
+                  const isCurrent = index === currentStep;
+                  const isFuture = index > currentStep;
+                  
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => goToStep(index)}
+                      disabled={isFuture}
+                      className={cn(
+                        "min-w-[58px] md:min-w-[68px] lg:flex-1 flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-md border transition-all duration-300",
+                        isComplete && "bg-primary/15 border-primary text-primary cursor-pointer hover:bg-primary/25",
+                        isCurrent && "bg-primary border-primary text-primary-foreground shadow-md scale-105",
+                        isFuture && "bg-muted/30 border-transparent text-muted-foreground cursor-not-allowed opacity-50"
                       )}
-                    </div>
-                    <span className="hidden sm:block text-[9px] leading-tight text-center">{step.title}</span>
-                  </button>
-                );
-              })}
+                      data-testid={`step-${step.id}`}
+                    >
+                      <div className={cn(
+                        "flex items-center justify-center w-5 h-5 rounded-full transition-all",
+                        isComplete && "bg-primary text-primary-foreground",
+                        isCurrent && "bg-primary-foreground text-primary",
+                        isFuture && "bg-muted text-muted-foreground"
+                      )}>
+                        {isComplete ? (
+                          <Check className="w-3 h-3" />
+                        ) : (
+                          <StepIcon className="w-3 h-3" />
+                        )}
+                      </div>
+                      <span className="text-[7px] md:text-[8px] font-medium leading-tight text-center truncate w-full">
+                        {step.title}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             
-            {/* Progress bar */}
-            <Progress value={progress} className="h-1.5" />
-            
-            {/* Progress text - more compact */}
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-[10px] text-muted-foreground">Step {currentStep + 1}/{WIZARD_STEPS.length}</span>
-              <span className="text-[10px] text-muted-foreground">{Math.round(progress)}%</span>
+            {/* Progress summary with bar */}
+            <div className="mt-2 flex items-center gap-3">
+              <Progress value={progress} className="h-1.5 flex-1" />
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                Step {currentStep + 1}/{WIZARD_STEPS.length} • {Math.round(progress)}%
+              </span>
             </div>
           </div>
 
