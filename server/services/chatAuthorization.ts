@@ -60,6 +60,11 @@ const MANAGER_ROLES = [
 ];
 
 export class ChatAuthorizationService {
+  // Public helper to check if user has admin or manager privileges
+  isPrivilegedUser(user: UserContext): boolean {
+    return this.hasManagerRole(user.roles);
+  }
+
   async checkPermission(
     action: ChatAction,
     user: UserContext,

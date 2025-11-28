@@ -163,6 +163,53 @@ const uploadPhoto = multer({
   }
 });
 
+// Chat attachment upload configuration
+const chatAttachmentDir = path.join(uploadsDir, 'chat-attachments');
+if (!fs.existsSync(chatAttachmentDir)) {
+  fs.mkdirSync(chatAttachmentDir, { recursive: true });
+}
+
+const chatAttachmentStorageConfig = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const roomId = (req as any).params.roomId;
+    if (roomId) {
+      const roomDir = path.join(chatAttachmentDir, sanitizeFilename(roomId));
+      if (!fs.existsSync(roomDir)) {
+        fs.mkdirSync(roomDir, { recursive: true });
+      }
+      cb(null, roomDir);
+    } else {
+      cb(new Error('Room ID required'), '');
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `attachment-${uniqueSuffix}${ext}`);
+  }
+});
+
+// Allowed MIME types for chat attachments
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15MB for images
+const MAX_VIDEO_SIZE = 60 * 1024 * 1024; // 60MB for videos
+
+const uploadChatAttachment = multer({
+  storage: chatAttachmentStorageConfig,
+  limits: { fileSize: MAX_VIDEO_SIZE }, // Use video size as max, validate per type
+  fileFilter: (req, file, cb) => {
+    const isImage = ALLOWED_IMAGE_TYPES.includes(file.mimetype);
+    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.mimetype);
+    
+    if (isImage || isVideo) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images (JPEG, PNG, WebP, GIF) and videos (MP4, WebM, QuickTime, AVI) are allowed'));
+    }
+  }
+});
+
 // Audit logging helper function
 interface AuditLogOptions {
   entityType: string;
@@ -9336,6 +9383,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
       email
     };
   }
+
+  // Upload chat attachment with size validation
+  app.post("/api/chat/rooms/:roomId/attachments", requireAuth, (req: any, res, next) => {
+    uploadChatAttachment.single('file')(req, res, async (err: any) => {
+      // Helper function to safely delete uploaded file
+      const cleanupFile = (filePath?: string) => {
+        if (filePath) {
+          try {
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          } catch (cleanupErr) {
+            console.error("Failed to cleanup uploaded file:", cleanupErr);
+          }
+        }
+      };
+
+      try {
+        const userContext = getUserContext(req);
+        if (!userContext) {
+          cleanupFile(req.file?.path);
+          return res.status(401).json({ error: "Not authenticated" });
+        }
+
+        const { roomId } = req.params;
+        
+        // Check send_message permission BEFORE processing file
+        const permission = await chatAuthorizationService.checkPermission("send_message", userContext, roomId);
+        if (!permission.allowed) {
+          cleanupFile(req.file?.path);
+          return res.status(403).json({ error: permission.reason });
+        }
+
+        // Handle multer errors
+        if (err) {
+          cleanupFile(req.file?.path);
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "File is too large. Maximum size is 60MB for videos or 15MB for images." });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        const file = req.file;
+        const isImage = ALLOWED_IMAGE_TYPES.includes(file.mimetype);
+        const isVideo = ALLOWED_VIDEO_TYPES.includes(file.mimetype);
+
+        // Validate size based on type - images have lower limit
+        if (isImage && file.size > MAX_IMAGE_SIZE) {
+          cleanupFile(file.path);
+          return res.status(400).json({ error: "Image file is too large. Maximum size is 15MB." });
+        }
+        
+        // Video size is already validated by multer limits, but double-check
+        if (isVideo && file.size > MAX_VIDEO_SIZE) {
+          cleanupFile(file.path);
+          return res.status(400).json({ error: "Video file is too large. Maximum size is 60MB." });
+        }
+
+        // Determine attachment type
+        let attachmentType: "photo" | "video" | "gif" = "photo";
+        if (isVideo) {
+          attachmentType = "video";
+        } else if (file.mimetype === 'image/gif') {
+          attachmentType = "gif";
+        }
+
+        // Create attachment record
+        const attachment = await storage.createChatMessageAttachment({
+          roomId,
+          type: attachmentType,
+          fileName: file.originalname,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          storageKey: file.path,
+          uploadedById: userContext.userId,
+          uploadedByName: userContext.userName,
+          status: "processing",
+        });
+
+        // Mark as completed (in a real app, you'd do thumbnail generation here)
+        const completedAttachment = await storage.updateChatMessageAttachmentStatus(
+          attachment.id, 
+          "completed"
+        );
+
+        // Create audit log entry
+        await storage.createChatAuditLog({
+          roomId,
+          action: "attachment_uploaded",
+          actorId: userContext.userId,
+          actorName: userContext.userName,
+          details: {
+            attachmentId: attachment.id,
+            fileName: file.originalname,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+            type: attachmentType
+          }
+        });
+
+        res.status(201).json(completedAttachment);
+      } catch (error) {
+        // Cleanup file on any unexpected error
+        cleanupFile(req.file?.path);
+        console.error("Error uploading chat attachment:", error);
+        res.status(500).json({ error: "Failed to upload attachment" });
+      }
+    });
+  });
+
+  // Get attachment by ID
+  app.get("/api/chat/attachments/:attachmentId", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { attachmentId } = req.params;
+      const attachments = await storage.getChatMessageAttachments(attachmentId);
+      
+      if (!attachments || attachments.length === 0) {
+        return res.status(404).json({ error: "Attachment not found" });
+      }
+
+      const attachment = attachments[0];
+      
+      // Check if user has access to the room
+      const permission = await chatAuthorizationService.checkPermission("view_messages", userContext, attachment.roomId);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      res.json(attachment);
+    } catch (error) {
+      console.error("Error fetching chat attachment:", error);
+      res.status(500).json({ error: "Failed to fetch attachment" });
+    }
+  });
+
+  // Serve attachment file
+  app.get("/api/chat/attachments/:attachmentId/file", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { attachmentId } = req.params;
+      const attachments = await storage.getChatMessageAttachments(attachmentId);
+      
+      if (!attachments || attachments.length === 0) {
+        return res.status(404).json({ error: "Attachment not found" });
+      }
+
+      const attachment = attachments[0];
+      
+      // Check if user has access to the room
+      const permission = await chatAuthorizationService.checkPermission("view_messages", userContext, attachment.roomId);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+
+      // Check if file exists
+      if (!attachment.storageKey || !fs.existsSync(attachment.storageKey)) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Set content type and send file
+      res.setHeader('Content-Type', attachment.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${attachment.fileName}"`);
+      res.sendFile(attachment.storageKey);
+    } catch (error) {
+      console.error("Error serving chat attachment:", error);
+      res.status(500).json({ error: "Failed to serve attachment" });
+    }
+  });
+
+  // Delete attachment (admin or uploader only)
+  app.delete("/api/chat/attachments/:attachmentId", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { attachmentId } = req.params;
+      const attachments = await storage.getChatMessageAttachments(attachmentId);
+      
+      if (!attachments || attachments.length === 0) {
+        return res.status(404).json({ error: "Attachment not found" });
+      }
+
+      const attachment = attachments[0];
+      
+      // Check if user is uploader or has admin delete permission
+      const isUploader = attachment.uploadedById === userContext.userId;
+      const isAdmin = chatAuthorizationService.isPrivilegedUser(userContext);
+      
+      if (!isUploader && !isAdmin) {
+        return res.status(403).json({ error: "You can only delete your own attachments" });
+      }
+
+      // Delete file from disk
+      if (attachment.storageKey && fs.existsSync(attachment.storageKey)) {
+        fs.unlinkSync(attachment.storageKey);
+      }
+
+      // Delete from database
+      await storage.deleteChatMessageAttachment(attachmentId);
+
+      // Create audit log entry
+      await storage.createChatAuditLog({
+        roomId: attachment.roomId,
+        action: "attachment_deleted",
+        actorId: userContext.userId,
+        actorName: userContext.userName,
+        details: {
+          attachmentId: attachment.id,
+          fileName: attachment.fileName,
+          deletedByUploader: isUploader
+        }
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting chat attachment:", error);
+      res.status(500).json({ error: "Failed to delete attachment" });
+    }
+  });
 
   // Lock chat room - Admin only
   app.post("/api/chat/rooms/:roomId/lock", requireAuth, async (req: any, res) => {
