@@ -20,6 +20,8 @@ import {
   serviceSubtypes,
   // Notifications, tickets, and announcements
   notifications, supportTickets, ticketComments, announcements,
+  // Tasks
+  tasks, taskComments, taskChecklists,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -77,7 +79,11 @@ import {
   type InsertNotification, type Notification,
   type InsertSupportTicket, type SupportTicket,
   type InsertTicketComment, type TicketComment,
-  type InsertAnnouncement, type Announcement
+  type InsertAnnouncement, type Announcement,
+  // Task types
+  type InsertTask, type Task,
+  type InsertTaskComment, type TaskComment,
+  type InsertTaskChecklist, type TaskChecklist
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql } from "drizzle-orm";
 
@@ -555,6 +561,28 @@ export interface IStorage {
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
   updateAnnouncement(id: string, updates: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
   deleteAnnouncement(id: string): Promise<boolean>;
+  
+  // Tasks
+  getAllTasks(): Promise<Task[]>;
+  getTasksByUser(userId: string): Promise<Task[]>;
+  getTasksAssignedToUser(userId: string): Promise<Task[]>;
+  getTasksByClient(clientId: string): Promise<Task[]>;
+  getTaskById(id: string): Promise<Task | undefined>;
+  createTask(task: InsertTask): Promise<Task>;
+  updateTask(id: string, updates: Partial<InsertTask>): Promise<Task | undefined>;
+  assignTask(id: string, assignedToId: string, assignedToName: string): Promise<Task | undefined>;
+  completeTask(id: string, completedById: string, completedByName: string, notes?: string): Promise<Task | undefined>;
+  deleteTask(id: string): Promise<boolean>;
+  
+  // Task Comments
+  getTaskComments(taskId: string): Promise<TaskComment[]>;
+  createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
+  
+  // Task Checklists
+  getTaskChecklists(taskId: string): Promise<TaskChecklist[]>;
+  createTaskChecklist(item: InsertTaskChecklist): Promise<TaskChecklist>;
+  updateTaskChecklist(id: string, updates: Partial<InsertTaskChecklist>): Promise<TaskChecklist | undefined>;
+  deleteTaskChecklist(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -3096,6 +3124,127 @@ export class DbStorage implements IStorage {
     const result = await db.update(announcements)
       .set({ isActive: "no" })
       .where(eq(announcements.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ============================================
+  // TASKS
+  // ============================================
+
+  async getAllTasks(): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  async getTasksByUser(userId: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .where(eq(tasks.createdById, userId))
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  async getTasksAssignedToUser(userId: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .where(eq(tasks.assignedToId, userId))
+      .orderBy(desc(tasks.dueDate), desc(tasks.createdAt));
+  }
+
+  async getTasksByClient(clientId: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .where(eq(tasks.clientId, clientId))
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  async getTaskById(id: string): Promise<Task | undefined> {
+    const result = await db.select().from(tasks)
+      .where(eq(tasks.id, id));
+    return result[0];
+  }
+
+  async createTask(task: InsertTask): Promise<Task> {
+    const result = await db.insert(tasks).values(task).returning();
+    return result[0];
+  }
+
+  async updateTask(id: string, updates: Partial<InsertTask>): Promise<Task | undefined> {
+    const result = await db.update(tasks)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(tasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async assignTask(id: string, assignedToId: string, assignedToName: string): Promise<Task | undefined> {
+    const result = await db.update(tasks)
+      .set({
+        assignedToId,
+        assignedToName,
+        assignedAt: new Date(),
+        status: "pending",
+        updatedAt: new Date()
+      })
+      .where(eq(tasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async completeTask(id: string, completedById: string, completedByName: string, notes?: string): Promise<Task | undefined> {
+    const result = await db.update(tasks)
+      .set({
+        status: "completed",
+        completedAt: new Date(),
+        completedById,
+        completedByName,
+        completionNotes: notes || null,
+        updatedAt: new Date()
+      })
+      .where(eq(tasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTask(id: string): Promise<boolean> {
+    const result = await db.delete(tasks)
+      .where(eq(tasks.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Task Comments
+  async getTaskComments(taskId: string): Promise<TaskComment[]> {
+    return await db.select().from(taskComments)
+      .where(eq(taskComments.taskId, taskId))
+      .orderBy(taskComments.createdAt);
+  }
+
+  async createTaskComment(comment: InsertTaskComment): Promise<TaskComment> {
+    const result = await db.insert(taskComments).values(comment).returning();
+    return result[0];
+  }
+
+  // Task Checklists
+  async getTaskChecklists(taskId: string): Promise<TaskChecklist[]> {
+    return await db.select().from(taskChecklists)
+      .where(eq(taskChecklists.taskId, taskId))
+      .orderBy(taskChecklists.sortOrder);
+  }
+
+  async createTaskChecklist(item: InsertTaskChecklist): Promise<TaskChecklist> {
+    const result = await db.insert(taskChecklists).values(item).returning();
+    return result[0];
+  }
+
+  async updateTaskChecklist(id: string, updates: Partial<InsertTaskChecklist>): Promise<TaskChecklist | undefined> {
+    const result = await db.update(taskChecklists)
+      .set(updates as any)
+      .where(eq(taskChecklists.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTaskChecklist(id: string): Promise<boolean> {
+    const result = await db.delete(taskChecklists)
+      .where(eq(taskChecklists.id, id))
       .returning();
     return result.length > 0;
   }
