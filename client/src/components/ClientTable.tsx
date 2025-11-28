@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import CategoryBadge from "./CategoryBadge";
-import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
+import ComplianceIndicator, { getOverallComplianceStatus } from "./ComplianceIndicator";
 import { ArrowUpDown, ArrowUp, ArrowDown, Phone, Mail, CalendarPlus, Star, StarOff, Heart, HeartOff, Sparkles, MoreHorizontal, Eye, Edit, UserPlus, Archive, Stethoscope, Pill, Building2, Briefcase, HeartPulse } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocation } from "wouter";
@@ -108,8 +108,8 @@ export default function ClientTable({
           break;
         case "compliance": {
           const complianceOrder: Record<string, number> = { "none": 0, "overdue": 1, "due-soon": 2, "compliant": 3 };
-          aVal = complianceOrder[getComplianceStatus(a.clinicalDocuments?.carePlanDate)] ?? 0;
-          bVal = complianceOrder[getComplianceStatus(b.clinicalDocuments?.carePlanDate)] ?? 0;
+          aVal = complianceOrder[getOverallComplianceStatus(a.clinicalDocuments)] ?? 0;
+          bVal = complianceOrder[getOverallComplianceStatus(b.clinicalDocuments)] ?? 0;
           break;
         }
       }
@@ -279,7 +279,7 @@ export default function ClientTable({
           </TableHeader>
           <TableBody>
             {sortedClients.map((client) => {
-              const complianceStatus = getComplianceStatus(client.clinicalDocuments?.carePlanDate);
+              const complianceStatus = getOverallComplianceStatus(client.clinicalDocuments);
               const clientId = getClientId(client);
               const isPinned = pinnedClients.has(client.id);
               const clientAge = calculateAge(client.dateOfBirth);

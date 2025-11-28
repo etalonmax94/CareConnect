@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import CategoryBadge from "./CategoryBadge";
 import FundingTypeBadge from "./FundingTypeBadge";
-import ComplianceIndicator, { getComplianceStatus } from "./ComplianceIndicator";
+import ComplianceIndicator, { getOverallComplianceStatus } from "./ComplianceIndicator";
 import { Phone, Mail, MoreVertical, Eye, Edit, UserPlus, Archive, Heart, HeartOff, Sparkles, Stethoscope, Pill, Building2, Briefcase, HeartPulse, UserCog } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocation } from "wouter";
@@ -80,7 +80,7 @@ export default function ClientGrid({ clients, onViewClient, density = "standard"
     <div className="space-y-4">
       <div className={`grid gap-4 ${getGridCols()}`}>
         {clients.map((client) => {
-          const complianceStatus = getComplianceStatus(client.clinicalDocuments?.carePlanDate);
+          const complianceStatus = getOverallComplianceStatus(client.clinicalDocuments);
           const clientAge = calculateAge(client.dateOfBirth);
           const isNewClient = client.isOnboarded !== "yes";
           const fundingType = client.category === "NDIS" ? client.ndisDetails?.ndisFundingType : null;

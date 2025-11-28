@@ -15,7 +15,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Loader2 } from "lucide-react";
-import { getComplianceStatus } from "@/components/ComplianceIndicator";
+import { getOverallComplianceStatus } from "@/components/ComplianceIndicator";
 
 type ViewMode = "list" | "grid";
 type DensityMode = "compact" | "standard" | "expanded";
@@ -121,11 +121,12 @@ export default function Clients() {
       const matchesCareManager = selectedCareManager === "All" || client.careTeam?.careManager === selectedCareManager;
       const clientStatus = client.status || "Active";
       const matchesStatus = selectedStatus === "All" || clientStatus === selectedStatus;
-      const compStatus = getComplianceStatus(client.clinicalDocuments?.carePlanDate);
+      const compStatus = getOverallComplianceStatus(client.clinicalDocuments);
       const matchesCompliance = selectedCompliance === "All" || 
         (selectedCompliance === "compliant" && compStatus === "compliant") ||
         (selectedCompliance === "due-soon" && compStatus === "due-soon") ||
-        (selectedCompliance === "overdue" && compStatus === "overdue");
+        (selectedCompliance === "overdue" && compStatus === "overdue") ||
+        (selectedCompliance === "none" && compStatus === "none");
       return matchesCategory && matchesCareManager && matchesStatus && matchesCompliance;
     });
   }, [clients, selectedCategory, selectedCareManager, selectedStatus, selectedCompliance]);

@@ -21,6 +21,14 @@ import {
   insertSilHouseSchema, insertSilHouseAuditLogSchema,
   USER_ROLES, type UserRole
 } from "@shared/schema";
+import { 
+  calculateClientCompliance, 
+  isClientCompliant, 
+  getDocumentStatus,
+  REQUIRED_DOCUMENTS,
+  ALL_DOCUMENTS,
+  type ClinicalDocuments
+} from "@shared/compliance";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import multer from "multer";
@@ -2076,7 +2084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter to only active (non-archived) clients for calculations
       const activeClients = allClients.filter(c => c.isArchived !== "yes");
       
-      // Calculate compliance rates based on clinical documents
+      // Calculate compliance rates using shared compliance utility
       let compliantCount = 0;
       let nonCompliantCount = 0;
       const dueThisMonth: any[] = [];
@@ -2086,49 +2094,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       
       activeClients.forEach(client => {
-        const docs = client.clinicalDocuments || {};
-        const requiredDocs = ['serviceAgreementDate', 'consentFormDate', 'riskAssessmentDate', 'carePlanDate'];
-        const filledDocs = requiredDocs.filter(doc => docs[doc as keyof typeof docs]);
+        // Use shared compliance calculation
+        const compliance = calculateClientCompliance(client.clinicalDocuments as ClinicalDocuments);
         
-        if (filledDocs.length >= requiredDocs.length * 0.75) {
+        if (isClientCompliant(client.clinicalDocuments as ClinicalDocuments)) {
           compliantCount++;
         } else {
           nonCompliantCount++;
         }
         
-        // Check for due/overdue documents with correct renewal frequencies
-        // 6-monthly: carePlan, healthSummary
-        // Annual: serviceAgreement, consentForm, riskAssessment, selfAssessmentMedx, medicationConsent, personalEmergencyPlan
-        const sixMonthlyDocs = ['carePlanDate', 'healthSummaryDate'];
-        
-        Object.entries(docs).forEach(([key, dateStr]) => {
-          if (dateStr) {
-            const date = new Date(dateStr);
-            const reviewDate = new Date(date);
+        // Collect due/overdue documents from shared compliance result
+        compliance.documents.forEach(doc => {
+          if (doc.dueDate) {
+            const dueDate = new Date(doc.dueDate);
             
-            // Apply correct renewal period based on document type
-            if (sixMonthlyDocs.includes(key)) {
-              reviewDate.setMonth(reviewDate.getMonth() + 6);
-            } else {
-              reviewDate.setFullYear(reviewDate.getFullYear() + 1);
-            }
-            
-            const docName = key.replace(/Date$/, '').replace(/([A-Z])/g, ' $1').trim();
-            
-            if (reviewDate < today) {
+            if (doc.status === "overdue") {
               overdueItems.push({
                 clientId: client.id,
                 clientName: client.participantName,
-                documentType: docName,
-                dueDate: reviewDate.toISOString()
+                documentType: doc.label,
+                dueDate: doc.dueDate
               });
-            } else if (reviewDate <= endOfMonth) {
+            } else if (doc.status === "due-soon" && dueDate <= endOfMonth) {
               dueThisMonth.push({
                 clientId: client.id,
                 clientName: client.participantName,
-                documentType: docName,
-                dueDate: reviewDate.toISOString()
+                documentType: doc.label,
+                dueDate: doc.dueDate
               });
+            }
+          }
+        });
+        
+        // Also check all trackable documents for due/overdue items
+        const docs = client.clinicalDocuments || {};
+        ALL_DOCUMENTS.forEach(docDef => {
+          const dateValue = docs[docDef.key as keyof typeof docs];
+          if (dateValue) {
+            const { status, dueDate } = getDocumentStatus(dateValue, docDef.renewalPeriod);
+            if (dueDate) {
+              const dueDateObj = new Date(dueDate);
+              
+              if (status === "overdue" && !overdueItems.find(item => 
+                item.clientId === client.id && item.documentType === docDef.label
+              )) {
+                overdueItems.push({
+                  clientId: client.id,
+                  clientName: client.participantName,
+                  documentType: docDef.label,
+                  dueDate: dueDate
+                });
+              } else if (status === "due-soon" && dueDateObj <= endOfMonth && !dueThisMonth.find(item => 
+                item.clientId === client.id && item.documentType === docDef.label
+              )) {
+                dueThisMonth.push({
+                  clientId: client.id,
+                  clientName: client.participantName,
+                  documentType: docDef.label,
+                  dueDate: dueDate
+                });
+              }
             }
           }
         });

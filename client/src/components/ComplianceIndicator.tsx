@@ -1,24 +1,26 @@
 import { CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+// Re-export compliance functions from shared module for backwards compatibility
+export { 
+  getComplianceStatus, 
+  calculateClientCompliance, 
+  getOverallComplianceStatus,
+  isClientCompliant,
+  getDocumentStatus,
+  REQUIRED_DOCUMENTS,
+  ALL_DOCUMENTS,
+  type ComplianceStatus,
+  type ClientComplianceResult,
+  type DocumentStatus,
+  type ClinicalDocuments,
+} from "@shared/compliance";
 
-type ComplianceStatus = "compliant" | "due-soon" | "overdue" | "none";
+import type { ComplianceStatus } from "@shared/compliance";
 
 interface ComplianceIndicatorProps {
   status: ComplianceStatus;
   date?: string;
   label?: string;
-}
-
-export function getComplianceStatus(dateString?: string): ComplianceStatus {
-  if (!dateString) return "none";
-  
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays < 0) return "overdue";
-  if (diffDays <= 30) return "due-soon";
-  return "compliant";
 }
 
 export default function ComplianceIndicator({ status, date, label }: ComplianceIndicatorProps) {
