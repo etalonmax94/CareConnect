@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Task, TaskComment, TaskChecklist, Staff, Client } from "@shared/schema";
+
+interface AuthUser {
+  id: string;
+  email: string;
+  displayName?: string;
+  roles: string[];
+}
 import { format, formatDistanceToNow, isAfter, isBefore, addDays } from "date-fns";
 import {
   CheckCircle2,
@@ -108,7 +115,26 @@ export default function Tasks() {
   const [newComment, setNewComment] = useState("");
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [completionNotes, setCompletionNotes] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("assigned"); // Default to assigned tasks
+
+  // Get current user info for role-based access
+  const { data: authData } = useQuery<{ authenticated: boolean; user: AuthUser | null }>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const currentUser = authData?.user;
+  const isAdminOrManager = currentUser?.roles?.some((role: string) => 
+    ["admin", "manager", "registered_nurse", "clinical_care_coordinator"].includes(role)
+  ) ?? false;
+
+  // Set default tab based on role
+  useEffect(() => {
+    if (isAdminOrManager) {
+      setActiveTab("all");
+    } else {
+      setActiveTab("assigned");
+    }
+  }, [isAdminOrManager]);
 
   // Recurrence pattern type
   type RecurrencePattern = "daily" | "weekly" | "fortnightly" | "monthly" | "custom" | "";
@@ -401,7 +427,9 @@ export default function Tasks() {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
-              <TabsTrigger value="all" className="flex-1" data-testid="tab-all-tasks">All</TabsTrigger>
+              {isAdminOrManager && (
+                <TabsTrigger value="all" className="flex-1" data-testid="tab-all-tasks">All Tasks</TabsTrigger>
+              )}
               <TabsTrigger value="assigned" className="flex-1" data-testid="tab-assigned-tasks">Assigned to Me</TabsTrigger>
               <TabsTrigger value="created" className="flex-1" data-testid="tab-my-tasks">Created by Me</TabsTrigger>
             </TabsList>
