@@ -24,6 +24,8 @@ import {
   tasks, taskComments, taskChecklists,
   // Chat
   chatRooms, chatRoomParticipants, chatMessages,
+  // Scheduling Conflicts
+  schedulingConflicts,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -89,7 +91,10 @@ import {
   // Chat types
   type InsertChatRoom, type ChatRoom,
   type InsertChatRoomParticipant, type ChatRoomParticipant,
-  type InsertChatMessage, type ChatMessage
+  type InsertChatMessage, type ChatMessage,
+  // Scheduling Conflicts types
+  type InsertSchedulingConflict, type SchedulingConflict,
+  type SchedulingConflictType, type ConflictSeverity, type ConflictStatus
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -621,6 +626,34 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   updateChatMessage(id: string, content: string): Promise<ChatMessage | undefined>;
   deleteChatMessage(id: string): Promise<boolean>;
+  
+  // Scheduling Conflicts
+  getSchedulingConflicts(filters?: {
+    status?: ConflictStatus;
+    severity?: ConflictSeverity;
+    conflictType?: SchedulingConflictType;
+    clientId?: string;
+    staffId?: string;
+    appointmentId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ conflicts: SchedulingConflict[]; total: number }>;
+  getSchedulingConflictById(id: string): Promise<SchedulingConflict | undefined>;
+  getOpenConflictsCount(): Promise<number>;
+  getConflictsByAppointment(appointmentId: string): Promise<SchedulingConflict[]>;
+  getConflictsByStaff(staffId: string): Promise<SchedulingConflict[]>;
+  getConflictsByClient(clientId: string): Promise<SchedulingConflict[]>;
+  createSchedulingConflict(conflict: InsertSchedulingConflict): Promise<SchedulingConflict>;
+  updateSchedulingConflict(id: string, updates: Partial<InsertSchedulingConflict>): Promise<SchedulingConflict | undefined>;
+  resolveSchedulingConflict(id: string, resolution: {
+    resolvedById: string;
+    resolvedByName: string;
+    resolutionNotes?: string;
+    resolutionAction: "reassigned" | "override_approved" | "appointment_cancelled" | "restriction_updated" | "dismissed" | "auto_resolved";
+  }): Promise<SchedulingConflict | undefined>;
+  dismissSchedulingConflict(id: string, userId: string, userName: string, notes?: string): Promise<SchedulingConflict | undefined>;
+  deleteSchedulingConflict(id: string): Promise<boolean>;
+  autoResolveConflictsForAppointment(appointmentId: string): Promise<number>;
 }
 
 export class DbStorage implements IStorage {
@@ -3674,6 +3707,171 @@ export class DbStorage implements IStorage {
       .where(eq(chatMessages.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // ============================================
+  // SCHEDULING CONFLICTS
+  // ============================================
+
+  async getSchedulingConflicts(filters?: {
+    status?: ConflictStatus;
+    severity?: ConflictSeverity;
+    conflictType?: SchedulingConflictType;
+    clientId?: string;
+    staffId?: string;
+    appointmentId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ conflicts: SchedulingConflict[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(schedulingConflicts.status, filters.status));
+    }
+    if (filters?.severity) {
+      conditions.push(eq(schedulingConflicts.severity, filters.severity));
+    }
+    if (filters?.conflictType) {
+      conditions.push(eq(schedulingConflicts.conflictType, filters.conflictType));
+    }
+    if (filters?.clientId) {
+      conditions.push(eq(schedulingConflicts.clientId, filters.clientId));
+    }
+    if (filters?.staffId) {
+      conditions.push(eq(schedulingConflicts.staffId, filters.staffId));
+    }
+    if (filters?.appointmentId) {
+      conditions.push(eq(schedulingConflicts.appointmentId, filters.appointmentId));
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    // Get total count
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(schedulingConflicts)
+      .where(whereClause);
+    const total = Number(countResult[0]?.count || 0);
+    
+    // Get paginated results
+    let query = db.select().from(schedulingConflicts);
+    if (whereClause) {
+      query = query.where(whereClause) as any;
+    }
+    
+    const conflicts = await query
+      .orderBy(
+        desc(sql`CASE WHEN ${schedulingConflicts.severity} = 'critical' THEN 3 WHEN ${schedulingConflicts.severity} = 'warning' THEN 2 ELSE 1 END`),
+        desc(schedulingConflicts.createdAt)
+      )
+      .limit(filters?.limit || 50)
+      .offset(filters?.offset || 0);
+    
+    return { conflicts, total };
+  }
+
+  async getSchedulingConflictById(id: string): Promise<SchedulingConflict | undefined> {
+    const result = await db.select().from(schedulingConflicts)
+      .where(eq(schedulingConflicts.id, id));
+    return result[0];
+  }
+
+  async getOpenConflictsCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(schedulingConflicts)
+      .where(eq(schedulingConflicts.status, "open"));
+    return Number(result[0]?.count || 0);
+  }
+
+  async getConflictsByAppointment(appointmentId: string): Promise<SchedulingConflict[]> {
+    return await db.select().from(schedulingConflicts)
+      .where(eq(schedulingConflicts.appointmentId, appointmentId))
+      .orderBy(desc(schedulingConflicts.createdAt));
+  }
+
+  async getConflictsByStaff(staffId: string): Promise<SchedulingConflict[]> {
+    return await db.select().from(schedulingConflicts)
+      .where(eq(schedulingConflicts.staffId, staffId))
+      .orderBy(desc(schedulingConflicts.createdAt));
+  }
+
+  async getConflictsByClient(clientId: string): Promise<SchedulingConflict[]> {
+    return await db.select().from(schedulingConflicts)
+      .where(eq(schedulingConflicts.clientId, clientId))
+      .orderBy(desc(schedulingConflicts.createdAt));
+  }
+
+  async createSchedulingConflict(conflict: InsertSchedulingConflict): Promise<SchedulingConflict> {
+    const result = await db.insert(schedulingConflicts).values(conflict).returning();
+    return result[0];
+  }
+
+  async updateSchedulingConflict(id: string, updates: Partial<InsertSchedulingConflict>): Promise<SchedulingConflict | undefined> {
+    const result = await db.update(schedulingConflicts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schedulingConflicts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async resolveSchedulingConflict(id: string, resolution: {
+    resolvedById: string;
+    resolvedByName: string;
+    resolutionNotes?: string;
+    resolutionAction: "reassigned" | "override_approved" | "appointment_cancelled" | "restriction_updated" | "dismissed" | "auto_resolved";
+  }): Promise<SchedulingConflict | undefined> {
+    const result = await db.update(schedulingConflicts)
+      .set({
+        status: "resolved",
+        resolvedAt: new Date(),
+        resolvedById: resolution.resolvedById,
+        resolvedByName: resolution.resolvedByName,
+        resolutionNotes: resolution.resolutionNotes,
+        resolutionAction: resolution.resolutionAction,
+        updatedAt: new Date()
+      })
+      .where(eq(schedulingConflicts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async dismissSchedulingConflict(id: string, userId: string, userName: string, notes?: string): Promise<SchedulingConflict | undefined> {
+    const result = await db.update(schedulingConflicts)
+      .set({
+        status: "dismissed",
+        resolvedAt: new Date(),
+        resolvedById: userId,
+        resolvedByName: userName,
+        resolutionNotes: notes,
+        resolutionAction: "dismissed",
+        updatedAt: new Date()
+      })
+      .where(eq(schedulingConflicts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSchedulingConflict(id: string): Promise<boolean> {
+    const result = await db.delete(schedulingConflicts)
+      .where(eq(schedulingConflicts.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async autoResolveConflictsForAppointment(appointmentId: string): Promise<number> {
+    const result = await db.update(schedulingConflicts)
+      .set({
+        status: "resolved",
+        resolvedAt: new Date(),
+        resolutionAction: "auto_resolved",
+        resolutionNotes: "Auto-resolved: Appointment was cancelled or staff reassigned",
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(schedulingConflicts.appointmentId, appointmentId),
+        eq(schedulingConflicts.status, "open")
+      ))
+      .returning();
+    return result.length;
   }
 }
 

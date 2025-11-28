@@ -1618,6 +1618,94 @@ export type InsertStaffStatusLog = z.infer<typeof insertStaffStatusLogSchema>;
 export type StaffStatusLog = typeof staffStatusLogs.$inferSelect;
 
 // ============================================
+// SCHEDULING CONFLICTS SYSTEM
+// ============================================
+
+// Conflict types for scheduling issues
+export type SchedulingConflictType = 
+  | "restriction_violation"    // Staff assigned despite client restriction
+  | "availability_conflict"    // Staff not available at scheduled time
+  | "double_booking"           // Staff assigned to overlapping appointments
+  | "preference_override"      // Non-preferred staff assigned
+  | "unavailability_period"    // Staff on leave/sick during appointment
+  | "care_team_change"         // Care team changed affecting existing appointments
+  | "missing_assignment";      // Appointment has no staff assigned
+
+export type ConflictSeverity = "critical" | "warning" | "info";
+export type ConflictStatus = "open" | "acknowledged" | "resolved" | "dismissed";
+
+export const schedulingConflicts = pgTable("scheduling_conflicts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Conflict details
+  conflictType: text("conflict_type").$type<SchedulingConflictType>().notNull(),
+  severity: text("severity").$type<ConflictSeverity>().notNull().default("warning"),
+  status: text("status").$type<ConflictStatus>().notNull().default("open"),
+  
+  // Description
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // Linked entities (at least one should be set)
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").references(() => staff.id, { onDelete: "cascade" }),
+  assignmentId: varchar("assignment_id").references(() => appointmentAssignments.id, { onDelete: "cascade" }),
+  
+  // For restriction violations
+  restrictionId: varchar("restriction_id").references(() => clientStaffRestrictions.id, { onDelete: "set null" }),
+  
+  // For unavailability conflicts
+  unavailabilityId: varchar("unavailability_id").references(() => staffUnavailabilityPeriods.id, { onDelete: "set null" }),
+  
+  // Conflict timing context
+  conflictDate: timestamp("conflict_date"), // When the conflict occurs
+  
+  // Resolution tracking
+  resolvedAt: timestamp("resolved_at"),
+  resolvedById: varchar("resolved_by_id").references(() => users.id, { onDelete: "set null" }),
+  resolvedByName: text("resolved_by_name"),
+  resolutionNotes: text("resolution_notes"),
+  resolutionAction: text("resolution_action").$type<"reassigned" | "override_approved" | "appointment_cancelled" | "restriction_updated" | "dismissed" | "auto_resolved">(),
+  
+  // Who was notified
+  notifiedUserIds: text("notified_user_ids").array(),
+  notifiedAt: timestamp("notified_at"),
+  
+  // Detection info
+  detectedById: varchar("detected_by_id").references(() => users.id, { onDelete: "set null" }),
+  detectedByName: text("detected_by_name"),
+  detectedBySystem: text("detected_by_system").default("no").$type<"yes" | "no">(), // Auto-detected vs manual
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSchedulingConflictSchema = createInsertSchema(schedulingConflicts, {
+  conflictType: z.enum([
+    "restriction_violation",
+    "availability_conflict", 
+    "double_booking",
+    "preference_override",
+    "unavailability_period",
+    "care_team_change",
+    "missing_assignment"
+  ]),
+  severity: z.enum(["critical", "warning", "info"]).optional(),
+  status: z.enum(["open", "acknowledged", "resolved", "dismissed"]).optional(),
+  resolutionAction: z.enum(["reassigned", "override_approved", "appointment_cancelled", "restriction_updated", "dismissed", "auto_resolved"]).optional(),
+  detectedBySystem: z.enum(["yes", "no"]).optional(),
+  notifiedUserIds: z.array(z.string()).optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSchedulingConflict = z.infer<typeof insertSchedulingConflictSchema>;
+export type SchedulingConflict = typeof schedulingConflicts.$inferSelect;
+
+// ============================================
 // CARE PLANS SYSTEM
 // ============================================
 
