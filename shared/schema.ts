@@ -2678,7 +2678,14 @@ export type TaskChecklist = typeof taskChecklists.$inferSelect;
 // CHAT SYSTEM
 // ============================================
 
-export type ChatRoomType = "direct" | "group" | "client";
+export type ChatRoomType = "direct" | "group" | "client" | "announcement";
+
+// Filter criteria for creating group chats based on staff attributes
+export type ChatStaffFilter = {
+  roles?: UserRole[];          // Filter by staff roles (e.g., nurses, managers)
+  skills?: string[];           // Filter by staff skills
+  clientAssignments?: string[];// Filter by staff assigned to specific clients
+};
 
 export const chatRooms = pgTable("chat_rooms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2694,6 +2701,12 @@ export const chatRooms = pgTable("chat_rooms", {
   description: text("description"),
   avatarUrl: text("avatar_url"),
   
+  // Announcement channel (broadcast only - only admins can post)
+  isAnnouncement: text("is_announcement").default("no").$type<"yes" | "no">(),
+  
+  // Staff filter criteria used to create this group (for auto-sync)
+  staffFilter: json("staff_filter").$type<ChatStaffFilter>(),
+  
   // Created by
   createdById: varchar("created_by_id").notNull(),
   createdByName: text("created_by_name").notNull(),
@@ -2703,6 +2716,8 @@ export const chatRooms = pgTable("chat_rooms", {
   lastMessagePreview: text("last_message_preview"),
   
   isArchived: text("is_archived").default("no").$type<"yes" | "no">(),
+  archivedAt: timestamp("archived_at"),
+  archivedById: varchar("archived_by_id"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -2710,14 +2725,22 @@ export const chatRooms = pgTable("chat_rooms", {
 
 export const insertChatRoomSchema = createInsertSchema(chatRooms, {
   name: z.string().optional(),
-  type: z.enum(["direct", "group", "client"]).optional().default("direct"),
+  type: z.enum(["direct", "group", "client", "announcement"]).optional().default("direct"),
   description: z.string().optional(),
+  isAnnouncement: z.enum(["yes", "no"]).optional(),
+  staffFilter: z.object({
+    roles: z.array(z.string()).optional(),
+    skills: z.array(z.string()).optional(),
+    clientAssignments: z.array(z.string()).optional(),
+  }).optional(),
 }).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   lastMessageAt: true,
   lastMessagePreview: true,
+  archivedAt: true,
+  archivedById: true,
 });
 
 export type InsertChatRoom = z.infer<typeof insertChatRoomSchema>;
@@ -2736,17 +2759,24 @@ export const chatRoomParticipants = pgTable("chat_room_participants", {
   // Role in the room
   role: text("role").$type<"admin" | "member">().default("member"),
   
+  // Who added this participant (for audit trail)
+  addedById: varchar("added_by_id"),
+  addedByName: text("added_by_name"),
+  
   // Read tracking
   lastReadAt: timestamp("last_read_at"),
   
   // Notification preferences
   isMuted: text("is_muted").default("no").$type<"yes" | "no">(),
+  isPinned: text("is_pinned").default("no").$type<"yes" | "no">(),
   
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
 });
 
 export const insertChatRoomParticipantSchema = createInsertSchema(chatRoomParticipants, {
   role: z.enum(["admin", "member"]).optional().default("member"),
+  isMuted: z.enum(["yes", "no"]).optional(),
+  isPinned: z.enum(["yes", "no"]).optional(),
 }).omit({
   id: true,
   joinedAt: true,

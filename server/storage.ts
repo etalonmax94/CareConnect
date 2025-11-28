@@ -594,16 +594,26 @@ export interface IStorage {
   getChatRooms(userId: string): Promise<ChatRoom[]>;
   getChatRoomById(id: string): Promise<ChatRoom | undefined>;
   getDirectChatRoom(userId1: string, userId2: string): Promise<ChatRoom | undefined>;
+  getClientChatRoom(clientId: string): Promise<ChatRoom | undefined>;
+  getChatRoomsByType(userId: string, type: string): Promise<ChatRoom[]>;
+  getAllChatRooms(): Promise<ChatRoom[]>; // Admin only
   createChatRoom(room: InsertChatRoom): Promise<ChatRoom>;
   updateChatRoom(id: string, updates: Partial<InsertChatRoom>): Promise<ChatRoom | undefined>;
+  archiveChatRoom(id: string, archivedById: string): Promise<ChatRoom | undefined>;
   deleteChatRoom(id: string): Promise<boolean>;
+  
+  // Client Chat Auto-Creation
+  createClientChatRoom(clientId: string, clientName: string, createdById: string, createdByName: string): Promise<ChatRoom>;
+  syncClientChatParticipants(clientId: string, assignedStaffIds: { id: string; name: string; email?: string }[]): Promise<void>;
   
   // Chat Room Participants
   getChatRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]>;
   addChatRoomParticipant(participant: InsertChatRoomParticipant): Promise<ChatRoomParticipant>;
   removeChatRoomParticipant(roomId: string, staffId: string): Promise<boolean>;
+  updateParticipantRole(roomId: string, staffId: string, role: "admin" | "member"): Promise<ChatRoomParticipant | undefined>;
   updateLastRead(roomId: string, staffId: string): Promise<void>;
   getUnreadCount(userId: string): Promise<number>;
+  isRoomAdmin(roomId: string, staffId: string): Promise<boolean>;
   
   // Chat Messages
   getChatMessages(roomId: string, limit?: number, before?: string): Promise<ChatMessage[]>;
@@ -3343,6 +3353,100 @@ export class DbStorage implements IStorage {
     return result.length > 0;
   }
 
+  async getClientChatRoom(clientId: string): Promise<ChatRoom | undefined> {
+    const result = await db.select().from(chatRooms)
+      .where(and(
+        eq(chatRooms.clientId, clientId),
+        eq(chatRooms.type, "client")
+      ));
+    return result[0];
+  }
+
+  async getChatRoomsByType(userId: string, type: string): Promise<ChatRoom[]> {
+    const participantRooms = await db.select({ roomId: chatRoomParticipants.roomId })
+      .from(chatRoomParticipants)
+      .where(eq(chatRoomParticipants.staffId, userId));
+    
+    const roomIds = participantRooms.map(p => p.roomId);
+    if (roomIds.length === 0) return [];
+
+    return await db.select().from(chatRooms)
+      .where(and(
+        inArray(chatRooms.id, roomIds),
+        eq(chatRooms.type, type as any),
+        eq(chatRooms.isArchived, "no")
+      ))
+      .orderBy(desc(chatRooms.lastMessageAt));
+  }
+
+  async getAllChatRooms(): Promise<ChatRoom[]> {
+    return await db.select().from(chatRooms)
+      .orderBy(desc(chatRooms.lastMessageAt));
+  }
+
+  async archiveChatRoom(id: string, archivedById: string): Promise<ChatRoom | undefined> {
+    const result = await db.update(chatRooms)
+      .set({
+        isArchived: "yes",
+        archivedAt: new Date(),
+        archivedById,
+        updatedAt: new Date()
+      })
+      .where(eq(chatRooms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createClientChatRoom(clientId: string, clientName: string, createdById: string, createdByName: string): Promise<ChatRoom> {
+    // Check if client chat already exists
+    const existing = await this.getClientChatRoom(clientId);
+    if (existing) return existing;
+
+    const result = await db.insert(chatRooms).values({
+      name: `${clientName}'s Care Team`,
+      type: "client",
+      clientId,
+      clientName,
+      createdById,
+      createdByName,
+      description: `Team chat for ${clientName}`,
+    }).returning();
+    
+    return result[0];
+  }
+
+  async syncClientChatParticipants(clientId: string, assignedStaff: { id: string; name: string; email?: string }[]): Promise<void> {
+    // Get the client chat room
+    const room = await this.getClientChatRoom(clientId);
+    if (!room) return;
+
+    // Get current participants
+    const currentParticipants = await this.getChatRoomParticipants(room.id);
+    const currentStaffIds = new Set(currentParticipants.map(p => p.staffId));
+    const newStaffIds = new Set(assignedStaff.map(s => s.id));
+
+    // SECURITY: Only remove non-admin members who are no longer assigned
+    // Admins are preserved to prevent privilege loss via sync manipulation
+    for (const participant of currentParticipants) {
+      if (!newStaffIds.has(participant.staffId) && participant.role !== "admin") {
+        await this.removeChatRoomParticipant(room.id, participant.staffId);
+      }
+    }
+
+    // Add new participants - always as member, not admin
+    for (const staff of assignedStaff) {
+      if (!currentStaffIds.has(staff.id)) {
+        await db.insert(chatRoomParticipants).values({
+          roomId: room.id,
+          staffId: staff.id,
+          staffName: staff.name,
+          staffEmail: staff.email,
+          role: "member", // SECURITY: Always member, never admin
+        });
+      }
+    }
+  }
+
   // Chat Room Participants
   async getChatRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]> {
     return await db.select().from(chatRoomParticipants)
@@ -3361,6 +3465,27 @@ export class DbStorage implements IStorage {
         eq(chatRoomParticipants.staffId, staffId)
       ))
       .returning();
+    return result.length > 0;
+  }
+
+  async updateParticipantRole(roomId: string, staffId: string, role: "admin" | "member"): Promise<ChatRoomParticipant | undefined> {
+    const result = await db.update(chatRoomParticipants)
+      .set({ role })
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId)
+      ))
+      .returning();
+    return result[0];
+  }
+
+  async isRoomAdmin(roomId: string, staffId: string): Promise<boolean> {
+    const result = await db.select().from(chatRoomParticipants)
+      .where(and(
+        eq(chatRoomParticipants.roomId, roomId),
+        eq(chatRoomParticipants.staffId, staffId),
+        eq(chatRoomParticipants.role, "admin")
+      ));
     return result.length > 0;
   }
 

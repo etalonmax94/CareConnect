@@ -8330,10 +8330,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add participant to room
   app.post("/api/chat/rooms/:roomId/participants", requireAuth, async (req: any, res) => {
     try {
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.displayName || req.session?.user?.email;
+      const userRoles = req.session?.user?.roles || [];
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
       const { roomId } = req.params;
+      
+      // SECURITY: Only app admins can add participants with admin role
+      // Regular users/room admins can only add as member
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      // Force role to member if not app admin
+      const roleToAssign = (isAppAdmin && req.body.role === "admin") ? "admin" : "member";
+      
       const validatedData = insertChatRoomParticipantSchema.parse({
         ...req.body,
-        roomId
+        roomId,
+        role: roleToAssign, // SECURITY: Override any client-provided role
+        addedById: userId,
+        addedByName: userName,
       });
 
       const participant = await storage.addChatRoomParticipant(validatedData);
@@ -8477,6 +8498,393 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting unread count:", error);
       res.status(500).json({ error: "Failed to get unread count" });
+    }
+  });
+
+  // ==================== CHAT ADMIN ROUTES ====================
+
+  // Get all chat rooms (admin only)
+  app.get("/api/chat/admin/rooms", requireAuth, async (req: any, res) => {
+    try {
+      const userRoles = req.session?.user?.roles || [];
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      if (!isAppAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const rooms = await storage.getAllChatRooms();
+      
+      const roomsWithParticipants = await Promise.all(
+        rooms.map(async (room) => {
+          const participants = await storage.getChatRoomParticipants(room.id);
+          return { ...room, participants };
+        })
+      );
+      
+      res.json(roomsWithParticipants);
+    } catch (error) {
+      console.error("Error fetching all chat rooms:", error);
+      res.status(500).json({ error: "Failed to fetch chat rooms" });
+    }
+  });
+
+  // Get rooms by type
+  app.get("/api/chat/rooms/type/:type", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { type } = req.params;
+      const rooms = await storage.getChatRoomsByType(userId, type);
+      
+      const roomsWithParticipants = await Promise.all(
+        rooms.map(async (room) => {
+          const participants = await storage.getChatRoomParticipants(room.id);
+          return { ...room, participants };
+        })
+      );
+      
+      res.json(roomsWithParticipants);
+    } catch (error) {
+      console.error("Error fetching rooms by type:", error);
+      res.status(500).json({ error: "Failed to fetch chat rooms" });
+    }
+  });
+
+  // Create client chat room (auto or manual) - restricted to app admins or assigned staff
+  app.post("/api/chat/rooms/client", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.displayName || req.session?.user?.email;
+      const userRoles = req.session?.user?.roles || [];
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { clientId, clientName, assignedStaff } = req.body;
+      if (!clientId || !clientName) {
+        return res.status(400).json({ error: "Client information required" });
+      }
+
+      // Check if user is app admin
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      // Verify client assignment server-side by fetching the actual client data
+      let isAssignedToClient = false;
+      if (!isAppAdmin) {
+        const client = await storage.getClientById(clientId);
+        if (client) {
+          // Check if user is assigned to this client (preferredStaffIds, coordinatorId, or other assignments)
+          const preferredStaff = client.preferredStaffIds || [];
+          const restrictedStaff = client.restrictedStaffIds || [];
+          isAssignedToClient = preferredStaff.includes(userId) || 
+            client.coordinatorId === userId ||
+            client.primaryCareCoordinatorId === userId;
+          
+          // Also check if user is explicitly restricted from this client
+          if (restrictedStaff.includes(userId)) {
+            return res.status(403).json({ error: "You are restricted from this client" });
+          }
+        }
+      }
+      
+      if (!isAppAdmin && !isAssignedToClient) {
+        return res.status(403).json({ error: "Only admins or assigned staff can create client chat rooms" });
+      }
+
+      // Create or get existing client chat room
+      const room = await storage.createClientChatRoom(clientId, clientName, userId, userName);
+
+      // Add creator as admin
+      const existingParticipants = await storage.getChatRoomParticipants(room.id);
+      if (!existingParticipants.find(p => p.staffId === userId)) {
+        await storage.addChatRoomParticipant({
+          roomId: room.id,
+          staffId: userId,
+          staffName: userName,
+          role: "admin",
+          addedById: userId,
+          addedByName: userName,
+        });
+      }
+
+      // SECURITY: Only app admins can sync staff from request body
+      // Otherwise derive from authoritative client record
+      if (isAppAdmin && assignedStaff && Array.isArray(assignedStaff)) {
+        // App admin can explicitly set participants via request body
+        await storage.syncClientChatParticipants(clientId, assignedStaff);
+      } else {
+        // For non-admins, derive staff list from client's actual assignments in database
+        const client = await storage.getClientById(clientId);
+        if (client) {
+          const authoritativeStaff: { id: string; name: string; email?: string }[] = [];
+          
+          // Get staff from preferred staff assignments
+          if (client.preferredStaffIds && client.preferredStaffIds.length > 0) {
+            for (const staffId of client.preferredStaffIds) {
+              const staffMember = await storage.getStaffById(staffId);
+              if (staffMember && staffMember.isActive === "yes") {
+                authoritativeStaff.push({
+                  id: staffMember.id,
+                  name: staffMember.name,
+                  email: staffMember.email || undefined,
+                });
+              }
+            }
+          }
+          
+          // Add coordinator if exists
+          if (client.coordinatorId) {
+            const coordinator = await storage.getStaffById(client.coordinatorId);
+            if (coordinator && coordinator.isActive === "yes" && 
+                !authoritativeStaff.find(s => s.id === coordinator.id)) {
+              authoritativeStaff.push({
+                id: coordinator.id,
+                name: coordinator.name,
+                email: coordinator.email || undefined,
+              });
+            }
+          }
+          
+          // Add primary care coordinator if exists
+          if (client.primaryCareCoordinatorId) {
+            const pcc = await storage.getStaffById(client.primaryCareCoordinatorId);
+            if (pcc && pcc.isActive === "yes" && 
+                !authoritativeStaff.find(s => s.id === pcc.id)) {
+              authoritativeStaff.push({
+                id: pcc.id,
+                name: pcc.name,
+                email: pcc.email || undefined,
+              });
+            }
+          }
+          
+          if (authoritativeStaff.length > 0) {
+            await storage.syncClientChatParticipants(clientId, authoritativeStaff);
+          }
+        }
+      }
+
+      const participants = await storage.getChatRoomParticipants(room.id);
+      res.status(201).json({ ...room, participants });
+    } catch (error) {
+      console.error("Error creating client chat room:", error);
+      res.status(500).json({ error: "Failed to create client chat room" });
+    }
+  });
+
+  // Create custom group chat with staff filtering (admin only)
+  app.post("/api/chat/rooms/custom", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.displayName || req.session?.user?.email;
+      const userRoles = req.session?.user?.roles || [];
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      if (!isAppAdmin) {
+        return res.status(403).json({ error: "Admin access required to create custom chats" });
+      }
+
+      const { name, description, participants, staffFilter, isAnnouncement } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "Chat name is required" });
+      }
+
+      const room = await storage.createChatRoom({
+        name,
+        description,
+        type: isAnnouncement === "yes" ? "announcement" : "group",
+        createdById: userId,
+        createdByName: userName,
+        staffFilter: staffFilter || null,
+        isAnnouncement: isAnnouncement || "no",
+        isArchived: "no"
+      });
+
+      // Add creator as admin
+      await storage.addChatRoomParticipant({
+        roomId: room.id,
+        staffId: userId,
+        staffName: userName,
+        role: "admin",
+        addedById: userId,
+        addedByName: userName,
+      });
+
+      // Add selected participants - all as members, only creator is admin
+      // This prevents privilege escalation via request body manipulation
+      if (participants && Array.isArray(participants)) {
+        for (const participant of participants) {
+          if (participant.staffId !== userId) {
+            await storage.addChatRoomParticipant({
+              roomId: room.id,
+              staffId: participant.staffId,
+              staffName: participant.staffName,
+              staffEmail: participant.staffEmail,
+              role: "member", // SECURITY: Always set to member, ignore request body
+              addedById: userId,
+              addedByName: userName,
+            });
+          }
+        }
+      }
+
+      const allParticipants = await storage.getChatRoomParticipants(room.id);
+      res.status(201).json({ ...room, participants: allParticipants });
+    } catch (error) {
+      console.error("Error creating custom chat room:", error);
+      res.status(500).json({ error: "Failed to create custom chat room" });
+    }
+  });
+
+  // Archive chat room - only creator or app admin can archive
+  app.post("/api/chat/rooms/:roomId/archive", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userRoles = req.session?.user?.roles || [];
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      
+      // Check if user is app admin
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      // Get room to check if user is the creator
+      const room = await storage.getChatRoomById(roomId);
+      if (!room) {
+        return res.status(404).json({ error: "Chat room not found" });
+      }
+      
+      const isCreator = room.createdById === userId;
+      
+      // Only app admins or the room creator can archive
+      if (!isCreator && !isAppAdmin) {
+        return res.status(403).json({ error: "Only room creator or app admins can archive this room" });
+      }
+
+      const archivedRoom = await storage.archiveChatRoom(roomId, userId);
+      if (!archivedRoom) {
+        return res.status(500).json({ error: "Failed to archive chat room" });
+      }
+
+      res.json(archivedRoom);
+    } catch (error) {
+      console.error("Error archiving chat room:", error);
+      res.status(500).json({ error: "Failed to archive chat room" });
+    }
+  });
+
+  // Update participant role (promote/demote admin) - APP ADMIN ONLY for security
+  app.patch("/api/chat/rooms/:roomId/participants/:staffId/role", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userRoles = req.session?.user?.roles || [];
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId, staffId } = req.params;
+      const { role } = req.body;
+      
+      if (!["admin", "member"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+
+      // STRICT SECURITY: Only app admins can change participant roles
+      // This prevents all privilege escalation attacks including:
+      // - Users promoting themselves
+      // - Room admins demoting each other
+      // - Attackers seizing control via role manipulation
+      const isAppAdmin = userRoles.some((r: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(r)
+      );
+      
+      if (!isAppAdmin) {
+        return res.status(403).json({ error: "Only app admins (Admin, Director, Operations Manager, Clinical Manager) can change participant roles" });
+      }
+
+      // Get room info to verify target exists and count admins
+      const participants = await storage.getChatRoomParticipants(roomId);
+      const targetParticipant = participants.find(p => p.staffId === staffId);
+      
+      if (!targetParticipant) {
+        return res.status(404).json({ error: "Participant not found in this room" });
+      }
+      
+      // If demoting (changing to member), prevent removing the last admin
+      if (role === "member" && targetParticipant.role === "admin") {
+        const adminCount = participants.filter(p => p.role === "admin").length;
+        if (adminCount <= 1) {
+          return res.status(403).json({ error: "Cannot remove the last admin from this room. Assign another admin first." });
+        }
+      }
+
+      const participant = await storage.updateParticipantRole(roomId, staffId, role);
+      if (!participant) {
+        return res.status(500).json({ error: "Failed to update participant role" });
+      }
+
+      res.json(participant);
+    } catch (error) {
+      console.error("Error updating participant role:", error);
+      res.status(500).json({ error: "Failed to update participant role" });
+    }
+  });
+
+  // Get client chat room
+  app.get("/api/chat/rooms/client/:clientId", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userRoles = req.session?.user?.roles || [];
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { clientId } = req.params;
+      const room = await storage.getClientChatRoom(clientId);
+      
+      if (!room) {
+        return res.status(404).json({ error: "Client chat room not found" });
+      }
+
+      const participants = await storage.getChatRoomParticipants(room.id);
+      
+      // Check if user is a participant or app admin
+      const isParticipant = participants.some(p => p.staffId === userId);
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      
+      if (!isParticipant && !isAppAdmin) {
+        return res.status(403).json({ error: "You don't have access to this chat" });
+      }
+
+      res.json({ ...room, participants });
+    } catch (error) {
+      console.error("Error fetching client chat room:", error);
+      res.status(500).json({ error: "Failed to fetch client chat room" });
     }
   });
 
