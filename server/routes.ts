@@ -9028,6 +9028,369 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // SCHEDULING CONFLICTS ROUTES
+  // ============================================
+
+  // Get scheduling conflicts with filtering
+  app.get("/api/scheduling-conflicts", requireAuth, async (req: any, res) => {
+    try {
+      const { status, severity, conflictType, clientId, staffId, appointmentId, limit, offset } = req.query;
+      
+      const filters: any = {};
+      if (status) filters.status = status;
+      if (severity) filters.severity = severity;
+      if (conflictType) filters.conflictType = conflictType;
+      if (clientId) filters.clientId = clientId;
+      if (staffId) filters.staffId = staffId;
+      if (appointmentId) filters.appointmentId = appointmentId;
+      if (limit) filters.limit = parseInt(limit as string, 10);
+      if (offset) filters.offset = parseInt(offset as string, 10);
+      
+      const result = await storage.getSchedulingConflicts(filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching scheduling conflicts:", error);
+      res.status(500).json({ error: "Failed to fetch scheduling conflicts" });
+    }
+  });
+
+  // Get open conflicts count (for dashboard badges)
+  app.get("/api/scheduling-conflicts/count", requireAuth, async (req: any, res) => {
+    try {
+      const count = await storage.getOpenConflictsCount();
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching conflicts count:", error);
+      res.status(500).json({ error: "Failed to fetch conflicts count" });
+    }
+  });
+
+  // Get single scheduling conflict by ID
+  app.get("/api/scheduling-conflicts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const conflict = await storage.getSchedulingConflictById(id);
+      
+      if (!conflict) {
+        return res.status(404).json({ error: "Conflict not found" });
+      }
+      
+      res.json(conflict);
+    } catch (error) {
+      console.error("Error fetching scheduling conflict:", error);
+      res.status(500).json({ error: "Failed to fetch scheduling conflict" });
+    }
+  });
+
+  // Get conflicts by appointment
+  app.get("/api/appointments/:appointmentId/conflicts", requireAuth, async (req: any, res) => {
+    try {
+      const { appointmentId } = req.params;
+      const conflicts = await storage.getConflictsByAppointment(appointmentId);
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error fetching appointment conflicts:", error);
+      res.status(500).json({ error: "Failed to fetch appointment conflicts" });
+    }
+  });
+
+  // Get conflicts by staff member
+  app.get("/api/staff/:staffId/conflicts", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const conflicts = await storage.getConflictsByStaff(staffId);
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error fetching staff conflicts:", error);
+      res.status(500).json({ error: "Failed to fetch staff conflicts" });
+    }
+  });
+
+  // Get conflicts by client
+  app.get("/api/clients/:clientId/conflicts", requireAuth, async (req: any, res) => {
+    try {
+      const { clientId } = req.params;
+      const conflicts = await storage.getConflictsByClient(clientId);
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error fetching client conflicts:", error);
+      res.status(500).json({ error: "Failed to fetch client conflicts" });
+    }
+  });
+
+  // Resolve a scheduling conflict (requires manager roles for critical conflicts)
+  app.post("/api/scheduling-conflicts/:id/resolve", requireAuth, requireRoles, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.name || req.session?.user?.email || "Unknown";
+      const userRoles = req.session?.user?.roles || [];
+      const { resolutionNotes, resolutionAction } = req.body;
+      
+      if (!resolutionAction) {
+        return res.status(400).json({ error: "Resolution action is required" });
+      }
+      
+      const validActions = ["reassigned", "override_approved", "appointment_cancelled", "restriction_updated", "dismissed", "auto_resolved"];
+      if (!validActions.includes(resolutionAction)) {
+        return res.status(400).json({ error: "Invalid resolution action" });
+      }
+      
+      // Get the conflict to check severity
+      const existingConflict = await storage.getSchedulingConflictById(id);
+      if (!existingConflict) {
+        return res.status(404).json({ error: "Conflict not found" });
+      }
+      
+      // Critical conflicts require manager roles to resolve
+      if (existingConflict.severity === "critical") {
+        const hasManagerRole = userRoles.some((role: string) =>
+          ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+        );
+        if (!hasManagerRole) {
+          return res.status(403).json({ 
+            error: "Critical conflicts can only be resolved by managers or administrators" 
+          });
+        }
+      }
+      
+      const conflict = await storage.resolveSchedulingConflict(id, {
+        resolvedById: userId,
+        resolvedByName: userName,
+        resolutionNotes,
+        resolutionAction,
+      });
+      
+      if (!conflict) {
+        return res.status(404).json({ error: "Conflict not found" });
+      }
+      
+      // Log the resolution in audit log
+      await storage.createAuditLog({
+        userId,
+        userName,
+        operation: "update",
+        entityType: "scheduling_conflict",
+        entityId: id,
+        changes: {
+          action: "resolved",
+          resolutionAction,
+          resolutionNotes,
+          previousSeverity: existingConflict.severity,
+        },
+      });
+      
+      res.json(conflict);
+    } catch (error) {
+      console.error("Error resolving scheduling conflict:", error);
+      res.status(500).json({ error: "Failed to resolve scheduling conflict" });
+    }
+  });
+
+  // Dismiss a scheduling conflict (requires manager roles for critical conflicts)
+  app.post("/api/scheduling-conflicts/:id/dismiss", requireAuth, requireRoles, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.name || req.session?.user?.email || "Unknown";
+      const userRoles = req.session?.user?.roles || [];
+      const { notes } = req.body;
+      
+      // Get the conflict to check severity
+      const existingConflict = await storage.getSchedulingConflictById(id);
+      if (!existingConflict) {
+        return res.status(404).json({ error: "Conflict not found" });
+      }
+      
+      // Critical conflicts require manager roles to dismiss
+      if (existingConflict.severity === "critical") {
+        const hasManagerRole = userRoles.some((role: string) =>
+          ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+        );
+        if (!hasManagerRole) {
+          return res.status(403).json({ 
+            error: "Critical conflicts can only be dismissed by managers or administrators" 
+          });
+        }
+      }
+      
+      const conflict = await storage.dismissSchedulingConflict(id, userId, userName, notes);
+      
+      if (!conflict) {
+        return res.status(404).json({ error: "Conflict not found" });
+      }
+      
+      // Log the dismissal in audit log
+      await storage.createAuditLog({
+        userId,
+        userName,
+        operation: "update",
+        entityType: "scheduling_conflict",
+        entityId: id,
+        changes: {
+          action: "dismissed",
+          previousSeverity: existingConflict.severity,
+          notes,
+        },
+      });
+      
+      res.json(conflict);
+    } catch (error) {
+      console.error("Error dismissing scheduling conflict:", error);
+      res.status(500).json({ error: "Failed to dismiss scheduling conflict" });
+    }
+  });
+
+  // Validate staff assignment before saving (preview conflicts)
+  app.post("/api/validate-staff-assignment", requireAuth, async (req: any, res) => {
+    try {
+      const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.name || req.session?.user?.email || "Unknown";
+      
+      const { 
+        appointmentId, 
+        clientId, 
+        clientName, 
+        staffId, 
+        staffName, 
+        scheduledStart, 
+        scheduledEnd 
+      } = req.body;
+      
+      if (!appointmentId || !clientId || !staffId || !scheduledStart || !scheduledEnd) {
+        return res.status(400).json({ 
+          error: "Missing required fields: appointmentId, clientId, staffId, scheduledStart, scheduledEnd" 
+        });
+      }
+      
+      const result = await staffAssignmentValidator.validateAssignment({
+        appointmentId,
+        clientId,
+        clientName: clientName || "Unknown Client",
+        staffId,
+        staffName: staffName || "Unknown Staff",
+        scheduledStart: new Date(scheduledStart),
+        scheduledEnd: new Date(scheduledEnd),
+        checkingUserId: userId,
+        checkingUserName: userName,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error validating staff assignment:", error);
+      res.status(500).json({ error: "Failed to validate staff assignment" });
+    }
+  });
+
+  // Validate all staff for an appointment and record conflicts
+  app.post("/api/appointments/:appointmentId/validate", requireAuth, async (req: any, res) => {
+    try {
+      const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+      const { appointmentId } = req.params;
+      
+      const results = await staffAssignmentValidator.validateAndRecordForAppointment(appointmentId);
+      
+      // Convert Map to object for JSON response
+      const response: Record<string, any> = {};
+      results.forEach((result, staffId) => {
+        response[staffId] = result;
+      });
+      
+      res.json(response);
+    } catch (error: any) {
+      console.error("Error validating appointment:", error);
+      res.status(500).json({ error: error.message || "Failed to validate appointment" });
+    }
+  });
+
+  // Revalidate all future appointments for a staff member (requires manager roles)
+  app.post("/api/staff/:staffId/revalidate", requireAuth, requireRoles, async (req: any, res) => {
+    try {
+      const userRoles = req.session?.user?.roles || [];
+      
+      // Require manager roles for revalidation operations
+      const hasManagerRole = userRoles.some((role: string) =>
+        ["admin", "director", "operations_manager", "clinical_manager", "rostering_coordinator"].includes(role)
+      );
+      if (!hasManagerRole) {
+        return res.status(403).json({ 
+          error: "Revalidation requires manager or coordinator permissions" 
+        });
+      }
+      
+      const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+      const { staffId } = req.params;
+      
+      const result = await staffAssignmentValidator.revalidateStaffFutureAppointments(staffId);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error revalidating staff appointments:", error);
+      res.status(500).json({ error: error.message || "Failed to revalidate staff appointments" });
+    }
+  });
+
+  // Revalidate all future appointments for a client (requires manager roles)
+  app.post("/api/clients/:clientId/revalidate", requireAuth, requireRoles, async (req: any, res) => {
+    try {
+      const userRoles = req.session?.user?.roles || [];
+      
+      // Require manager roles for revalidation operations
+      const hasManagerRole = userRoles.some((role: string) =>
+        ["admin", "director", "operations_manager", "clinical_manager", "rostering_coordinator"].includes(role)
+      );
+      if (!hasManagerRole) {
+        return res.status(403).json({ 
+          error: "Revalidation requires manager or coordinator permissions" 
+        });
+      }
+      
+      const { staffAssignmentValidator } = await import("./services/staffAssignmentValidator");
+      const { clientId } = req.params;
+      
+      const result = await staffAssignmentValidator.revalidateClientFutureAppointments(clientId);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error revalidating client appointments:", error);
+      res.status(500).json({ error: error.message || "Failed to revalidate client appointments" });
+    }
+  });
+
+  // Acknowledge a conflict (mark as seen)
+  app.post("/api/scheduling-conflicts/:id/acknowledge", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      const conflict = await storage.updateSchedulingConflict(id, { status: "acknowledged" });
+      
+      if (!conflict) {
+        return res.status(404).json({ error: "Conflict not found" });
+      }
+      
+      res.json(conflict);
+    } catch (error) {
+      console.error("Error acknowledging scheduling conflict:", error);
+      res.status(500).json({ error: "Failed to acknowledge scheduling conflict" });
+    }
+  });
+
+  // Auto-resolve conflicts for a cancelled/reassigned appointment
+  app.post("/api/appointments/:appointmentId/conflicts/auto-resolve", requireAuth, async (req: any, res) => {
+    try {
+      const { appointmentId } = req.params;
+      
+      const count = await storage.autoResolveConflictsForAppointment(appointmentId);
+      
+      res.json({ resolvedCount: count });
+    } catch (error) {
+      console.error("Error auto-resolving conflicts:", error);
+      res.status(500).json({ error: "Failed to auto-resolve conflicts" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Set up WebSocket server for real-time chat

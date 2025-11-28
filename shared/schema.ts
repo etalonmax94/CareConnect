@@ -1652,6 +1652,13 @@ export const schedulingConflicts = pgTable("scheduling_conflicts", {
   staffId: varchar("staff_id").references(() => staff.id, { onDelete: "cascade" }),
   assignmentId: varchar("assignment_id").references(() => appointmentAssignments.id, { onDelete: "cascade" }),
   
+  // Denormalized names for display (snapshot at time of conflict detection)
+  clientName: text("client_name"),
+  staffName: text("staff_name"),
+  
+  // Detailed conflict context as JSON (for complex display scenarios)
+  conflictDetails: json("conflict_details").$type<Record<string, any>>(),
+  
   // For restriction violations
   restrictionId: varchar("restriction_id").references(() => clientStaffRestrictions.id, { onDelete: "set null" }),
   
@@ -1696,6 +1703,7 @@ export const insertSchedulingConflictSchema = createInsertSchema(schedulingConfl
   resolutionAction: z.enum(["reassigned", "override_approved", "appointment_cancelled", "restriction_updated", "dismissed", "auto_resolved"]).optional(),
   detectedBySystem: z.enum(["yes", "no"]).optional(),
   notifiedUserIds: z.array(z.string()).optional().nullable(),
+  conflictDetails: z.record(z.string(), z.any()).optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
