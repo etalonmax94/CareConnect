@@ -1811,7 +1811,7 @@ export default function Chat() {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background" data-testid="chat-page">
       {/* Sidebar - Conversation List */}
-      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col h-full overflow-hidden bg-card md:border-r`}>
+      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col h-full overflow-hidden bg-card md:border-r z-20 relative`}>
         {/* Header - Fixed at top */}
         <div className="shrink-0 bg-card border-b">
           <div className="px-4 pt-4 pb-3 md:px-5 md:pt-5">
@@ -2145,7 +2145,7 @@ export default function Chat() {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col h-full overflow-hidden md:flex bg-muted/30`}>
+      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col h-full overflow-hidden bg-muted/30`}>
         {selectedRoom ? (
           <>
             {/* Chat Header - Premium Design */}

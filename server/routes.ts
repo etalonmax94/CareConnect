@@ -9196,11 +9196,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { roomId } = req.params;
       const userId = req.session?.user?.id;
+      const userRoles = req.session?.user?.roles || [];
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 100); // Cap at 100 to prevent overwhelming browser
       const before = req.query.before as string | undefined;
 
-      const messages = await storage.getChatMessages(roomId, limit, before, userId);
-      res.json(messages);
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Check if user is app admin
+      const isAppAdmin = userRoles.some((role: string) =>
+        ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role.toLowerCase())
+      );
+
+      // Check if room exists and if user has access
+      const room = await storage.getChatRoomById(roomId);
+      if (!room) {
+        return res.status(404).json({ error: "Room not found" });
+      }
+
+      // If room is archived and user is admin, allow access even if not a participant
+      // Otherwise, check if user is a participant
+      if (room.isArchived === "yes" && isAppAdmin) {
+        // Admin viewing archived room - fetch all messages without participant filtering
+        const messages = await storage.getChatMessages(roomId, limit, before);
+        res.json(messages);
+      } else {
+        // Regular access - apply participant filtering
+        const isParticipant = await storage.isParticipant(roomId, userId);
+        if (!isParticipant && !isAppAdmin) {
+          return res.status(403).json({ error: "You are not a participant in this room" });
+        }
+        const messages = await storage.getChatMessages(roomId, limit, before, userId);
+        res.json(messages);
+      }
     } catch (error) {
       console.error("Error fetching messages:", error);
       res.status(500).json({ error: "Failed to fetch messages" });
