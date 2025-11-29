@@ -5542,6 +5542,602 @@ export class DbStorage implements IStorage {
       .returning();
     return result[0];
   }
+
+  // ============================================
+  // LEARNING MANAGEMENT SYSTEM (LMS)
+  // ============================================
+
+  // LMS Courses
+  async getAllLmsCourses(filters?: { status?: string; category?: string; isComplianceRequired?: boolean }): Promise<LmsCourse[]> {
+    const conditions = [];
+    if (filters?.status) {
+      conditions.push(eq(lmsCourses.status, filters.status as any));
+    }
+    if (filters?.category) {
+      conditions.push(eq(lmsCourses.category, filters.category));
+    }
+    if (filters?.isComplianceRequired !== undefined) {
+      conditions.push(eq(lmsCourses.isComplianceRequired, filters.isComplianceRequired ? 'yes' : 'no'));
+    }
+    const query = conditions.length > 0
+      ? db.select().from(lmsCourses).where(and(...conditions))
+      : db.select().from(lmsCourses);
+    return await query.orderBy(desc(lmsCourses.createdAt));
+  }
+
+  async getLmsCourseById(id: string): Promise<LmsCourse | undefined> {
+    const result = await db.select().from(lmsCourses).where(eq(lmsCourses.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLmsCourse(course: InsertLmsCourse): Promise<LmsCourse> {
+    const result = await db.insert(lmsCourses).values(course).returning();
+    return result[0];
+  }
+
+  async updateLmsCourse(id: string, course: Partial<InsertLmsCourse>): Promise<LmsCourse | undefined> {
+    const result = await db.update(lmsCourses)
+      .set({ ...course as any, updatedAt: new Date() })
+      .where(eq(lmsCourses.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLmsCourse(id: string): Promise<boolean> {
+    const result = await db.delete(lmsCourses).where(eq(lmsCourses.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // LMS Modules
+  async getLmsModulesByCourse(courseId: string): Promise<LmsModule[]> {
+    return await db.select().from(lmsModules)
+      .where(eq(lmsModules.courseId, courseId))
+      .orderBy(lmsModules.orderIndex);
+  }
+
+  async getLmsModuleById(id: string): Promise<LmsModule | undefined> {
+    const result = await db.select().from(lmsModules).where(eq(lmsModules.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLmsModule(module: InsertLmsModule): Promise<LmsModule> {
+    const result = await db.insert(lmsModules).values(module).returning();
+    return result[0];
+  }
+
+  async updateLmsModule(id: string, module: Partial<InsertLmsModule>): Promise<LmsModule | undefined> {
+    const result = await db.update(lmsModules)
+      .set({ ...module as any, updatedAt: new Date() })
+      .where(eq(lmsModules.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLmsModule(id: string): Promise<boolean> {
+    const result = await db.delete(lmsModules).where(eq(lmsModules.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async reorderLmsModules(courseId: string, moduleIds: string[]): Promise<void> {
+    for (let i = 0; i < moduleIds.length; i++) {
+      await db.update(lmsModules)
+        .set({ orderIndex: i + 1, updatedAt: new Date() })
+        .where(eq(lmsModules.id, moduleIds[i]));
+    }
+  }
+
+  // LMS Quizzes
+  async getLmsQuizzesByModule(moduleId: string): Promise<LmsQuiz[]> {
+    return await db.select().from(lmsQuizzes)
+      .where(eq(lmsQuizzes.moduleId, moduleId))
+      .orderBy(lmsQuizzes.createdAt);
+  }
+
+  async getLmsQuizById(id: string): Promise<LmsQuiz | undefined> {
+    const result = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLmsQuiz(quiz: InsertLmsQuiz): Promise<LmsQuiz> {
+    const result = await db.insert(lmsQuizzes).values(quiz).returning();
+    return result[0];
+  }
+
+  async updateLmsQuiz(id: string, quiz: Partial<InsertLmsQuiz>): Promise<LmsQuiz | undefined> {
+    const result = await db.update(lmsQuizzes)
+      .set({ ...quiz as any, updatedAt: new Date() })
+      .where(eq(lmsQuizzes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLmsQuiz(id: string): Promise<boolean> {
+    const result = await db.delete(lmsQuizzes).where(eq(lmsQuizzes.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // LMS Quiz Questions
+  async getLmsQuestionsByQuiz(quizId: string): Promise<LmsQuizQuestion[]> {
+    return await db.select().from(lmsQuizQuestions)
+      .where(eq(lmsQuizQuestions.quizId, quizId))
+      .orderBy(lmsQuizQuestions.orderIndex);
+  }
+
+  async getLmsQuestionById(id: string): Promise<LmsQuizQuestion | undefined> {
+    const result = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLmsQuestion(question: InsertLmsQuizQuestion): Promise<LmsQuizQuestion> {
+    const result = await db.insert(lmsQuizQuestions).values(question).returning();
+    return result[0];
+  }
+
+  async updateLmsQuestion(id: string, question: Partial<InsertLmsQuizQuestion>): Promise<LmsQuizQuestion | undefined> {
+    const result = await db.update(lmsQuizQuestions)
+      .set({ ...question as any, updatedAt: new Date() })
+      .where(eq(lmsQuizQuestions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLmsQuestion(id: string): Promise<boolean> {
+    const result = await db.delete(lmsQuizQuestions).where(eq(lmsQuizQuestions.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // LMS Badges
+  async getAllLmsBadges(): Promise<LmsBadge[]> {
+    return await db.select().from(lmsBadges).orderBy(lmsBadges.name);
+  }
+
+  async getLmsBadgeById(id: string): Promise<LmsBadge | undefined> {
+    const result = await db.select().from(lmsBadges).where(eq(lmsBadges.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLmsBadge(badge: InsertLmsBadge): Promise<LmsBadge> {
+    const result = await db.insert(lmsBadges).values(badge).returning();
+    return result[0];
+  }
+
+  async updateLmsBadge(id: string, badge: Partial<InsertLmsBadge>): Promise<LmsBadge | undefined> {
+    const result = await db.update(lmsBadges)
+      .set({ ...badge as any, updatedAt: new Date() })
+      .where(eq(lmsBadges.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLmsBadge(id: string): Promise<boolean> {
+    const result = await db.delete(lmsBadges).where(eq(lmsBadges.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // LMS Enrollments
+  async getLmsEnrollmentsByStaff(staffId: string): Promise<LmsEnrollment[]> {
+    return await db.select().from(lmsEnrollments)
+      .where(eq(lmsEnrollments.staffId, staffId))
+      .orderBy(desc(lmsEnrollments.enrolledAt));
+  }
+
+  async getLmsEnrollmentsByCourse(courseId: string): Promise<LmsEnrollment[]> {
+    return await db.select().from(lmsEnrollments)
+      .where(eq(lmsEnrollments.courseId, courseId))
+      .orderBy(desc(lmsEnrollments.enrolledAt));
+  }
+
+  async getLmsEnrollment(staffId: string, courseId: string): Promise<LmsEnrollment | undefined> {
+    const result = await db.select().from(lmsEnrollments)
+      .where(and(
+        eq(lmsEnrollments.staffId, staffId),
+        eq(lmsEnrollments.courseId, courseId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getLmsEnrollmentById(id: string): Promise<LmsEnrollment | undefined> {
+    const result = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLmsEnrollment(enrollment: InsertLmsEnrollment): Promise<LmsEnrollment> {
+    const result = await db.insert(lmsEnrollments).values(enrollment).returning();
+    return result[0];
+  }
+
+  async updateLmsEnrollment(id: string, enrollment: Partial<InsertLmsEnrollment>): Promise<LmsEnrollment | undefined> {
+    const result = await db.update(lmsEnrollments)
+      .set({ ...enrollment as any, updatedAt: new Date() })
+      .where(eq(lmsEnrollments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLmsEnrollment(id: string): Promise<boolean> {
+    const result = await db.delete(lmsEnrollments).where(eq(lmsEnrollments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // LMS Module Progress
+  async getLmsModuleProgressByEnrollment(enrollmentId: string): Promise<LmsModuleProgress[]> {
+    return await db.select().from(lmsModuleProgress)
+      .where(eq(lmsModuleProgress.enrollmentId, enrollmentId))
+      .orderBy(lmsModuleProgress.startedAt);
+  }
+
+  async getLmsModuleProgress(enrollmentId: string, moduleId: string): Promise<LmsModuleProgress | undefined> {
+    const result = await db.select().from(lmsModuleProgress)
+      .where(and(
+        eq(lmsModuleProgress.enrollmentId, enrollmentId),
+        eq(lmsModuleProgress.moduleId, moduleId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async createLmsModuleProgress(progress: InsertLmsModuleProgress): Promise<LmsModuleProgress> {
+    const result = await db.insert(lmsModuleProgress).values(progress).returning();
+    return result[0];
+  }
+
+  async updateLmsModuleProgress(id: string, progress: Partial<InsertLmsModuleProgress>): Promise<LmsModuleProgress | undefined> {
+    const result = await db.update(lmsModuleProgress)
+      .set({ ...progress as any, updatedAt: new Date() })
+      .where(eq(lmsModuleProgress.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // LMS Quiz Attempts
+  async getLmsQuizAttemptsByEnrollment(enrollmentId: string): Promise<LmsQuizAttempt[]> {
+    return await db.select().from(lmsQuizAttempts)
+      .where(eq(lmsQuizAttempts.enrollmentId, enrollmentId))
+      .orderBy(desc(lmsQuizAttempts.startedAt));
+  }
+
+  async getLmsQuizAttemptById(id: string): Promise<LmsQuizAttempt | undefined> {
+    const result = await db.select().from(lmsQuizAttempts).where(eq(lmsQuizAttempts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLmsQuizAttempt(attempt: InsertLmsQuizAttempt): Promise<LmsQuizAttempt> {
+    const result = await db.insert(lmsQuizAttempts).values(attempt).returning();
+    return result[0];
+  }
+
+  async updateLmsQuizAttempt(id: string, attempt: Partial<InsertLmsQuizAttempt>): Promise<LmsQuizAttempt | undefined> {
+    const result = await db.update(lmsQuizAttempts)
+      .set(attempt as any)
+      .where(eq(lmsQuizAttempts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // LMS Staff Badges
+  async getLmsStaffBadges(staffId: string): Promise<LmsStaffBadge[]> {
+    return await db.select().from(lmsStaffBadges)
+      .where(eq(lmsStaffBadges.staffId, staffId))
+      .orderBy(desc(lmsStaffBadges.earnedAt));
+  }
+
+  async awardLmsBadge(staffBadge: InsertLmsStaffBadge): Promise<LmsStaffBadge> {
+    const result = await db.insert(lmsStaffBadges).values(staffBadge).returning();
+    return result[0];
+  }
+
+  // LMS Staff Stats (Gamification)
+  async getLmsStaffStats(staffId: string): Promise<LmsStaffStats | undefined> {
+    const result = await db.select().from(lmsStaffStats)
+      .where(eq(lmsStaffStats.staffId, staffId))
+      .limit(1);
+    return result[0];
+  }
+
+  async createOrUpdateLmsStaffStats(staffId: string, stats: Partial<InsertLmsStaffStats>): Promise<LmsStaffStats> {
+    const existing = await this.getLmsStaffStats(staffId);
+    if (existing) {
+      // Update existing stats
+      const newPoints = (existing.totalPoints || 0) + (stats.totalPoints || 0);
+      const levelInfo = getLmsLevelFromPoints(newPoints);
+      const result = await db.update(lmsStaffStats)
+        .set({
+          ...stats,
+          totalPoints: newPoints,
+          currentLevel: levelInfo.level,
+          currentLevelName: levelInfo.name,
+          pointsToNextLevel: levelInfo.pointsToNext,
+          coursesCompleted: (existing.coursesCompleted || 0) + (stats.coursesCompleted || 0),
+          quizzesPassed: (existing.quizzesPassed || 0) + (stats.quizzesPassed || 0),
+          totalTimeSpentMinutes: (existing.totalTimeSpentMinutes || 0) + (stats.totalTimeSpentMinutes || 0),
+          updatedAt: new Date()
+        })
+        .where(eq(lmsStaffStats.staffId, staffId))
+        .returning();
+      return result[0];
+    } else {
+      // Create new stats
+      const levelInfo = getLmsLevelFromPoints(stats.totalPoints || 0);
+      const result = await db.insert(lmsStaffStats).values({
+        staffId,
+        ...stats,
+        currentLevel: levelInfo.level,
+        currentLevelName: levelInfo.name,
+        pointsToNextLevel: levelInfo.pointsToNext
+      }).returning();
+      return result[0];
+    }
+  }
+
+  async updateLmsStreak(staffId: string): Promise<LmsStaffStats | undefined> {
+    const stats = await this.getLmsStaffStats(staffId);
+    if (!stats) return undefined;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const lastActivity = stats.lastActivityDate ? new Date(stats.lastActivityDate) : null;
+
+    let newStreak = stats.currentStreak || 0;
+    let longestStreak = stats.longestStreak || 0;
+
+    if (lastActivity) {
+      lastActivity.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((today.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        // Consecutive day - increment streak
+        newStreak += 1;
+        if (newStreak > longestStreak) {
+          longestStreak = newStreak;
+        }
+      } else if (diffDays > 1) {
+        // Streak broken
+        newStreak = 1;
+      }
+      // If diffDays === 0, same day - no change to streak
+    } else {
+      newStreak = 1;
+    }
+
+    const result = await db.update(lmsStaffStats)
+      .set({
+        currentStreak: newStreak,
+        longestStreak,
+        lastActivityDate: today,
+        updatedAt: new Date()
+      })
+      .where(eq(lmsStaffStats.staffId, staffId))
+      .returning();
+    return result[0];
+  }
+
+  async getLmsLeaderboard(limit: number = 10): Promise<LmsStaffStats[]> {
+    return await db.select().from(lmsStaffStats)
+      .orderBy(desc(lmsStaffStats.totalPoints))
+      .limit(limit);
+  }
+
+  // LMS Compliance Records
+  async getLmsComplianceRecordsByStaff(staffId: string): Promise<LmsComplianceRecord[]> {
+    return await db.select().from(lmsComplianceRecords)
+      .where(eq(lmsComplianceRecords.staffId, staffId))
+      .orderBy(lmsComplianceRecords.dueDate);
+  }
+
+  async getLmsComplianceRecordsByCourse(courseId: string): Promise<LmsComplianceRecord[]> {
+    return await db.select().from(lmsComplianceRecords)
+      .where(eq(lmsComplianceRecords.courseId, courseId))
+      .orderBy(lmsComplianceRecords.dueDate);
+  }
+
+  async getLmsOverdueCompliance(): Promise<LmsComplianceRecord[]> {
+    return await db.select().from(lmsComplianceRecords)
+      .where(and(
+        lte(lmsComplianceRecords.dueDate, new Date()),
+        sql`${lmsComplianceRecords.status} IN ('overdue', 'due_soon')`
+      ))
+      .orderBy(lmsComplianceRecords.dueDate);
+  }
+
+  async createLmsComplianceRecord(record: InsertLmsComplianceRecord): Promise<LmsComplianceRecord> {
+    const result = await db.insert(lmsComplianceRecords).values(record).returning();
+    return result[0];
+  }
+
+  async updateLmsComplianceRecord(id: string, record: Partial<InsertLmsComplianceRecord>): Promise<LmsComplianceRecord | undefined> {
+    const result = await db.update(lmsComplianceRecords)
+      .set({ ...record as any, updatedAt: new Date() })
+      .where(eq(lmsComplianceRecords.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // LMS Activity Logs
+  async getLmsActivityLogsByStaff(staffId: string, limit?: number): Promise<LmsActivityLog[]> {
+    const query = db.select().from(lmsActivityLogs)
+      .where(eq(lmsActivityLogs.staffId, staffId))
+      .orderBy(desc(lmsActivityLogs.timestamp));
+    return limit ? await query.limit(limit) : await query;
+  }
+
+  async createLmsActivityLog(log: InsertLmsActivityLog): Promise<LmsActivityLog> {
+    const result = await db.insert(lmsActivityLogs).values(log).returning();
+    return result[0];
+  }
+
+  // LMS Course Feedback
+  async getLmsFeedbackByCourse(courseId: string): Promise<LmsCourseFeedback[]> {
+    return await db.select().from(lmsCourseFeedback)
+      .where(eq(lmsCourseFeedback.courseId, courseId))
+      .orderBy(desc(lmsCourseFeedback.createdAt));
+  }
+
+  async createLmsCourseFeedback(feedback: InsertLmsCourseFeedback): Promise<LmsCourseFeedback> {
+    const result = await db.insert(lmsCourseFeedback).values(feedback).returning();
+
+    // Update course average rating
+    const allFeedback = await this.getLmsFeedbackByCourse(feedback.courseId);
+    const avgRating = allFeedback.reduce((sum, f) => sum + f.rating, 0) / allFeedback.length;
+    await this.updateLmsCourse(feedback.courseId, { averageRating: avgRating.toString() });
+
+    return result[0];
+  }
+
+  // LMS Notifications
+  async getLmsNotificationsByStaff(staffId: string, unreadOnly?: boolean): Promise<LmsNotification[]> {
+    const conditions = [eq(lmsNotifications.staffId, staffId)];
+    if (unreadOnly) {
+      conditions.push(eq(lmsNotifications.isRead, 'no'));
+    }
+    return await db.select().from(lmsNotifications)
+      .where(and(...conditions))
+      .orderBy(desc(lmsNotifications.createdAt));
+  }
+
+  async createLmsNotification(notification: InsertLmsNotification): Promise<LmsNotification> {
+    const result = await db.insert(lmsNotifications).values(notification).returning();
+    return result[0];
+  }
+
+  async markLmsNotificationRead(id: string): Promise<LmsNotification | undefined> {
+    const result = await db.update(lmsNotifications)
+      .set({ isRead: 'yes', readAt: new Date() })
+      .where(eq(lmsNotifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markAllLmsNotificationsRead(staffId: string): Promise<void> {
+    await db.update(lmsNotifications)
+      .set({ isRead: 'yes', readAt: new Date() })
+      .where(and(
+        eq(lmsNotifications.staffId, staffId),
+        eq(lmsNotifications.isRead, 'no')
+      ));
+  }
+
+  // LMS Certificate Templates
+  async getAllLmsCertificateTemplates(): Promise<LmsCertificateTemplate[]> {
+    return await db.select().from(lmsCertificateTemplates)
+      .where(eq(lmsCertificateTemplates.isActive, 'yes'))
+      .orderBy(lmsCertificateTemplates.name);
+  }
+
+  async getLmsCertificateTemplateById(id: string): Promise<LmsCertificateTemplate | undefined> {
+    const result = await db.select().from(lmsCertificateTemplates)
+      .where(eq(lmsCertificateTemplates.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createLmsCertificateTemplate(template: InsertLmsCertificateTemplate): Promise<LmsCertificateTemplate> {
+    const result = await db.insert(lmsCertificateTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateLmsCertificateTemplate(id: string, template: Partial<InsertLmsCertificateTemplate>): Promise<LmsCertificateTemplate | undefined> {
+    const result = await db.update(lmsCertificateTemplates)
+      .set({ ...template as any, updatedAt: new Date() })
+      .where(eq(lmsCertificateTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // LMS Dashboard Stats
+  async getLmsDashboardStats(): Promise<{
+    totalCourses: number;
+    publishedCourses: number;
+    totalEnrollments: number;
+    completedEnrollments: number;
+    activeStaff: number;
+    overdueCompliance: number;
+    averageCompletionRate: number;
+  }> {
+    const allCourses = await db.select().from(lmsCourses);
+    const publishedCourses = allCourses.filter(c => c.status === 'published');
+
+    const allEnrollments = await db.select().from(lmsEnrollments);
+    const completedEnrollments = allEnrollments.filter(e => e.status === 'completed');
+
+    const activeStaffIds = new Set(allEnrollments.map(e => e.staffId));
+
+    const overdueCompliance = await this.getLmsOverdueCompliance();
+
+    const completionRate = allEnrollments.length > 0
+      ? (completedEnrollments.length / allEnrollments.length) * 100
+      : 0;
+
+    return {
+      totalCourses: allCourses.length,
+      publishedCourses: publishedCourses.length,
+      totalEnrollments: allEnrollments.length,
+      completedEnrollments: completedEnrollments.length,
+      activeStaff: activeStaffIds.size,
+      overdueCompliance: overdueCompliance.length,
+      averageCompletionRate: Math.round(completionRate * 100) / 100
+    };
+  }
+
+  // Bulk enroll staff in a course
+  async bulkEnrollStaff(courseId: string, staffIds: string[], enrolledById: string): Promise<LmsEnrollment[]> {
+    const enrollments: LmsEnrollment[] = [];
+    for (const staffId of staffIds) {
+      const existing = await this.getLmsEnrollment(staffId, courseId);
+      if (!existing) {
+        const enrollment = await this.createLmsEnrollment({
+          courseId,
+          staffId,
+          enrolledBy: enrolledById,
+          status: 'not_started'
+        });
+        enrollments.push(enrollment);
+      }
+    }
+    return enrollments;
+  }
+
+  // Award points and check for badges
+  async awardLmsPoints(staffId: string, points: number, reason: string): Promise<LmsStaffStats> {
+    // Update stats with new points
+    const stats = await this.createOrUpdateLmsStaffStats(staffId, { totalPoints: points });
+
+    // Log the activity
+    await this.createLmsActivityLog({
+      staffId,
+      activityType: 'points_earned',
+      description: reason,
+      pointsEarned: points
+    });
+
+    // Check for milestone badges
+    const totalPoints = stats.totalPoints || 0;
+    const milestones = [100, 500, 1000, 2500, 5000, 10000];
+    for (const milestone of milestones) {
+      if (totalPoints >= milestone && (totalPoints - points) < milestone) {
+        // Just crossed this milestone - check if badge exists for it
+        const badges = await this.getAllLmsBadges();
+        const milestoneBadge = badges.find(b =>
+          b.badgeType === 'milestone' &&
+          b.pointsRequired === milestone
+        );
+        if (milestoneBadge) {
+          // Check if already awarded
+          const staffBadges = await this.getLmsStaffBadges(staffId);
+          const alreadyAwarded = staffBadges.some(sb => sb.badgeId === milestoneBadge.id);
+          if (!alreadyAwarded) {
+            await this.awardLmsBadge({
+              staffId,
+              badgeId: milestoneBadge.id,
+              awardReason: `Reached ${milestone} points`
+            });
+          }
+        }
+      }
+    }
+
+    return stats;
+  }
 }
 
 export const storage = new DbStorage();
