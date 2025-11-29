@@ -10465,6 +10465,187 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get reactions for a message
+  app.get("/api/chat/messages/:messageId/reactions", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId } = req.params;
+      const reactions = await storage.getMessageReactions(messageId);
+      res.json(reactions);
+    } catch (error) {
+      console.error("Error fetching message reactions:", error);
+      res.status(500).json({ error: "Failed to fetch reactions" });
+    }
+  });
+
+  // Add a reaction to a message
+  app.post("/api/chat/messages/:messageId/reactions", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId } = req.params;
+      const { emoji } = req.body;
+
+      if (!emoji) {
+        return res.status(400).json({ error: "Emoji is required" });
+      }
+
+      // Validate emoji is one of the allowed ones
+      const allowedEmojis = ["heart", "thumbsup", "thumbsdown", "diamond", "party"];
+      if (!allowedEmojis.includes(emoji)) {
+        return res.status(400).json({ error: "Invalid emoji. Allowed: heart, thumbsup, thumbsdown, diamond, party" });
+      }
+
+      // Get the message to verify it exists and get roomId
+      const message = await storage.getChatMessageById(messageId);
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+
+      // Check if user is a participant in this room
+      const isParticipant = await storage.isRoomParticipant(message.roomId, userContext.userId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "Not a participant in this chat" });
+      }
+
+      const reaction = await storage.addReaction({
+        messageId,
+        roomId: message.roomId,
+        staffId: userContext.userId,
+        staffName: userContext.userName,
+        emoji
+      });
+
+      res.status(201).json(reaction);
+    } catch (error) {
+      console.error("Error adding reaction:", error);
+      res.status(500).json({ error: "Failed to add reaction" });
+    }
+  });
+
+  // Remove a reaction from a message
+  app.delete("/api/chat/messages/:messageId/reactions/:emoji", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId, emoji } = req.params;
+
+      const removed = await storage.removeReaction(messageId, userContext.userId, emoji);
+      if (!removed) {
+        return res.status(404).json({ error: "Reaction not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing reaction:", error);
+      res.status(500).json({ error: "Failed to remove reaction" });
+    }
+  });
+
+  // Get read receipts for a message
+  app.get("/api/chat/messages/:messageId/reads", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId } = req.params;
+      const reads = await storage.getMessageReads(messageId);
+      res.json(reads);
+    } catch (error) {
+      console.error("Error fetching read receipts:", error);
+      res.status(500).json({ error: "Failed to fetch read receipts" });
+    }
+  });
+
+  // Mark messages as read (bulk)
+  app.post("/api/chat/rooms/:roomId/messages/read", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const { messageIds } = req.body;
+
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return res.status(400).json({ error: "messageIds array is required" });
+      }
+
+      // Check if user is a participant
+      const isParticipant = await storage.isRoomParticipant(roomId, userContext.userId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "Not a participant in this chat" });
+      }
+
+      const markedCount = await storage.markMessagesAsRead(
+        roomId,
+        messageIds,
+        userContext.userId,
+        userContext.userName
+      );
+
+      res.json({ markedCount });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).json({ error: "Failed to mark messages as read" });
+    }
+  });
+
+  // Get reactions for multiple messages (batch)
+  app.post("/api/chat/messages/batch/reactions", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageIds } = req.body;
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return res.status(400).json({ error: "messageIds array is required" });
+      }
+
+      const reactions = await storage.getReactionsForMessages(messageIds);
+      res.json(reactions);
+    } catch (error) {
+      console.error("Error fetching batch reactions:", error);
+      res.status(500).json({ error: "Failed to fetch reactions" });
+    }
+  });
+
+  // Get read receipts for multiple messages (batch)
+  app.post("/api/chat/messages/batch/reads", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageIds } = req.body;
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return res.status(400).json({ error: "messageIds array is required" });
+      }
+
+      const reads = await storage.getReadsForMessages(messageIds);
+      res.json(reads);
+    } catch (error) {
+      console.error("Error fetching batch read receipts:", error);
+      res.status(500).json({ error: "Failed to fetch read receipts" });
+    }
+  });
+
   // Reply to a message with quote
   app.post("/api/chat/rooms/:roomId/messages/reply", requireAuth, async (req: any, res) => {
     try {

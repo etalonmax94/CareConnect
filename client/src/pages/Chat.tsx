@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { ChatRoom, ChatMessage, ChatRoomParticipant, Staff, UserRole, User } from "@shared/schema";
+import type { ChatRoom, ChatMessage, ChatRoomParticipant, Staff, UserRole, User, ChatMessageReaction, ChatMessageRead } from "@shared/schema";
 import { USER_ROLES } from "@shared/schema";
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import {
@@ -40,6 +40,12 @@ import {
   Bell,
   BellOff,
   ChevronRight,
+  Heart,
+  ThumbsUp,
+  ThumbsDown,
+  Diamond,
+  PartyPopper,
+  Eye,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -168,6 +174,9 @@ export default function Chat() {
   const [manageMembersRoomId, setManageMembersRoomId] = useState<string | null>(null);
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
   const [newMemberStaffId, setNewMemberStaffId] = useState<string>("");
+  const [messageReactions, setMessageReactions] = useState<Record<string, ChatMessageReaction[]>>({});
+  const [messageReads, setMessageReads] = useState<Record<string, ChatMessageRead[]>>({});
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -234,6 +243,77 @@ export default function Chat() {
   });
 
   const displayedGifs = gifSearchQuery.length >= 2 ? gifSearchResults.results : trendingGifs.results;
+
+  // Fetch reactions for all displayed messages
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const messageIds = messages.map(m => m.id);
+    apiRequest("POST", "/api/chat/messages/batch/reactions", { messageIds })
+      .then(res => res.json())
+      .then((reactions: Record<string, ChatMessageReaction[]>) => {
+        setMessageReactions(reactions);
+      }).catch(console.error);
+  }, [messages]);
+
+  // Add/remove reaction mutation
+  const addReactionMutation = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      const res = await apiRequest("POST", `/api/chat/messages/${messageId}/reactions`, { emoji });
+      return await res.json();
+    },
+    onSuccess: () => {
+      // Refetch reactions
+      if (messages.length > 0) {
+        const messageIds = messages.map(m => m.id);
+        apiRequest("POST", "/api/chat/messages/batch/reactions", { messageIds })
+          .then(res => res.json())
+          .then((reactions: Record<string, ChatMessageReaction[]>) => {
+            setMessageReactions(reactions);
+          });
+      }
+    }
+  });
+
+  const removeReactionMutation = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      const res = await apiRequest("DELETE", `/api/chat/messages/${messageId}/reactions/${emoji}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      if (messages.length > 0) {
+        const messageIds = messages.map(m => m.id);
+        apiRequest("POST", "/api/chat/messages/batch/reactions", { messageIds })
+          .then(res => res.json())
+          .then((reactions: Record<string, ChatMessageReaction[]>) => {
+            setMessageReactions(reactions);
+          });
+      }
+    }
+  });
+
+  // Toggle reaction (add if not exists, remove if exists)
+  const handleToggleReaction = useCallback((messageId: string, emoji: string) => {
+    const existingReactions = messageReactions[messageId] || [];
+    const userReaction = existingReactions.find(r => r.staffId === currentUser?.id && r.emoji === emoji);
+    
+    if (userReaction) {
+      removeReactionMutation.mutate({ messageId, emoji });
+    } else {
+      addReactionMutation.mutate({ messageId, emoji });
+    }
+  }, [messageReactions, currentUser?.id, addReactionMutation, removeReactionMutation]);
+
+  // Fetch read receipts for a message on hover
+  const fetchMessageReads = useCallback(async (messageId: string) => {
+    if (messageReads[messageId]) return; // Already fetched
+    try {
+      const res = await apiRequest("GET", `/api/chat/messages/${messageId}/reads`);
+      const reads = await res.json() as ChatMessageRead[];
+      setMessageReads(prev => ({ ...prev, [messageId]: reads }));
+    } catch (error) {
+      console.error("Failed to fetch read receipts:", error);
+    }
+  }, [messageReads]);
   
   useEffect(() => {
     setShowGifPicker(false);
@@ -1983,13 +2063,39 @@ export default function Chat() {
                             </div>
                             
                             {!isDeleted && (
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                {/* Reaction Picker */}
+                                <div className="flex items-center bg-background/90 dark:bg-slate-800/90 rounded-full shadow-sm border px-1 py-0.5">
+                                  {[
+                                    { emoji: "heart", icon: Heart, color: "text-red-500 hover:text-red-600" },
+                                    { emoji: "thumbsup", icon: ThumbsUp, color: "text-blue-500 hover:text-blue-600" },
+                                    { emoji: "thumbsdown", icon: ThumbsDown, color: "text-orange-500 hover:text-orange-600" },
+                                    { emoji: "diamond", icon: Diamond, color: "text-cyan-500 hover:text-cyan-600" },
+                                    { emoji: "party", icon: PartyPopper, color: "text-yellow-500 hover:text-yellow-600" },
+                                  ].map(({ emoji, icon: Icon, color }) => {
+                                    const reactions = messageReactions[message.id] || [];
+                                    const hasReacted = reactions.some(r => r.staffId === currentUser?.id && r.emoji === emoji);
+                                    return (
+                                      <Button
+                                        key={emoji}
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`h-6 w-6 rounded-full ${hasReacted ? "bg-muted" : ""} ${color}`}
+                                        onClick={() => handleToggleReaction(message.id, emoji)}
+                                        data-testid={`button-reaction-${emoji}-${message.id}`}
+                                      >
+                                        <Icon className="h-3.5 w-3.5" />
+                                      </Button>
+                                    );
+                                  })}
+                                </div>
+                                
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className="rounded-full"
+                                      className="rounded-full h-7 w-7"
                                       data-testid={`button-message-actions-${message.id}`}
                                     >
                                       <MoreVertical className="h-3.5 w-3.5" />
@@ -2029,12 +2135,88 @@ export default function Chat() {
                             )}
                           </div>
                           
+                          {/* Display Reactions */}
+                          {!isDeleted && messageReactions[message.id]?.length > 0 && (() => {
+                            const reactions = messageReactions[message.id];
+                            const grouped = reactions.reduce((acc, r) => {
+                              if (!acc[r.emoji]) acc[r.emoji] = [];
+                              acc[r.emoji].push(r);
+                              return acc;
+                            }, {} as Record<string, ChatMessageReaction[]>);
+                            
+                            const emojiIcons: Record<string, typeof Heart> = {
+                              heart: Heart, thumbsup: ThumbsUp, thumbsdown: ThumbsDown,
+                              diamond: Diamond, party: PartyPopper
+                            };
+                            const emojiColors: Record<string, string> = {
+                              heart: "text-red-500", thumbsup: "text-blue-500", thumbsdown: "text-orange-500",
+                              diamond: "text-cyan-500", party: "text-yellow-500"
+                            };
+                            
+                            return (
+                              <div className={`flex items-center gap-1 mt-1 flex-wrap ${isOwn ? "justify-end" : ""}`}>
+                                {Object.entries(grouped).map(([emoji, reactionList]) => {
+                                  const Icon = emojiIcons[emoji] || Heart;
+                                  const hasUserReacted = reactionList.some(r => r.staffId === currentUser?.id);
+                                  return (
+                                    <Tooltip key={emoji}>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className={`h-6 px-2 py-0 rounded-full text-xs ${hasUserReacted ? "bg-muted border border-primary/30" : "bg-muted/50"}`}
+                                          onClick={() => handleToggleReaction(message.id, emoji)}
+                                          data-testid={`reaction-count-${emoji}-${message.id}`}
+                                        >
+                                          <Icon className={`h-3 w-3 mr-1 ${emojiColors[emoji]}`} />
+                                          <span className="font-medium">{reactionList.length}</span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[200px]">
+                                        <p className="text-xs">{reactionList.map(r => r.staffName).join(", ")}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                          
                           <div className={`flex items-center gap-1.5 mt-1 px-1 ${isOwn ? "justify-end" : ""}`}>
                             <span className="text-[10px] text-muted-foreground/70">
                               {formatMessageDate(message.createdAt)}
                             </span>
                             {message.isEdited === "yes" && (
                               <span className="text-[10px] text-muted-foreground/70">(edited)</span>
+                            )}
+                            {/* Read Receipts Indicator */}
+                            {isOwn && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button 
+                                    className="inline-flex items-center text-[10px] text-muted-foreground/70 hover:text-muted-foreground cursor-pointer"
+                                    onMouseEnter={() => fetchMessageReads(message.id)}
+                                    data-testid={`read-receipts-${message.id}`}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    {messageReads[message.id]?.length > 0 && (
+                                      <span className="ml-0.5">{messageReads[message.id].length}</span>
+                                    )}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[200px]">
+                                  <div className="text-xs">
+                                    {messageReads[message.id]?.length > 0 ? (
+                                      <>
+                                        <p className="font-medium mb-1">Seen by:</p>
+                                        <p>{messageReads[message.id].map(r => r.staffName).join(", ")}</p>
+                                      </>
+                                    ) : (
+                                      <p>No read receipts yet</p>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         </div>
