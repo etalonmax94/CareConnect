@@ -3,6 +3,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Bell, Check, CheckCheck, Trash2, ExternalLink, MessageSquare, AlertCircle, Megaphone, ClipboardList, Calendar, FileText, Users, Heart, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -224,26 +229,33 @@ export default function NotificationBell({ className, userId, userName }: Notifi
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={className}
-          data-testid="button-notifications"
-        >
-          <div className="relative">
-            <Bell className="h-4 w-4" />
-            {count > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-2 -right-2 h-5 min-w-[20px] px-1 text-xs flex items-center justify-center"
-              >
-                {count > 99 ? "99+" : count}
-              </Badge>
-            )}
-          </div>
-        </Button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={className}
+              data-testid="button-notifications"
+            >
+              <div className="relative">
+                <Bell className="h-4 w-4" />
+                {count > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-2 -right-2 h-5 min-w-[20px] px-1 text-xs flex items-center justify-center"
+                  >
+                    {count > 99 ? "99+" : count}
+                  </Badge>
+                )}
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Notifications</p>
+        </TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Notifications</span>
