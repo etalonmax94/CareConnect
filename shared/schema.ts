@@ -3042,7 +3042,7 @@ export type InsertChatRoomParticipant = z.infer<typeof insertChatRoomParticipant
 export type ChatRoomParticipant = typeof chatRoomParticipants.$inferSelect;
 
 // Chat Messages
-export type ChatMessageType = "text" | "system" | "file" | "image" | "video" | "gif";
+export type ChatMessageType = "text" | "system" | "file" | "image" | "video" | "gif" | "voice";
 
 export const chatMessages = pgTable("chat_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3103,12 +3103,18 @@ export const chatMessages = pgTable("chat_messages", {
     endIndex: number;
   }[]>(),
   
+  // Message pinning
+  isPinned: text("is_pinned").default("no").$type<"yes" | "no">(),
+  pinnedAt: timestamp("pinned_at"),
+  pinnedById: varchar("pinned_by_id"),
+  pinnedByName: text("pinned_by_name"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertChatMessageSchema = createInsertSchema(chatMessages, {
   content: z.string().default(""),
-  messageType: z.enum(["text", "system", "file", "image", "video", "gif"]).optional().default("text"),
+  messageType: z.enum(["text", "system", "file", "image", "video", "gif", "voice"]).optional().default("text"),
   replyToId: z.string().optional(),
   replyToPreview: z.string().optional(),
   replyToSenderId: z.string().optional(),
@@ -3142,13 +3148,17 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages, {
   deletedById: true,
   deletedByName: true,
   forwardedAt: true,
+  isPinned: true,
+  pinnedAt: true,
+  pinnedById: true,
+  pinnedByName: true,
 });
 
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 
 // Chat Message Attachments (for multiple attachments per message)
-export type ChatAttachmentType = "image" | "video" | "gif" | "file" | "audio";
+export type ChatAttachmentType = "image" | "video" | "gif" | "file" | "audio" | "voice";
 
 export const chatMessageAttachments = pgTable("chat_message_attachments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3192,7 +3202,7 @@ export const chatMessageAttachments = pgTable("chat_message_attachments", {
 });
 
 export const insertChatMessageAttachmentSchema = createInsertSchema(chatMessageAttachments, {
-  type: z.enum(["image", "video", "gif", "file", "audio"]),
+  type: z.enum(["image", "video", "gif", "file", "audio", "voice"]),
   fileName: z.string().min(1),
   fileSize: z.number().positive(),
   mimeType: z.string().min(1),
@@ -3328,3 +3338,70 @@ export const insertChatMessageReadSchema = createInsertSchema(chatMessageReads).
 
 export type InsertChatMessageRead = z.infer<typeof insertChatMessageReadSchema>;
 export type ChatMessageRead = typeof chatMessageReads.$inferSelect;
+
+// Chat Message Delivery Receipts - per-message tracking of when delivered to each user
+export const chatMessageDeliveries = pgTable("chat_message_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  messageId: varchar("message_id").notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  roomId: varchar("room_id").notNull().references(() => chatRooms.id, { onDelete: "cascade" }),
+  
+  // Recipient info
+  staffId: varchar("staff_id").notNull(),
+  staffName: text("staff_name").notNull(),
+  
+  deliveredAt: timestamp("delivered_at").defaultNow().notNull(),
+}, (table) => ({
+  // Prevent duplicate delivery entries
+  uniqueDelivery: sql`UNIQUE(message_id, staff_id)`,
+}));
+
+export const insertChatMessageDeliverySchema = createInsertSchema(chatMessageDeliveries).omit({
+  id: true,
+  deliveredAt: true,
+});
+
+export type InsertChatMessageDelivery = z.infer<typeof insertChatMessageDeliverySchema>;
+export type ChatMessageDelivery = typeof chatMessageDeliveries.$inferSelect;
+
+// Scheduled Messages
+export const scheduledMessages = pgTable("scheduled_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  roomId: varchar("room_id").notNull().references(() => chatRooms.id, { onDelete: "cascade" }),
+  
+  // Sender info
+  senderId: varchar("sender_id").notNull(),
+  senderName: text("sender_name").notNull(),
+  
+  // Message content
+  content: text("content").notNull(),
+  
+  // Scheduling
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  status: text("status").$type<"pending" | "sent" | "cancelled" | "failed">().default("pending"),
+  
+  // When sent or cancelled
+  sentAt: timestamp("sent_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  
+  // Created message ID (after sending)
+  messageId: varchar("message_id"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertScheduledMessageSchema = createInsertSchema(scheduledMessages, {
+  content: z.string().min(1),
+  scheduledAt: z.string().or(z.date()),
+}).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  sentAt: true,
+  cancelledAt: true,
+  messageId: true,
+});
+
+export type InsertScheduledMessage = z.infer<typeof insertScheduledMessageSchema>;
+export type ScheduledMessage = typeof scheduledMessages.$inferSelect;

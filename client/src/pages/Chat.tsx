@@ -49,6 +49,14 @@ import {
   Eye,
   FileText,
   FolderOpen,
+  Mic,
+  Square,
+  Pause,
+  Clock,
+  Calendar,
+  FileCode,
+  BookTemplate,
+  CheckCheck,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -182,14 +190,47 @@ export default function Chat() {
   const [newMemberStaffId, setNewMemberStaffId] = useState<string>("");
   const [messageReactions, setMessageReactions] = useState<Record<string, ChatMessageReaction[]>>({});
   const [messageReads, setMessageReads] = useState<Record<string, ChatMessageRead[]>>({});
+  const [messageDeliveries, setMessageDeliveries] = useState<Record<string, Array<{ staffId: string; staffName: string; deliveredAt: string }>>>({});
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<"settings" | "media">("settings");
+  
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  
+  // Message scheduling state
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleContent, setScheduleContent] = useState("");
+  
+  // Advanced message search state (with filters)
+  const [showAdvancedSearchDialog, setShowAdvancedSearchDialog] = useState(false);
+  const [advancedSearchQuery, setAdvancedSearchQuery] = useState("");
+  const [searchSender, setSearchSender] = useState<string>("all");
+  const [searchDateFrom, setSearchDateFrom] = useState("");
+  const [searchDateTo, setSearchDateTo] = useState("");
+  const [searchMediaType, setSearchMediaType] = useState<string>("all");
+  const [advancedSearchResults, setAdvancedSearchResults] = useState<ChatMessage[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // Chat templates state
+  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
+  const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; content: string }>>([]);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateContent, setNewTemplateContent] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -197,6 +238,18 @@ export default function Chat() {
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Load chat templates from localStorage
+  useEffect(() => {
+    const savedTemplates = localStorage.getItem("chat_templates");
+    if (savedTemplates) {
+      try {
+        setTemplates(JSON.parse(savedTemplates));
+      } catch {
+        setTemplates([]);
+      }
+    }
   }, []);
 
   const { data: authData } = useQuery<{ user: User }>({
@@ -283,6 +336,34 @@ export default function Chat() {
         setMessageReactions(reactions);
       }).catch(console.error);
   }, [messages]);
+
+  // Fetch deliveries for all displayed messages
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const messageIds = messages.map(m => m.id);
+    apiRequest("POST", "/api/chat/messages/batch/deliveries", { messageIds })
+      .then(res => res.json())
+      .then((deliveries: Record<string, Array<{ staffId: string; staffName: string; deliveredAt: string }>>) => {
+        setMessageDeliveries(deliveries);
+      }).catch(console.error);
+  }, [messages]);
+
+  // Mark messages as delivered when viewing
+  useEffect(() => {
+    if (messages.length === 0 || !selectedRoomId || !currentUser) return;
+    
+    // Filter out own messages and get IDs of messages to mark as delivered
+    const otherUsersMessages = messages
+      .filter(m => m.senderId !== currentUser.id)
+      .map(m => m.id);
+    
+    if (otherUsersMessages.length === 0) return;
+
+    // Mark as delivered
+    apiRequest("POST", `/api/chat/rooms/${selectedRoomId}/messages/deliver`, { 
+      messageIds: otherUsersMessages 
+    }).catch(console.error);
+  }, [messages, selectedRoomId, currentUser]);
 
   // Add/remove reaction mutation
   const addReactionMutation = useMutation({
@@ -443,6 +524,12 @@ export default function Chat() {
         break;
       case "read":
         queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+        break;
+      case "pinUpdate":
+        // Refresh messages when pin state changes
+        if (data.roomId) {
+          queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms", data.roomId, "messages"] });
+        }
         break;
     }
   }, []);
@@ -853,6 +940,62 @@ export default function Chat() {
     },
   });
 
+  const pinMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const response = await apiRequest("POST", `/api/chat/messages/${messageId}/pin`);
+      return response.json();
+    },
+    onSuccess: (data: { isPinned: boolean }) => {
+      refetchMessages();
+      toast({ title: data.isPinned ? "Message pinned" : "Message unpinned" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update pin status", variant: "destructive" });
+    },
+  });
+
+  const scheduleMessageMutation = useMutation({
+    mutationFn: async ({ content, scheduledAt }: { content: string; scheduledAt: string }) => {
+      if (!selectedRoomId) throw new Error("No room selected");
+      const response = await apiRequest("POST", `/api/chat/rooms/${selectedRoomId}/scheduled`, {
+        content,
+        scheduledAt,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      setShowScheduleDialog(false);
+      setScheduleContent("");
+      setScheduleDate("");
+      setScheduleTime("");
+      toast({ title: "Message scheduled successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms", selectedRoomId, "scheduled"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to schedule message", variant: "destructive" });
+    },
+  });
+
+  const cancelScheduledMutation = useMutation({
+    mutationFn: async (scheduledId: string) => {
+      const response = await apiRequest("DELETE", `/api/chat/scheduled/${scheduledId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Scheduled message cancelled" });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms", selectedRoomId, "scheduled"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to cancel scheduled message", variant: "destructive" });
+    },
+  });
+
+  // Query for scheduled messages
+  const { data: scheduledMessages = [] } = useQuery<any[]>({
+    queryKey: ["/api/chat/rooms", selectedRoomId, "scheduled"],
+    enabled: !!selectedRoomId && !!currentUser,
+  });
+
   const uploadAttachmentMutation = useMutation({
     mutationFn: async ({ file, roomId }: { file: File; roomId: string }) => {
       if (!roomId) throw new Error("No room selected");
@@ -978,6 +1121,144 @@ export default function Chat() {
     setReplyToMessage(message);
   };
 
+  const handleScheduleMessage = () => {
+    if (!scheduleContent.trim() || !scheduleDate || !scheduleTime) {
+      toast({ title: "Please fill in all fields", variant: "destructive" });
+      return;
+    }
+    
+    const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`);
+    if (scheduledAt <= new Date()) {
+      toast({ title: "Scheduled time must be in the future", variant: "destructive" });
+      return;
+    }
+    
+    scheduleMessageMutation.mutate({
+      content: scheduleContent.trim(),
+      scheduledAt: scheduledAt.toISOString(),
+    });
+  };
+
+  const openScheduleDialog = () => {
+    // Pre-fill with current message text if any
+    if (messageText.trim()) {
+      setScheduleContent(messageText.trim());
+    }
+    setShowScheduleDialog(true);
+  };
+
+  const handleAdvancedSearch = async () => {
+    if (!selectedRoomId) return;
+    
+    setIsSearching(true);
+    try {
+      const params = new URLSearchParams();
+      if (advancedSearchQuery.trim()) params.append("q", advancedSearchQuery.trim());
+      if (searchSender && searchSender !== "all") params.append("senderId", searchSender);
+      if (searchDateFrom) params.append("dateFrom", searchDateFrom);
+      if (searchDateTo) params.append("dateTo", searchDateTo);
+      if (searchMediaType && searchMediaType !== "all") params.append("mediaType", searchMediaType);
+      
+      const response = await fetch(`/api/chat/rooms/${selectedRoomId}/search?${params.toString()}`, {
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Search failed");
+      }
+      
+      const results = await response.json();
+      setAdvancedSearchResults(results);
+    } catch (error) {
+      toast({ title: "Search failed", variant: "destructive" });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const clearAdvancedSearchFilters = () => {
+    setAdvancedSearchQuery("");
+    setSearchSender("all");
+    setSearchDateFrom("");
+    setSearchDateTo("");
+    setSearchMediaType("all");
+    setAdvancedSearchResults([]);
+  };
+
+  const jumpToMessage = (messageId: string) => {
+    setShowAdvancedSearchDialog(false);
+    // Scroll to the message
+    setTimeout(() => {
+      const messageElement = document.getElementById(`message-${messageId}`);
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        messageElement.classList.add("bg-yellow-100", "dark:bg-yellow-900/30");
+        setTimeout(() => {
+          messageElement.classList.remove("bg-yellow-100", "dark:bg-yellow-900/30");
+        }, 2000);
+      }
+    }, 100);
+  };
+
+  // Template management functions
+  const saveTemplate = () => {
+    if (!newTemplateName.trim() || !newTemplateContent.trim()) {
+      toast({ title: "Please fill in both name and content", variant: "destructive" });
+      return;
+    }
+    
+    let updatedTemplates;
+    if (editingTemplateId) {
+      updatedTemplates = templates.map(t => 
+        t.id === editingTemplateId 
+          ? { ...t, name: newTemplateName.trim(), content: newTemplateContent.trim() }
+          : t
+      );
+    } else {
+      const newTemplate = {
+        id: Date.now().toString(),
+        name: newTemplateName.trim(),
+        content: newTemplateContent.trim(),
+      };
+      updatedTemplates = [...templates, newTemplate];
+    }
+    
+    setTemplates(updatedTemplates);
+    localStorage.setItem("chat_templates", JSON.stringify(updatedTemplates));
+    setNewTemplateName("");
+    setNewTemplateContent("");
+    setEditingTemplateId(null);
+    toast({ title: editingTemplateId ? "Template updated" : "Template saved" });
+  };
+
+  const deleteTemplate = (id: string) => {
+    const updatedTemplates = templates.filter(t => t.id !== id);
+    setTemplates(updatedTemplates);
+    localStorage.setItem("chat_templates", JSON.stringify(updatedTemplates));
+    toast({ title: "Template deleted" });
+  };
+
+  const useTemplate = (content: string) => {
+    setMessageText(content);
+    setShowTemplatesMenu(false);
+    messageInputRef.current?.focus();
+  };
+
+  const editTemplate = (template: { id: string; name: string; content: string }) => {
+    setEditingTemplateId(template.id);
+    setNewTemplateName(template.name);
+    setNewTemplateContent(template.content);
+  };
+
+  const saveCurrentAsTemplate = () => {
+    if (messageText.trim()) {
+      setNewTemplateContent(messageText.trim());
+      setShowTemplatesDialog(true);
+    } else {
+      toast({ title: "Type a message first to save as template", variant: "destructive" });
+    }
+  };
+
   const handleForwardMessage = (message: ChatMessage) => {
     setForwardingMessage(message);
     setShowForwardDialog(true);
@@ -1004,6 +1285,161 @@ export default function Chat() {
     if (!isOwn) return false;
     const twoMinutes = 2 * 60 * 1000;
     return messageAge < twoMinutes;
+  };
+
+  const handleExportChat = () => {
+    if (!selectedRoom || !messages.length) {
+      toast({ title: "No messages to export", variant: "destructive" });
+      return;
+    }
+    
+    const roomName = getRoomDisplayName(selectedRoom);
+    const exportDate = format(new Date(), "yyyy-MM-dd HH:mm");
+    
+    let content = `Chat Export: ${roomName}\n`;
+    content += `Exported on: ${exportDate}\n`;
+    content += `Messages: ${messages.length}\n`;
+    content += `${"=".repeat(50)}\n\n`;
+    
+    const sortedMessages = [...messages].sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    
+    sortedMessages.forEach(msg => {
+      const timestamp = format(new Date(msg.createdAt), "MMM d, yyyy HH:mm");
+      const sender = msg.senderName;
+      const isDeleted = msg.deletedAt !== null;
+      
+      if (isDeleted) {
+        content += `[${timestamp}] ${sender}: [Message deleted]\n`;
+      } else if (msg.messageType === "gif") {
+        content += `[${timestamp}] ${sender}: [GIF: ${(msg as any).attachmentName || "GIF"}]\n`;
+      } else if (msg.messageType === "image") {
+        content += `[${timestamp}] ${sender}: [Image: ${(msg as any).attachmentName || "Image"}]\n`;
+      } else if (msg.messageType === "video") {
+        content += `[${timestamp}] ${sender}: [Video: ${(msg as any).attachmentName || "Video"}]\n`;
+      } else if (msg.messageType === "voice") {
+        content += `[${timestamp}] ${sender}: [Voice message]\n`;
+      } else if (msg.messageType === "file") {
+        content += `[${timestamp}] ${sender}: [File: ${(msg as any).attachmentName || "File"}]\n`;
+      } else {
+        content += `[${timestamp}] ${sender}: ${msg.content}\n`;
+      }
+    });
+    
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `chat-${roomName.replace(/[^a-z0-9]/gi, "-")}-${format(new Date(), "yyyyMMdd")}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: "Chat exported successfully" });
+  };
+
+  // Voice recording functions
+  const startRecording = async () => {
+    if (!selectedRoomId) {
+      toast({ title: "Select a chat first", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        setAudioBlob(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      
+      // Start duration counter
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      toast({ 
+        title: "Microphone access denied", 
+        description: "Please allow microphone access to record voice messages",
+        variant: "destructive" 
+      });
+    }
+  };
+  
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+  };
+  
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    setAudioBlob(null);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+  };
+  
+  const sendVoiceMessage = async () => {
+    if (!audioBlob || !selectedRoomId) return;
+    
+    const formData = new FormData();
+    formData.append("audio", audioBlob, `voice-${Date.now()}.webm`);
+    formData.append("duration", recordingDuration.toString());
+    
+    try {
+      const response = await fetch(`/api/chat/rooms/${selectedRoomId}/voice`, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error("Failed to send voice message");
+      
+      setAudioBlob(null);
+      setRecordingDuration(0);
+      refetchMessages();
+      toast({ title: "Voice message sent" });
+    } catch (error) {
+      console.error("Error sending voice message:", error);
+      toast({ title: "Failed to send voice message", variant: "destructive" });
+    }
+  };
+  
+  const formatRecordingDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1101,21 +1537,35 @@ export default function Chat() {
     return format(d, "MMM d, h:mm a");
   };
 
-  const getTypingText = () => {
+  const getTypingInfo = () => {
     if (!selectedRoomId) return null;
     const roomTyping = typingUsers.get(selectedRoomId);
     if (!roomTyping || roomTyping.size === 0) return null;
     
-    const typingNames = Array.from(roomTyping)
+    const typingParticipants = Array.from(roomTyping)
       .filter(id => id !== currentUser?.id)
       .map(id => {
         const participant = selectedRoom?.participants.find(p => p.staffId === id);
-        return participant?.staffName?.split(" ")[0] || "Someone";
+        return {
+          id,
+          name: participant?.staffName?.split(" ")[0] || "Someone",
+          fullName: participant?.staffName || "Someone",
+          avatar: participant?.staffAvatarUrl
+        };
       });
     
-    if (typingNames.length === 0) return null;
-    if (typingNames.length === 1) return `${typingNames[0]} is typing...`;
-    return `${typingNames.join(", ")} are typing...`;
+    if (typingParticipants.length === 0) return null;
+    
+    const text = typingParticipants.length === 1 
+      ? `${typingParticipants[0].name} is typing...`
+      : `${typingParticipants.map(p => p.name).join(", ")} are typing...`;
+    
+    return { participants: typingParticipants, text };
+  };
+  
+  const getTypingText = () => {
+    const info = getTypingInfo();
+    return info?.text || null;
   };
 
   // Filter rooms based on active tab and search, then sort with pinned first
@@ -1775,6 +2225,22 @@ export default function Chat() {
                     className="border-0 bg-transparent text-sm focus-visible:ring-0 p-0 h-full w-32 placeholder:text-muted-foreground/50"
                     data-testid="input-message-search"
                   />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-full shrink-0"
+                        onClick={() => setShowAdvancedSearchDialog(true)}
+                        data-testid="button-advanced-search"
+                      >
+                        <Filter className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Advanced search with filters</p>
+                    </TooltipContent>
+                  </Tooltip>
                   {searchResults.length > 0 && (
                     <span className="text-xs text-muted-foreground shrink-0">
                       {currentSearchResultIndex + 1}/{searchResults.length}
@@ -1804,6 +2270,24 @@ export default function Chat() {
                   )}
                 </div>
               </div>
+              
+              {/* Export Chat Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full shrink-0 min-w-[44px] min-h-[44px]"
+                    onClick={handleExportChat}
+                    data-testid="button-export-chat"
+                  >
+                    <Download className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export chat as text</p>
+                </TooltipContent>
+              </Tooltip>
               
               {(isRoomAdmin || isAppAdmin) && selectedRoom.type !== "direct" && (
                 <Sheet open={showRoomSettings} onOpenChange={setShowRoomSettings}>
@@ -2202,6 +2686,13 @@ export default function Chat() {
                             </p>
                           )}
                           
+                          {message.isPinned === "yes" && (
+                            <div className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 mb-1 ml-1">
+                              <Pin className="h-2.5 w-2.5" />
+                              <span>Pinned</span>
+                            </div>
+                          )}
+                          
                           {isForwarded && (
                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1 ml-1">
                               <Forward className="h-2.5 w-2.5" />
@@ -2283,6 +2774,19 @@ export default function Chat() {
                                   <Paperclip className="h-4 w-4" />
                                   {(message as any).attachmentName || "Download file"}
                                 </a>
+                              ) : (message as any).attachmentUrl && (message as any).messageType === "voice" ? (
+                                <div className="flex items-center gap-3 py-1" data-testid={`voice-message-${message.id}`}>
+                                  <div className={`p-2 rounded-full ${isOwn ? "bg-white/20" : "bg-primary/10"}`}>
+                                    <Mic className={`h-4 w-4 ${isOwn ? "text-white" : "text-primary"}`} />
+                                  </div>
+                                  <audio 
+                                    src={(message as any).attachmentUrl} 
+                                    controls
+                                    className="h-8 max-w-[200px]"
+                                  >
+                                    Your browser does not support the audio tag.
+                                  </audio>
+                                </div>
                               ) : (
                                 <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
                                   {renderMessageContent(message.content || "", isOwn)}
@@ -2291,7 +2795,31 @@ export default function Chat() {
                             </div>
                             
                             {!isDeleted && (
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                {/* Quick Reaction Picker - Most used emojis */}
+                                <div className="flex items-center gap-0.5 bg-background/95 backdrop-blur rounded-full px-1.5 py-0.5 shadow-sm border">
+                                  {[
+                                    { emoji: "heart", icon: Heart, color: "text-red-500 hover:text-red-600" },
+                                    { emoji: "thumbsup", icon: ThumbsUp, color: "text-blue-500 hover:text-blue-600" },
+                                    { emoji: "party", icon: PartyPopper, color: "text-yellow-500 hover:text-yellow-600" },
+                                  ].map(({ emoji, icon: Icon, color }) => {
+                                    const reactions = messageReactions[message.id] || [];
+                                    const hasReacted = reactions.some(r => r.staffId === currentUser?.id && r.emoji === emoji);
+                                    return (
+                                      <Button
+                                        key={emoji}
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`h-6 w-6 rounded-full ${hasReacted ? "bg-muted ring-1 ring-primary/30" : ""} ${color}`}
+                                        onClick={() => handleToggleReaction(message.id, emoji)}
+                                        data-testid={`quick-reaction-${emoji}-${message.id}`}
+                                      >
+                                        <Icon className="h-3.5 w-3.5" />
+                                      </Button>
+                                    );
+                                  })}
+                                </div>
+                                
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button 
@@ -2357,6 +2885,22 @@ export default function Chat() {
                                     >
                                       <Forward className="h-4 w-4 mr-2" />
                                       Forward
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => pinMessageMutation.mutate(message.id)}
+                                      data-testid={`button-pin-${message.id}`}
+                                    >
+                                      {message.isPinned === "yes" ? (
+                                        <>
+                                          <PinOff className="h-4 w-4 mr-2" />
+                                          Unpin
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Pin className="h-4 w-4 mr-2" />
+                                          Pin
+                                        </>
+                                      )}
                                     </DropdownMenuItem>
                                     {canDeleteMessage(message) && (
                                       <>
@@ -2431,35 +2975,79 @@ export default function Chat() {
                             {message.isEdited === "yes" && (
                               <span className="text-[10px] text-muted-foreground/70">(edited)</span>
                             )}
-                            {/* Read Receipts Indicator */}
-                            {isOwn && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button 
-                                    className="inline-flex items-center text-[10px] text-muted-foreground/70 hover:text-muted-foreground cursor-pointer"
-                                    onMouseEnter={() => fetchMessageReads(message.id)}
-                                    data-testid={`read-receipts-${message.id}`}
-                                  >
-                                    <Eye className="h-3 w-3" />
-                                    {messageReads[message.id]?.length > 0 && (
-                                      <span className="ml-0.5">{messageReads[message.id].length}</span>
-                                    )}
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-[200px]">
-                                  <div className="text-xs">
-                                    {messageReads[message.id]?.length > 0 ? (
-                                      <>
-                                        <p className="font-medium mb-1">Seen by:</p>
-                                        <p>{messageReads[message.id].map(r => r.staffName).join(", ")}</p>
-                                      </>
-                                    ) : (
-                                      <p>No read receipts yet</p>
-                                    )}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
+                            {/* Delivery & Read Status Indicator */}
+                            {isOwn && (() => {
+                              const deliveries = messageDeliveries[message.id] || [];
+                              const reads = messageReads[message.id] || [];
+                              const hasDeliveries = deliveries.length > 0;
+                              const hasReads = reads.length > 0;
+                              
+                              // Status: sent (single check) -> delivered (double check) -> read (blue double check)
+                              let statusIcon;
+                              let statusText;
+                              let statusColor;
+                              
+                              if (hasReads) {
+                                statusIcon = <CheckCheck className="h-3.5 w-3.5" />;
+                                statusText = `Read by ${reads.length}`;
+                                statusColor = "text-blue-500";
+                              } else if (hasDeliveries) {
+                                statusIcon = <CheckCheck className="h-3.5 w-3.5" />;
+                                statusText = `Delivered to ${deliveries.length}`;
+                                statusColor = "text-muted-foreground/70";
+                              } else {
+                                statusIcon = <Check className="h-3.5 w-3.5" />;
+                                statusText = "Sent";
+                                statusColor = "text-muted-foreground/50";
+                              }
+                              
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button 
+                                      className={`inline-flex items-center cursor-pointer ${statusColor}`}
+                                      onMouseEnter={() => fetchMessageReads(message.id)}
+                                      data-testid={`delivery-status-${message.id}`}
+                                    >
+                                      {statusIcon}
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[220px]">
+                                    <div className="text-xs space-y-2">
+                                      <div className="flex items-center gap-1.5">
+                                        <Check className="h-3 w-3 text-muted-foreground" />
+                                        <span>Sent</span>
+                                      </div>
+                                      {hasDeliveries && (
+                                        <div>
+                                          <div className="flex items-center gap-1.5 mb-1">
+                                            <CheckCheck className="h-3 w-3" />
+                                            <span className="font-medium">Delivered to:</span>
+                                          </div>
+                                          <p className="pl-4.5 text-muted-foreground">
+                                            {deliveries.map(d => d.staffName).join(", ")}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {hasReads && (
+                                        <div>
+                                          <div className="flex items-center gap-1.5 mb-1">
+                                            <CheckCheck className="h-3 w-3 text-blue-500" />
+                                            <span className="font-medium">Read by:</span>
+                                          </div>
+                                          <p className="pl-4.5 text-muted-foreground">
+                                            {reads.map(r => r.staffName).join(", ")}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {!hasDeliveries && !hasReads && (
+                                        <p className="text-muted-foreground">Waiting for delivery...</p>
+                                      )}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -2469,17 +3057,39 @@ export default function Chat() {
                 </div>
               )}
               
-              {/* Typing Indicator */}
-              {getTypingText() && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-4 ml-10">
-                  <div className="flex gap-0.5">
-                    <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce" />
-                    <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
-                    <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
+              {/* Typing Indicator with Avatars */}
+              {(() => {
+                const typingInfo = getTypingInfo();
+                if (!typingInfo) return null;
+                const extraCount = typingInfo.participants.length - 3;
+                return (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-4 ml-2" data-testid="typing-indicator">
+                    <div className="flex -space-x-2">
+                      {typingInfo.participants.slice(0, 3).map(p => (
+                        <Avatar key={p.id} className="h-5 w-5 border-2 border-background shadow-sm">
+                          <AvatarImage src={p.avatar} alt={p.fullName} />
+                          <AvatarFallback className="text-[8px] bg-muted">
+                            {p.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                      {extraCount > 0 && (
+                        <div className="h-5 w-5 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[8px] font-medium">
+                          +{extraCount}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-muted/50 rounded-full px-2.5 py-1">
+                      <div className="flex gap-0.5">
+                        <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" />
+                        <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
+                        <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
+                      </div>
+                      <span>{typingInfo.text}</span>
+                    </div>
                   </div>
-                  <span>{getTypingText()}</span>
-                </div>
-              )}
+                );
+              })()}
             </ScrollArea>
 
             {/* Message Input - Premium Design */}
@@ -2549,6 +3159,61 @@ export default function Chat() {
                   >
                     <ImageIcon className="h-5 w-5" />
                   </Button>
+                  {/* Templates Dropdown */}
+                  <DropdownMenu open={showTemplatesMenu} onOpenChange={setShowTemplatesMenu}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full min-w-[44px] min-h-[44px]"
+                        disabled={!selectedRoomId}
+                        data-testid="button-templates"
+                        title={!selectedRoomId ? "Select a chat first" : "Message templates"}
+                      >
+                        <FileCode className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-64">
+                      {templates.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-muted-foreground">
+                          <FileCode className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm font-medium">No templates yet</p>
+                          <p className="text-xs">Save common messages for quick access</p>
+                        </div>
+                      ) : (
+                        templates.map((template) => (
+                          <DropdownMenuItem
+                            key={template.id}
+                            onClick={() => useTemplate(template.content)}
+                            className="flex items-start gap-2 py-2"
+                            data-testid={`template-item-${template.id}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm">{template.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{template.content}</p>
+                            </div>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setShowTemplatesDialog(true)}
+                        data-testid="button-manage-templates"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Manage Templates
+                      </DropdownMenuItem>
+                      {messageText.trim() && (
+                        <DropdownMenuItem
+                          onClick={saveCurrentAsTemplate}
+                          data-testid="button-save-as-template"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Save Current as Template
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 
                 {/* Message Input Field */}
@@ -2605,16 +3270,101 @@ export default function Chat() {
                   )}
                 </div>
                 
-                {/* Send Button - Touch-friendly for mobile */}
-                <Button
-                  size="icon"
-                  className="rounded-full shrink-0 shadow-sm min-w-[44px] min-h-[44px]"
-                  onClick={handleSendMessage}
-                  disabled={!messageText.trim() || sendMessageMutation.isPending}
-                  data-testid="button-send-message"
-                >
-                  <Send className="h-5 w-5" />
-                </Button>
+                {/* Voice Recording Controls */}
+                {isRecording ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 rounded-full">
+                      <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                      <span className="text-sm font-medium text-destructive">
+                        {formatRecordingDuration(recordingDuration)}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full min-w-[44px] min-h-[44px]"
+                      onClick={cancelRecording}
+                      data-testid="button-cancel-recording"
+                      title="Cancel recording"
+                    >
+                      <X className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      className="rounded-full shrink-0 shadow-sm min-w-[44px] min-h-[44px] bg-destructive hover:bg-destructive/90"
+                      onClick={stopRecording}
+                      data-testid="button-stop-recording"
+                      title="Stop recording"
+                    >
+                      <Square className="h-4 w-4 fill-current" />
+                    </Button>
+                  </div>
+                ) : audioBlob ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full">
+                      <Mic className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">
+                        {formatRecordingDuration(recordingDuration)}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full min-w-[44px] min-h-[44px]"
+                      onClick={cancelRecording}
+                      data-testid="button-discard-recording"
+                      title="Discard recording"
+                    >
+                      <X className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      className="rounded-full shrink-0 shadow-sm min-w-[44px] min-h-[44px]"
+                      onClick={sendVoiceMessage}
+                      data-testid="button-send-voice"
+                      title="Send voice message"
+                    >
+                      <Send className="h-5 w-5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Schedule Message Button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full shrink-0 min-w-[44px] min-h-[44px]"
+                      onClick={openScheduleDialog}
+                      disabled={!selectedRoomId}
+                      data-testid="button-schedule-message"
+                      title={!selectedRoomId ? "Select a chat first" : "Schedule message"}
+                    >
+                      <Clock className="h-5 w-5" />
+                    </Button>
+                    {/* Voice Recording Button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full shrink-0 min-w-[44px] min-h-[44px]"
+                      onClick={startRecording}
+                      disabled={!selectedRoomId}
+                      data-testid="button-start-recording"
+                      title={!selectedRoomId ? "Select a chat first" : "Record voice message"}
+                    >
+                      <Mic className="h-5 w-5" />
+                    </Button>
+                    {/* Send Button - Touch-friendly for mobile */}
+                    <Button
+                      size="icon"
+                      className="rounded-full shrink-0 shadow-sm min-w-[44px] min-h-[44px]"
+                      onClick={handleSendMessage}
+                      disabled={!messageText.trim() || sendMessageMutation.isPending}
+                      data-testid="button-send-message"
+                    >
+                      <Send className="h-5 w-5" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </>
@@ -3208,6 +3958,404 @@ export default function Chat() {
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Add Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Message Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Schedule Message
+            </DialogTitle>
+            <DialogDescription>
+              Schedule a message to be sent at a specific time
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="schedule-content">Message</Label>
+              <Textarea
+                id="schedule-content"
+                placeholder="Type your message..."
+                value={scheduleContent}
+                onChange={(e) => setScheduleContent(e.target.value)}
+                className="min-h-[100px]"
+                data-testid="input-schedule-content"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="schedule-date">Date</Label>
+                <Input
+                  id="schedule-date"
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  data-testid="input-schedule-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="schedule-time">Time</Label>
+                <Input
+                  id="schedule-time"
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  data-testid="input-schedule-time"
+                />
+              </div>
+            </div>
+
+            {/* Show scheduled messages for this room */}
+            {scheduledMessages.length > 0 && (
+              <div className="space-y-2 border-t pt-4">
+                <Label>Pending Scheduled Messages</Label>
+                <ScrollArea className="max-h-[150px]">
+                  <div className="space-y-2">
+                    {scheduledMessages
+                      .filter((m: any) => m.status === "pending")
+                      .map((scheduled: any) => (
+                        <div 
+                          key={scheduled.id} 
+                          className="flex items-center justify-between p-2 bg-muted rounded-md text-sm"
+                          data-testid={`scheduled-message-${scheduled.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate">{scheduled.content}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(scheduled.scheduledAt).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 h-8 w-8"
+                            onClick={() => cancelScheduledMutation.mutate(scheduled.id)}
+                            disabled={cancelScheduledMutation.isPending}
+                            data-testid={`cancel-scheduled-${scheduled.id}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowScheduleDialog(false);
+                setScheduleContent("");
+                setScheduleDate("");
+                setScheduleTime("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleScheduleMessage}
+              disabled={!scheduleContent.trim() || !scheduleDate || !scheduleTime || scheduleMessageMutation.isPending}
+              data-testid="button-confirm-schedule"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Advanced Message Search Dialog */}
+      <Dialog open={showAdvancedSearchDialog} onOpenChange={setShowAdvancedSearchDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Advanced Message Search
+            </DialogTitle>
+            <DialogDescription>
+              Search messages with filters for sender, date range, and content type
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="search-query">Search Text</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search-query"
+                  placeholder="Search in messages..."
+                  value={advancedSearchQuery}
+                  onChange={(e) => setAdvancedSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-advanced-search-query"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="search-sender">Sender</Label>
+                <Select value={searchSender} onValueChange={setSearchSender}>
+                  <SelectTrigger id="search-sender" data-testid="select-search-sender">
+                    <SelectValue placeholder="All senders" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All senders</SelectItem>
+                    {selectedRoom?.participants.map((p) => (
+                      <SelectItem key={p.staffId} value={p.staffId}>
+                        {p.staffName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="search-media-type">Content Type</Label>
+                <Select value={searchMediaType} onValueChange={setSearchMediaType}>
+                  <SelectTrigger id="search-media-type" data-testid="select-search-media-type">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="text">Text only</SelectItem>
+                    <SelectItem value="media">Media (images, videos, voice)</SelectItem>
+                    <SelectItem value="files">Files</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="search-date-from">From Date</Label>
+                <Input
+                  id="search-date-from"
+                  type="date"
+                  value={searchDateFrom}
+                  onChange={(e) => setSearchDateFrom(e.target.value)}
+                  data-testid="input-search-date-from"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="search-date-to">To Date</Label>
+                <Input
+                  id="search-date-to"
+                  type="date"
+                  value={searchDateTo}
+                  onChange={(e) => setSearchDateTo(e.target.value)}
+                  data-testid="input-search-date-to"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleAdvancedSearch}
+                disabled={isSearching}
+                className="flex-1"
+                data-testid="button-run-search"
+              >
+                {isSearching ? (
+                  <>Searching...</>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4 mr-2" />
+                    Search
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={clearAdvancedSearchFilters}
+                data-testid="button-clear-filters"
+              >
+                Clear
+              </Button>
+            </div>
+
+            {/* Search Results */}
+            {advancedSearchResults.length > 0 && (
+              <div className="space-y-2 border-t pt-4">
+                <Label>Found {advancedSearchResults.length} messages</Label>
+                <ScrollArea className="max-h-[250px]">
+                  <div className="space-y-2">
+                    {advancedSearchResults.map((msg) => (
+                      <div 
+                        key={msg.id}
+                        className="flex items-start gap-3 p-3 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors"
+                        onClick={() => jumpToMessage(msg.id)}
+                        data-testid={`search-result-${msg.id}`}
+                      >
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarFallback className="text-xs">
+                            {msg.senderName?.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">{msg.senderName}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(msg.createdAt), "MMM d, yyyy h:mm a")}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {msg.content || (msg.messageType !== "text" ? `[${msg.messageType}]` : "")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            {advancedSearchResults.length === 0 && advancedSearchQuery && !isSearching && (
+              <div className="text-center py-6 text-muted-foreground">
+                <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No messages found</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Templates Management Dialog */}
+      <Dialog open={showTemplatesDialog} onOpenChange={(open) => {
+        setShowTemplatesDialog(open);
+        if (!open) {
+          setEditingTemplateId(null);
+          setNewTemplateName("");
+          setNewTemplateContent("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCode className="h-5 w-5" />
+              Message Templates
+            </DialogTitle>
+            <DialogDescription>
+              Create and manage reusable message templates for quick responses
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Add/Edit Template Form */}
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">
+                  {editingTemplateId ? "Edit Template" : "New Template"}
+                </Label>
+                {editingTemplateId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditingTemplateId(null);
+                      setNewTemplateName("");
+                      setNewTemplateContent("");
+                    }}
+                    className="h-7 px-2"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Cancel Edit
+                  </Button>
+                )}
+              </div>
+              <Input
+                placeholder="Template name (e.g., 'Greeting')"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                data-testid="input-template-name"
+              />
+              <Textarea
+                placeholder="Template content (e.g., 'Hello! How can I help you today?')"
+                value={newTemplateContent}
+                onChange={(e) => setNewTemplateContent(e.target.value)}
+                className="min-h-[80px]"
+                data-testid="input-template-content"
+              />
+              <Button
+                onClick={saveTemplate}
+                disabled={!newTemplateName.trim() || !newTemplateContent.trim()}
+                className="w-full"
+                data-testid="button-save-template"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {editingTemplateId ? "Update Template" : "Save Template"}
+              </Button>
+            </div>
+            
+            {/* Templates List */}
+            {templates.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Your Templates ({templates.length})</Label>
+                <ScrollArea className="max-h-[200px]">
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <div
+                        key={template.id}
+                        className="flex items-start gap-3 p-3 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
+                        data-testid={`template-${template.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{template.name}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                            {template.content}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => editTemplate(template)}
+                            data-testid={`edit-template-${template.id}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => deleteTemplate(template.id)}
+                            data-testid={`delete-template-${template.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            {templates.length === 0 && (
+              <div className="text-center py-6 text-muted-foreground">
+                <FileCode className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                <p className="font-medium">No templates yet</p>
+                <p className="text-sm">Create templates for messages you send frequently</p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTemplatesDialog(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

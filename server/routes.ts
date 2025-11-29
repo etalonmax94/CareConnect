@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupWebSocket, broadcastNotification } from "./websocket";
+import { setupWebSocket, broadcastNotification, broadcastToRoom } from "./websocket";
 import { storage } from "./storage";
 import { chatAuthorizationService, type ChatAction, type UserContext } from "./services/chatAuthorization";
 import { 
@@ -241,6 +241,44 @@ const uploadChatAvatar = multer({
       cb(null, true);
     } else {
       cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+    }
+  }
+});
+
+// Voice message upload configuration
+const voiceMessageDir = path.join(uploadsDir, 'voice-messages');
+if (!fs.existsSync(voiceMessageDir)) {
+  fs.mkdirSync(voiceMessageDir, { recursive: true });
+}
+
+const voiceMessageStorageConfig = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const roomId = (req as any).params.roomId;
+    if (roomId) {
+      const roomDir = path.join(voiceMessageDir, sanitizeFilename(roomId));
+      if (!fs.existsSync(roomDir)) {
+        fs.mkdirSync(roomDir, { recursive: true });
+      }
+      cb(null, roomDir);
+    } else {
+      cb(new Error('Room ID required'), '');
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `voice-${uniqueSuffix}.webm`);
+  }
+});
+
+const uploadVoiceMessage = multer({
+  storage: voiceMessageStorageConfig,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for voice messages
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['audio/webm', 'audio/ogg', 'audio/mp3', 'audio/mpeg', 'audio/wav'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only audio files (WebM, OGG, MP3, WAV) are allowed'));
     }
   }
 });
@@ -9902,6 +9940,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Upload voice message
+  app.post("/api/chat/rooms/:roomId/voice", requireAuth, (req: any, res, next) => {
+    uploadVoiceMessage.single('audio')(req, res, async (err: any) => {
+      const cleanupFile = (filePath?: string) => {
+        if (filePath) {
+          try {
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          } catch (cleanupErr) {
+            console.error("Failed to cleanup uploaded file:", cleanupErr);
+          }
+        }
+      };
+
+      try {
+        const userContext = getUserContext(req);
+        if (!userContext) {
+          cleanupFile(req.file?.path);
+          return res.status(401).json({ error: "Not authenticated" });
+        }
+
+        const { roomId } = req.params;
+        const duration = parseInt(req.body.duration || "0", 10);
+        
+        const permission = await chatAuthorizationService.checkPermission("send_message", userContext, roomId);
+        if (!permission.allowed) {
+          cleanupFile(req.file?.path);
+          return res.status(403).json({ error: permission.reason });
+        }
+
+        if (err) {
+          cleanupFile(req.file?.path);
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: "Voice message too large. Maximum size is 10MB." });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ error: "No audio file uploaded" });
+        }
+
+        const file = req.file;
+        
+        // Create message for voice recording
+        const message = await storage.createChatMessage({
+          roomId,
+          senderId: userContext.userId,
+          senderName: userContext.userName,
+          content: `Voice message (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, "0")})`,
+          messageType: "voice",
+          attachmentUrl: file.path,
+          attachmentName: file.originalname || file.filename,
+          attachmentType: "audio",
+        });
+
+        // Create attachment record
+        const attachment = await storage.createChatMessageAttachment({
+          messageId: message.id,
+          type: "voice",
+          fileName: file.filename,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          storageKey: file.path,
+          uploadedById: userContext.userId,
+          uploadedByName: userContext.userName,
+          status: "completed",
+          duration: duration,
+        });
+
+        await storage.createChatAuditLog({
+          roomId,
+          action: "voice_message_sent",
+          actorId: userContext.userId,
+          actorName: userContext.userName,
+          details: {
+            messageId: message.id,
+            duration,
+            fileSize: file.size,
+          }
+        });
+
+        res.status(201).json({ message, attachment });
+      } catch (error) {
+        cleanupFile(req.file?.path);
+        console.error("Error uploading voice message:", error);
+        res.status(500).json({ error: "Failed to upload voice message" });
+      }
+    });
+  });
+
   // Get attachment by ID
   app.get("/api/chat/attachments/:attachmentId", requireAuth, async (req: any, res) => {
     try {
@@ -10537,6 +10667,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // BATCH ROUTES - Must be defined before :messageId routes
+  // Get reactions for multiple messages (batch)
+  app.post("/api/chat/messages/batch/reactions", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageIds } = req.body;
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return res.status(400).json({ error: "messageIds array is required" });
+      }
+
+      const reactions = await storage.getReactionsForMessages(messageIds);
+      res.json(reactions);
+    } catch (error) {
+      console.error("Error fetching batch reactions:", error);
+      res.status(500).json({ error: "Failed to fetch reactions" });
+    }
+  });
+
+  // Get read receipts for multiple messages (batch)
+  app.post("/api/chat/messages/batch/reads", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageIds } = req.body;
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return res.status(400).json({ error: "messageIds array is required" });
+      }
+
+      const reads = await storage.getReadsForMessages(messageIds);
+      res.json(reads);
+    } catch (error) {
+      console.error("Error fetching batch read receipts:", error);
+      res.status(500).json({ error: "Failed to fetch read receipts" });
+    }
+  });
+
+  // Get delivery receipts for multiple messages (batch)
+  app.post("/api/chat/messages/batch/deliveries", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageIds } = req.body;
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return res.status(400).json({ error: "messageIds array is required" });
+      }
+
+      const deliveries = await storage.getDeliveriesForMessages(messageIds);
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching batch delivery receipts:", error);
+      res.status(500).json({ error: "Failed to fetch delivery receipts" });
+    }
+  });
+
+  // Mark messages as delivered
+  app.post("/api/chat/rooms/:roomId/messages/deliver", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const { messageIds } = req.body;
+
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return res.status(400).json({ error: "messageIds array is required" });
+      }
+
+      // Check if user is a participant
+      const isParticipant = await storage.isRoomParticipant(roomId, userContext.userId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "Not a participant in this chat" });
+      }
+
+      const deliveredCount = await storage.markMessagesAsDelivered(
+        roomId,
+        messageIds,
+        userContext.userId,
+        userContext.userName
+      );
+
+      res.json({ deliveredCount });
+    } catch (error) {
+      console.error("Error marking messages as delivered:", error);
+      res.status(500).json({ error: "Failed to mark messages as delivered" });
+    }
+  });
+
+  // SINGLE MESSAGE ROUTES
   // Get reactions for a message
   app.get("/api/chat/messages/:messageId/reactions", requireAuth, async (req: any, res) => {
     try {
@@ -10676,48 +10906,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get reactions for multiple messages (batch)
-  app.post("/api/chat/messages/batch/reactions", requireAuth, async (req: any, res) => {
-    try {
-      const userContext = getUserContext(req);
-      if (!userContext) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const { messageIds } = req.body;
-      if (!messageIds || !Array.isArray(messageIds)) {
-        return res.status(400).json({ error: "messageIds array is required" });
-      }
-
-      const reactions = await storage.getReactionsForMessages(messageIds);
-      res.json(reactions);
-    } catch (error) {
-      console.error("Error fetching batch reactions:", error);
-      res.status(500).json({ error: "Failed to fetch reactions" });
-    }
-  });
-
-  // Get read receipts for multiple messages (batch)
-  app.post("/api/chat/messages/batch/reads", requireAuth, async (req: any, res) => {
-    try {
-      const userContext = getUserContext(req);
-      if (!userContext) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const { messageIds } = req.body;
-      if (!messageIds || !Array.isArray(messageIds)) {
-        return res.status(400).json({ error: "messageIds array is required" });
-      }
-
-      const reads = await storage.getReadsForMessages(messageIds);
-      res.json(reads);
-    } catch (error) {
-      console.error("Error fetching batch read receipts:", error);
-      res.status(500).json({ error: "Failed to fetch read receipts" });
-    }
-  });
-
   // Reply to a message with quote
   app.post("/api/chat/rooms/:roomId/messages/reply", requireAuth, async (req: any, res) => {
     try {
@@ -10847,6 +11035,302 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error soft deleting message:", error);
       res.status(500).json({ error: "Failed to delete message" });
+    }
+  });
+
+  // Pin a message
+  app.post("/api/chat/messages/:messageId/pin", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { messageId } = req.params;
+      const message = await storage.getChatMessageById(messageId);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+
+      // Check if user is a participant
+      const isParticipant = await storage.isRoomParticipant(message.roomId, userContext.userId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "Not a participant in this chat" });
+      }
+
+      // Toggle pin state
+      if (message.isPinned === "yes") {
+        const unpinnedMessage = await storage.unpinChatMessage(messageId);
+        
+        await storage.createChatAuditLog({
+          roomId: message.roomId,
+          messageId,
+          action: "message_unpinned",
+          actorId: userContext.userId,
+          actorName: userContext.userName,
+          details: { 
+            senderId: message.senderId,
+            senderName: message.senderName
+          }
+        });
+        
+        // Broadcast pin update to all room participants
+        await broadcastToRoom(message.roomId, {
+          type: "pinUpdate",
+          messageId,
+          roomId: message.roomId,
+          isPinned: false,
+          updatedBy: userContext.userName
+        });
+        
+        res.json({ success: true, message: unpinnedMessage, isPinned: false });
+      } else {
+        const pinnedMessage = await storage.pinChatMessage(
+          messageId, 
+          userContext.userId, 
+          userContext.userName
+        );
+        
+        await storage.createChatAuditLog({
+          roomId: message.roomId,
+          messageId,
+          action: "message_pinned",
+          actorId: userContext.userId,
+          actorName: userContext.userName,
+          details: { 
+            senderId: message.senderId,
+            senderName: message.senderName
+          }
+        });
+        
+        // Broadcast pin update to all room participants
+        await broadcastToRoom(message.roomId, {
+          type: "pinUpdate",
+          messageId,
+          roomId: message.roomId,
+          isPinned: true,
+          updatedBy: userContext.userName
+        });
+        
+        res.json({ success: true, message: pinnedMessage, isPinned: true });
+      }
+    } catch (error) {
+      console.error("Error pinning message:", error);
+      res.status(500).json({ error: "Failed to pin message" });
+    }
+  });
+
+  // Get pinned messages for a room
+  app.get("/api/chat/rooms/:roomId/pinned", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      
+      // Check if user is a participant
+      const isParticipant = await storage.isRoomParticipant(roomId, userContext.userId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "Not a participant in this chat" });
+      }
+
+      const pinnedMessages = await storage.getPinnedMessages(roomId);
+      res.json(pinnedMessages);
+    } catch (error) {
+      console.error("Error getting pinned messages:", error);
+      res.status(500).json({ error: "Failed to get pinned messages" });
+    }
+  });
+
+  // ==================== MESSAGE SEARCH ====================
+  
+  // Search messages in a room with filters
+  app.get("/api/chat/rooms/:roomId/search", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const { q, senderId, dateFrom, dateTo, mediaType } = req.query;
+      
+      // Check if user is a participant
+      const isParticipant = await storage.isRoomParticipant(roomId, userContext.userId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "Not a participant in this chat" });
+      }
+
+      const results = await storage.searchChatMessages(roomId, {
+        query: q as string | undefined,
+        senderId: senderId as string | undefined,
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+        mediaType: mediaType as string | undefined,
+      });
+      
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching messages:", error);
+      res.status(500).json({ error: "Failed to search messages" });
+    }
+  });
+
+  // ==================== SCHEDULED MESSAGES ====================
+  
+  // Create scheduled message
+  app.post("/api/chat/rooms/:roomId/scheduled", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      const { content, scheduledAt } = req.body;
+      
+      if (!content || !scheduledAt) {
+        return res.status(400).json({ error: "Content and scheduledAt are required" });
+      }
+      
+      // Check send permission
+      const permission = await chatAuthorizationService.checkPermission("send_message", userContext, roomId);
+      if (!permission.allowed) {
+        return res.status(403).json({ error: permission.reason });
+      }
+      
+      // Validate scheduled time is in the future
+      const scheduledDate = new Date(scheduledAt);
+      if (scheduledDate <= new Date()) {
+        return res.status(400).json({ error: "Scheduled time must be in the future" });
+      }
+      
+      const scheduled = await storage.createScheduledMessage({
+        roomId,
+        senderId: userContext.userId,
+        senderName: userContext.userName,
+        content,
+        scheduledAt: scheduledDate,
+      });
+      
+      res.status(201).json(scheduled);
+    } catch (error) {
+      console.error("Error creating scheduled message:", error);
+      res.status(500).json({ error: "Failed to schedule message" });
+    }
+  });
+  
+  // Get user's scheduled messages for a room
+  app.get("/api/chat/rooms/:roomId/scheduled", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { roomId } = req.params;
+      
+      const scheduled = await storage.getScheduledMessages(userContext.userId, roomId);
+      res.json(scheduled);
+    } catch (error) {
+      console.error("Error fetching scheduled messages:", error);
+      res.status(500).json({ error: "Failed to fetch scheduled messages" });
+    }
+  });
+  
+  // Get all user's scheduled messages
+  app.get("/api/chat/scheduled", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const scheduled = await storage.getScheduledMessages(userContext.userId);
+      res.json(scheduled);
+    } catch (error) {
+      console.error("Error fetching scheduled messages:", error);
+      res.status(500).json({ error: "Failed to fetch scheduled messages" });
+    }
+  });
+  
+  // Cancel scheduled message
+  app.delete("/api/chat/scheduled/:scheduledId", requireAuth, async (req: any, res) => {
+    try {
+      const userContext = getUserContext(req);
+      if (!userContext) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { scheduledId } = req.params;
+      
+      // Verify ownership
+      const scheduled = await storage.getScheduledMessageById(scheduledId);
+      if (!scheduled) {
+        return res.status(404).json({ error: "Scheduled message not found" });
+      }
+      if (scheduled.senderId !== userContext.userId) {
+        return res.status(403).json({ error: "You can only cancel your own scheduled messages" });
+      }
+      if (scheduled.status !== "pending") {
+        return res.status(400).json({ error: "Only pending messages can be cancelled" });
+      }
+      
+      const cancelled = await storage.cancelScheduledMessage(scheduledId);
+      res.json(cancelled);
+    } catch (error) {
+      console.error("Error cancelling scheduled message:", error);
+      res.status(500).json({ error: "Failed to cancel scheduled message" });
+    }
+  });
+  
+  // Process scheduled messages (internal endpoint for background job)
+  app.post("/api/internal/process-scheduled-messages", async (req: any, res) => {
+    try {
+      // Verify internal API key
+      const apiKey = req.headers['x-internal-api-key'];
+      if (apiKey !== process.env.INTERNAL_API_KEY && process.env.NODE_ENV !== 'development') {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const pending = await storage.getPendingScheduledMessages();
+      let sent = 0;
+      let failed = 0;
+      
+      for (const scheduled of pending) {
+        try {
+          // Create the actual message
+          const message = await storage.createChatMessage({
+            roomId: scheduled.roomId,
+            senderId: scheduled.senderId,
+            senderName: scheduled.senderName,
+            content: scheduled.content,
+          });
+          
+          await storage.markScheduledMessageAsSent(scheduled.id, message.id);
+          
+          // Broadcast to room
+          await broadcastToRoom(scheduled.roomId, {
+            type: "message",
+            roomId: scheduled.roomId,
+            message: message,
+          });
+          
+          sent++;
+        } catch (error) {
+          console.error("Error sending scheduled message:", scheduled.id, error);
+          await storage.markScheduledMessageAsFailed(scheduled.id);
+          failed++;
+        }
+      }
+      
+      res.json({ processed: pending.length, sent, failed });
+    } catch (error) {
+      console.error("Error processing scheduled messages:", error);
+      res.status(500).json({ error: "Failed to process scheduled messages" });
     }
   });
 

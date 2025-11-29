@@ -25,7 +25,7 @@ import {
   tasks, taskComments, taskChecklists,
   // Chat
   chatRooms, chatRoomParticipants, chatMessages, chatMessageAttachments, chatAuditLogs,
-  chatMessageReactions, chatMessageReads,
+  chatMessageReactions, chatMessageReads, chatMessageDeliveries, scheduledMessages,
   // Scheduling Conflicts
   schedulingConflicts,
   computeFullName,
@@ -98,6 +98,8 @@ import {
   type InsertChatAuditLog, type ChatAuditLog,
   type InsertChatMessageReaction, type ChatMessageReaction,
   type InsertChatMessageRead, type ChatMessageRead,
+  type InsertChatMessageDelivery, type ChatMessageDelivery,
+  type InsertScheduledMessage, type ScheduledMessage,
   // Scheduling Conflicts types
   type InsertSchedulingConflict, type SchedulingConflict,
   type SchedulingConflictType, type ConflictSeverity, type ConflictStatus
@@ -655,6 +657,16 @@ export interface IStorage {
   deleteChatMessage(id: string): Promise<boolean>;
   softDeleteChatMessage(id: string, deletedById: string, deletedByName: string): Promise<ChatMessage | undefined>;
   forwardChatMessage(originalMessageId: string, targetRoomId: string, forwarderId: string, forwarderName: string, comment?: string): Promise<ChatMessage | undefined>;
+  pinChatMessage(id: string, pinnedById: string, pinnedByName: string): Promise<ChatMessage | undefined>;
+  unpinChatMessage(id: string): Promise<ChatMessage | undefined>;
+  getPinnedMessages(roomId: string): Promise<ChatMessage[]>;
+  searchChatMessages(roomId: string, filters: {
+    query?: string;
+    senderId?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    mediaType?: string;
+  }): Promise<ChatMessage[]>;
   
   // Chat Message Attachments
   getChatMessageAttachments(messageId: string): Promise<ChatMessageAttachment[]>;
@@ -685,6 +697,20 @@ export interface IStorage {
   getReadsForMessages(messageIds: string[]): Promise<Record<string, ChatMessageRead[]>>;
   markMessageAsRead(read: InsertChatMessageRead): Promise<ChatMessageRead>;
   markMessagesAsRead(roomId: string, messageIds: string[], staffId: string, staffName: string): Promise<number>;
+  
+  // Chat Message Delivery Receipts
+  getMessageDeliveries(messageId: string): Promise<ChatMessageDelivery[]>;
+  getDeliveriesForMessages(messageIds: string[]): Promise<Record<string, ChatMessageDelivery[]>>;
+  markMessagesAsDelivered(roomId: string, messageIds: string[], staffId: string, staffName: string): Promise<number>;
+  
+  // Scheduled Messages
+  createScheduledMessage(message: InsertScheduledMessage): Promise<ScheduledMessage>;
+  getScheduledMessages(userId: string, roomId?: string): Promise<ScheduledMessage[]>;
+  getScheduledMessageById(id: string): Promise<ScheduledMessage | undefined>;
+  cancelScheduledMessage(id: string): Promise<ScheduledMessage | undefined>;
+  getPendingScheduledMessages(): Promise<ScheduledMessage[]>;
+  markScheduledMessageAsSent(id: string, messageId: string): Promise<ScheduledMessage | undefined>;
+  markScheduledMessageAsFailed(id: string): Promise<ScheduledMessage | undefined>;
   
   // Scheduling Conflicts
   getSchedulingConflicts(filters?: {
@@ -4184,6 +4210,46 @@ export class DbStorage implements IStorage {
     return marked;
   }
 
+  // Delivery Receipt Methods
+  async getMessageDeliveries(messageId: string): Promise<ChatMessageDelivery[]> {
+    return await db.select().from(chatMessageDeliveries)
+      .where(eq(chatMessageDeliveries.messageId, messageId))
+      .orderBy(chatMessageDeliveries.deliveredAt);
+  }
+
+  async getDeliveriesForMessages(messageIds: string[]): Promise<Record<string, ChatMessageDelivery[]>> {
+    if (messageIds.length === 0) return {};
+    
+    const deliveries = await db.select().from(chatMessageDeliveries)
+      .where(inArray(chatMessageDeliveries.messageId, messageIds));
+    
+    const result: Record<string, ChatMessageDelivery[]> = {};
+    for (const delivery of deliveries) {
+      if (!result[delivery.messageId]) {
+        result[delivery.messageId] = [];
+      }
+      result[delivery.messageId].push(delivery);
+    }
+    return result;
+  }
+
+  async markMessagesAsDelivered(roomId: string, messageIds: string[], staffId: string, staffName: string): Promise<number> {
+    if (messageIds.length === 0) return 0;
+    
+    let marked = 0;
+    for (const messageId of messageIds) {
+      try {
+        await db.insert(chatMessageDeliveries)
+          .values({ messageId, roomId, staffId, staffName })
+          .onConflictDoNothing();
+        marked++;
+      } catch (error) {
+        // Ignore duplicate errors
+      }
+    }
+    return marked;
+  }
+
   async createClientChatRoom(clientId: string, clientName: string, createdById: string, createdByName: string): Promise<ChatRoom> {
     // Check if client chat already exists
     const existing = await this.getClientChatRoom(clientId);
@@ -4582,6 +4648,132 @@ export class DbStorage implements IStorage {
     return result.length > 0;
   }
 
+  async pinChatMessage(id: string, pinnedById: string, pinnedByName: string): Promise<ChatMessage | undefined> {
+    const result = await db.update(chatMessages)
+      .set({
+        isPinned: "yes",
+        pinnedAt: new Date(),
+        pinnedById,
+        pinnedByName
+      })
+      .where(eq(chatMessages.id, id))
+      .returning();
+    
+    if (result[0]) {
+      // Decrypt content if encrypted
+      if (result[0].isEncrypted === "yes" && result[0].content) {
+        return { ...result[0], content: decryptMessage(result[0].content) };
+      }
+      return result[0];
+    }
+    return undefined;
+  }
+
+  async unpinChatMessage(id: string): Promise<ChatMessage | undefined> {
+    const result = await db.update(chatMessages)
+      .set({
+        isPinned: "no",
+        pinnedAt: null,
+        pinnedById: null,
+        pinnedByName: null
+      })
+      .where(eq(chatMessages.id, id))
+      .returning();
+    
+    if (result[0]) {
+      // Decrypt content if encrypted
+      if (result[0].isEncrypted === "yes" && result[0].content) {
+        return { ...result[0], content: decryptMessage(result[0].content) };
+      }
+      return result[0];
+    }
+    return undefined;
+  }
+
+  async getPinnedMessages(roomId: string): Promise<ChatMessage[]> {
+    const messages = await db.select()
+      .from(chatMessages)
+      .where(and(
+        eq(chatMessages.roomId, roomId),
+        eq(chatMessages.isPinned, "yes"),
+        eq(chatMessages.isDeleted, "no")
+      ))
+      .orderBy(desc(chatMessages.pinnedAt));
+    
+    // Decrypt messages
+    return messages.map(msg => {
+      if (msg.isEncrypted === "yes" && msg.content) {
+        return { ...msg, content: decryptMessage(msg.content) };
+      }
+      return msg;
+    });
+  }
+
+  async searchChatMessages(roomId: string, filters: {
+    query?: string;
+    senderId?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    mediaType?: string;
+  }): Promise<ChatMessage[]> {
+    const conditions = [
+      eq(chatMessages.roomId, roomId),
+      eq(chatMessages.isDeleted, "no"),
+    ];
+    
+    if (filters.senderId) {
+      conditions.push(eq(chatMessages.senderId, filters.senderId));
+    }
+    
+    if (filters.dateFrom) {
+      conditions.push(gte(chatMessages.createdAt, filters.dateFrom));
+    }
+    
+    if (filters.dateTo) {
+      // Add one day to include the entire day
+      const endDate = new Date(filters.dateTo);
+      endDate.setDate(endDate.getDate() + 1);
+      conditions.push(lte(chatMessages.createdAt, endDate));
+    }
+    
+    if (filters.mediaType) {
+      if (filters.mediaType === "text") {
+        conditions.push(eq(chatMessages.messageType, "text"));
+      } else if (filters.mediaType === "media") {
+        conditions.push(
+          sql`${chatMessages.messageType} IN ('image', 'video', 'voice', 'gif')`
+        );
+      } else if (filters.mediaType === "files") {
+        conditions.push(eq(chatMessages.messageType, "file"));
+      }
+    }
+    
+    let messages = await db.select()
+      .from(chatMessages)
+      .where(and(...conditions))
+      .orderBy(desc(chatMessages.createdAt))
+      .limit(100);
+    
+    // Decrypt messages
+    messages = messages.map(msg => {
+      if (msg.isEncrypted === "yes" && msg.content) {
+        return { ...msg, content: decryptMessage(msg.content) };
+      }
+      return msg;
+    });
+    
+    // Filter by query text after decryption
+    if (filters.query) {
+      const queryLower = filters.query.toLowerCase();
+      messages = messages.filter(msg => 
+        msg.content?.toLowerCase().includes(queryLower) ||
+        msg.senderName?.toLowerCase().includes(queryLower)
+      );
+    }
+    
+    return messages;
+  }
+
   // ============================================
   // SCHEDULING CONFLICTS
   // ============================================
@@ -4745,6 +4937,82 @@ export class DbStorage implements IStorage {
       ))
       .returning();
     return result.length;
+  }
+
+  // Scheduled Messages
+  async createScheduledMessage(message: InsertScheduledMessage): Promise<ScheduledMessage> {
+    const result = await db.insert(scheduledMessages).values({
+      ...message,
+      scheduledAt: typeof message.scheduledAt === 'string' 
+        ? new Date(message.scheduledAt) 
+        : message.scheduledAt,
+    }).returning();
+    return result[0];
+  }
+
+  async getScheduledMessages(userId: string, roomId?: string): Promise<ScheduledMessage[]> {
+    const conditions = [eq(scheduledMessages.senderId, userId)];
+    if (roomId) {
+      conditions.push(eq(scheduledMessages.roomId, roomId));
+    }
+    conditions.push(eq(scheduledMessages.status, "pending"));
+    
+    return await db.select()
+      .from(scheduledMessages)
+      .where(and(...conditions))
+      .orderBy(scheduledMessages.scheduledAt);
+  }
+
+  async getScheduledMessageById(id: string): Promise<ScheduledMessage | undefined> {
+    const result = await db.select()
+      .from(scheduledMessages)
+      .where(eq(scheduledMessages.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async cancelScheduledMessage(id: string): Promise<ScheduledMessage | undefined> {
+    const result = await db.update(scheduledMessages)
+      .set({
+        status: "cancelled",
+        cancelledAt: new Date(),
+      })
+      .where(eq(scheduledMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getPendingScheduledMessages(): Promise<ScheduledMessage[]> {
+    const now = new Date();
+    return await db.select()
+      .from(scheduledMessages)
+      .where(and(
+        eq(scheduledMessages.status, "pending"),
+        lte(scheduledMessages.scheduledAt, now)
+      ))
+      .orderBy(scheduledMessages.scheduledAt);
+  }
+
+  async markScheduledMessageAsSent(id: string, messageId: string): Promise<ScheduledMessage | undefined> {
+    const result = await db.update(scheduledMessages)
+      .set({
+        status: "sent",
+        sentAt: new Date(),
+        messageId: messageId,
+      })
+      .where(eq(scheduledMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markScheduledMessageAsFailed(id: string): Promise<ScheduledMessage | undefined> {
+    const result = await db.update(scheduledMessages)
+      .set({
+        status: "failed",
+      })
+      .where(eq(scheduledMessages.id, id))
+      .returning();
+    return result[0];
   }
 }
 

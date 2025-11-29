@@ -227,7 +227,7 @@ function clearTyping(roomId: string, userId: string) {
   }
 }
 
-async function broadcastToRoom(roomId: string, message: any, excludeUserId?: string) {
+export async function broadcastToRoom(roomId: string, message: any, excludeUserId?: string) {
   try {
     const participants = await storage.getChatRoomParticipants(roomId);
     
