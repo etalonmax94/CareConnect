@@ -72,7 +72,7 @@ export function DatePicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <div className={cn("relative cursor-pointer", className)}>
           <Input
@@ -80,17 +80,18 @@ export function DatePicker({
             type="text"
             value={inputValue}
             onChange={handleInputChange}
-            onFocus={() => !disabled && setOpen(true)}
+            onClick={() => !disabled && setOpen(true)}
             placeholder={placeholder}
             disabled={disabled}
             className="pr-10 cursor-pointer"
+            readOnly
           />
           <div className="absolute right-0 top-0 h-full px-3 flex items-center pointer-events-none">
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0" align="start" sideOffset={4}>
         <Calendar
           mode="single"
           selected={dateValue}

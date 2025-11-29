@@ -8415,8 +8415,11 @@ export class DbStorage implements IStorage {
     if (filters?.clientId) {
       conditions.push(eq(scheduleTaskTemplates.clientId, filters.clientId));
     }
-    if (filters?.isActive) {
+    // Default to showing only active templates unless explicitly requested
+    if (filters?.isActive !== undefined) {
       conditions.push(eq(scheduleTaskTemplates.isActive, filters.isActive));
+    } else {
+      conditions.push(eq(scheduleTaskTemplates.isActive, 'yes'));
     }
 
     if (conditions.length > 0) {
@@ -8451,6 +8454,14 @@ export class DbStorage implements IStorage {
         lastUsedAt: new Date()
       })
       .where(eq(scheduleTaskTemplates.id, templateId));
+  }
+
+  async deleteScheduleTaskTemplate(id: string): Promise<boolean> {
+    // Soft delete by setting isActive to 'no'
+    const result = await db.update(scheduleTaskTemplates)
+      .set({ isActive: 'no', updatedAt: new Date() })
+      .where(eq(scheduleTaskTemplates.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Schedule Suggestions (AI)

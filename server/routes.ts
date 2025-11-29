@@ -16500,7 +16500,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: clientId as string | undefined,
         isActive: isActive as string | undefined
       });
-      res.json(templates);
+      // Parse JSON fields before returning
+      const parsedTemplates = templates.map(template => ({
+        ...template,
+        tasks: typeof template.tasks === 'string' ? JSON.parse(template.tasks) : (template.tasks || []),
+        requiredQualifications: template.autoAssignConditions
+          ? (typeof template.autoAssignConditions === 'string'
+              ? JSON.parse(template.autoAssignConditions).requiredQualifications || []
+              : [])
+          : [],
+        isActive: template.isActive === 'yes',
+      }));
+      res.json(parsedTemplates);
     } catch (error) {
       console.error("Error getting task templates:", error);
       res.status(500).json({ error: "Failed to get task templates" });
@@ -16509,15 +16520,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/ascs/task-templates", async (req, res) => {
     try {
+      const { tasks, requiredQualifications, isActive, ...rest } = req.body;
       const template = await storage.createScheduleTaskTemplate({
-        ...req.body,
+        ...rest,
+        tasks: typeof tasks === 'string' ? tasks : JSON.stringify(tasks || []),
+        autoAssignConditions: requiredQualifications
+          ? JSON.stringify({ requiredQualifications })
+          : null,
+        isActive: isActive === true || isActive === 'yes' ? 'yes' : 'no',
         createdById: req.user?.id,
         createdByName: req.user?.displayName
       });
-      res.status(201).json(template);
+      // Return parsed template
+      res.status(201).json({
+        ...template,
+        tasks: typeof template.tasks === 'string' ? JSON.parse(template.tasks) : template.tasks,
+        requiredQualifications: requiredQualifications || [],
+        isActive: template.isActive === 'yes',
+      });
     } catch (error) {
       console.error("Error creating template:", error);
       res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  app.put("/api/ascs/task-templates/:id", async (req, res) => {
+    try {
+      const { tasks, requiredQualifications, isActive, ...rest } = req.body;
+      const template = await storage.updateScheduleTaskTemplate(req.params.id, {
+        ...rest,
+        tasks: typeof tasks === 'string' ? tasks : JSON.stringify(tasks || []),
+        autoAssignConditions: requiredQualifications
+          ? JSON.stringify({ requiredQualifications })
+          : undefined,
+        isActive: isActive === true || isActive === 'yes' ? 'yes' : 'no',
+      });
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      // Return parsed template
+      res.json({
+        ...template,
+        tasks: typeof template.tasks === 'string' ? JSON.parse(template.tasks) : template.tasks,
+        requiredQualifications: requiredQualifications || [],
+        isActive: template.isActive === 'yes',
+      });
+    } catch (error) {
+      console.error("Error updating template:", error);
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/ascs/task-templates/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteScheduleTaskTemplate(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ error: "Failed to delete template" });
     }
   });
 

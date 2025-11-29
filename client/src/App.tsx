@@ -173,10 +173,10 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between w-full px-4 py-2 border-b sticky top-0 bg-background z-50 gap-4">
-            <div className="flex items-center gap-4 flex-shrink-0">
+            <div className="flex items-center gap-4 flex-shrink-0 hidden sm:flex">
               <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto" />
             </div>
-            <div className="flex-1 flex justify-center max-w-2xl mx-auto">
+            <div className="flex-1 flex justify-center max-w-2xl mx-auto hidden md:flex">
               <GlobalSearch />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

@@ -925,6 +925,12 @@ export default function ASCSCalendar() {
     const targetDate = date || new Date();
     const client = clientId ? getClientDetails(clientId) : null;
 
+    // Safely handle tasks - could be array or string
+    const tasks = Array.isArray(template.tasks) ? template.tasks : [];
+    const tasksNotes = tasks.length > 0
+      ? `Tasks:\n${tasks.map(t => `- ${t.name}${t.isRequired ? " (required)" : ""}`).join("\n")}`
+      : "";
+
     setNewShift({
       clientId: clientId || "",
       staffId: staffId || "",
@@ -937,9 +943,7 @@ export default function ASCSCalendar() {
       locationAddress: client
         ? [client.address, client.suburb, client.state, client.postcode].filter(Boolean).join(", ")
         : "",
-      notes: template.tasks.length > 0
-        ? `Tasks:\n${template.tasks.map(t => `- ${t.name}${t.isRequired ? " (required)" : ""}`).join("\n")}`
-        : "",
+      notes: tasksNotes,
       isOpenShift: false,
       urgencyLevel: "medium",
     });
@@ -1100,6 +1104,12 @@ export default function ASCSCalendar() {
         status: "open",
       });
     } else {
+      // Calculate duration in minutes from start and end times
+      const [startHour, startMin] = newShift.startTime.split(':').map(Number);
+      const [endHour, endMin] = newShift.endTime.split(':').map(Number);
+      let durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+      if (durationMinutes < 0) durationMinutes += 24 * 60; // Handle overnight shifts
+
       createShiftMutation.mutate({
         title: newShift.title,
         description: newShift.description,
@@ -1108,6 +1118,7 @@ export default function ASCSCalendar() {
         scheduledDate: newShift.scheduledDate,
         scheduledStartTime: newShift.startTime,
         scheduledEndTime: newShift.endTime,
+        durationMinutes,
         locationAddress: newShift.locationAddress,
         notes: newShift.notes,
         status: "draft",
@@ -2695,7 +2706,7 @@ export default function ASCSCalendar() {
                               {template.shiftType && (
                                 <Badge variant="secondary" className="text-xs">{template.shiftType}</Badge>
                               )}
-                              {template.tasks.length > 0 && (
+                              {Array.isArray(template.tasks) && template.tasks.length > 0 && (
                                 <span className="flex items-center gap-1">
                                   <CheckSquare className="w-3 h-3" />
                                   {template.tasks.length} tasks
