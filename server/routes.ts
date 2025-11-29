@@ -9031,6 +9031,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get room media (photos and documents for gallery)
+  app.get("/api/chat/rooms/:roomId/media", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const { roomId } = req.params;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Verify room exists
+      const room = await storage.getChatRoomById(roomId);
+      if (!room) {
+        return res.status(404).json({ error: "Chat room not found" });
+      }
+
+      // Verify user is a participant
+      const participants = await storage.getChatRoomParticipants(roomId);
+      const isParticipant = participants.some(p => p.staffId === userId);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ error: "Not a member of this chat" });
+      }
+
+      const media = await storage.getChatRoomMediaAttachments(roomId);
+      res.json(media);
+    } catch (error) {
+      console.error("Error fetching room media:", error);
+      res.status(500).json({ error: "Failed to fetch room media" });
+    }
+  });
+
   // Add participant to room
   app.post("/api/chat/rooms/:roomId/participants", requireAuth, async (req: any, res) => {
     try {

@@ -3887,6 +3887,48 @@ export class DbStorage implements IStorage {
     return result.length > 0;
   }
 
+  // Get all media attachments for a chat room (photos and documents only, excludes GIFs and videos)
+  async getChatRoomMediaAttachments(roomId: string): Promise<(ChatMessageAttachment & { senderName: string; createdAt: Date })[]> {
+    const result = await db.select({
+      id: chatMessageAttachments.id,
+      messageId: chatMessageAttachments.messageId,
+      type: chatMessageAttachments.type,
+      fileName: chatMessageAttachments.fileName,
+      fileSize: chatMessageAttachments.fileSize,
+      mimeType: chatMessageAttachments.mimeType,
+      storageKey: chatMessageAttachments.storageKey,
+      thumbnailKey: chatMessageAttachments.thumbnailKey,
+      width: chatMessageAttachments.width,
+      height: chatMessageAttachments.height,
+      duration: chatMessageAttachments.duration,
+      externalUrl: chatMessageAttachments.externalUrl,
+      externalProvider: chatMessageAttachments.externalProvider,
+      externalId: chatMessageAttachments.externalId,
+      processingStatus: chatMessageAttachments.processingStatus,
+      processingError: chatMessageAttachments.processingError,
+      expiresAt: chatMessageAttachments.expiresAt,
+      isExpired: chatMessageAttachments.isExpired,
+      expiredAt: chatMessageAttachments.expiredAt,
+      fileHash: chatMessageAttachments.fileHash,
+      deletedReason: chatMessageAttachments.deletedReason,
+      createdAt: chatMessageAttachments.createdAt,
+      senderName: chatMessages.senderName,
+    })
+      .from(chatMessageAttachments)
+      .innerJoin(chatMessages, eq(chatMessageAttachments.messageId, chatMessages.id))
+      .where(and(
+        eq(chatMessages.roomId, roomId),
+        eq(chatMessageAttachments.isExpired, "no"),
+        or(
+          eq(chatMessageAttachments.type, "image"),
+          eq(chatMessageAttachments.type, "file")
+        )
+      ))
+      .orderBy(desc(chatMessageAttachments.createdAt));
+    
+    return result as any;
+  }
+
   // Media Retention Methods
   async getExpiredMediaAttachments(limit: number = 100): Promise<ChatMessageAttachment[]> {
     const now = new Date();

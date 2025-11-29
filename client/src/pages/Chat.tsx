@@ -46,6 +46,8 @@ import {
   Diamond,
   PartyPopper,
   Eye,
+  FileText,
+  FolderOpen,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -177,6 +179,7 @@ export default function Chat() {
   const [messageReactions, setMessageReactions] = useState<Record<string, ChatMessageReaction[]>>({});
   const [messageReads, setMessageReads] = useState<Record<string, ChatMessageRead[]>>({});
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<"settings" | "media">("settings");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -243,6 +246,28 @@ export default function Chat() {
   });
 
   const displayedGifs = gifSearchQuery.length >= 2 ? gifSearchResults.results : trendingGifs.results;
+
+  // Fetch media for room gallery (photos and documents only)
+  interface RoomMediaItem {
+    id: string;
+    messageId: string;
+    type: "image" | "video" | "file";
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    storageKey: string;
+    thumbnailKey?: string;
+    width?: number;
+    height?: number;
+    expiresAt?: Date;
+    createdAt: Date;
+    senderName: string;
+  }
+  
+  const { data: roomMedia = [], isLoading: mediaLoading } = useQuery<RoomMediaItem[]>({
+    queryKey: ["/api/chat/rooms", selectedRoomId, "media"],
+    enabled: !!selectedRoomId && showRoomSettings && settingsTab === "media",
+  });
 
   // Fetch reactions for all displayed messages
   useEffect(() => {
@@ -1752,14 +1777,28 @@ export default function Chat() {
                       <Settings className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent>
+                  <SheetContent className="w-[400px] sm:w-[540px]">
                     <SheetHeader>
                       <SheetTitle>Chat Settings</SheetTitle>
                       <SheetDescription>
                         Manage this chat room
                       </SheetDescription>
                     </SheetHeader>
-                    <div className="space-y-6 mt-6">
+                    
+                    <Tabs value={settingsTab} onValueChange={(v) => setSettingsTab(v as "settings" | "media")} className="mt-4">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="settings">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Settings
+                        </TabsTrigger>
+                        <TabsTrigger value="media">
+                          <FolderOpen className="h-4 w-4 mr-2" />
+                          Media
+                        </TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="settings" className="mt-4">
+                        <div className="space-y-6">
                       {/* Chat Avatar */}
                       <div className="space-y-3">
                         <Label>Chat Photo</Label>
@@ -1974,7 +2013,102 @@ export default function Chat() {
                         <Archive className="h-4 w-4 mr-2" />
                         Archive Chat
                       </Button>
-                    </div>
+                        </div>
+                      </TabsContent>
+                      
+                      <TabsContent value="media" className="mt-4">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-muted-foreground">
+                              Shared photos and documents (30-day retention)
+                            </p>
+                          </div>
+                          
+                          {mediaLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                              <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          ) : roomMedia.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <FolderOpen className="h-12 w-12 text-muted-foreground/40 mb-3" />
+                              <p className="text-sm font-medium">No media shared yet</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Photos and documents shared in this chat will appear here
+                              </p>
+                            </div>
+                          ) : (
+                            <ScrollArea className="h-[400px]">
+                              {/* Photos Section */}
+                              {roomMedia.filter(m => m.type === "image").length > 0 && (
+                                <div className="mb-6">
+                                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                                    <ImageIcon className="h-4 w-4" />
+                                    Photos ({roomMedia.filter(m => m.type === "image").length})
+                                  </h4>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {roomMedia.filter(m => m.type === "image").map(media => (
+                                      <a
+                                        key={media.id}
+                                        href={media.storageKey}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="relative aspect-square rounded-xl overflow-hidden border hover:opacity-90 transition-opacity group"
+                                      >
+                                        <img
+                                          src={media.thumbnailKey || media.storageKey}
+                                          alt={media.fileName}
+                                          className="w-full h-full object-cover"
+                                        />
+                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs p-2">
+                                          <Download className="h-4 w-4 mb-1" />
+                                          <span className="truncate w-full text-center">{media.fileName}</span>
+                                          <span className="text-[10px] text-white/70">
+                                            {format(new Date(media.createdAt), "MMM d, yyyy")}
+                                          </span>
+                                        </div>
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Documents Section */}
+                              {roomMedia.filter(m => m.type === "file").length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Documents ({roomMedia.filter(m => m.type === "file").length})
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {roomMedia.filter(m => m.type === "file").map(media => (
+                                      <a
+                                        key={media.id}
+                                        href={media.storageKey}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-colors"
+                                      >
+                                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                          <FileText className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-medium truncate">{media.fileName}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {(media.fileSize / 1024).toFixed(1)} KB • {media.senderName} • {format(new Date(media.createdAt), "MMM d, yyyy")}
+                                          </p>
+                                        </div>
+                                        <Download className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                            </ScrollArea>
+                          )}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </SheetContent>
                 </Sheet>
               )}
