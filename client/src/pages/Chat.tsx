@@ -1352,38 +1352,55 @@ export default function Chat() {
                                 )}
                               </DropdownMenuItem>
                               
-                              <DropdownMenuSeparator />
-                              
-                              {/* Add member - only for group/client/announcement chats */}
+                              {/* Member management - only for group/client/announcement chats */}
                               {(room.type === "group" || room.type === "client" || room.type === "announcement") && (
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setManageMembersRoomId(room.id);
-                                    setShowAddMemberDialog(true);
-                                  }}
-                                  data-testid={`add-member-${room.id}`}
-                                >
-                                  <UserPlus className="h-4 w-4 mr-2" />
-                                  Add member
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  
+                                  <DropdownMenuItem 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setManageMembersRoomId(room.id);
+                                      setShowAddMemberDialog(true);
+                                    }}
+                                    data-testid={`add-member-${room.id}`}
+                                  >
+                                    <UserPlus className="h-4 w-4 mr-2" />
+                                    Add member
+                                  </DropdownMenuItem>
+                                  
+                                  <DropdownMenuItem 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedRoomId(room.id);
+                                      setShowRoomSettings(true);
+                                    }}
+                                    data-testid={`manage-members-${room.id}`}
+                                  >
+                                    <Users className="h-4 w-4 mr-2" />
+                                    Manage members
+                                  </DropdownMenuItem>
+                                </>
                               )}
                               
                               {/* Archive chat - only for admins */}
                               {isAppAdmin && (
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (confirm("Are you sure you want to archive this chat? This action can be undone by an administrator.")) {
-                                      archiveChatMutation.mutate(room.id);
-                                    }
-                                  }}
-                                  className="text-orange-600 dark:text-orange-400"
-                                  data-testid={`archive-chat-${room.id}`}
-                                >
-                                  <Archive className="h-4 w-4 mr-2" />
-                                  Archive chat
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm("Are you sure you want to archive this chat? This action can be undone by an administrator.")) {
+                                        archiveChatMutation.mutate(room.id);
+                                      }
+                                    }}
+                                    className="text-orange-600 dark:text-orange-400"
+                                    data-testid={`archive-chat-${room.id}`}
+                                  >
+                                    <Archive className="h-4 w-4 mr-2" />
+                                    Archive chat
+                                  </DropdownMenuItem>
+                                </>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
