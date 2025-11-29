@@ -824,6 +824,35 @@ export const staff = pgTable("staff", {
   isActive: text("is_active").default("yes").$type<"yes" | "no">(),
   notes: text("notes"),
   supervisorId: varchar("supervisor_id"),
+
+  // Personal Details
+  dateOfBirth: date("date_of_birth"),
+  gender: text("gender").$type<"male" | "female" | "non_binary" | "prefer_not_to_say" | null>(),
+  pronouns: text("pronouns"),
+
+  // Address Fields
+  streetAddress: text("street_address"),
+  suburb: text("suburb"),
+  state: text("state"),
+  postCode: text("post_code"),
+  country: text("country").default("Australia"),
+
+  // Employment Details
+  employmentType: text("employment_type").$type<"full_time" | "part_time" | "casual" | "contractor" | null>(),
+  employmentStartDate: date("employment_start_date"),
+  employmentEndDate: date("employment_end_date"),
+  department: text("department").$type<"nursing" | "support_work" | "management" | "administration" | "clinical" | null>(),
+  workingHoursPerWeek: text("working_hours_per_week"),
+
+  // Secondary Contact
+  secondaryPhone: text("secondary_phone"),
+  secondaryEmail: text("secondary_email"),
+  preferredContactMethod: text("preferred_contact_method").$type<"email" | "phone" | "sms">().default("phone"),
+
+  // Profile
+  profileImageUrl: text("profile_image_url"),
+  bio: text("bio"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -831,6 +860,24 @@ export const staff = pgTable("staff", {
 export const insertStaffSchema = createInsertSchema(staff, {
   role: z.enum(["support_worker", "nurse", "care_manager", "admin"]).optional(),
   isActive: z.enum(["yes", "no"]).optional(),
+  gender: z.enum(["male", "female", "non_binary", "prefer_not_to_say"]).optional().nullable(),
+  employmentType: z.enum(["full_time", "part_time", "casual", "contractor"]).optional().nullable(),
+  department: z.enum(["nursing", "support_work", "management", "administration", "clinical"]).optional().nullable(),
+  preferredContactMethod: z.enum(["email", "phone", "sms"]).optional(),
+  dateOfBirth: z.string().optional().nullable(),
+  employmentStartDate: z.string().optional().nullable(),
+  employmentEndDate: z.string().optional().nullable(),
+  pronouns: z.string().max(50).optional().nullable(),
+  streetAddress: z.string().max(255).optional().nullable(),
+  suburb: z.string().max(100).optional().nullable(),
+  state: z.string().max(50).optional().nullable(),
+  postCode: z.string().max(10).optional().nullable(),
+  country: z.string().max(100).optional().nullable(),
+  secondaryPhone: z.string().max(20).optional().nullable(),
+  secondaryEmail: z.string().email().optional().nullable(),
+  profileImageUrl: z.string().optional().nullable(),
+  bio: z.string().max(1000).optional().nullable(),
+  workingHoursPerWeek: z.string().optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
@@ -1769,6 +1816,41 @@ export const insertStaffQualificationSchema = createInsertSchema(staffQualificat
 
 export type InsertStaffQualification = z.infer<typeof insertStaffQualificationSchema>;
 export type StaffQualification = typeof staffQualifications.$inferSelect;
+
+// Staff Emergency Contacts
+export type StaffEmergencyContactRelationship = "spouse" | "partner" | "parent" | "child" | "sibling" | "friend" | "other";
+
+export const staffEmergencyContacts = pgTable("staff_emergency_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  name: text("name").notNull(),
+  relationship: text("relationship").$type<StaffEmergencyContactRelationship>().notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  alternatePhone: text("alternate_phone"),
+  email: text("email"),
+
+  isPrimary: text("is_primary").default("no").$type<"yes" | "no">(),
+  priority: text("priority").default("1"),
+
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffEmergencyContactSchema = createInsertSchema(staffEmergencyContacts, {
+  relationship: z.enum(["spouse", "partner", "parent", "child", "sibling", "friend", "other"]),
+  isPrimary: z.enum(["yes", "no"]).optional(),
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  email: z.string().email().optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffEmergencyContact = z.infer<typeof insertStaffEmergencyContactSchema>;
+export type StaffEmergencyContact = typeof staffEmergencyContacts.$inferSelect;
 
 // Staff Blacklist - Service type, category, or general restrictions
 export type BlacklistType = "service_type" | "service_category" | "client_category" | "general";
