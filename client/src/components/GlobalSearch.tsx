@@ -266,7 +266,7 @@ export default function GlobalSearch() {
   return (
     <>
       <button
-        className="relative flex items-center h-10 w-full max-w-md bg-muted/50 hover:bg-muted border border-border rounded-lg px-4 py-2 text-sm text-muted-foreground transition-colors"
+        className="relative flex items-center h-10 w-full max-w-md bg-muted/50 hover:bg-muted border border-border rounded-lg px-4 py-2 text-sm text-muted-foreground transition-colors hidden md:flex"
         onClick={() => setOpen(true)}
         data-testid="button-global-search"
       >
@@ -275,6 +275,14 @@ export default function GlobalSearch() {
         <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
           {isMac ? "⌘" : "Ctrl"}+K
         </kbd>
+      </button>
+      
+      <button
+        className="md:hidden p-0"
+        onClick={() => setOpen(true)}
+        data-testid="button-global-search-mobile"
+      >
+        <Search className="h-5 w-5" />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

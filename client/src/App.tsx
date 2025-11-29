@@ -177,7 +177,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
               <SidebarTrigger data-testid="button-sidebar-toggle" className="md:hidden" />
               <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto hidden sm:block" />
             </div>
-            <div className="flex-1 flex justify-center max-w-2xl mx-auto hidden md:flex">
+            <div className="flex-1 flex justify-center max-w-2xl mx-auto">
               <GlobalSearch />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
