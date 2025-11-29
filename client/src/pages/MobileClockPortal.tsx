@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MapPin, Clock, CheckCircle, XCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { Staff } from "@shared/schema";
 
 interface ClockStatus {
   isClockedIn: boolean;
@@ -28,10 +29,14 @@ interface ClockResult {
 export default function MobileClockPortal() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [staffId, setStaffId] = useState("");
   const [location, setLocation] = useState<GeolocationPosition | null>(null);
   const [locationError, setLocationError] = useState("");
   const [gettingLocation, setGettingLocation] = useState(false);
+
+  // Fetch current user's staff record
+  const { data: staffRecord, isLoading: loadingStaffRecord, error: staffError } = useQuery<Staff>({
+    queryKey: ["/api/staff/me"],
+  });
 
   // Get current location
   const getCurrentLocation = () => {
@@ -77,8 +82,8 @@ export default function MobileClockPortal() {
 
   // Fetch clock status
   const { data: clockStatus } = useQuery<ClockStatus>({
-    queryKey: [`/api/staff/${staffId}/clock-status`],
-    enabled: !!staffId,
+    queryKey: [`/api/staff/${staffRecord?.id}/clock-status`],
+    enabled: !!staffRecord?.id,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
@@ -86,8 +91,9 @@ export default function MobileClockPortal() {
   const clockInMutation = useMutation({
     mutationFn: async () => {
       if (!location) throw new Error("Location not available");
+      if (!staffRecord?.id) throw new Error("Staff record not found");
 
-      const res = await fetch(`/api/staff/${staffId}/clock-in`, {
+      const res = await fetch(`/api/staff/${staffRecord.id}/clock-in`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -104,7 +110,7 @@ export default function MobileClockPortal() {
       return data as ClockResult;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/staff/${staffId}/clock-status`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/staff/${staffRecord?.id}/clock-status`] });
 
       if (data.success) {
         toast({
@@ -128,8 +134,9 @@ export default function MobileClockPortal() {
   const clockOutMutation = useMutation({
     mutationFn: async () => {
       if (!location) throw new Error("Location not available");
+      if (!staffRecord?.id) throw new Error("Staff record not found");
 
-      const res = await fetch(`/api/staff/${staffId}/clock-out`, {
+      const res = await fetch(`/api/staff/${staffRecord.id}/clock-out`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -146,7 +153,7 @@ export default function MobileClockPortal() {
       return data as ClockResult;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/staff/${staffId}/clock-status`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/staff/${staffRecord?.id}/clock-status`] });
 
       if (data.success) {
         toast({
@@ -193,6 +200,32 @@ export default function MobileClockPortal() {
   const isClockedIn = clockStatus?.isClockedIn || false;
   const isProcessing = clockInMutation.isPending || clockOutMutation.isPending;
 
+  // Loading state while fetching staff record
+  if (loadingStaffRecord) {
+    return (
+      <div className="container max-w-md mx-auto py-6 px-4">
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Loading your staff profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state if no staff record found
+  if (staffError || !staffRecord) {
+    return (
+      <div className="container max-w-md mx-auto py-6 px-4">
+        <Alert variant="destructive">
+          <AlertTriangle className="w-4 h-4" />
+          <AlertDescription>
+            No staff record found for your account. Please contact your administrator to set up your staff profile.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="container max-w-md mx-auto py-6 px-4 space-y-6">
       <div className="text-center">
@@ -200,29 +233,23 @@ export default function MobileClockPortal() {
         <p className="text-sm text-muted-foreground">GPS-enabled clock in/out</p>
       </div>
 
-      {/* Staff ID Input */}
-      {!staffId && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Enter Your Staff ID</CardTitle>
-            <CardDescription>Required to access time clock</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <input
-              type="text"
-              placeholder="Staff ID"
-              className="w-full px-4 py-3 border rounded-lg text-lg"
-              onBlur={(e) => setStaffId(e.target.value)}
-              autoFocus
-            />
-          </CardContent>
-        </Card>
-      )}
+      {/* Staff Info */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">Logged in as</p>
+            <p className="text-lg font-semibold">{staffRecord.name}</p>
+            {staffRecord.role && (
+              <Badge variant="secondary" className="mt-2">
+                {staffRecord.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-      {staffId && (
-        <>
-          {/* Location Status */}
-          <Card>
+      {/* Location Status */}
+      <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="w-5 h-5" />
@@ -375,8 +402,6 @@ export default function MobileClockPortal() {
               </div>
             </CardContent>
           </Card>
-        </>
-      )}
     </div>
   );
 }

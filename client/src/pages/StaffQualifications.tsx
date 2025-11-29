@@ -264,7 +264,7 @@ export default function StaffQualifications() {
                   <TableRow>
                     <TableHead>Qualification</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Issuing Organization</TableHead>
+                    <TableHead>Issuing Organisation</TableHead>
                     <TableHead>Issued Date</TableHead>
                     <TableHead>Expiry Date</TableHead>
                     <TableHead>Status</TableHead>
@@ -388,7 +388,7 @@ export default function StaffQualifications() {
             </div>
 
             <div>
-              <Label htmlFor="org">Issuing Organization</Label>
+              <Label htmlFor="org">Issuing Organisation</Label>
               <Input
                 id="org"
                 value={formData.issuingOrganization}

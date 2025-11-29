@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -70,6 +70,15 @@ const menuCategories: MenuCategory[] = [
       { title: "Org Chart", url: "/org-chart", icon: Network, iconColor: "text-rose-500" },
       { title: "Tasks", url: "/tasks", icon: ListTodo, iconColor: "text-violet-500" },
       { title: "Chat", url: "/chat", icon: MessageSquare, iconColor: "text-pink-500" },
+    ],
+  },
+  {
+    label: "Workforce",
+    items: [
+      { title: "Mobile Clock", url: "/mobile-clock", icon: Clock, iconColor: "text-blue-500" },
+      { title: "Timesheet Approval", url: "/timesheet-approval", icon: ClipboardCheck, iconColor: "text-green-500" },
+      { title: "GPS Compliance", url: "/gps-compliance", icon: MapPin, iconColor: "text-red-500" },
+      { title: "Staff Qualifications", url: "/staff-qualifications", icon: Award, iconColor: "text-yellow-600" },
     ],
   },
   {
@@ -198,7 +207,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
         </div>
       </SidebarHeader>
       
-      <SidebarContent className={cn("pt-2", isCollapsed ? "px-1" : "px-2")}>
+      <SidebarContent className={cn("pt-2 overflow-y-auto", isCollapsed ? "px-1" : "px-2")}>
         {!isCollapsed && user && (
           <div className="px-3 py-3 mb-1">
             <div className="flex items-center gap-2 text-sidebar-foreground">

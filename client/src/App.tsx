@@ -101,6 +101,10 @@ function ProtectedRouter() {
       <Route path="/admin/chat" component={AdminChat} />
       <Route path="/notifications" component={Notifications} />
       <Route path="/scheduling-conflicts" component={SchedulingConflicts} />
+      <Route path="/timesheet-approval" component={TimesheetApproval} />
+      <Route path="/gps-compliance" component={GpsComplianceReview} />
+      <Route path="/staff-qualifications" component={StaffQualifications} />
+      <Route path="/mobile-clock" component={MobileClockPortal} />
       <Route component={NotFound} />
     </Switch>
   );

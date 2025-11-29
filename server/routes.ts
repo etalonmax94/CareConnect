@@ -1478,7 +1478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vcfContent.push(`NOTE:${notesText}`);
       }
       
-      // Build notification preferences for organization field
+      // Build notification preferences for organisation field
       const notifPrefs = client.notificationPreferences;
       const notifParts: string[] = [];
       if (notifPrefs?.smsArrival || notifPrefs?.smsSchedule) {
@@ -2875,6 +2875,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current user's staff record
+  app.get("/api/staff/me", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const staffRecord = await storage.getStaffByUserId(userId);
+      if (!staffRecord) {
+        return res.status(404).json({ error: "Staff record not found for current user" });
+      }
+
+      res.json(staffRecord);
+    } catch (error) {
+      console.error("Error fetching current user's staff record:", error);
+      res.status(500).json({ error: "Failed to fetch staff record" });
+    }
+  });
+
   // Get staff by ID
   app.get("/api/staff/:id", async (req, res) => {
     try {
@@ -2965,7 +2985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(hierarchy);
     } catch (error) {
       console.error("Error fetching org chart hierarchy:", error);
-      res.status(500).json({ error: "Failed to fetch organization hierarchy" });
+      res.status(500).json({ error: "Failed to fetch organisation hierarchy" });
     }
   });
 

@@ -381,7 +381,7 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
       queryClient.invalidateQueries({ queryKey: ["/api/clients", clientId, "document-folders"] });
       setFolderSettingsDialogOpen(false);
       setSelectedFolderForSettings(null);
-      toast({ title: "Folder settings saved", description: "Folder customization has been saved" });
+      toast({ title: "Folder settings saved", description: "Folder customisation has been saved" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save folder settings", variant: "destructive" });
@@ -1386,7 +1386,7 @@ export default function DocumentTracker({ documents, clientId, clientCategory, n
           <DialogHeader>
             <DialogTitle>Folder Settings</DialogTitle>
             <DialogDescription>
-              Customize how this folder appears for this client
+              Customise how this folder appears for this client
             </DialogDescription>
           </DialogHeader>
           {selectedFolderForSettings && (
