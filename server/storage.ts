@@ -139,7 +139,22 @@ import {
   type InsertLmsCourseFeedback, type LmsCourseFeedback,
   type InsertLmsNotification, type LmsNotification,
   type InsertLmsCertificateTemplate, type LmsCertificateTemplate,
-  getLmsLevelFromPoints
+  getLmsLevelFromPoints,
+  // Policy Management System tables
+  policies, policyVersionHistory, staffPolicyAssignments, policyViews,
+  policyAcknowledgments, policyComplianceRecords, policyNotifications,
+  policyAuditLogs, policyCategories, policySavedReports,
+  // PMS types
+  type InsertPolicy, type Policy,
+  type InsertPolicyVersionHistory, type PolicyVersionHistory,
+  type InsertStaffPolicyAssignment, type StaffPolicyAssignment,
+  type InsertPolicyView, type PolicyView,
+  type InsertPolicyAcknowledgment, type PolicyAcknowledgment,
+  type InsertPolicyComplianceRecord, type PolicyComplianceRecord,
+  type InsertPolicyNotification, type PolicyNotification,
+  type InsertPolicyAuditLog, type PolicyAuditLog,
+  type InsertPolicyCategory, type PolicyCategory,
+  type InsertPolicySavedReport, type PolicySavedReport
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -835,6 +850,90 @@ export interface IStorage {
   getGpsComplianceLogById(id: string): Promise<GpsComplianceLog | undefined>;
   createGpsComplianceLog(log: InsertGpsComplianceLog): Promise<GpsComplianceLog>;
   updateGpsComplianceLog(id: string, log: Partial<InsertGpsComplianceLog>): Promise<GpsComplianceLog | undefined>;
+
+  // ============================================
+  // POLICY MANAGEMENT SYSTEM (PMS)
+  // ============================================
+
+  // Policies - Core CRUD
+  getAllPolicies(filters?: { status?: string; category?: string; isMandatory?: string }): Promise<Policy[]>;
+  getPolicyById(id: string): Promise<Policy | undefined>;
+  getPublishedPolicies(filters?: { category?: string; audienceType?: string }): Promise<Policy[]>;
+  searchPolicies(searchTerm: string): Promise<Policy[]>;
+  createPolicy(policy: InsertPolicy): Promise<Policy>;
+  updatePolicy(id: string, policy: Partial<InsertPolicy>): Promise<Policy | undefined>;
+  publishPolicy(id: string, publishedById: string, publishedByName: string): Promise<Policy | undefined>;
+  archivePolicy(id: string): Promise<Policy | undefined>;
+  deletePolicy(id: string): Promise<boolean>;
+
+  // Policy Version History
+  getPolicyVersionHistory(policyId: string): Promise<PolicyVersionHistory[]>;
+  getPolicyVersionById(id: string): Promise<PolicyVersionHistory | undefined>;
+  createPolicyVersion(version: InsertPolicyVersionHistory): Promise<PolicyVersionHistory>;
+
+  // Staff Policy Assignments
+  getStaffPolicyAssignments(staffId: string): Promise<StaffPolicyAssignment[]>;
+  getPolicyAssignments(policyId: string): Promise<StaffPolicyAssignment[]>;
+  getAssignmentById(id: string): Promise<StaffPolicyAssignment | undefined>;
+  getOverdueAssignments(): Promise<StaffPolicyAssignment[]>;
+  createPolicyAssignment(assignment: InsertStaffPolicyAssignment): Promise<StaffPolicyAssignment>;
+  updatePolicyAssignment(id: string, assignment: Partial<InsertStaffPolicyAssignment>): Promise<StaffPolicyAssignment | undefined>;
+  bulkAssignPolicy(policyId: string, staffIds: string[], assignedById: string, dueDate?: Date): Promise<StaffPolicyAssignment[]>;
+  deletePolicyAssignment(id: string): Promise<boolean>;
+
+  // Policy Views
+  getPolicyViews(policyId: string): Promise<PolicyView[]>;
+  getStaffPolicyViews(staffId: string): Promise<PolicyView[]>;
+  createPolicyView(view: InsertPolicyView): Promise<PolicyView>;
+  updatePolicyView(id: string, view: Partial<InsertPolicyView>): Promise<PolicyView | undefined>;
+
+  // Policy Acknowledgments
+  getPolicyAcknowledgments(policyId: string): Promise<PolicyAcknowledgment[]>;
+  getStaffAcknowledgments(staffId: string): Promise<PolicyAcknowledgment[]>;
+  getAcknowledgmentById(id: string): Promise<PolicyAcknowledgment | undefined>;
+  hasStaffAcknowledgedPolicy(staffId: string, policyId: string, version: number): Promise<boolean>;
+  createPolicyAcknowledgment(acknowledgment: InsertPolicyAcknowledgment): Promise<PolicyAcknowledgment>;
+
+  // Policy Compliance Records
+  getComplianceRecords(filters?: { staffId?: string; policyId?: string; isCompliant?: string; isOverdue?: string }): Promise<PolicyComplianceRecord[]>;
+  getComplianceRecordById(id: string): Promise<PolicyComplianceRecord | undefined>;
+  getStaffComplianceRecord(staffId: string, policyId: string): Promise<PolicyComplianceRecord | undefined>;
+  createComplianceRecord(record: InsertPolicyComplianceRecord): Promise<PolicyComplianceRecord>;
+  updateComplianceRecord(id: string, record: Partial<InsertPolicyComplianceRecord>): Promise<PolicyComplianceRecord | undefined>;
+  upsertComplianceRecord(staffId: string, policyId: string, updates: Partial<InsertPolicyComplianceRecord>): Promise<PolicyComplianceRecord>;
+
+  // Policy Notifications
+  getPolicyNotifications(staffId: string): Promise<PolicyNotification[]>;
+  getUnreadPolicyNotifications(staffId: string): Promise<PolicyNotification[]>;
+  createPolicyNotification(notification: InsertPolicyNotification): Promise<PolicyNotification>;
+  markPolicyNotificationRead(id: string): Promise<PolicyNotification | undefined>;
+  markAllPolicyNotificationsRead(staffId: string): Promise<number>;
+
+  // Policy Audit Logs
+  getPolicyAuditLogs(filters?: { policyId?: string; staffId?: string; action?: string; startDate?: Date; endDate?: Date; limit?: number; offset?: number }): Promise<{ logs: PolicyAuditLog[]; total: number }>;
+  createPolicyAuditLog(log: InsertPolicyAuditLog): Promise<PolicyAuditLog>;
+
+  // Policy Categories
+  getAllPolicyCategories(): Promise<PolicyCategory[]>;
+  getActivePolicyCategories(): Promise<PolicyCategory[]>;
+  getPolicyCategoryById(id: string): Promise<PolicyCategory | undefined>;
+  createPolicyCategory(category: InsertPolicyCategory): Promise<PolicyCategory>;
+  updatePolicyCategory(id: string, category: Partial<InsertPolicyCategory>): Promise<PolicyCategory | undefined>;
+  deletePolicyCategory(id: string): Promise<boolean>;
+
+  // Policy Saved Reports
+  getSavedReports(createdById?: string): Promise<PolicySavedReport[]>;
+  getSavedReportById(id: string): Promise<PolicySavedReport | undefined>;
+  getScheduledReports(): Promise<PolicySavedReport[]>;
+  createSavedReport(report: InsertPolicySavedReport): Promise<PolicySavedReport>;
+  updateSavedReport(id: string, report: Partial<InsertPolicySavedReport>): Promise<PolicySavedReport | undefined>;
+  deleteSavedReport(id: string): Promise<boolean>;
+
+  // PMS Dashboard & Analytics
+  getPolicyComplianceStats(): Promise<{ totalPolicies: number; publishedPolicies: number; totalAssignments: number; acknowledgedCount: number; overdueCount: number; complianceRate: number }>;
+  getStaffComplianceStats(staffId: string): Promise<{ assigned: number; viewed: number; acknowledged: number; overdue: number; complianceRate: number }>;
+  getPoliciesNeedingReview(days?: number): Promise<Policy[]>;
+  getRecentPolicyActivity(limit?: number): Promise<PolicyAuditLog[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -6137,6 +6236,562 @@ export class DbStorage implements IStorage {
     }
 
     return stats;
+  }
+
+  // ============================================
+  // POLICY MANAGEMENT SYSTEM (PMS) Implementation
+  // ============================================
+
+  // Policies - Core CRUD
+  async getAllPolicies(filters?: { status?: string; category?: string; isMandatory?: string }): Promise<Policy[]> {
+    const conditions = [];
+    if (filters?.status) {
+      conditions.push(eq(policies.status, filters.status));
+    }
+    if (filters?.category) {
+      conditions.push(eq(policies.category, filters.category));
+    }
+    if (filters?.isMandatory) {
+      conditions.push(eq(policies.isMandatory, filters.isMandatory));
+    }
+    const query = conditions.length > 0
+      ? db.select().from(policies).where(and(...conditions))
+      : db.select().from(policies);
+    return await query.orderBy(desc(policies.createdAt));
+  }
+
+  async getPolicyById(id: string): Promise<Policy | undefined> {
+    const result = await db.select().from(policies).where(eq(policies.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPublishedPolicies(filters?: { category?: string; audienceType?: string }): Promise<Policy[]> {
+    const conditions = [eq(policies.status, 'published')];
+    if (filters?.category) {
+      conditions.push(eq(policies.category, filters.category));
+    }
+    if (filters?.audienceType) {
+      conditions.push(eq(policies.audienceType, filters.audienceType));
+    }
+    return await db.select().from(policies)
+      .where(and(...conditions))
+      .orderBy(desc(policies.publishedAt));
+  }
+
+  async searchPolicies(searchTerm: string): Promise<Policy[]> {
+    return await db.select().from(policies)
+      .where(
+        or(
+          ilike(policies.title, `%${searchTerm}%`),
+          ilike(policies.description, `%${searchTerm}%`),
+          ilike(policies.category, `%${searchTerm}%`)
+        )
+      )
+      .orderBy(desc(policies.createdAt));
+  }
+
+  async createPolicy(policy: InsertPolicy): Promise<Policy> {
+    const result = await db.insert(policies).values(policy).returning();
+    return result[0];
+  }
+
+  async updatePolicy(id: string, policy: Partial<InsertPolicy>): Promise<Policy | undefined> {
+    const result = await db.update(policies)
+      .set({ ...policy as any, updatedAt: new Date() })
+      .where(eq(policies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async publishPolicy(id: string, publishedById: string, publishedByName: string): Promise<Policy | undefined> {
+    const result = await db.update(policies)
+      .set({
+        status: 'published',
+        publishedAt: new Date(),
+        publishedById,
+        updatedAt: new Date()
+      })
+      .where(eq(policies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async archivePolicy(id: string): Promise<Policy | undefined> {
+    const result = await db.update(policies)
+      .set({ status: 'archived', updatedAt: new Date() })
+      .where(eq(policies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePolicy(id: string): Promise<boolean> {
+    const result = await db.delete(policies).where(eq(policies.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Policy Version History
+  async getPolicyVersionHistory(policyId: string): Promise<PolicyVersionHistory[]> {
+    return await db.select().from(policyVersionHistory)
+      .where(eq(policyVersionHistory.policyId, policyId))
+      .orderBy(desc(policyVersionHistory.version));
+  }
+
+  async getPolicyVersionById(id: string): Promise<PolicyVersionHistory | undefined> {
+    const result = await db.select().from(policyVersionHistory)
+      .where(eq(policyVersionHistory.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createPolicyVersion(version: InsertPolicyVersionHistory): Promise<PolicyVersionHistory> {
+    const result = await db.insert(policyVersionHistory).values(version).returning();
+    return result[0];
+  }
+
+  // Staff Policy Assignments
+  async getStaffPolicyAssignments(staffId: string): Promise<StaffPolicyAssignment[]> {
+    return await db.select().from(staffPolicyAssignments)
+      .where(eq(staffPolicyAssignments.staffId, staffId))
+      .orderBy(desc(staffPolicyAssignments.assignedAt));
+  }
+
+  async getPolicyAssignments(policyId: string): Promise<StaffPolicyAssignment[]> {
+    return await db.select().from(staffPolicyAssignments)
+      .where(eq(staffPolicyAssignments.policyId, policyId))
+      .orderBy(desc(staffPolicyAssignments.assignedAt));
+  }
+
+  async getAssignmentById(id: string): Promise<StaffPolicyAssignment | undefined> {
+    const result = await db.select().from(staffPolicyAssignments)
+      .where(eq(staffPolicyAssignments.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getOverdueAssignments(): Promise<StaffPolicyAssignment[]> {
+    return await db.select().from(staffPolicyAssignments)
+      .where(
+        and(
+          eq(staffPolicyAssignments.isOverdue, 'yes'),
+          or(
+            eq(staffPolicyAssignments.status, 'not_viewed'),
+            eq(staffPolicyAssignments.status, 'viewed')
+          )
+        )
+      )
+      .orderBy(staffPolicyAssignments.dueDate);
+  }
+
+  async createPolicyAssignment(assignment: InsertStaffPolicyAssignment): Promise<StaffPolicyAssignment> {
+    const result = await db.insert(staffPolicyAssignments).values(assignment).returning();
+    return result[0];
+  }
+
+  async updatePolicyAssignment(id: string, assignment: Partial<InsertStaffPolicyAssignment>): Promise<StaffPolicyAssignment | undefined> {
+    const result = await db.update(staffPolicyAssignments)
+      .set({ ...assignment as any, updatedAt: new Date() })
+      .where(eq(staffPolicyAssignments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async bulkAssignPolicy(policyId: string, staffIds: string[], assignedById: string, dueDate?: Date): Promise<StaffPolicyAssignment[]> {
+    const policy = await this.getPolicyById(policyId);
+    if (!policy) throw new Error('Policy not found');
+
+    const assignments = staffIds.map(staffId => ({
+      staffId,
+      policyId,
+      policyVersion: policy.version,
+      assignedById,
+      dueDate: dueDate || null,
+      status: 'not_viewed' as const
+    }));
+
+    const result = await db.insert(staffPolicyAssignments).values(assignments).returning();
+    return result;
+  }
+
+  async deletePolicyAssignment(id: string): Promise<boolean> {
+    const result = await db.delete(staffPolicyAssignments)
+      .where(eq(staffPolicyAssignments.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Policy Views
+  async getPolicyViews(policyId: string): Promise<PolicyView[]> {
+    return await db.select().from(policyViews)
+      .where(eq(policyViews.policyId, policyId))
+      .orderBy(desc(policyViews.viewedAt));
+  }
+
+  async getStaffPolicyViews(staffId: string): Promise<PolicyView[]> {
+    return await db.select().from(policyViews)
+      .where(eq(policyViews.staffId, staffId))
+      .orderBy(desc(policyViews.viewedAt));
+  }
+
+  async createPolicyView(view: InsertPolicyView): Promise<PolicyView> {
+    const result = await db.insert(policyViews).values(view).returning();
+    return result[0];
+  }
+
+  async updatePolicyView(id: string, view: Partial<InsertPolicyView>): Promise<PolicyView | undefined> {
+    const result = await db.update(policyViews)
+      .set(view as any)
+      .where(eq(policyViews.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Policy Acknowledgments
+  async getPolicyAcknowledgments(policyId: string): Promise<PolicyAcknowledgment[]> {
+    return await db.select().from(policyAcknowledgments)
+      .where(eq(policyAcknowledgments.policyId, policyId))
+      .orderBy(desc(policyAcknowledgments.acknowledgedAt));
+  }
+
+  async getStaffAcknowledgments(staffId: string): Promise<PolicyAcknowledgment[]> {
+    return await db.select().from(policyAcknowledgments)
+      .where(eq(policyAcknowledgments.staffId, staffId))
+      .orderBy(desc(policyAcknowledgments.acknowledgedAt));
+  }
+
+  async getAcknowledgmentById(id: string): Promise<PolicyAcknowledgment | undefined> {
+    const result = await db.select().from(policyAcknowledgments)
+      .where(eq(policyAcknowledgments.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async hasStaffAcknowledgedPolicy(staffId: string, policyId: string, version: number): Promise<boolean> {
+    const result = await db.select().from(policyAcknowledgments)
+      .where(
+        and(
+          eq(policyAcknowledgments.staffId, staffId),
+          eq(policyAcknowledgments.policyId, policyId),
+          eq(policyAcknowledgments.policyVersion, version)
+        )
+      )
+      .limit(1);
+    return result.length > 0;
+  }
+
+  async createPolicyAcknowledgment(acknowledgment: InsertPolicyAcknowledgment): Promise<PolicyAcknowledgment> {
+    const result = await db.insert(policyAcknowledgments).values(acknowledgment).returning();
+    return result[0];
+  }
+
+  // Policy Compliance Records
+  async getComplianceRecords(filters?: { staffId?: string; policyId?: string; isCompliant?: string; isOverdue?: string }): Promise<PolicyComplianceRecord[]> {
+    const conditions = [];
+    if (filters?.staffId) {
+      conditions.push(eq(policyComplianceRecords.staffId, filters.staffId));
+    }
+    if (filters?.policyId) {
+      conditions.push(eq(policyComplianceRecords.policyId, filters.policyId));
+    }
+    if (filters?.isCompliant) {
+      conditions.push(eq(policyComplianceRecords.isCompliant, filters.isCompliant));
+    }
+    if (filters?.isOverdue) {
+      conditions.push(eq(policyComplianceRecords.isOverdue, filters.isOverdue));
+    }
+    const query = conditions.length > 0
+      ? db.select().from(policyComplianceRecords).where(and(...conditions))
+      : db.select().from(policyComplianceRecords);
+    return await query.orderBy(desc(policyComplianceRecords.updatedAt));
+  }
+
+  async getComplianceRecordById(id: string): Promise<PolicyComplianceRecord | undefined> {
+    const result = await db.select().from(policyComplianceRecords)
+      .where(eq(policyComplianceRecords.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getStaffComplianceRecord(staffId: string, policyId: string): Promise<PolicyComplianceRecord | undefined> {
+    const result = await db.select().from(policyComplianceRecords)
+      .where(
+        and(
+          eq(policyComplianceRecords.staffId, staffId),
+          eq(policyComplianceRecords.policyId, policyId)
+        )
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  async createComplianceRecord(record: InsertPolicyComplianceRecord): Promise<PolicyComplianceRecord> {
+    const result = await db.insert(policyComplianceRecords).values(record).returning();
+    return result[0];
+  }
+
+  async updateComplianceRecord(id: string, record: Partial<InsertPolicyComplianceRecord>): Promise<PolicyComplianceRecord | undefined> {
+    const result = await db.update(policyComplianceRecords)
+      .set({ ...record as any, updatedAt: new Date() })
+      .where(eq(policyComplianceRecords.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async upsertComplianceRecord(staffId: string, policyId: string, updates: Partial<InsertPolicyComplianceRecord>): Promise<PolicyComplianceRecord> {
+    const existing = await this.getStaffComplianceRecord(staffId, policyId);
+    if (existing) {
+      const result = await this.updateComplianceRecord(existing.id, updates);
+      return result!;
+    }
+    return await this.createComplianceRecord({
+      staffId,
+      policyId,
+      currentPolicyVersion: updates.currentPolicyVersion || 1,
+      status: updates.status || 'not_viewed',
+      ...updates
+    } as InsertPolicyComplianceRecord);
+  }
+
+  // Policy Notifications
+  async getPolicyNotifications(staffId: string): Promise<PolicyNotification[]> {
+    return await db.select().from(policyNotifications)
+      .where(
+        and(
+          eq(policyNotifications.staffId, staffId),
+          eq(policyNotifications.isArchived, 'no')
+        )
+      )
+      .orderBy(desc(policyNotifications.sentAt));
+  }
+
+  async getUnreadPolicyNotifications(staffId: string): Promise<PolicyNotification[]> {
+    return await db.select().from(policyNotifications)
+      .where(
+        and(
+          eq(policyNotifications.staffId, staffId),
+          eq(policyNotifications.isRead, 'no'),
+          eq(policyNotifications.isArchived, 'no')
+        )
+      )
+      .orderBy(desc(policyNotifications.sentAt));
+  }
+
+  async createPolicyNotification(notification: InsertPolicyNotification): Promise<PolicyNotification> {
+    const result = await db.insert(policyNotifications).values(notification).returning();
+    return result[0];
+  }
+
+  async markPolicyNotificationRead(id: string): Promise<PolicyNotification | undefined> {
+    const result = await db.update(policyNotifications)
+      .set({ isRead: 'yes', readAt: new Date() })
+      .where(eq(policyNotifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markAllPolicyNotificationsRead(staffId: string): Promise<number> {
+    const result = await db.update(policyNotifications)
+      .set({ isRead: 'yes', readAt: new Date() })
+      .where(
+        and(
+          eq(policyNotifications.staffId, staffId),
+          eq(policyNotifications.isRead, 'no')
+        )
+      )
+      .returning();
+    return result.length;
+  }
+
+  // Policy Audit Logs
+  async getPolicyAuditLogs(filters?: { policyId?: string; staffId?: string; action?: string; startDate?: Date; endDate?: Date; limit?: number; offset?: number }): Promise<{ logs: PolicyAuditLog[]; total: number }> {
+    const conditions = [];
+    if (filters?.policyId) {
+      conditions.push(eq(policyAuditLogs.policyId, filters.policyId));
+    }
+    if (filters?.staffId) {
+      conditions.push(eq(policyAuditLogs.staffId, filters.staffId));
+    }
+    if (filters?.action) {
+      conditions.push(eq(policyAuditLogs.action, filters.action));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(policyAuditLogs.timestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(policyAuditLogs.timestamp, filters.endDate));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get total count
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(policyAuditLogs)
+      .where(whereClause);
+    const total = Number(countResult[0]?.count || 0);
+
+    // Get logs with pagination
+    let query = db.select().from(policyAuditLogs);
+    if (whereClause) {
+      query = query.where(whereClause) as typeof query;
+    }
+    const logs = await query
+      .orderBy(desc(policyAuditLogs.timestamp))
+      .limit(filters?.limit || 100)
+      .offset(filters?.offset || 0);
+
+    return { logs, total };
+  }
+
+  async createPolicyAuditLog(log: InsertPolicyAuditLog): Promise<PolicyAuditLog> {
+    const result = await db.insert(policyAuditLogs).values(log).returning();
+    return result[0];
+  }
+
+  // Policy Categories
+  async getAllPolicyCategories(): Promise<PolicyCategory[]> {
+    return await db.select().from(policyCategories)
+      .orderBy(policyCategories.sortOrder);
+  }
+
+  async getActivePolicyCategories(): Promise<PolicyCategory[]> {
+    return await db.select().from(policyCategories)
+      .where(eq(policyCategories.isActive, 'yes'))
+      .orderBy(policyCategories.sortOrder);
+  }
+
+  async getPolicyCategoryById(id: string): Promise<PolicyCategory | undefined> {
+    const result = await db.select().from(policyCategories)
+      .where(eq(policyCategories.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createPolicyCategory(category: InsertPolicyCategory): Promise<PolicyCategory> {
+    const result = await db.insert(policyCategories).values(category).returning();
+    return result[0];
+  }
+
+  async updatePolicyCategory(id: string, category: Partial<InsertPolicyCategory>): Promise<PolicyCategory | undefined> {
+    const result = await db.update(policyCategories)
+      .set(category as any)
+      .where(eq(policyCategories.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePolicyCategory(id: string): Promise<boolean> {
+    const result = await db.delete(policyCategories)
+      .where(eq(policyCategories.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Policy Saved Reports
+  async getSavedReports(createdById?: string): Promise<PolicySavedReport[]> {
+    if (createdById) {
+      return await db.select().from(policySavedReports)
+        .where(eq(policySavedReports.createdById, createdById))
+        .orderBy(desc(policySavedReports.createdAt));
+    }
+    return await db.select().from(policySavedReports)
+      .orderBy(desc(policySavedReports.createdAt));
+  }
+
+  async getSavedReportById(id: string): Promise<PolicySavedReport | undefined> {
+    const result = await db.select().from(policySavedReports)
+      .where(eq(policySavedReports.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getScheduledReports(): Promise<PolicySavedReport[]> {
+    return await db.select().from(policySavedReports)
+      .where(eq(policySavedReports.isScheduled, 'yes'))
+      .orderBy(policySavedReports.nextRunAt);
+  }
+
+  async createSavedReport(report: InsertPolicySavedReport): Promise<PolicySavedReport> {
+    const result = await db.insert(policySavedReports).values(report).returning();
+    return result[0];
+  }
+
+  async updateSavedReport(id: string, report: Partial<InsertPolicySavedReport>): Promise<PolicySavedReport | undefined> {
+    const result = await db.update(policySavedReports)
+      .set({ ...report as any, updatedAt: new Date() })
+      .where(eq(policySavedReports.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSavedReport(id: string): Promise<boolean> {
+    const result = await db.delete(policySavedReports)
+      .where(eq(policySavedReports.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // PMS Dashboard & Analytics
+  async getPolicyComplianceStats(): Promise<{ totalPolicies: number; publishedPolicies: number; totalAssignments: number; acknowledgedCount: number; overdueCount: number; complianceRate: number }> {
+    // Get total policies
+    const totalPoliciesResult = await db.select({ count: sql<number>`count(*)` }).from(policies);
+    const totalPolicies = Number(totalPoliciesResult[0]?.count || 0);
+
+    // Get published policies
+    const publishedResult = await db.select({ count: sql<number>`count(*)` })
+      .from(policies)
+      .where(eq(policies.status, 'published'));
+    const publishedPolicies = Number(publishedResult[0]?.count || 0);
+
+    // Get total assignments
+    const assignmentsResult = await db.select({ count: sql<number>`count(*)` }).from(staffPolicyAssignments);
+    const totalAssignments = Number(assignmentsResult[0]?.count || 0);
+
+    // Get acknowledged count
+    const acknowledgedResult = await db.select({ count: sql<number>`count(*)` })
+      .from(staffPolicyAssignments)
+      .where(eq(staffPolicyAssignments.status, 'acknowledged'));
+    const acknowledgedCount = Number(acknowledgedResult[0]?.count || 0);
+
+    // Get overdue count
+    const overdueResult = await db.select({ count: sql<number>`count(*)` })
+      .from(staffPolicyAssignments)
+      .where(eq(staffPolicyAssignments.isOverdue, 'yes'));
+    const overdueCount = Number(overdueResult[0]?.count || 0);
+
+    // Calculate compliance rate
+    const complianceRate = totalAssignments > 0 ? Math.round((acknowledgedCount / totalAssignments) * 100) : 0;
+
+    return { totalPolicies, publishedPolicies, totalAssignments, acknowledgedCount, overdueCount, complianceRate };
+  }
+
+  async getStaffComplianceStats(staffId: string): Promise<{ assigned: number; viewed: number; acknowledged: number; overdue: number; complianceRate: number }> {
+    const assignments = await this.getStaffPolicyAssignments(staffId);
+    const assigned = assignments.length;
+    const viewed = assignments.filter(a => a.status === 'viewed' || a.status === 'acknowledged').length;
+    const acknowledged = assignments.filter(a => a.status === 'acknowledged').length;
+    const overdue = assignments.filter(a => a.isOverdue === 'yes').length;
+    const complianceRate = assigned > 0 ? Math.round((acknowledged / assigned) * 100) : 0;
+
+    return { assigned, viewed, acknowledged, overdue, complianceRate };
+  }
+
+  async getPoliciesNeedingReview(days?: number): Promise<Policy[]> {
+    const reviewDate = new Date();
+    reviewDate.setDate(reviewDate.getDate() + (days || 30));
+
+    return await db.select().from(policies)
+      .where(
+        and(
+          eq(policies.status, 'published'),
+          lte(policies.reviewDate, reviewDate.toISOString().split('T')[0])
+        )
+      )
+      .orderBy(policies.reviewDate);
+  }
+
+  async getRecentPolicyActivity(limit?: number): Promise<PolicyAuditLog[]> {
+    return await db.select().from(policyAuditLogs)
+      .orderBy(desc(policyAuditLogs.timestamp))
+      .limit(limit || 20);
   }
 }
 

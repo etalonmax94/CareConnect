@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, Monitor, Settings, LogOut, ChevronDown } from "lucide-react";
+import { Moon, Sun, Monitor, Settings, LogOut, ChevronDown, BarChart3, History } from "lucide-react";
 import { removeAuthToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -145,6 +145,21 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem 
+          onClick={() => setLocation("/reports")}
+          data-testid="menu-item-reports"
+        >
+          <BarChart3 className="mr-2 h-4 w-4" />
+          <span>Reports</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={() => setLocation("/audit-log")}
+          data-testid="menu-item-audit-log"
+        >
+          <History className="mr-2 h-4 w-4" />
+          <span>Audit Log</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
           onClick={() => setLocation("/settings")}

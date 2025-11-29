@@ -12905,6 +12905,1740 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // LEARNING MANAGEMENT SYSTEM (LMS) API
+  // ============================================
+
+  // LMS Dashboard Stats
+  app.get("/api/lms/dashboard-stats", requireAuth, async (req: any, res) => {
+    try {
+      const stats = await storage.getLmsDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching LMS dashboard stats:", error);
+      res.status(500).json({ error: "Failed to fetch LMS dashboard stats" });
+    }
+  });
+
+  // LMS Courses
+  app.get("/api/lms/courses", requireAuth, async (req: any, res) => {
+    try {
+      const { status, category, isComplianceRequired } = req.query;
+      const filters: any = {};
+      if (status) filters.status = status;
+      if (category) filters.category = category;
+      if (isComplianceRequired !== undefined) {
+        filters.isComplianceRequired = isComplianceRequired === 'true';
+      }
+      const courses = await storage.getAllLmsCourses(Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(courses);
+    } catch (error) {
+      console.error("Error fetching LMS courses:", error);
+      res.status(500).json({ error: "Failed to fetch LMS courses" });
+    }
+  });
+
+  app.get("/api/lms/courses/:id", requireAuth, async (req: any, res) => {
+    try {
+      const course = await storage.getLmsCourseById(req.params.id);
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+      // Also fetch modules for the course
+      const modules = await storage.getLmsModulesByCourse(req.params.id);
+      res.json({ ...course, modules });
+    } catch (error) {
+      console.error("Error fetching LMS course:", error);
+      res.status(500).json({ error: "Failed to fetch LMS course" });
+    }
+  });
+
+  app.post("/api/lms/courses", requireAuth, async (req: any, res) => {
+    try {
+      const course = await storage.createLmsCourse({
+        ...req.body,
+        createdById: req.user.id
+      });
+      res.status(201).json(course);
+    } catch (error) {
+      console.error("Error creating LMS course:", error);
+      res.status(500).json({ error: "Failed to create LMS course" });
+    }
+  });
+
+  app.put("/api/lms/courses/:id", requireAuth, async (req: any, res) => {
+    try {
+      const course = await storage.updateLmsCourse(req.params.id, req.body);
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+      res.json(course);
+    } catch (error) {
+      console.error("Error updating LMS course:", error);
+      res.status(500).json({ error: "Failed to update LMS course" });
+    }
+  });
+
+  app.delete("/api/lms/courses/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteLmsCourse(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting LMS course:", error);
+      res.status(500).json({ error: "Failed to delete LMS course" });
+    }
+  });
+
+  // LMS Modules
+  app.get("/api/lms/courses/:courseId/modules", requireAuth, async (req: any, res) => {
+    try {
+      const modules = await storage.getLmsModulesByCourse(req.params.courseId);
+      res.json(modules);
+    } catch (error) {
+      console.error("Error fetching LMS modules:", error);
+      res.status(500).json({ error: "Failed to fetch LMS modules" });
+    }
+  });
+
+  app.get("/api/lms/modules/:id", requireAuth, async (req: any, res) => {
+    try {
+      const module = await storage.getLmsModuleById(req.params.id);
+      if (!module) {
+        return res.status(404).json({ error: "Module not found" });
+      }
+      res.json(module);
+    } catch (error) {
+      console.error("Error fetching LMS module:", error);
+      res.status(500).json({ error: "Failed to fetch LMS module" });
+    }
+  });
+
+  app.post("/api/lms/courses/:courseId/modules", requireAuth, async (req: any, res) => {
+    try {
+      const module = await storage.createLmsModule({
+        ...req.body,
+        courseId: req.params.courseId,
+        createdById: req.user.id
+      });
+      res.status(201).json(module);
+    } catch (error) {
+      console.error("Error creating LMS module:", error);
+      res.status(500).json({ error: "Failed to create LMS module" });
+    }
+  });
+
+  app.put("/api/lms/modules/:id", requireAuth, async (req: any, res) => {
+    try {
+      const module = await storage.updateLmsModule(req.params.id, req.body);
+      if (!module) {
+        return res.status(404).json({ error: "Module not found" });
+      }
+      res.json(module);
+    } catch (error) {
+      console.error("Error updating LMS module:", error);
+      res.status(500).json({ error: "Failed to update LMS module" });
+    }
+  });
+
+  app.delete("/api/lms/modules/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteLmsModule(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Module not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting LMS module:", error);
+      res.status(500).json({ error: "Failed to delete LMS module" });
+    }
+  });
+
+  app.post("/api/lms/courses/:courseId/modules/reorder", requireAuth, async (req: any, res) => {
+    try {
+      await storage.reorderLmsModules(req.params.courseId, req.body.moduleIds);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error reordering LMS modules:", error);
+      res.status(500).json({ error: "Failed to reorder LMS modules" });
+    }
+  });
+
+  // LMS Quizzes
+  app.get("/api/lms/modules/:moduleId/quizzes", requireAuth, async (req: any, res) => {
+    try {
+      const quizzes = await storage.getLmsQuizzesByModule(req.params.moduleId);
+      res.json(quizzes);
+    } catch (error) {
+      console.error("Error fetching LMS quizzes:", error);
+      res.status(500).json({ error: "Failed to fetch LMS quizzes" });
+    }
+  });
+
+  app.get("/api/lms/quizzes/:id", requireAuth, async (req: any, res) => {
+    try {
+      const quiz = await storage.getLmsQuizById(req.params.id);
+      if (!quiz) {
+        return res.status(404).json({ error: "Quiz not found" });
+      }
+      // Also fetch questions
+      const questions = await storage.getLmsQuestionsByQuiz(req.params.id);
+      res.json({ ...quiz, questions });
+    } catch (error) {
+      console.error("Error fetching LMS quiz:", error);
+      res.status(500).json({ error: "Failed to fetch LMS quiz" });
+    }
+  });
+
+  app.post("/api/lms/modules/:moduleId/quizzes", requireAuth, async (req: any, res) => {
+    try {
+      const quiz = await storage.createLmsQuiz({
+        ...req.body,
+        moduleId: req.params.moduleId,
+        createdById: req.user.id
+      });
+      res.status(201).json(quiz);
+    } catch (error) {
+      console.error("Error creating LMS quiz:", error);
+      res.status(500).json({ error: "Failed to create LMS quiz" });
+    }
+  });
+
+  app.put("/api/lms/quizzes/:id", requireAuth, async (req: any, res) => {
+    try {
+      const quiz = await storage.updateLmsQuiz(req.params.id, req.body);
+      if (!quiz) {
+        return res.status(404).json({ error: "Quiz not found" });
+      }
+      res.json(quiz);
+    } catch (error) {
+      console.error("Error updating LMS quiz:", error);
+      res.status(500).json({ error: "Failed to update LMS quiz" });
+    }
+  });
+
+  app.delete("/api/lms/quizzes/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteLmsQuiz(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Quiz not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting LMS quiz:", error);
+      res.status(500).json({ error: "Failed to delete LMS quiz" });
+    }
+  });
+
+  // LMS Quiz Questions
+  app.get("/api/lms/quizzes/:quizId/questions", requireAuth, async (req: any, res) => {
+    try {
+      const questions = await storage.getLmsQuestionsByQuiz(req.params.quizId);
+      res.json(questions);
+    } catch (error) {
+      console.error("Error fetching LMS questions:", error);
+      res.status(500).json({ error: "Failed to fetch LMS questions" });
+    }
+  });
+
+  app.post("/api/lms/quizzes/:quizId/questions", requireAuth, async (req: any, res) => {
+    try {
+      const question = await storage.createLmsQuestion({
+        ...req.body,
+        quizId: req.params.quizId
+      });
+      res.status(201).json(question);
+    } catch (error) {
+      console.error("Error creating LMS question:", error);
+      res.status(500).json({ error: "Failed to create LMS question" });
+    }
+  });
+
+  app.put("/api/lms/questions/:id", requireAuth, async (req: any, res) => {
+    try {
+      const question = await storage.updateLmsQuestion(req.params.id, req.body);
+      if (!question) {
+        return res.status(404).json({ error: "Question not found" });
+      }
+      res.json(question);
+    } catch (error) {
+      console.error("Error updating LMS question:", error);
+      res.status(500).json({ error: "Failed to update LMS question" });
+    }
+  });
+
+  app.delete("/api/lms/questions/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteLmsQuestion(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Question not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting LMS question:", error);
+      res.status(500).json({ error: "Failed to delete LMS question" });
+    }
+  });
+
+  // LMS Badges
+  app.get("/api/lms/badges", requireAuth, async (req: any, res) => {
+    try {
+      const badges = await storage.getAllLmsBadges();
+      res.json(badges);
+    } catch (error) {
+      console.error("Error fetching LMS badges:", error);
+      res.status(500).json({ error: "Failed to fetch LMS badges" });
+    }
+  });
+
+  app.get("/api/lms/badges/:id", requireAuth, async (req: any, res) => {
+    try {
+      const badge = await storage.getLmsBadgeById(req.params.id);
+      if (!badge) {
+        return res.status(404).json({ error: "Badge not found" });
+      }
+      res.json(badge);
+    } catch (error) {
+      console.error("Error fetching LMS badge:", error);
+      res.status(500).json({ error: "Failed to fetch LMS badge" });
+    }
+  });
+
+  app.post("/api/lms/badges", requireAuth, async (req: any, res) => {
+    try {
+      const badge = await storage.createLmsBadge({
+        ...req.body,
+        createdById: req.user.id
+      });
+      res.status(201).json(badge);
+    } catch (error) {
+      console.error("Error creating LMS badge:", error);
+      res.status(500).json({ error: "Failed to create LMS badge" });
+    }
+  });
+
+  app.put("/api/lms/badges/:id", requireAuth, async (req: any, res) => {
+    try {
+      const badge = await storage.updateLmsBadge(req.params.id, req.body);
+      if (!badge) {
+        return res.status(404).json({ error: "Badge not found" });
+      }
+      res.json(badge);
+    } catch (error) {
+      console.error("Error updating LMS badge:", error);
+      res.status(500).json({ error: "Failed to update LMS badge" });
+    }
+  });
+
+  app.delete("/api/lms/badges/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteLmsBadge(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Badge not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting LMS badge:", error);
+      res.status(500).json({ error: "Failed to delete LMS badge" });
+    }
+  });
+
+  // LMS Enrollments
+  app.get("/api/lms/enrollments", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId, courseId } = req.query;
+      let enrollments;
+      if (staffId) {
+        enrollments = await storage.getLmsEnrollmentsByStaff(staffId as string);
+      } else if (courseId) {
+        enrollments = await storage.getLmsEnrollmentsByCourse(courseId as string);
+      } else {
+        // Return current user's enrollments by default
+        enrollments = await storage.getLmsEnrollmentsByStaff(req.user.id);
+      }
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Error fetching LMS enrollments:", error);
+      res.status(500).json({ error: "Failed to fetch LMS enrollments" });
+    }
+  });
+
+  app.get("/api/lms/enrollments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const enrollment = await storage.getLmsEnrollmentById(req.params.id);
+      if (!enrollment) {
+        return res.status(404).json({ error: "Enrollment not found" });
+      }
+      // Also fetch progress
+      const moduleProgress = await storage.getLmsModuleProgressByEnrollment(req.params.id);
+      const quizAttempts = await storage.getLmsQuizAttemptsByEnrollment(req.params.id);
+      res.json({ ...enrollment, moduleProgress, quizAttempts });
+    } catch (error) {
+      console.error("Error fetching LMS enrollment:", error);
+      res.status(500).json({ error: "Failed to fetch LMS enrollment" });
+    }
+  });
+
+  app.post("/api/lms/enrollments", requireAuth, async (req: any, res) => {
+    try {
+      const enrollment = await storage.createLmsEnrollment({
+        ...req.body,
+        enrolledBy: req.user.id
+      });
+
+      // Log activity
+      await storage.createLmsActivityLog({
+        staffId: enrollment.staffId,
+        activityType: 'course_enrolled',
+        courseId: enrollment.courseId,
+        description: 'Enrolled in course'
+      });
+
+      res.status(201).json(enrollment);
+    } catch (error) {
+      console.error("Error creating LMS enrollment:", error);
+      res.status(500).json({ error: "Failed to create LMS enrollment" });
+    }
+  });
+
+  app.post("/api/lms/courses/:courseId/bulk-enroll", requireAuth, async (req: any, res) => {
+    try {
+      const enrollments = await storage.bulkEnrollStaff(
+        req.params.courseId,
+        req.body.staffIds,
+        req.user.id
+      );
+      res.status(201).json(enrollments);
+    } catch (error) {
+      console.error("Error bulk enrolling staff:", error);
+      res.status(500).json({ error: "Failed to bulk enroll staff" });
+    }
+  });
+
+  app.put("/api/lms/enrollments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const enrollment = await storage.updateLmsEnrollment(req.params.id, req.body);
+      if (!enrollment) {
+        return res.status(404).json({ error: "Enrollment not found" });
+      }
+      res.json(enrollment);
+    } catch (error) {
+      console.error("Error updating LMS enrollment:", error);
+      res.status(500).json({ error: "Failed to update LMS enrollment" });
+    }
+  });
+
+  // LMS Module Progress
+  app.get("/api/lms/enrollments/:enrollmentId/progress", requireAuth, async (req: any, res) => {
+    try {
+      const progress = await storage.getLmsModuleProgressByEnrollment(req.params.enrollmentId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching module progress:", error);
+      res.status(500).json({ error: "Failed to fetch module progress" });
+    }
+  });
+
+  app.post("/api/lms/enrollments/:enrollmentId/progress", requireAuth, async (req: any, res) => {
+    try {
+      const progress = await storage.createLmsModuleProgress({
+        ...req.body,
+        enrollmentId: req.params.enrollmentId
+      });
+
+      // Update streak
+      const enrollment = await storage.getLmsEnrollmentById(req.params.enrollmentId);
+      if (enrollment) {
+        await storage.updateLmsStreak(enrollment.staffId);
+      }
+
+      res.status(201).json(progress);
+    } catch (error) {
+      console.error("Error creating module progress:", error);
+      res.status(500).json({ error: "Failed to create module progress" });
+    }
+  });
+
+  app.put("/api/lms/progress/:id", requireAuth, async (req: any, res) => {
+    try {
+      const progress = await storage.updateLmsModuleProgress(req.params.id, req.body);
+      if (!progress) {
+        return res.status(404).json({ error: "Progress not found" });
+      }
+
+      // Check if module completed and award points
+      if (req.body.isCompleted === 'yes' && progress.enrollmentId) {
+        const enrollment = await storage.getLmsEnrollmentById(progress.enrollmentId);
+        if (enrollment) {
+          await storage.awardLmsPoints(
+            enrollment.staffId,
+            50, // Points for completing a module
+            'Completed a learning module'
+          );
+
+          // Log activity
+          await storage.createLmsActivityLog({
+            staffId: enrollment.staffId,
+            activityType: 'module_completed',
+            moduleId: progress.moduleId,
+            courseId: enrollment.courseId,
+            pointsEarned: 50,
+            description: 'Completed a module'
+          });
+        }
+      }
+
+      res.json(progress);
+    } catch (error) {
+      console.error("Error updating module progress:", error);
+      res.status(500).json({ error: "Failed to update module progress" });
+    }
+  });
+
+  // LMS Quiz Attempts
+  app.post("/api/lms/enrollments/:enrollmentId/quiz-attempts", requireAuth, async (req: any, res) => {
+    try {
+      const attempt = await storage.createLmsQuizAttempt({
+        ...req.body,
+        enrollmentId: req.params.enrollmentId
+      });
+      res.status(201).json(attempt);
+    } catch (error) {
+      console.error("Error creating quiz attempt:", error);
+      res.status(500).json({ error: "Failed to create quiz attempt" });
+    }
+  });
+
+  app.put("/api/lms/quiz-attempts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const attempt = await storage.updateLmsQuizAttempt(req.params.id, req.body);
+      if (!attempt) {
+        return res.status(404).json({ error: "Quiz attempt not found" });
+      }
+
+      // If quiz completed, calculate score and award points
+      if (req.body.completedAt) {
+        const enrollment = await storage.getLmsEnrollmentById(attempt.enrollmentId);
+        if (enrollment) {
+          const quiz = await storage.getLmsQuizById(attempt.quizId);
+          const isPassed = attempt.score !== null && quiz && attempt.score >= quiz.passingScore;
+
+          if (isPassed) {
+            // Award points for passing quiz
+            const pointsEarned = attempt.score === 100 ? 200 : 100; // Bonus for perfect score
+            await storage.awardLmsPoints(
+              enrollment.staffId,
+              pointsEarned,
+              attempt.score === 100 ? 'Perfect quiz score!' : 'Passed a quiz'
+            );
+
+            // Update staff stats
+            await storage.createOrUpdateLmsStaffStats(enrollment.staffId, {
+              quizzesPassed: 1
+            });
+
+            // Log activity
+            await storage.createLmsActivityLog({
+              staffId: enrollment.staffId,
+              activityType: 'quiz_completed',
+              quizId: attempt.quizId,
+              courseId: enrollment.courseId,
+              pointsEarned,
+              description: `Scored ${attempt.score}% on quiz`
+            });
+
+            // Check for perfect score badge
+            if (attempt.score === 100) {
+              const badges = await storage.getAllLmsBadges();
+              const perfectBadge = badges.find(b => b.badgeType === 'perfect_score');
+              if (perfectBadge) {
+                const staffBadges = await storage.getLmsStaffBadges(enrollment.staffId);
+                const alreadyHas = staffBadges.some(sb => sb.badgeId === perfectBadge.id);
+                if (!alreadyHas) {
+                  await storage.awardLmsBadge({
+                    staffId: enrollment.staffId,
+                    badgeId: perfectBadge.id,
+                    awardReason: 'Achieved a perfect quiz score'
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      res.json(attempt);
+    } catch (error) {
+      console.error("Error updating quiz attempt:", error);
+      res.status(500).json({ error: "Failed to update quiz attempt" });
+    }
+  });
+
+  // Complete a course enrollment
+  app.post("/api/lms/enrollments/:id/complete", requireAuth, async (req: any, res) => {
+    try {
+      const enrollment = await storage.updateLmsEnrollment(req.params.id, {
+        status: 'completed',
+        completedAt: new Date(),
+        progressPercentage: 100
+      });
+
+      if (!enrollment) {
+        return res.status(404).json({ error: "Enrollment not found" });
+      }
+
+      // Award completion points
+      const course = await storage.getLmsCourseById(enrollment.courseId);
+      const pointsEarned = course?.pointsValue || 100;
+
+      await storage.awardLmsPoints(
+        enrollment.staffId,
+        pointsEarned,
+        `Completed course: ${course?.title || 'Unknown course'}`
+      );
+
+      // Update staff stats
+      await storage.createOrUpdateLmsStaffStats(enrollment.staffId, {
+        coursesCompleted: 1
+      });
+
+      // Log activity
+      await storage.createLmsActivityLog({
+        staffId: enrollment.staffId,
+        activityType: 'course_completed',
+        courseId: enrollment.courseId,
+        pointsEarned,
+        description: `Completed course: ${course?.title}`
+      });
+
+      // Award course completion badge if exists
+      const badges = await storage.getAllLmsBadges();
+      const completionBadge = badges.find(b => b.badgeType === 'completion' && b.courseId === enrollment.courseId);
+      if (completionBadge) {
+        await storage.awardLmsBadge({
+          staffId: enrollment.staffId,
+          badgeId: completionBadge.id,
+          courseId: enrollment.courseId,
+          awardReason: `Completed ${course?.title}`
+        });
+      }
+
+      // Update compliance record if this is a compliance course
+      if (course?.isComplianceRequired === 'yes') {
+        const complianceRecords = await storage.getLmsComplianceRecordsByStaff(enrollment.staffId);
+        const record = complianceRecords.find(r => r.courseId === enrollment.courseId);
+        if (record) {
+          const nextDueDate = new Date();
+          nextDueDate.setFullYear(nextDueDate.getFullYear() + (course.renewalPeriodMonths ? course.renewalPeriodMonths / 12 : 1));
+          await storage.updateLmsComplianceRecord(record.id, {
+            status: 'compliant',
+            completedAt: new Date(),
+            dueDate: nextDueDate
+          });
+        }
+      }
+
+      // Create notification
+      await storage.createLmsNotification({
+        staffId: enrollment.staffId,
+        type: 'course_completed',
+        title: 'Course Completed!',
+        message: `Congratulations! You've completed "${course?.title}" and earned ${pointsEarned} points!`,
+        courseId: enrollment.courseId
+      });
+
+      res.json(enrollment);
+    } catch (error) {
+      console.error("Error completing enrollment:", error);
+      res.status(500).json({ error: "Failed to complete enrollment" });
+    }
+  });
+
+  // LMS Staff Stats & Gamification
+  app.get("/api/lms/my-stats", requireAuth, async (req: any, res) => {
+    try {
+      let stats = await storage.getLmsStaffStats(req.user.id);
+      if (!stats) {
+        // Create initial stats
+        stats = await storage.createOrUpdateLmsStaffStats(req.user.id, { totalPoints: 0 });
+      }
+      // Also get badges
+      const badges = await storage.getLmsStaffBadges(req.user.id);
+      res.json({ ...stats, badges });
+    } catch (error) {
+      console.error("Error fetching my LMS stats:", error);
+      res.status(500).json({ error: "Failed to fetch my LMS stats" });
+    }
+  });
+
+  app.get("/api/lms/staff/:staffId/stats", requireAuth, async (req: any, res) => {
+    try {
+      const stats = await storage.getLmsStaffStats(req.params.staffId);
+      const badges = await storage.getLmsStaffBadges(req.params.staffId);
+      res.json({ ...stats, badges });
+    } catch (error) {
+      console.error("Error fetching staff LMS stats:", error);
+      res.status(500).json({ error: "Failed to fetch staff LMS stats" });
+    }
+  });
+
+  app.get("/api/lms/leaderboard", requireAuth, async (req: any, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const leaderboard = await storage.getLmsLeaderboard(limit);
+
+      // Enrich with staff info
+      const enrichedLeaderboard = await Promise.all(
+        leaderboard.map(async (stats, index) => {
+          const staffMember = await storage.getStaffById(stats.staffId);
+          return {
+            rank: index + 1,
+            staffId: stats.staffId,
+            staffName: staffMember ? `${staffMember.firstName} ${staffMember.lastName}` : 'Unknown',
+            staffPhoto: staffMember?.photoUrl,
+            totalPoints: stats.totalPoints,
+            currentLevel: stats.currentLevel,
+            currentLevelName: stats.currentLevelName,
+            coursesCompleted: stats.coursesCompleted,
+            currentStreak: stats.currentStreak
+          };
+        })
+      );
+
+      res.json(enrichedLeaderboard);
+    } catch (error) {
+      console.error("Error fetching LMS leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch LMS leaderboard" });
+    }
+  });
+
+  // LMS Staff Badges
+  app.get("/api/lms/my-badges", requireAuth, async (req: any, res) => {
+    try {
+      const staffBadges = await storage.getLmsStaffBadges(req.user.id);
+      // Enrich with badge details
+      const enrichedBadges = await Promise.all(
+        staffBadges.map(async (sb) => {
+          const badge = await storage.getLmsBadgeById(sb.badgeId);
+          return { ...sb, badge };
+        })
+      );
+      res.json(enrichedBadges);
+    } catch (error) {
+      console.error("Error fetching my badges:", error);
+      res.status(500).json({ error: "Failed to fetch my badges" });
+    }
+  });
+
+  // LMS Compliance
+  app.get("/api/lms/compliance", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.query;
+      const records = staffId
+        ? await storage.getLmsComplianceRecordsByStaff(staffId as string)
+        : await storage.getLmsComplianceRecordsByStaff(req.user.id);
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching compliance records:", error);
+      res.status(500).json({ error: "Failed to fetch compliance records" });
+    }
+  });
+
+  app.get("/api/lms/compliance/overdue", requireAuth, async (req: any, res) => {
+    try {
+      const records = await storage.getLmsOverdueCompliance();
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching overdue compliance:", error);
+      res.status(500).json({ error: "Failed to fetch overdue compliance" });
+    }
+  });
+
+  app.post("/api/lms/compliance", requireAuth, async (req: any, res) => {
+    try {
+      const record = await storage.createLmsComplianceRecord(req.body);
+      res.status(201).json(record);
+    } catch (error) {
+      console.error("Error creating compliance record:", error);
+      res.status(500).json({ error: "Failed to create compliance record" });
+    }
+  });
+
+  app.put("/api/lms/compliance/:id", requireAuth, async (req: any, res) => {
+    try {
+      const record = await storage.updateLmsComplianceRecord(req.params.id, req.body);
+      if (!record) {
+        return res.status(404).json({ error: "Compliance record not found" });
+      }
+      res.json(record);
+    } catch (error) {
+      console.error("Error updating compliance record:", error);
+      res.status(500).json({ error: "Failed to update compliance record" });
+    }
+  });
+
+  // LMS Activity Logs
+  app.get("/api/lms/activity", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId, limit } = req.query;
+      const logs = await storage.getLmsActivityLogsByStaff(
+        (staffId as string) || req.user.id,
+        limit ? parseInt(limit as string) : undefined
+      );
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching activity logs:", error);
+      res.status(500).json({ error: "Failed to fetch activity logs" });
+    }
+  });
+
+  // LMS Course Feedback
+  app.get("/api/lms/courses/:courseId/feedback", requireAuth, async (req: any, res) => {
+    try {
+      const feedback = await storage.getLmsFeedbackByCourse(req.params.courseId);
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error fetching course feedback:", error);
+      res.status(500).json({ error: "Failed to fetch course feedback" });
+    }
+  });
+
+  app.post("/api/lms/courses/:courseId/feedback", requireAuth, async (req: any, res) => {
+    try {
+      const feedback = await storage.createLmsCourseFeedback({
+        ...req.body,
+        courseId: req.params.courseId,
+        staffId: req.user.id
+      });
+      res.status(201).json(feedback);
+    } catch (error) {
+      console.error("Error creating course feedback:", error);
+      res.status(500).json({ error: "Failed to create course feedback" });
+    }
+  });
+
+  // LMS Notifications
+  app.get("/api/lms/notifications", requireAuth, async (req: any, res) => {
+    try {
+      const unreadOnly = req.query.unreadOnly === 'true';
+      const notifications = await storage.getLmsNotificationsByStaff(req.user.id, unreadOnly);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching LMS notifications:", error);
+      res.status(500).json({ error: "Failed to fetch LMS notifications" });
+    }
+  });
+
+  app.put("/api/lms/notifications/:id/read", requireAuth, async (req: any, res) => {
+    try {
+      const notification = await storage.markLmsNotificationRead(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification read:", error);
+      res.status(500).json({ error: "Failed to mark notification read" });
+    }
+  });
+
+  app.put("/api/lms/notifications/read-all", requireAuth, async (req: any, res) => {
+    try {
+      await storage.markAllLmsNotificationsRead(req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all notifications read:", error);
+      res.status(500).json({ error: "Failed to mark all notifications read" });
+    }
+  });
+
+  // LMS Certificate Templates
+  app.get("/api/lms/certificate-templates", requireAuth, async (req: any, res) => {
+    try {
+      const templates = await storage.getAllLmsCertificateTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching certificate templates:", error);
+      res.status(500).json({ error: "Failed to fetch certificate templates" });
+    }
+  });
+
+  app.post("/api/lms/certificate-templates", requireAuth, async (req: any, res) => {
+    try {
+      const template = await storage.createLmsCertificateTemplate({
+        ...req.body,
+        createdById: req.user.id
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating certificate template:", error);
+      res.status(500).json({ error: "Failed to create certificate template" });
+    }
+  });
+
+  app.put("/api/lms/certificate-templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const template = await storage.updateLmsCertificateTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating certificate template:", error);
+      res.status(500).json({ error: "Failed to update certificate template" });
+    }
+  });
+
+  // ============================================
+  // POLICY MANAGEMENT SYSTEM (PMS) ROUTES
+  // ============================================
+
+  // Dashboard & Analytics
+  app.get("/api/pms/stats", requireAuth, async (req: any, res) => {
+    try {
+      const stats = await storage.getPolicyComplianceStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching policy stats:", error);
+      res.status(500).json({ error: "Failed to fetch policy statistics" });
+    }
+  });
+
+  app.get("/api/pms/staff/:staffId/stats", requireAuth, async (req: any, res) => {
+    try {
+      const stats = await storage.getStaffComplianceStats(req.params.staffId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching staff compliance stats:", error);
+      res.status(500).json({ error: "Failed to fetch staff compliance statistics" });
+    }
+  });
+
+  app.get("/api/pms/policies-needing-review", requireAuth, async (req: any, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days as string) : 30;
+      const policies = await storage.getPoliciesNeedingReview(days);
+      res.json(policies);
+    } catch (error) {
+      console.error("Error fetching policies needing review:", error);
+      res.status(500).json({ error: "Failed to fetch policies needing review" });
+    }
+  });
+
+  app.get("/api/pms/recent-activity", requireAuth, async (req: any, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      const activity = await storage.getRecentPolicyActivity(limit);
+      res.json(activity);
+    } catch (error) {
+      console.error("Error fetching recent policy activity:", error);
+      res.status(500).json({ error: "Failed to fetch recent policy activity" });
+    }
+  });
+
+  // Policies CRUD
+  app.get("/api/pms/policies", requireAuth, async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.status) filters.status = req.query.status;
+      if (req.query.category) filters.category = req.query.category;
+      if (req.query.isMandatory) filters.isMandatory = req.query.isMandatory;
+
+      const policies = await storage.getAllPolicies(filters);
+      res.json(policies);
+    } catch (error) {
+      console.error("Error fetching policies:", error);
+      res.status(500).json({ error: "Failed to fetch policies" });
+    }
+  });
+
+  app.get("/api/pms/policies/published", requireAuth, async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.category) filters.category = req.query.category;
+      if (req.query.audienceType) filters.audienceType = req.query.audienceType;
+
+      const policies = await storage.getPublishedPolicies(filters);
+      res.json(policies);
+    } catch (error) {
+      console.error("Error fetching published policies:", error);
+      res.status(500).json({ error: "Failed to fetch published policies" });
+    }
+  });
+
+  app.get("/api/pms/policies/search", requireAuth, async (req: any, res) => {
+    try {
+      const searchTerm = req.query.q as string || '';
+      const policies = await storage.searchPolicies(searchTerm);
+      res.json(policies);
+    } catch (error) {
+      console.error("Error searching policies:", error);
+      res.status(500).json({ error: "Failed to search policies" });
+    }
+  });
+
+  app.get("/api/pms/policies/:id", requireAuth, async (req: any, res) => {
+    try {
+      const policy = await storage.getPolicyById(req.params.id);
+      if (!policy) {
+        return res.status(404).json({ error: "Policy not found" });
+      }
+      res.json(policy);
+    } catch (error) {
+      console.error("Error fetching policy:", error);
+      res.status(500).json({ error: "Failed to fetch policy" });
+    }
+  });
+
+  app.post("/api/pms/policies", requireAuth, async (req: any, res) => {
+    try {
+      const policy = await storage.createPolicy({
+        ...req.body,
+        createdById: req.user.id,
+        createdByName: req.user.displayName
+      });
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: policy.id,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'created',
+        entityType: 'policy',
+        entityId: policy.id,
+        description: `Policy "${policy.title}" was created`
+      });
+
+      res.status(201).json(policy);
+    } catch (error) {
+      console.error("Error creating policy:", error);
+      res.status(500).json({ error: "Failed to create policy" });
+    }
+  });
+
+  app.put("/api/pms/policies/:id", requireAuth, async (req: any, res) => {
+    try {
+      const existingPolicy = await storage.getPolicyById(req.params.id);
+      if (!existingPolicy) {
+        return res.status(404).json({ error: "Policy not found" });
+      }
+
+      const policy = await storage.updatePolicy(req.params.id, {
+        ...req.body,
+        lastModifiedById: req.user.id,
+        lastModifiedByName: req.user.displayName
+      });
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: req.params.id,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'updated',
+        entityType: 'policy',
+        entityId: req.params.id,
+        previousValue: JSON.stringify(existingPolicy),
+        newValue: JSON.stringify(policy),
+        description: `Policy "${policy?.title}" was updated`
+      });
+
+      res.json(policy);
+    } catch (error) {
+      console.error("Error updating policy:", error);
+      res.status(500).json({ error: "Failed to update policy" });
+    }
+  });
+
+  app.post("/api/pms/policies/:id/publish", requireAuth, async (req: any, res) => {
+    try {
+      const policy = await storage.publishPolicy(
+        req.params.id,
+        req.user.id,
+        req.user.displayName
+      );
+
+      if (!policy) {
+        return res.status(404).json({ error: "Policy not found" });
+      }
+
+      // Create version history entry
+      await storage.createPolicyVersion({
+        policyId: policy.id,
+        version: policy.version,
+        title: policy.title,
+        content: policy.content,
+        fileUrl: policy.fileUrl,
+        changeDescription: 'Published',
+        changedById: req.user.id,
+        changedByName: req.user.displayName
+      });
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: policy.id,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'published',
+        entityType: 'policy',
+        entityId: policy.id,
+        description: `Policy "${policy.title}" was published (version ${policy.version})`
+      });
+
+      res.json(policy);
+    } catch (error) {
+      console.error("Error publishing policy:", error);
+      res.status(500).json({ error: "Failed to publish policy" });
+    }
+  });
+
+  app.post("/api/pms/policies/:id/archive", requireAuth, async (req: any, res) => {
+    try {
+      const policy = await storage.archivePolicy(req.params.id);
+
+      if (!policy) {
+        return res.status(404).json({ error: "Policy not found" });
+      }
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: policy.id,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'archived',
+        entityType: 'policy',
+        entityId: policy.id,
+        description: `Policy "${policy.title}" was archived`
+      });
+
+      res.json(policy);
+    } catch (error) {
+      console.error("Error archiving policy:", error);
+      res.status(500).json({ error: "Failed to archive policy" });
+    }
+  });
+
+  app.delete("/api/pms/policies/:id", requireAuth, async (req: any, res) => {
+    try {
+      const policy = await storage.getPolicyById(req.params.id);
+      if (!policy) {
+        return res.status(404).json({ error: "Policy not found" });
+      }
+
+      const deleted = await storage.deletePolicy(req.params.id);
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'deleted',
+        entityType: 'policy',
+        entityId: req.params.id,
+        previousValue: JSON.stringify(policy),
+        description: `Policy "${policy.title}" was deleted`
+      });
+
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting policy:", error);
+      res.status(500).json({ error: "Failed to delete policy" });
+    }
+  });
+
+  // Policy Version History
+  app.get("/api/pms/policies/:id/versions", requireAuth, async (req: any, res) => {
+    try {
+      const versions = await storage.getPolicyVersionHistory(req.params.id);
+      res.json(versions);
+    } catch (error) {
+      console.error("Error fetching policy versions:", error);
+      res.status(500).json({ error: "Failed to fetch policy versions" });
+    }
+  });
+
+  app.get("/api/pms/versions/:id", requireAuth, async (req: any, res) => {
+    try {
+      const version = await storage.getPolicyVersionById(req.params.id);
+      if (!version) {
+        return res.status(404).json({ error: "Version not found" });
+      }
+      res.json(version);
+    } catch (error) {
+      console.error("Error fetching policy version:", error);
+      res.status(500).json({ error: "Failed to fetch policy version" });
+    }
+  });
+
+  // Policy Assignments
+  app.get("/api/pms/assignments/staff/:staffId", requireAuth, async (req: any, res) => {
+    try {
+      const assignments = await storage.getStaffPolicyAssignments(req.params.staffId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching staff assignments:", error);
+      res.status(500).json({ error: "Failed to fetch staff policy assignments" });
+    }
+  });
+
+  app.get("/api/pms/policies/:id/assignments", requireAuth, async (req: any, res) => {
+    try {
+      const assignments = await storage.getPolicyAssignments(req.params.id);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching policy assignments:", error);
+      res.status(500).json({ error: "Failed to fetch policy assignments" });
+    }
+  });
+
+  app.get("/api/pms/assignments/overdue", requireAuth, async (req: any, res) => {
+    try {
+      const assignments = await storage.getOverdueAssignments();
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching overdue assignments:", error);
+      res.status(500).json({ error: "Failed to fetch overdue assignments" });
+    }
+  });
+
+  app.post("/api/pms/assignments", requireAuth, async (req: any, res) => {
+    try {
+      const assignment = await storage.createPolicyAssignment({
+        ...req.body,
+        assignedById: req.user.id
+      });
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: req.body.policyId,
+        staffId: req.body.staffId,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'assigned',
+        entityType: 'assignment',
+        entityId: assignment.id,
+        description: `Policy was assigned to staff member`
+      });
+
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating assignment:", error);
+      res.status(500).json({ error: "Failed to create policy assignment" });
+    }
+  });
+
+  app.post("/api/pms/policies/:id/bulk-assign", requireAuth, async (req: any, res) => {
+    try {
+      const { staffIds, dueDate } = req.body;
+      const assignments = await storage.bulkAssignPolicy(
+        req.params.id,
+        staffIds,
+        req.user.id,
+        dueDate ? new Date(dueDate) : undefined
+      );
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: req.params.id,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'bulk_assigned',
+        entityType: 'policy',
+        entityId: req.params.id,
+        description: `Policy was assigned to ${staffIds.length} staff members`
+      });
+
+      res.status(201).json(assignments);
+    } catch (error) {
+      console.error("Error bulk assigning policy:", error);
+      res.status(500).json({ error: "Failed to bulk assign policy" });
+    }
+  });
+
+  app.put("/api/pms/assignments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const assignment = await storage.updatePolicyAssignment(req.params.id, req.body);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error updating assignment:", error);
+      res.status(500).json({ error: "Failed to update policy assignment" });
+    }
+  });
+
+  app.delete("/api/pms/assignments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deletePolicyAssignment(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      res.status(500).json({ error: "Failed to delete policy assignment" });
+    }
+  });
+
+  // Policy Views - Track when staff view policies
+  app.get("/api/pms/policies/:id/views", requireAuth, async (req: any, res) => {
+    try {
+      const views = await storage.getPolicyViews(req.params.id);
+      res.json(views);
+    } catch (error) {
+      console.error("Error fetching policy views:", error);
+      res.status(500).json({ error: "Failed to fetch policy views" });
+    }
+  });
+
+  app.get("/api/pms/staff/:staffId/views", requireAuth, async (req: any, res) => {
+    try {
+      const views = await storage.getStaffPolicyViews(req.params.staffId);
+      res.json(views);
+    } catch (error) {
+      console.error("Error fetching staff policy views:", error);
+      res.status(500).json({ error: "Failed to fetch staff policy views" });
+    }
+  });
+
+  app.post("/api/pms/views", requireAuth, async (req: any, res) => {
+    try {
+      const view = await storage.createPolicyView({
+        ...req.body,
+        staffId: req.user.staffId || req.user.id,
+        staffName: req.user.displayName
+      });
+
+      // Update assignment status to viewed if not already acknowledged
+      const assignments = await storage.getStaffPolicyAssignments(req.user.staffId || req.user.id);
+      const assignment = assignments.find(a => a.policyId === req.body.policyId);
+      if (assignment && assignment.status === 'not_viewed') {
+        await storage.updatePolicyAssignment(assignment.id, { status: 'viewed' });
+      }
+
+      // Update compliance record
+      await storage.upsertComplianceRecord(
+        req.user.staffId || req.user.id,
+        req.body.policyId,
+        {
+          status: 'viewed',
+          lastViewedAt: new Date(),
+          firstViewedAt: new Date(),
+          currentPolicyVersion: req.body.policyVersion,
+          totalViewCount: 1
+        }
+      );
+
+      // Increment view count on policy
+      const policy = await storage.getPolicyById(req.body.policyId);
+      if (policy) {
+        await storage.updatePolicy(req.body.policyId, {
+          viewCount: (policy.viewCount || 0) + 1
+        });
+      }
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: req.body.policyId,
+        staffId: req.user.staffId || req.user.id,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'viewed',
+        entityType: 'policy',
+        entityId: req.body.policyId,
+        description: 'Policy was viewed'
+      });
+
+      res.status(201).json(view);
+    } catch (error) {
+      console.error("Error creating policy view:", error);
+      res.status(500).json({ error: "Failed to record policy view" });
+    }
+  });
+
+  app.put("/api/pms/views/:id", requireAuth, async (req: any, res) => {
+    try {
+      const view = await storage.updatePolicyView(req.params.id, req.body);
+      if (!view) {
+        return res.status(404).json({ error: "View record not found" });
+      }
+      res.json(view);
+    } catch (error) {
+      console.error("Error updating policy view:", error);
+      res.status(500).json({ error: "Failed to update policy view" });
+    }
+  });
+
+  // Policy Acknowledgments
+  app.get("/api/pms/policies/:id/acknowledgments", requireAuth, async (req: any, res) => {
+    try {
+      const acknowledgments = await storage.getPolicyAcknowledgments(req.params.id);
+      res.json(acknowledgments);
+    } catch (error) {
+      console.error("Error fetching policy acknowledgments:", error);
+      res.status(500).json({ error: "Failed to fetch policy acknowledgments" });
+    }
+  });
+
+  app.get("/api/pms/staff/:staffId/acknowledgments", requireAuth, async (req: any, res) => {
+    try {
+      const acknowledgments = await storage.getStaffAcknowledgments(req.params.staffId);
+      res.json(acknowledgments);
+    } catch (error) {
+      console.error("Error fetching staff acknowledgments:", error);
+      res.status(500).json({ error: "Failed to fetch staff acknowledgments" });
+    }
+  });
+
+  app.get("/api/pms/policies/:id/check-acknowledged", requireAuth, async (req: any, res) => {
+    try {
+      const staffId = req.query.staffId as string || req.user.staffId || req.user.id;
+      const version = parseInt(req.query.version as string) || 1;
+      const acknowledged = await storage.hasStaffAcknowledgedPolicy(staffId, req.params.id, version);
+      res.json({ acknowledged });
+    } catch (error) {
+      console.error("Error checking acknowledgment:", error);
+      res.status(500).json({ error: "Failed to check acknowledgment status" });
+    }
+  });
+
+  app.post("/api/pms/acknowledgments", requireAuth, async (req: any, res) => {
+    try {
+      const staffId = req.user.staffId || req.user.id;
+
+      // Check if already acknowledged this version
+      const alreadyAcknowledged = await storage.hasStaffAcknowledgedPolicy(
+        staffId,
+        req.body.policyId,
+        req.body.policyVersion
+      );
+
+      if (alreadyAcknowledged) {
+        return res.status(400).json({ error: "Policy already acknowledged for this version" });
+      }
+
+      // Get assignment to check due date
+      const assignments = await storage.getStaffPolicyAssignments(staffId);
+      const assignment = assignments.find(a => a.policyId === req.body.policyId);
+
+      let wasOnTime = 'yes';
+      let daysOverdue = 0;
+      if (assignment && assignment.dueDate) {
+        const now = new Date();
+        const dueDate = new Date(assignment.dueDate);
+        if (now > dueDate) {
+          wasOnTime = 'no';
+          daysOverdue = Math.ceil((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        }
+      }
+
+      const acknowledgment = await storage.createPolicyAcknowledgment({
+        ...req.body,
+        staffId,
+        staffName: req.user.displayName,
+        wasOnTime,
+        daysOverdue,
+        ipAddress: req.ip,
+        deviceType: req.body.deviceType || 'desktop',
+        userAgent: req.get('User-Agent')
+      });
+
+      // Update assignment status
+      if (assignment) {
+        await storage.updatePolicyAssignment(assignment.id, { status: 'acknowledged' });
+      }
+
+      // Update compliance record
+      await storage.upsertComplianceRecord(staffId, req.body.policyId, {
+        status: 'acknowledged',
+        acknowledgedAt: new Date(),
+        acknowledgedVersion: req.body.policyVersion,
+        isCompliant: 'yes',
+        isOverdue: 'no',
+        currentPolicyVersion: req.body.policyVersion
+      });
+
+      // Update acknowledgment count on policy
+      const policy = await storage.getPolicyById(req.body.policyId);
+      if (policy) {
+        await storage.updatePolicy(req.body.policyId, {
+          acknowledgmentCount: (policy.acknowledgmentCount || 0) + 1
+        });
+      }
+
+      // Create audit log
+      await storage.createPolicyAuditLog({
+        policyId: req.body.policyId,
+        staffId,
+        userId: req.user.id,
+        userName: req.user.displayName,
+        action: 'acknowledged',
+        entityType: 'acknowledgment',
+        entityId: acknowledgment.id,
+        description: `Policy was acknowledged (version ${req.body.policyVersion})`
+      });
+
+      // Create notification for staff
+      await storage.createPolicyNotification({
+        policyId: req.body.policyId,
+        staffId,
+        type: 'acknowledgment_confirmed',
+        title: 'Policy Acknowledged',
+        message: `You have successfully acknowledged "${policy?.title}"`,
+        channel: 'in_app'
+      });
+
+      res.status(201).json(acknowledgment);
+    } catch (error) {
+      console.error("Error creating acknowledgment:", error);
+      res.status(500).json({ error: "Failed to create policy acknowledgment" });
+    }
+  });
+
+  // Compliance Records
+  app.get("/api/pms/compliance", requireAuth, async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.staffId) filters.staffId = req.query.staffId;
+      if (req.query.policyId) filters.policyId = req.query.policyId;
+      if (req.query.isCompliant) filters.isCompliant = req.query.isCompliant;
+      if (req.query.isOverdue) filters.isOverdue = req.query.isOverdue;
+
+      const records = await storage.getComplianceRecords(filters);
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching compliance records:", error);
+      res.status(500).json({ error: "Failed to fetch compliance records" });
+    }
+  });
+
+  app.get("/api/pms/compliance/:id", requireAuth, async (req: any, res) => {
+    try {
+      const record = await storage.getComplianceRecordById(req.params.id);
+      if (!record) {
+        return res.status(404).json({ error: "Compliance record not found" });
+      }
+      res.json(record);
+    } catch (error) {
+      console.error("Error fetching compliance record:", error);
+      res.status(500).json({ error: "Failed to fetch compliance record" });
+    }
+  });
+
+  // Policy Notifications
+  app.get("/api/pms/notifications", requireAuth, async (req: any, res) => {
+    try {
+      const staffId = req.query.staffId as string || req.user.staffId || req.user.id;
+      const notifications = await storage.getPolicyNotifications(staffId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching policy notifications:", error);
+      res.status(500).json({ error: "Failed to fetch policy notifications" });
+    }
+  });
+
+  app.get("/api/pms/notifications/unread", requireAuth, async (req: any, res) => {
+    try {
+      const staffId = req.query.staffId as string || req.user.staffId || req.user.id;
+      const notifications = await storage.getUnreadPolicyNotifications(staffId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching unread policy notifications:", error);
+      res.status(500).json({ error: "Failed to fetch unread policy notifications" });
+    }
+  });
+
+  app.post("/api/pms/notifications", requireAuth, async (req: any, res) => {
+    try {
+      const notification = await storage.createPolicyNotification(req.body);
+      res.status(201).json(notification);
+    } catch (error) {
+      console.error("Error creating policy notification:", error);
+      res.status(500).json({ error: "Failed to create policy notification" });
+    }
+  });
+
+  app.put("/api/pms/notifications/:id/read", requireAuth, async (req: any, res) => {
+    try {
+      const notification = await storage.markPolicyNotificationRead(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  app.put("/api/pms/notifications/mark-all-read", requireAuth, async (req: any, res) => {
+    try {
+      const staffId = req.user.staffId || req.user.id;
+      const count = await storage.markAllPolicyNotificationsRead(staffId);
+      res.json({ markedCount: count });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Audit Logs
+  app.get("/api/pms/audit-logs", requireAuth, async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.policyId) filters.policyId = req.query.policyId;
+      if (req.query.staffId) filters.staffId = req.query.staffId;
+      if (req.query.action) filters.action = req.query.action;
+      if (req.query.startDate) filters.startDate = new Date(req.query.startDate as string);
+      if (req.query.endDate) filters.endDate = new Date(req.query.endDate as string);
+      if (req.query.limit) filters.limit = parseInt(req.query.limit as string);
+      if (req.query.offset) filters.offset = parseInt(req.query.offset as string);
+
+      const result = await storage.getPolicyAuditLogs(filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching policy audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch policy audit logs" });
+    }
+  });
+
+  // Policy Categories
+  app.get("/api/pms/categories", requireAuth, async (req: any, res) => {
+    try {
+      const categories = await storage.getAllPolicyCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching policy categories:", error);
+      res.status(500).json({ error: "Failed to fetch policy categories" });
+    }
+  });
+
+  app.get("/api/pms/categories/active", requireAuth, async (req: any, res) => {
+    try {
+      const categories = await storage.getActivePolicyCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching active policy categories:", error);
+      res.status(500).json({ error: "Failed to fetch active policy categories" });
+    }
+  });
+
+  app.get("/api/pms/categories/:id", requireAuth, async (req: any, res) => {
+    try {
+      const category = await storage.getPolicyCategoryById(req.params.id);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error fetching policy category:", error);
+      res.status(500).json({ error: "Failed to fetch policy category" });
+    }
+  });
+
+  app.post("/api/pms/categories", requireAuth, async (req: any, res) => {
+    try {
+      const category = await storage.createPolicyCategory(req.body);
+      res.status(201).json(category);
+    } catch (error) {
+      console.error("Error creating policy category:", error);
+      res.status(500).json({ error: "Failed to create policy category" });
+    }
+  });
+
+  app.put("/api/pms/categories/:id", requireAuth, async (req: any, res) => {
+    try {
+      const category = await storage.updatePolicyCategory(req.params.id, req.body);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating policy category:", error);
+      res.status(500).json({ error: "Failed to update policy category" });
+    }
+  });
+
+  app.delete("/api/pms/categories/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deletePolicyCategory(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting policy category:", error);
+      res.status(500).json({ error: "Failed to delete policy category" });
+    }
+  });
+
+  // Saved Reports
+  app.get("/api/pms/reports", requireAuth, async (req: any, res) => {
+    try {
+      const createdById = req.query.mine === 'true' ? req.user.id : undefined;
+      const reports = await storage.getSavedReports(createdById);
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching saved reports:", error);
+      res.status(500).json({ error: "Failed to fetch saved reports" });
+    }
+  });
+
+  app.get("/api/pms/reports/scheduled", requireAuth, async (req: any, res) => {
+    try {
+      const reports = await storage.getScheduledReports();
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching scheduled reports:", error);
+      res.status(500).json({ error: "Failed to fetch scheduled reports" });
+    }
+  });
+
+  app.get("/api/pms/reports/:id", requireAuth, async (req: any, res) => {
+    try {
+      const report = await storage.getSavedReportById(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching saved report:", error);
+      res.status(500).json({ error: "Failed to fetch saved report" });
+    }
+  });
+
+  app.post("/api/pms/reports", requireAuth, async (req: any, res) => {
+    try {
+      const report = await storage.createSavedReport({
+        ...req.body,
+        createdById: req.user.id,
+        createdByName: req.user.displayName
+      });
+      res.status(201).json(report);
+    } catch (error) {
+      console.error("Error creating saved report:", error);
+      res.status(500).json({ error: "Failed to create saved report" });
+    }
+  });
+
+  app.put("/api/pms/reports/:id", requireAuth, async (req: any, res) => {
+    try {
+      const report = await storage.updateSavedReport(req.params.id, req.body);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error("Error updating saved report:", error);
+      res.status(500).json({ error: "Failed to update saved report" });
+    }
+  });
+
+  app.delete("/api/pms/reports/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteSavedReport(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting saved report:", error);
+      res.status(500).json({ error: "Failed to delete saved report" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Set up WebSocket server for real-time chat

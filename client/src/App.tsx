@@ -49,6 +49,7 @@ import GpsComplianceReview from "@/pages/GpsComplianceReview";
 import StaffQualifications from "@/pages/StaffQualifications";
 import StaffDocumentReview from "@/pages/StaffDocumentReview";
 import MobileClockPortal from "@/pages/MobileClockPortal";
+import LearningManagement from "@/pages/LearningManagement";
 import NotFound from "@/pages/not-found";
 import NotificationBell from "@/components/NotificationBell";
 import QuickChatPanel from "@/components/QuickChatPanel";
@@ -110,6 +111,7 @@ function ProtectedRouter() {
       <Route path="/staff-qualifications" component={StaffQualifications} />
       <Route path="/staff-documents" component={StaffDocumentReview} />
       <Route path="/mobile-clock" component={MobileClockPortal} />
+      <Route path="/learning" component={LearningManagement} />
       <Route component={NotFound} />
     </Switch>
   );

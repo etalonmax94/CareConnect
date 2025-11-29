@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, json, date, serial, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, json, date, serial, integer, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -4772,3 +4772,388 @@ export function getLmsLevelFromPoints(points: number): { level: number; name: st
   }
   return { level: 1, name: "Beginner", color: "#94a3b8", pointsToNext: 100 - points };
 }
+
+// ============================================
+// POLICY MANAGEMENT SYSTEM (PMS)
+// ============================================
+
+// PMS Type Definitions
+export type PolicyStatus = "draft" | "published" | "archived" | "pending_review";
+export type PolicyCategoryType = "HR" | "Safety" | "Finance" | "Operations" | "Clinical" | "IT" | "Legal" | "Quality" | "General";
+export type PolicyType = "code_of_conduct" | "leave_policy" | "data_privacy" | "safety_procedure" | "clinical_guideline" | "financial_procedure" | "it_security" | "emergency_procedure" | "general";
+export type AcknowledgmentStatus = "not_viewed" | "viewed" | "acknowledged" | "overdue" | "expired";
+export type PolicyAudience = "all_staff" | "specific_roles" | "specific_departments" | "specific_staff";
+
+// Policies - Core policy documents
+export const policies = pgTable("policies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  content: text("content"), // Rich text content
+  fileUrl: text("file_url"), // URL to uploaded document (PDF, Word, etc.)
+  fileName: varchar("file_name", { length: 500 }),
+  fileType: varchar("file_type", { length: 100 }), // application/pdf, etc.
+  fileSize: integer("file_size"), // in bytes
+
+  // Categorization
+  category: varchar("category", { length: 100 }).notNull().default("General"),
+  policyType: varchar("policy_type", { length: 100 }).default("general"),
+  tags: text("tags"), // JSON array of tags
+  departmentTags: text("department_tags"), // JSON array of departments
+
+  // Version control
+  version: integer("version").notNull().default(1),
+  versionNotes: text("version_notes"),
+  previousVersionId: uuid("previous_version_id"),
+
+  // Status and publishing
+  status: varchar("status", { length: 50 }).notNull().default("draft"),
+  publishedAt: timestamp("published_at"),
+  publishedById: varchar("published_by_id", { length: 255 }),
+
+  // Dates
+  effectiveDate: date("effective_date"),
+  reviewDate: date("review_date"), // When policy should be reviewed
+  expiryDate: date("expiry_date"),
+
+  // Mandatory settings
+  isMandatory: varchar("is_mandatory", { length: 10 }).default("no"),
+  requiresReacknowledgment: varchar("requires_reacknowledgment", { length: 10 }).default("no"),
+  reacknowledgmentPeriodDays: integer("reacknowledgment_period_days"), // e.g., 365 for annual
+  acknowledgmentDeadlineDays: integer("acknowledgment_deadline_days").default(7), // Days to acknowledge after assignment
+
+  // Target audience
+  audienceType: varchar("audience_type", { length: 50 }).default("all_staff"),
+  targetRoles: text("target_roles"), // JSON array of role names
+  targetDepartments: text("target_departments"), // JSON array of departments
+  targetStaffIds: text("target_staff_ids"), // JSON array of specific staff IDs
+
+  // Accessibility
+  isSearchable: varchar("is_searchable", { length: 10 }).default("yes"),
+  isPrintable: varchar("is_printable", { length: 10 }).default("yes"),
+  allowOfflineDownload: varchar("allow_offline_download", { length: 10 }).default("yes"),
+
+  // Metadata
+  createdById: varchar("created_by_id", { length: 255 }).notNull(),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  lastModifiedById: varchar("last_modified_by_id", { length: 255 }),
+  lastModifiedByName: varchar("last_modified_by_name", { length: 255 }),
+
+  // Statistics
+  viewCount: integer("view_count").default(0),
+  acknowledgmentCount: integer("acknowledgment_count").default(0),
+  averageReadTimeSeconds: integer("average_read_time_seconds"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPolicySchema = createInsertSchema(policies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPolicy = z.infer<typeof insertPolicySchema>;
+export type Policy = typeof policies.$inferSelect;
+
+// Policy Version History - Track all versions
+export const policyVersionHistory = pgTable("policy_version_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  policyId: uuid("policy_id").notNull().references(() => policies.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  content: text("content"),
+  fileUrl: text("file_url"),
+  changeDescription: text("change_description"),
+  changedById: varchar("changed_by_id", { length: 255 }).notNull(),
+  changedByName: varchar("changed_by_name", { length: 255 }),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+  // Diff tracking
+  contentDiff: text("content_diff"), // JSON showing differences
+  requiresReacknowledgment: varchar("requires_reacknowledgment", { length: 10 }).default("no"),
+});
+
+export const insertPolicyVersionHistorySchema = createInsertSchema(policyVersionHistory).omit({
+  id: true,
+  changedAt: true,
+});
+
+export type InsertPolicyVersionHistory = z.infer<typeof insertPolicyVersionHistorySchema>;
+export type PolicyVersionHistory = typeof policyVersionHistory.$inferSelect;
+
+// Staff Policy Assignments - Which policies are assigned to which staff
+export const staffPolicyAssignments = pgTable("staff_policy_assignments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+  policyId: uuid("policy_id").notNull().references(() => policies.id, { onDelete: "cascade" }),
+  policyVersion: integer("policy_version").notNull(),
+
+  // Assignment details
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  assignedById: varchar("assigned_by_id", { length: 255 }),
+  dueDate: timestamp("due_date"), // Deadline for acknowledgment
+
+  // Status tracking
+  status: varchar("status", { length: 50 }).notNull().default("not_viewed"),
+  isOverdue: varchar("is_overdue", { length: 10 }).default("no"),
+
+  // Last notification sent
+  lastReminderAt: timestamp("last_reminder_at"),
+  reminderCount: integer("reminder_count").default(0),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffPolicyAssignmentSchema = createInsertSchema(staffPolicyAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffPolicyAssignment = z.infer<typeof insertStaffPolicyAssignmentSchema>;
+export type StaffPolicyAssignment = typeof staffPolicyAssignments.$inferSelect;
+
+// Policy Views - Track when staff view policies
+export const policyViews = pgTable("policy_views", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  policyId: uuid("policy_id").notNull().references(() => policies.id, { onDelete: "cascade" }),
+  policyVersion: integer("policy_version").notNull(),
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+
+  // View tracking
+  viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+  viewDurationSeconds: integer("view_duration_seconds"),
+  scrollPercentage: integer("scroll_percentage"), // How far they scrolled (0-100)
+  fullyViewed: varchar("fully_viewed", { length: 10 }).default("no"), // Scrolled to end
+
+  // Device info
+  deviceType: varchar("device_type", { length: 50 }), // mobile, tablet, desktop
+  ipAddress: varchar("ip_address", { length: 100 }),
+  userAgent: text("user_agent"),
+
+  // Session tracking
+  sessionId: varchar("session_id", { length: 255 }),
+});
+
+export const insertPolicyViewSchema = createInsertSchema(policyViews).omit({
+  id: true,
+  viewedAt: true,
+});
+
+export type InsertPolicyView = z.infer<typeof insertPolicyViewSchema>;
+export type PolicyView = typeof policyViews.$inferSelect;
+
+// Policy Acknowledgments - Staff confirmation of reading
+export const policyAcknowledgments = pgTable("policy_acknowledgments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  policyId: uuid("policy_id").notNull().references(() => policies.id, { onDelete: "cascade" }),
+  policyVersion: integer("policy_version").notNull(),
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+
+  // Acknowledgment details
+  acknowledgedAt: timestamp("acknowledged_at").defaultNow().notNull(),
+  acknowledgmentMethod: varchar("acknowledgment_method", { length: 50 }).default("checkbox"), // checkbox, signature, etc.
+  electronicSignature: text("electronic_signature"), // Base64 signature image if applicable
+  confirmationText: text("confirmation_text"), // "I have read and understood..."
+
+  // Verification
+  ipAddress: varchar("ip_address", { length: 100 }),
+  deviceType: varchar("device_type", { length: 50 }),
+  userAgent: text("user_agent"),
+
+  // Time spent before acknowledgment
+  totalViewTimeSeconds: integer("total_view_time_seconds"),
+
+  // Compliance
+  wasOnTime: varchar("was_on_time", { length: 10 }).default("yes"), // Acknowledged before due date
+  daysOverdue: integer("days_overdue").default(0),
+
+  // For re-acknowledgments
+  isReacknowledgment: varchar("is_reacknowledgment", { length: 10 }).default("no"),
+  previousAcknowledgmentId: uuid("previous_acknowledgment_id"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPolicyAcknowledgmentSchema = createInsertSchema(policyAcknowledgments).omit({
+  id: true,
+  acknowledgedAt: true,
+  createdAt: true,
+});
+
+export type InsertPolicyAcknowledgment = z.infer<typeof insertPolicyAcknowledgmentSchema>;
+export type PolicyAcknowledgment = typeof policyAcknowledgments.$inferSelect;
+
+// Policy Compliance Records - Track overall compliance status per staff per policy
+export const policyComplianceRecords = pgTable("policy_compliance_records", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+  policyId: uuid("policy_id").notNull().references(() => policies.id, { onDelete: "cascade" }),
+  currentPolicyVersion: integer("current_policy_version").notNull(),
+
+  // Status
+  status: varchar("status", { length: 50 }).notNull().default("not_viewed"),
+
+  // Dates
+  firstViewedAt: timestamp("first_viewed_at"),
+  lastViewedAt: timestamp("last_viewed_at"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  acknowledgedVersion: integer("acknowledged_version"),
+  dueDate: timestamp("due_date"),
+  nextReacknowledgmentDate: timestamp("next_reacknowledgment_date"),
+
+  // Compliance metrics
+  isCompliant: varchar("is_compliant", { length: 10 }).default("no"),
+  isOverdue: varchar("is_overdue", { length: 10 }).default("no"),
+  daysUntilDue: integer("days_until_due"),
+  totalViewCount: integer("total_view_count").default(0),
+  totalTimeSpentSeconds: integer("total_time_spent_seconds").default(0),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPolicyComplianceRecordSchema = createInsertSchema(policyComplianceRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPolicyComplianceRecord = z.infer<typeof insertPolicyComplianceRecordSchema>;
+export type PolicyComplianceRecord = typeof policyComplianceRecords.$inferSelect;
+
+// Policy Notifications - Track notifications sent about policies
+export const policyNotifications = pgTable("policy_notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  policyId: uuid("policy_id").references(() => policies.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+
+  // Notification details
+  type: varchar("type", { length: 50 }).notNull(), // new_policy, update_required, reminder, overdue, expiring
+  title: varchar("title", { length: 500 }).notNull(),
+  message: text("message").notNull(),
+
+  // Delivery
+  channel: varchar("channel", { length: 50 }).default("in_app"), // in_app, email, push
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+
+  // Action
+  actionUrl: text("action_url"),
+  actionTaken: varchar("action_taken", { length: 10 }).default("no"),
+
+  // Status
+  isRead: varchar("is_read", { length: 10 }).default("no"),
+  isArchived: varchar("is_archived", { length: 10 }).default("no"),
+});
+
+export const insertPolicyNotificationSchema = createInsertSchema(policyNotifications).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertPolicyNotification = z.infer<typeof insertPolicyNotificationSchema>;
+export type PolicyNotification = typeof policyNotifications.$inferSelect;
+
+// Policy Audit Logs - Complete audit trail
+export const policyAuditLogs = pgTable("policy_audit_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  policyId: uuid("policy_id").references(() => policies.id, { onDelete: "set null" }),
+  staffId: varchar("staff_id", { length: 255 }),
+  userId: varchar("user_id", { length: 255 }).notNull(), // Who performed the action
+  userName: varchar("user_name", { length: 255 }),
+
+  // Action details
+  action: varchar("action", { length: 100 }).notNull(), // created, updated, published, archived, viewed, acknowledged, etc.
+  entityType: varchar("entity_type", { length: 100 }).notNull(), // policy, acknowledgment, assignment, etc.
+  entityId: varchar("entity_id", { length: 255 }),
+
+  // Change details
+  previousValue: text("previous_value"), // JSON of previous state
+  newValue: text("new_value"), // JSON of new state
+  description: text("description"),
+
+  // Context
+  ipAddress: varchar("ip_address", { length: 100 }),
+  userAgent: text("user_agent"),
+
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const insertPolicyAuditLogSchema = createInsertSchema(policyAuditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertPolicyAuditLog = z.infer<typeof insertPolicyAuditLogSchema>;
+export type PolicyAuditLog = typeof policyAuditLogs.$inferSelect;
+
+// Policy Categories - Configurable categories
+export const policyCategories = pgTable("policy_categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 200 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 20 }), // Hex color for UI
+  icon: varchar("icon", { length: 50 }), // Icon name
+  sortOrder: integer("sort_order").default(0),
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPolicyCategorySchema = createInsertSchema(policyCategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPolicyCategory = z.infer<typeof insertPolicyCategorySchema>;
+export type PolicyCategory = typeof policyCategories.$inferSelect;
+
+// Saved Reports - For scheduled or saved compliance reports
+export const policySavedReports = pgTable("policy_saved_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  reportType: varchar("report_type", { length: 100 }).notNull(), // compliance_overview, staff_detail, policy_performance, overdue_list
+
+  // Filters and configuration
+  filters: text("filters"), // JSON of applied filters
+  columns: text("columns"), // JSON of selected columns
+  sortBy: varchar("sort_by", { length: 100 }),
+  sortOrder: varchar("sort_order", { length: 10 }).default("asc"),
+
+  // Scheduling
+  isScheduled: varchar("is_scheduled", { length: 10 }).default("no"),
+  scheduleFrequency: varchar("schedule_frequency", { length: 50 }), // daily, weekly, monthly
+  scheduleDayOfWeek: integer("schedule_day_of_week"), // 0-6 for weekly
+  scheduleDayOfMonth: integer("schedule_day_of_month"), // 1-31 for monthly
+  scheduleTime: varchar("schedule_time", { length: 10 }), // HH:MM
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+
+  // Recipients
+  emailRecipients: text("email_recipients"), // JSON array of emails
+
+  // Creator
+  createdById: varchar("created_by_id", { length: 255 }).notNull(),
+  createdByName: varchar("created_by_name", { length: 255 }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPolicySavedReportSchema = createInsertSchema(policySavedReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPolicySavedReport = z.infer<typeof insertPolicySavedReportSchema>;
+export type PolicySavedReport = typeof policySavedReports.$inferSelect;

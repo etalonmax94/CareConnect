@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck, ChevronRight, FileCheck } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck, ChevronRight, FileCheck, GraduationCap } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -68,6 +68,7 @@ const menuCategories: MenuCategory[] = [
       { title: "Org Chart", url: "/org-chart", icon: Network, iconColor: "text-rose-500" },
       { title: "Tasks", url: "/tasks", icon: ListTodo, iconColor: "text-violet-500" },
       { title: "Chat", url: "/chat", icon: MessageSquare, iconColor: "text-pink-500" },
+      { title: "Learning", url: "/learning", icon: GraduationCap, iconColor: "text-blue-600" },
     ],
   },
   {
@@ -83,10 +84,8 @@ const menuCategories: MenuCategory[] = [
   {
     label: "System",
     items: [
-      { title: "Reports", url: "/reports", icon: BarChart3, iconColor: "text-orange-500" },
       { title: "Form Templates", url: "/form-templates", icon: ClipboardList, iconColor: "text-lime-500" },
       { title: "Help Desk", url: "/help-desk", icon: LifeBuoy, iconColor: "text-cyan-500" },
-      { title: "Audit Log", url: "/audit-log", icon: History, iconColor: "text-slate-500" },
     ],
   },
 ];
