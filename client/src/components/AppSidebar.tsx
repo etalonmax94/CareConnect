@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, UsersRound, HomeIcon, LifeBuoy, ListTodo, MessageSquare } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -66,7 +66,7 @@ const menuCategories: MenuCategory[] = [
   {
     label: "Team",
     items: [
-      { title: "Care Team", url: "/care-team", icon: UsersRound, iconColor: "text-emerald-500" },
+      { title: "Care Team", url: "/care-team", icon: UserCog, iconColor: "text-emerald-500" },
       { title: "Tasks", url: "/tasks", icon: ListTodo, iconColor: "text-violet-500" },
       { title: "Chat", url: "/chat", icon: MessageSquare, iconColor: "text-pink-500" },
     ],
@@ -153,7 +153,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       <Link href={item.url} onClick={handleNavigation} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
         <div className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-          isCollapsed ? "justify-center border-b border-sidebar-border/50" : "",
+          isCollapsed ? "justify-center" : "",
           isActive 
             ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm' 
             : 'text-sidebar-foreground hover:bg-sidebar-accent/50'

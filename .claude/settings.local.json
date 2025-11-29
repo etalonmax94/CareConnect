@@ -4,7 +4,8 @@
       "Bash(npm run check:*)",
       "Bash(npm run build:*)",
       "Bash(node read-excel.js:*)",
-      "Bash(node read-pricing-sheet.js:*)"
+      "Bash(node read-pricing-sheet.js:*)",
+      "Bash(npm run db:push:*)"
     ],
     "deny": [],
     "ask": []

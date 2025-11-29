@@ -452,19 +452,36 @@ export type InsertProgressNote = z.infer<typeof insertProgressNoteSchema>;
 export type ProgressNote = typeof progressNotes.$inferSelect;
 
 // Budgets
+export type BudgetPeriod = "weekly" | "monthly" | "quarterly" | "annual";
+
 export const budgets = pgTable("budgets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  quoteId: varchar("quote_id").references(() => quotes.id, { onDelete: "set null" }), // Link to source quote
   category: text("category").notNull(),
+  serviceType: text("service_type").$type<ServiceType>().default("NDIS"),
+  period: text("period").$type<BudgetPeriod>().default("annual"), // weekly, monthly, quarterly, annual
   totalAllocated: text("total_allocated").notNull(),
   used: text("used").default("0").notNull(),
+  remaining: text("remaining").default("0").notNull(),
+  weeklyAmount: text("weekly_amount").default("0"),
+  monthlyAmount: text("monthly_amount").default("0"),
+  quarterlyAmount: text("quarterly_amount").default("0"),
+  annualAmount: text("annual_amount").default("0"),
   startDate: date("start_date"),
   endDate: date("end_date"),
+  notes: text("notes"),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertBudgetSchema = createInsertSchema(budgets).omit({
+export const insertBudgetSchema = createInsertSchema(budgets, {
+  serviceType: z.enum(["NDIS", "Support at Home", "Private"]).optional(),
+  period: z.enum(["weekly", "monthly", "quarterly", "annual"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -1081,6 +1098,44 @@ export const insertNdisPriceGuideItemSchema = createInsertSchema(ndisPriceGuideI
 export type InsertNdisPriceGuideItem = z.infer<typeof insertNdisPriceGuideItemSchema>;
 export type NdisPriceGuideItem = typeof ndisPriceGuideItems.$inferSelect;
 
+// Pricing Services - Centralized pricing for NDIS, Support at Home, and Private services
+export type ServiceType = "NDIS" | "Support at Home" | "Private";
+export type RateType = "weekday" | "saturday" | "sunday" | "public_holiday" | "evening" | "night";
+
+export const pricingServices = pgTable("pricing_services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serviceType: text("service_type").notNull().$type<ServiceType>(),
+  serviceName: text("service_name").notNull(),
+  description: text("description"),
+  category: text("category"), // e.g., "Nursing", "Support Work", "Transport"
+  unit: text("unit").default("Hour"),
+  weekdayRate: text("weekday_rate").default("0"),
+  saturdayRate: text("saturday_rate").default("0"),
+  sundayRate: text("sunday_rate").default("0"),
+  publicHolidayRate: text("public_holiday_rate").default("0"),
+  eveningRate: text("evening_rate").default("0"),
+  nightRate: text("night_rate").default("0"),
+  includesGst: text("includes_gst").default("no").$type<"yes" | "no">(),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPricingServiceSchema = createInsertSchema(pricingServices, {
+  serviceType: z.enum(["NDIS", "Support at Home", "Private"]),
+  includesGst: z.enum(["yes", "no"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPricingService = z.infer<typeof insertPricingServiceSchema>;
+export type PricingService = typeof pricingServices.$inferSelect;
+
 // Quotes - Service estimates/quotations for clients
 export type QuoteStatus = "draft" | "sent" | "accepted" | "declined" | "expired";
 
@@ -1088,6 +1143,7 @@ export const quotes = pgTable("quotes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   quoteNumber: text("quote_number").notNull(),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  serviceType: text("service_type").$type<ServiceType>().default("NDIS"), // NDIS, Support at Home, Private
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").$type<QuoteStatus>().default("draft").notNull(),
@@ -1110,6 +1166,7 @@ export const quotes = pgTable("quotes", {
 });
 
 export const insertQuoteSchema = createInsertSchema(quotes, {
+  serviceType: z.enum(["NDIS", "Support at Home", "Private"]).optional(),
   status: z.enum(["draft", "sent", "accepted", "declined", "expired"]).optional(),
 }).omit({
   id: true,
@@ -1226,6 +1283,56 @@ export const insertQuoteSendHistorySchema = createInsertSchema(quoteSendHistory,
 
 export type InsertQuoteSendHistory = z.infer<typeof insertQuoteSendHistorySchema>;
 export type QuoteSendHistory = typeof quoteSendHistory.$inferSelect;
+
+// Quote vs Actual Tracking - Compare quoted hours against delivered hours
+export const quoteVsActual = pgTable("quote_vs_actual", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  lineItemId: varchar("line_item_id").notNull().references(() => quoteLineItems.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  serviceName: text("service_name").notNull(),
+  category: text("category"),
+
+  // Quoted hours (from quote line item)
+  quotedWeekdayHours: text("quoted_weekday_hours").default("0"),
+  quotedSaturdayHours: text("quoted_saturday_hours").default("0"),
+  quotedSundayHours: text("quoted_sunday_hours").default("0"),
+  quotedEveningHours: text("quoted_evening_hours").default("0"),
+  quotedNightHours: text("quoted_night_hours").default("0"),
+  quotedPublicHolidayHours: text("quoted_public_holiday_hours").default("0"),
+  quotedWeeklyTotal: text("quoted_weekly_total").default("0"),
+  quotedAnnualTotal: text("quoted_annual_total").default("0"),
+
+  // Actual delivered hours (from service deliveries)
+  actualWeekdayHours: text("actual_weekday_hours").default("0"),
+  actualSaturdayHours: text("actual_saturday_hours").default("0"),
+  actualSundayHours: text("actual_sunday_hours").default("0"),
+  actualEveningHours: text("actual_evening_hours").default("0"),
+  actualNightHours: text("actual_night_hours").default("0"),
+  actualPublicHolidayHours: text("actual_public_holiday_hours").default("0"),
+  actualWeeklyTotal: text("actual_weekly_total").default("0"),
+  actualTotalToDate: text("actual_total_to_date").default("0"),
+
+  // Variance tracking
+  weeklyVariance: text("weekly_variance").default("0"), // actual - quoted
+  weeklyVariancePercent: text("weekly_variance_percent").default("0"),
+
+  periodStart: date("period_start"),
+  periodEnd: date("period_end"),
+  lastCalculated: timestamp("last_calculated"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertQuoteVsActualSchema = createInsertSchema(quoteVsActual).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuoteVsActual = z.infer<typeof insertQuoteVsActualSchema>;
+export type QuoteVsActual = typeof quoteVsActual.$inferSelect;
 
 // Client Contacts - NOK, Family, Advocates, etc.
 export type ContactRelationship = "spouse" | "parent" | "child" | "sibling" | "guardian" | "advocate" | "friend" | "other";
