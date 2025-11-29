@@ -189,12 +189,18 @@ export default function Chat() {
 
   const currentUser = authData?.user;
   const isAppAdmin = currentUser?.roles?.some((role: string) => 
-    ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role)
+    ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role.toLowerCase())
   ) || false;
 
   const { data: rooms = [], isLoading: roomsLoading } = useQuery<ChatRoomWithParticipants[]>({
     queryKey: ["/api/chat/rooms"],
     enabled: !!currentUser,
+  });
+
+  // Fetch archived rooms (admin only)
+  const { data: archivedRooms = [] } = useQuery<ChatRoomWithParticipants[]>({
+    queryKey: ["/api/chat/rooms/archived"],
+    enabled: !!currentUser && isAppAdmin,
   });
 
   const { data: staff = [] } = useQuery<Staff[]>({
@@ -946,7 +952,7 @@ export default function Chat() {
   };
 
   // Filter rooms based on active tab and search, then sort with pinned first
-  const filteredRooms = rooms
+  const filteredRooms = (activeTab === "archived" ? archivedRooms : rooms)
     .filter(room => {
       const matchesSearch = !searchQuery || getRoomDisplayName(room).toLowerCase().includes(searchQuery.toLowerCase());
       
@@ -954,6 +960,7 @@ export default function Chat() {
       if (activeTab === "client") return room.type === "client" && matchesSearch;
       if (activeTab === "direct") return room.type === "direct" && matchesSearch;
       if (activeTab === "group") return (room.type === "group" || room.type === "announcement") && matchesSearch;
+      if (activeTab === "archived") return matchesSearch;
       
       return matchesSearch;
     })
@@ -1013,6 +1020,7 @@ export default function Chat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms/archived"] });
       toast({ 
         title: "Chat archived",
         description: "This chat has been archived"
@@ -1023,6 +1031,23 @@ export default function Chat() {
     },
     onError: () => {
       toast({ title: "Failed to archive chat", variant: "destructive" });
+    }
+  });
+
+  const unarchiveChatMutation = useMutation({
+    mutationFn: async (roomId: string) => {
+      return await apiRequest("POST", `/api/chat/rooms/${roomId}/unarchive`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms/archived"] });
+      toast({ 
+        title: "Chat restored",
+        description: "This chat has been restored from archive"
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to restore chat", variant: "destructive" });
     }
   });
 
@@ -1225,7 +1250,7 @@ export default function Chat() {
           {/* Filter Tabs */}
           <div className="px-4 pb-3 md:px-5">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full h-9 p-1 bg-muted/50 rounded-lg grid grid-cols-4 gap-0.5">
+              <TabsList className={`w-full h-9 p-1 bg-muted/50 rounded-lg grid gap-0.5 ${isAppAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
                 <TabsTrigger value="all" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">All</TabsTrigger>
                 <TabsTrigger value="client" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
                   <Briefcase className="h-3 w-3 mr-1" />
@@ -1239,6 +1264,12 @@ export default function Chat() {
                   <Users className="h-3 w-3 mr-1" />
                   Teams
                 </TabsTrigger>
+                {isAppAdmin && (
+                  <TabsTrigger value="archived" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                    <Archive className="h-3 w-3 mr-1" />
+                    Archived
+                  </TabsTrigger>
+                )}
               </TabsList>
             </Tabs>
           </div>
@@ -1412,23 +1443,37 @@ export default function Chat() {
                                 </>
                               )}
                               
-                              {/* Archive chat - only for admins */}
+                              {/* Archive/Restore chat - only for admins */}
                               {isAppAdmin && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (confirm("Are you sure you want to archive this chat? This action can be undone by an administrator.")) {
-                                        archiveChatMutation.mutate(room.id);
-                                      }
-                                    }}
-                                    className="text-orange-600 dark:text-orange-400"
-                                    data-testid={`archive-chat-${room.id}`}
-                                  >
-                                    <Archive className="h-4 w-4 mr-2" />
-                                    Archive chat
-                                  </DropdownMenuItem>
+                                  {room.isArchived === "yes" ? (
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        unarchiveChatMutation.mutate(room.id);
+                                      }}
+                                      className="text-green-600 dark:text-green-400"
+                                      data-testid={`restore-chat-${room.id}`}
+                                    >
+                                      <ArchiveRestore className="h-4 w-4 mr-2" />
+                                      Restore chat
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm("Are you sure you want to archive this chat? This action can be undone by an administrator.")) {
+                                          archiveChatMutation.mutate(room.id);
+                                        }
+                                      }}
+                                      className="text-orange-600 dark:text-orange-400"
+                                      data-testid={`archive-chat-${room.id}`}
+                                    >
+                                      <Archive className="h-4 w-4 mr-2" />
+                                      Archive chat
+                                    </DropdownMenuItem>
+                                  )}
                                 </>
                               )}
                             </DropdownMenuContent>

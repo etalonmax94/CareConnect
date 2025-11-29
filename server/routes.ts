@@ -8721,6 +8721,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get archived chat rooms (admin only)
+  app.get("/api/chat/rooms/archived", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userRoles = req.session?.user?.roles || [];
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      // Check if user is app admin
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role.toLowerCase())
+      );
+      
+      if (!isAppAdmin) {
+        return res.status(403).json({ error: "Only administrators can view archived chats" });
+      }
+      
+      // Get all archived rooms
+      const { rooms } = await storage.getAllChatRoomsWithFilters({ isArchived: "yes" });
+      
+      // Get participants for each room
+      const roomsWithParticipants = await Promise.all(
+        rooms.map(async (room) => {
+          const participants = await storage.getChatRoomParticipants(room.id);
+          return { ...room, participants };
+        })
+      );
+      
+      res.json(roomsWithParticipants);
+    } catch (error) {
+      console.error("Error fetching archived chat rooms:", error);
+      res.status(500).json({ error: "Failed to fetch archived chat rooms" });
+    }
+  });
+
   // Get or create direct message room
   app.post("/api/chat/rooms/direct", requireAuth, async (req: any, res) => {
     try {
