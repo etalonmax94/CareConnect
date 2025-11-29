@@ -8767,7 +8767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const { targetUserId, targetUserName, targetUserEmail } = req.body;
+      const { targetUserId, targetUserName, targetUserEmail, targetUserAvatarUrl } = req.body;
       if (!targetUserId || !targetUserName) {
         return res.status(400).json({ error: "Target user information required" });
       }
@@ -8776,6 +8776,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let room = await storage.getDirectChatRoom(userId, targetUserId);
       
       if (!room) {
+        // Fetch avatar URLs for both participants
+        const currentUserStaff = await storage.getStaffByUserId(userId);
+        const targetUserStaff = await storage.getStaffByUserId(targetUserId);
+        
         // Create new direct message room
         room = await storage.createChatRoom({
           type: "direct",
@@ -8784,11 +8788,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isArchived: "no"
         });
 
-        // Add both participants
+        // Add both participants with avatar URLs
         await storage.addChatRoomParticipant({
           roomId: room.id,
           staffId: userId,
           staffName: userName,
+          staffAvatarUrl: currentUserStaff?.avatarUrl || undefined,
           role: "admin"
         });
 
@@ -8797,6 +8802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           staffId: targetUserId,
           staffName: targetUserName,
           staffEmail: targetUserEmail,
+          staffAvatarUrl: targetUserAvatarUrl || targetUserStaff?.avatarUrl || undefined,
           role: "admin"
         });
       }
@@ -8828,11 +8834,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const room = await storage.createChatRoom(validatedData);
 
-      // Add creator as admin
+      // Fetch creator's avatar URL
+      const creatorStaff = await storage.getStaffByUserId(userId);
+
+      // Add creator as admin with avatar URL
       await storage.addChatRoomParticipant({
         roomId: room.id,
         staffId: userId,
         staffName: userName,
+        staffAvatarUrl: creatorStaff?.avatarUrl || undefined,
         role: "admin"
       });
 
@@ -8840,11 +8850,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.participants && Array.isArray(req.body.participants)) {
         for (const participant of req.body.participants) {
           if (participant.staffId !== userId) {
+            // Fetch participant's avatar URL from staff record
+            const participantStaff = await storage.getStaffByUserId(participant.staffId);
             await storage.addChatRoomParticipant({
               roomId: room.id,
               staffId: participant.staffId,
               staffName: participant.staffName,
               staffEmail: participant.staffEmail,
+              staffAvatarUrl: participant.staffAvatarUrl || participantStaff?.avatarUrl || undefined,
               role: "member"
             });
           }
@@ -9040,12 +9053,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Force role to member if not app admin
       const roleToAssign = (isAppAdmin && req.body.role === "admin") ? "admin" : "member";
       
+      // Fetch participant's avatar URL from staff record if not provided
+      let staffAvatarUrl = req.body.staffAvatarUrl;
+      if (!staffAvatarUrl && req.body.staffId) {
+        const participantStaff = await storage.getStaffByUserId(req.body.staffId);
+        staffAvatarUrl = participantStaff?.avatarUrl || undefined;
+      }
+      
       const validatedData = insertChatRoomParticipantSchema.parse({
         ...req.body,
         roomId,
         role: roleToAssign, // SECURITY: Override any client-provided role
         addedById: userId,
         addedByName: userName,
+        staffAvatarUrl,
       });
 
       const participant = await storage.addChatRoomParticipant(validatedData);

@@ -33,6 +33,7 @@ interface ChatRoomWithParticipants extends Omit<ChatRoom, 'clientName' | 'lastMe
     id: string;
     staffId: string;
     staffName: string;
+    staffAvatarUrl?: string | null;
     role: string;
     joinedAt: Date | null;
   }>;
@@ -266,6 +267,13 @@ export default function QuickChatPanel({ userId, userName }: QuickChatPanelProps
 
   const getRoomAvatarUrl = (room: ChatRoomWithParticipants) => {
     if (room.avatarUrl) return room.avatarUrl;
+    // For direct message chats, show the other participant's profile photo
+    if (room.type === "direct") {
+      const otherParticipant = room.participants.find(p => p.staffId !== userId);
+      if (otherParticipant?.staffAvatarUrl) {
+        return otherParticipant.staffAvatarUrl;
+      }
+    }
     if (room.type === "client" && room.clientId) {
       const client = clients.find(c => c.id === room.clientId);
       if (client?.profilePhotoUrl) return client.profilePhotoUrl;

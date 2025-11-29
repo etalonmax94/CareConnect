@@ -3010,6 +3010,7 @@ export const chatRoomParticipants = pgTable("chat_room_participants", {
   staffId: varchar("staff_id").notNull(),
   staffName: text("staff_name").notNull(),
   staffEmail: text("staff_email"),
+  staffAvatarUrl: text("staff_avatar_url"), // Profile photo URL for staff member
   
   // Role in the room
   role: text("role").$type<"admin" | "member">().default("member"),

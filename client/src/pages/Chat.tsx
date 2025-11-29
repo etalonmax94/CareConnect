@@ -985,11 +985,19 @@ export default function Chat() {
     }
   };
 
-  // Get avatar URL for a chat room - prioritizes room avatar, then client photo for client chats
+  // Get avatar URL for a chat room - prioritizes room avatar, then client photo for client chats, then staff photo for direct chats
   const getRoomAvatarUrl = (room: ChatRoomWithParticipants): string | undefined => {
     // If room has a custom avatar set, use it
     if (room.avatarUrl) {
       return room.avatarUrl;
+    }
+    
+    // For direct message chats, show the other participant's profile photo
+    if (room.type === "direct") {
+      const otherParticipant = room.participants.find(p => p.staffId !== currentUser?.id);
+      if (otherParticipant?.staffAvatarUrl) {
+        return otherParticipant.staffAvatarUrl;
+      }
     }
     
     // For client chats, try to get the client's photo
