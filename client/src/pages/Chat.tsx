@@ -165,6 +165,9 @@ export default function Chat() {
   const [activeMentions, setActiveMentions] = useState<Array<{ id: string; name: string }>>([]);
   const [messageSearchQuery, setMessageSearchQuery] = useState("");
   const [currentSearchResultIndex, setCurrentSearchResultIndex] = useState(0);
+  const [manageMembersRoomId, setManageMembersRoomId] = useState<string | null>(null);
+  const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
+  const [newMemberStaffId, setNewMemberStaffId] = useState<string>("");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -977,6 +980,45 @@ export default function Chat() {
     }
   });
 
+  const archiveChatMutation = useMutation({
+    mutationFn: async (roomId: string) => {
+      return await apiRequest("POST", `/api/chat/rooms/${roomId}/archive`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+      toast({ 
+        title: "Chat archived",
+        description: "This chat has been archived"
+      });
+      if (selectedRoomId === manageMembersRoomId) {
+        setSelectedRoomId(null);
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to archive chat", variant: "destructive" });
+    }
+  });
+
+  const addMemberMutation = useMutation({
+    mutationFn: async ({ roomId, staffId, staffName, staffEmail }: { roomId: string; staffId: string; staffName: string; staffEmail?: string }) => {
+      return await apiRequest("POST", `/api/chat/rooms/${roomId}/participants`, {
+        staffId,
+        staffName,
+        staffEmail,
+        role: "member"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+      toast({ title: "Member added successfully" });
+      setShowAddMemberDialog(false);
+      setNewMemberStaffId("");
+    },
+    onError: () => {
+      toast({ title: "Failed to add member", variant: "destructive" });
+    }
+  });
+
   // Filter staff based on role selection for custom chat
   const getFilteredStaff = () => {
     let filtered = staff.filter(s => s.isActive === "yes" && s.id !== currentUser?.id);
@@ -1270,7 +1312,7 @@ export default function Chat() {
                                 <MoreVertical className="h-4 w-4 text-slate-500" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuItem 
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1309,6 +1351,40 @@ export default function Chat() {
                                   </>
                                 )}
                               </DropdownMenuItem>
+                              
+                              <DropdownMenuSeparator />
+                              
+                              {/* Add member - only for group/client/announcement chats */}
+                              {(room.type === "group" || room.type === "client" || room.type === "announcement") && (
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setManageMembersRoomId(room.id);
+                                    setShowAddMemberDialog(true);
+                                  }}
+                                  data-testid={`add-member-${room.id}`}
+                                >
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Add member
+                                </DropdownMenuItem>
+                              )}
+                              
+                              {/* Archive chat - only for admins */}
+                              {isAppAdmin && (
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm("Are you sure you want to archive this chat? This action can be undone by an administrator.")) {
+                                      archiveChatMutation.mutate(room.id);
+                                    }
+                                  }}
+                                  className="text-orange-600 dark:text-orange-400"
+                                  data-testid={`archive-chat-${room.id}`}
+                                >
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archive chat
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -2439,6 +2515,99 @@ export default function Chat() {
               Powered by GIPHY
             </p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Member Dialog */}
+      <Dialog open={showAddMemberDialog} onOpenChange={(open) => {
+        setShowAddMemberDialog(open);
+        if (!open) {
+          setManageMembersRoomId(null);
+          setNewMemberStaffId("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Add Member
+            </DialogTitle>
+            <DialogDescription>
+              Select a team member to add to this chat
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[350px] py-4">
+            <div className="space-y-2">
+              {(() => {
+                const managedRoom = rooms.find(r => r.id === manageMembersRoomId);
+                const existingParticipantIds = managedRoom?.participants.map(p => p.staffId) || [];
+                const availableStaff = staff.filter(s => 
+                  s.isActive === "yes" && 
+                  !existingParticipantIds.includes(s.id)
+                );
+                
+                if (availableStaff.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-slate-500">
+                      <Users className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                      <p className="font-medium">All team members are already in this chat</p>
+                    </div>
+                  );
+                }
+                
+                return availableStaff.map((member) => (
+                  <div
+                    key={member.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                      newMemberStaffId === member.id 
+                        ? "bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800" 
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                    }`}
+                    onClick={() => setNewMemberStaffId(member.id)}
+                    data-testid={`add-member-staff-${member.id}`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                        {member.name?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-900 dark:text-white">{member.name}</p>
+                      <p className="text-sm text-slate-500">{member.role}</p>
+                    </div>
+                    {newMemberStaffId === member.id && (
+                      <Check className="h-5 w-5 text-blue-500" />
+                    )}
+                  </div>
+                ));
+              })()}
+            </div>
+          </ScrollArea>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const selectedStaff = staff.find(s => s.id === newMemberStaffId);
+                if (selectedStaff && manageMembersRoomId) {
+                  addMemberMutation.mutate({
+                    roomId: manageMembersRoomId,
+                    staffId: selectedStaff.id,
+                    staffName: selectedStaff.name || "Unknown",
+                    staffEmail: selectedStaff.email || undefined
+                  });
+                }
+              }}
+              disabled={!newMemberStaffId || addMemberMutation.isPending}
+              data-testid="button-confirm-add-member"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add Member
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
