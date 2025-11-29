@@ -28,6 +28,8 @@ import {
   chatMessageReactions, chatMessageReads, chatMessageDeliveries, scheduledMessages,
   // Scheduling Conflicts
   schedulingConflicts,
+  // Workforce Management
+  staffQualifications, staffBlacklist, timeClockRecords, timesheets, timesheetEntries, gpsComplianceLogs, publicHolidays, clientStaffRestrictions,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -104,7 +106,15 @@ import {
   type InsertScheduledMessage, type ScheduledMessage,
   // Scheduling Conflicts types
   type InsertSchedulingConflict, type SchedulingConflict,
-  type SchedulingConflictType, type ConflictSeverity, type ConflictStatus
+  type SchedulingConflictType, type ConflictSeverity, type ConflictStatus,
+  // Workforce Management types
+  type InsertStaffQualification, type StaffQualification,
+  type InsertStaffBlacklist, type StaffBlacklist,
+  type InsertTimeClockRecord, type TimeClockRecord,
+  type InsertTimesheet, type Timesheet,
+  type InsertTimesheetEntry, type TimesheetEntry,
+  type InsertGpsComplianceLog, type GpsComplianceLog,
+  type InsertPublicHoliday, type PublicHoliday
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 

@@ -1823,7 +1823,7 @@ export default function Chat() {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background" data-testid="chat-page">
       {/* Sidebar - Conversation List */}
-      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} ${isMobileView ? "w-full" : "w-80 lg:w-96"} flex-col h-full overflow-hidden bg-card md:border-r shrink-0`}>
+      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} ${isMobileView ? "w-full" : "w-64 lg:w-80 xl:w-96"} flex-col h-full overflow-hidden bg-card md:border-r shrink-0`}>
         {/* Header - Fixed at top */}
         <div className="shrink-0 bg-card border-b">
           <div className="px-4 pt-4 pb-3 md:px-5 md:pt-5">
