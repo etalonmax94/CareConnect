@@ -950,7 +950,8 @@ export default function Chat() {
   // Pin/mute mutations
   const pinMutation = useMutation({
     mutationFn: async (roomId: string) => {
-      return await apiRequest("POST", `/api/chat/rooms/${roomId}/pin`);
+      const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/pin`);
+      return response as { isPinned: boolean };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
@@ -966,7 +967,8 @@ export default function Chat() {
 
   const muteMutation = useMutation({
     mutationFn: async (roomId: string) => {
-      return await apiRequest("POST", `/api/chat/rooms/${roomId}/mute`);
+      const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/mute`);
+      return response as { isMuted: boolean };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
@@ -1129,23 +1131,23 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-white dark:bg-slate-900" data-testid="chat-page">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background" data-testid="chat-page">
       {/* Sidebar - Conversation List */}
-      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col bg-white dark:bg-slate-900 md:border-r border-slate-200 dark:border-slate-700`}>
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col h-full overflow-hidden bg-card md:border-r`}>
+        {/* Header - Fixed at top */}
+        <div className="shrink-0 bg-card border-b">
           <div className="px-4 pt-4 pb-3 md:px-5 md:pt-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-white" data-testid="text-page-title">Messages</h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Team communication</p>
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight" data-testid="text-page-title">Messages</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">Team communication</p>
               </div>
-              <div className="flex items-center">
+              <div className="flex items-center gap-1">
                 {isAppAdmin && (
                   <Button 
                     size="icon" 
                     variant="ghost" 
-                    className="rounded-full min-w-[44px] min-h-[44px]"
+                    className="rounded-full h-10 w-10"
                     onClick={() => setShowCustomChatDialog(true)}
                     title="Create Custom Chat"
                     data-testid="button-admin-create-chat"
@@ -1155,7 +1157,7 @@ export default function Chat() {
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="icon" className="rounded-full min-w-[44px] min-h-[44px]" data-testid="button-new-chat">
+                    <Button size="icon" className="rounded-full h-10 w-10 bg-primary hover:bg-primary/90" data-testid="button-new-chat">
                       <Plus className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -1184,12 +1186,12 @@ export default function Chat() {
             
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400"
+                className="pl-9 h-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary rounded-xl"
                 data-testid="input-search-chats"
               />
             </div>
@@ -1198,17 +1200,17 @@ export default function Chat() {
           {/* Filter Tabs */}
           <div className="px-4 pb-3 md:px-5">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full h-10 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl grid grid-cols-4 gap-1">
-                <TabsTrigger value="all" className="text-xs font-medium rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-700 dark:data-[state=active]:text-blue-400">All</TabsTrigger>
-                <TabsTrigger value="client" className="text-xs font-medium rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-700 dark:data-[state=active]:text-blue-400">
+              <TabsList className="w-full h-9 p-1 bg-muted/50 rounded-lg grid grid-cols-4 gap-0.5">
+                <TabsTrigger value="all" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">All</TabsTrigger>
+                <TabsTrigger value="client" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
                   <Briefcase className="h-3 w-3 mr-1" />
                   Clients
                 </TabsTrigger>
-                <TabsTrigger value="direct" className="text-xs font-medium rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-700 dark:data-[state=active]:text-blue-400">
+                <TabsTrigger value="direct" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
                   <UserIcon className="h-3 w-3 mr-1" />
                   Direct
                 </TabsTrigger>
-                <TabsTrigger value="group" className="text-xs font-medium rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-700 dark:data-[state=active]:text-blue-400">
+                <TabsTrigger value="group" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
                   <Users className="h-3 w-3 mr-1" />
                   Teams
                 </TabsTrigger>
@@ -1217,31 +1219,32 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Conversation List */}
-        <ScrollArea className="flex-1 bg-white dark:bg-slate-900">
+        {/* Conversation List - Scrollable area that fills remaining height */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full">
           {roomsLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="flex flex-col items-center gap-2">
-                <div className="h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-slate-500">Loading chats...</p>
+                <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-muted-foreground">Loading chats...</p>
               </div>
             </div>
           ) : filteredRooms.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-              <div className="h-16 w-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-                <MessageSquare className="h-8 w-8 text-slate-400" />
+              <div className="h-14 w-14 rounded-xl bg-muted/50 flex items-center justify-center mb-4">
+                <MessageSquare className="h-7 w-7 text-muted-foreground/50" />
               </div>
-              <h3 className="font-semibold text-slate-900 dark:text-white mb-1">No conversations yet</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              <h3 className="font-semibold mb-1">No conversations yet</h3>
+              <p className="text-sm text-muted-foreground mb-4">
                 Start a new conversation with your team
               </p>
-              <Button onClick={() => setShowNewChatDialog(true)} className="rounded-full px-6 bg-blue-500 hover:bg-blue-600">
+              <Button onClick={() => setShowNewChatDialog(true)} className="rounded-lg px-5">
                 <Plus className="h-4 w-4 mr-2" />
                 Start Chat
               </Button>
             </div>
           ) : (
-            <div className="px-2 py-2">
+            <div className="p-2">
               {filteredRooms.map((room) => {
                 const isSelected = room.id === selectedRoomId;
                 const otherParticipant = room.participants.find(p => p.staffId !== currentUser?.id);
@@ -1253,10 +1256,10 @@ export default function Chat() {
                 return (
                   <div
                     key={room.id}
-                    className={`group relative flex items-center gap-3 p-3 mb-1 cursor-pointer rounded-xl transition-all duration-200 ${
+                    className={`group relative flex items-center gap-3 p-3 mb-1.5 cursor-pointer rounded-lg transition-colors ${
                       isSelected 
-                        ? "bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 shadow-sm" 
-                        : "hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100 dark:active:bg-slate-700 border border-transparent"
+                        ? "bg-primary/10 border border-primary/20" 
+                        : "hover:bg-muted/50 border border-transparent"
                     }`}
                     data-testid={`chat-room-${room.id}`}
                     onClick={() => {
@@ -1266,20 +1269,20 @@ export default function Chat() {
                     {/* Pin indicator */}
                     {isPinned && (
                       <div className="absolute -top-1 -left-1 z-10">
-                        <div className="bg-amber-500 text-white p-1 rounded-full shadow-sm">
+                        <div className="bg-amber-500 text-white p-0.5 rounded-full shadow-sm">
                           <Pin className="h-2.5 w-2.5" />
                         </div>
                       </div>
                     )}
                     
                     <div className="relative shrink-0">
-                      <Avatar className="h-12 w-12 ring-2 ring-white dark:ring-slate-800 shadow-sm">
+                      <Avatar className="h-11 w-11 shadow-sm">
                         <AvatarFallback className={`${getRoomBgColor(room)} text-sm font-medium`}>
                           {getRoomAvatar(room)}
                         </AvatarFallback>
                       </Avatar>
                       {room.type === "direct" && isOnline && (
-                        <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white dark:border-slate-800 ring-2 ring-green-500/20" />
+                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
                       )}
                     </div>
                     
@@ -1287,16 +1290,16 @@ export default function Chat() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
                           {getRoomIcon(room)}
-                          <span className={`font-semibold truncate text-slate-900 dark:text-white ${isSelected ? "text-blue-600 dark:text-blue-400" : ""}`}>
+                          <span className={`font-medium truncate ${isSelected ? "text-primary" : ""}`}>
                             {getRoomDisplayName(room)}
                           </span>
                           {isMuted && (
-                            <BellOff className="h-3 w-3 text-slate-400" />
+                            <BellOff className="h-3 w-3 text-muted-foreground" />
                           )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {room.lastMessageAt && (
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="text-[11px] text-muted-foreground">
                               {formatDistanceToNow(new Date(room.lastMessageAt), { addSuffix: false })}
                             </span>
                           )}
@@ -1309,7 +1312,7 @@ export default function Chat() {
                                 size="icon" 
                                 className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                               >
-                                <MoreVertical className="h-4 w-4 text-slate-500" />
+                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
@@ -1407,23 +1410,23 @@ export default function Chat() {
                         </div>
                       </div>
                       {room.lastMessagePreview && (
-                        <p className="text-sm text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                        <p className="text-sm text-muted-foreground truncate mt-0.5">
                           {room.lastMessagePreview}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-1.5">
+                      <div className="flex items-center gap-2 mt-1">
                         {room.type === "client" && room.clientName && (
-                          <Badge className="text-[10px] h-5 px-2 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0">
+                          <Badge variant="secondary" className="text-[10px] h-5 px-2 rounded-md font-normal">
                             {room.clientName}
                           </Badge>
                         )}
                         {(room.type === "group" || room.type === "announcement") && (
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="text-[11px] text-muted-foreground">
                             {room.participants.length} members
                           </span>
                         )}
                         {room.isAnnouncement === "yes" && (
-                          <Badge className="text-[10px] h-5 px-2 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-0">
+                          <Badge variant="secondary" className="text-[10px] h-5 px-2 rounded-md font-normal bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
                             <Megaphone className="h-2.5 w-2.5 mr-1" />
                             Broadcast
                           </Badge>
@@ -1432,17 +1435,18 @@ export default function Chat() {
                     </div>
                     
                     {/* Chevron indicator */}
-                    <ChevronRight className={`h-4 w-4 shrink-0 transition-all ${isSelected ? "text-blue-500" : "text-slate-300 dark:text-slate-600"}`} />
+                    <ChevronRight className={`h-4 w-4 shrink-0 transition-all ${isSelected ? "text-primary" : "text-muted-foreground/30"}`} />
                   </div>
                 );
               })}
             </div>
           )}
-        </ScrollArea>
+          </ScrollArea>
+        </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col md:flex bg-slate-50 dark:bg-slate-950`}>
+      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col h-full overflow-hidden md:flex bg-muted/30`}>
         {selectedRoom ? (
           <>
             {/* Chat Header - Premium Design */}
