@@ -2924,6 +2924,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get staff full profile with all related data
+  app.get("/api/staff/:id/full-profile", requireAuth, async (req: any, res) => {
+    try {
+      const staffId = req.params.id;
+
+      // Fetch staff basic info
+      const staffMember = await storage.getStaffById(staffId);
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Fetch all related data in parallel
+      const [
+        emergencyContacts,
+        qualifications,
+        availabilityWindows,
+        unavailabilityPeriods,
+        currentStatus,
+        blacklistEntries,
+        clientAssignments,
+        supervisor
+      ] = await Promise.all([
+        storage.getStaffEmergencyContacts(staffId),
+        storage.getStaffQualifications(staffId),
+        storage.getStaffAvailabilityWindows(staffId),
+        storage.getStaffUnavailabilityPeriods(staffId),
+        storage.getCurrentStaffStatus(staffId),
+        storage.getStaffBlacklist(staffId),
+        storage.getClientStaffAssignmentsByStaff(staffId),
+        staffMember.supervisorId ? storage.getStaffById(staffMember.supervisorId) : null
+      ]);
+
+      // Build full profile response
+      const fullProfile = {
+        // Core staff data
+        ...staffMember,
+
+        // Related entities
+        emergencyContacts,
+        qualifications,
+        availabilityWindows,
+        unavailabilityPeriods,
+        currentStatus,
+        blacklistEntries,
+        clientAssignments,
+
+        // Enriched data
+        supervisor: supervisor ? {
+          id: supervisor.id,
+          name: supervisor.name,
+          role: supervisor.role,
+          email: supervisor.email
+        } : null,
+
+        // Computed fields
+        qualificationsCount: qualifications.length,
+        activeQualificationsCount: qualifications.filter((q: any) => q.status === "current").length,
+        expiringQualificationsCount: qualifications.filter((q: any) => {
+          if (!q.expiryDate) return false;
+          const expiryDate = new Date(q.expiryDate);
+          const thirtyDaysFromNow = new Date();
+          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+          return expiryDate <= thirtyDaysFromNow && expiryDate > new Date();
+        }).length,
+        activeClientCount: clientAssignments.length
+      };
+
+      res.json(fullProfile);
+    } catch (error) {
+      console.error("Error fetching staff full profile:", error);
+      res.status(500).json({ error: "Failed to fetch staff full profile" });
+    }
+  });
+
   // Create staff
   app.post("/api/staff", async (req, res) => {
     try {
@@ -12222,6 +12296,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting staff qualification:", error);
       res.status(500).json({ error: "Failed to delete staff qualification" });
+    }
+  });
+
+  // ============================================
+  // Staff Emergency Contacts
+  // ============================================
+
+  app.get("/api/staff/:staffId/emergency-contacts", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const contacts = await storage.getStaffEmergencyContacts(staffId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching staff emergency contacts:", error);
+      res.status(500).json({ error: "Failed to fetch emergency contacts" });
+    }
+  });
+
+  app.get("/api/staff/emergency-contacts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const contact = await storage.getStaffEmergencyContactById(id);
+      if (!contact) {
+        return res.status(404).json({ error: "Emergency contact not found" });
+      }
+      res.json(contact);
+    } catch (error) {
+      console.error("Error fetching emergency contact:", error);
+      res.status(500).json({ error: "Failed to fetch emergency contact" });
+    }
+  });
+
+  app.post("/api/staff/:staffId/emergency-contacts", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+
+      // If this contact is marked as primary, unset other primary contacts
+      if (req.body.isPrimary === "yes") {
+        await storage.unsetPrimaryStaffEmergencyContacts(staffId);
+      }
+
+      const contact = await storage.createStaffEmergencyContact({
+        ...req.body,
+        staffId,
+      });
+      res.status(201).json(contact);
+    } catch (error) {
+      console.error("Error creating staff emergency contact:", error);
+      res.status(500).json({ error: "Failed to create emergency contact" });
+    }
+  });
+
+  app.patch("/api/staff/emergency-contacts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const existingContact = await storage.getStaffEmergencyContactById(id);
+      if (!existingContact) {
+        return res.status(404).json({ error: "Emergency contact not found" });
+      }
+
+      // If setting as primary, unset others first
+      if (req.body.isPrimary === "yes") {
+        await storage.unsetPrimaryStaffEmergencyContacts(existingContact.staffId);
+      }
+
+      const contact = await storage.updateStaffEmergencyContact(id, req.body);
+      res.json(contact);
+    } catch (error) {
+      console.error("Error updating staff emergency contact:", error);
+      res.status(500).json({ error: "Failed to update emergency contact" });
+    }
+  });
+
+  app.delete("/api/staff/emergency-contacts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteStaffEmergencyContact(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Emergency contact not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting staff emergency contact:", error);
+      res.status(500).json({ error: "Failed to delete emergency contact" });
     }
   });
 

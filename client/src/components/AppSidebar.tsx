@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -193,17 +194,20 @@ export function AppSidebar({ user }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className={cn(
-        "border-b border-sidebar-border",
+        "border-b border-sidebar-border sticky top-0 z-40",
         isCollapsed ? "p-2" : "p-4"
       )}>
-        <div className="flex items-center justify-center">
-          {isCollapsed ? (
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <span className="text-primary font-bold text-sm">E</span>
-            </div>
-          ) : (
-            <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto" />
-          )}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1 flex items-center justify-center">
+            {isCollapsed ? (
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold text-sm">E</span>
+              </div>
+            ) : (
+              <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto" />
+            )}
+          </div>
+          <SidebarTrigger className="ml-auto" data-testid="button-sidebar-toggle" />
         </div>
       </SidebarHeader>
       

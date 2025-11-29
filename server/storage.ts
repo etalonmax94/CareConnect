@@ -30,6 +30,7 @@ import {
   schedulingConflicts,
   // Workforce Management
   staffQualifications, staffBlacklist, timeClockRecords, timesheets, timesheetEntries, gpsComplianceLogs, clientStaffRestrictions,
+  staffEmergencyContacts,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -113,7 +114,9 @@ import {
   type InsertTimeClockRecord, type TimeClockRecord,
   type InsertTimesheet, type Timesheet,
   type InsertTimesheetEntry, type TimesheetEntry,
-  type InsertGpsComplianceLog, type GpsComplianceLog
+  type InsertGpsComplianceLog, type GpsComplianceLog,
+  // Staff Emergency Contacts
+  type InsertStaffEmergencyContact, type StaffEmergencyContact
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -757,6 +760,14 @@ export interface IStorage {
   createStaffQualification(qualification: InsertStaffQualification): Promise<StaffQualification>;
   updateStaffQualification(id: string, qualification: Partial<InsertStaffQualification>): Promise<StaffQualification | undefined>;
   deleteStaffQualification(id: string): Promise<boolean>;
+
+  // Staff Emergency Contacts
+  getStaffEmergencyContacts(staffId: string): Promise<StaffEmergencyContact[]>;
+  getStaffEmergencyContactById(id: string): Promise<StaffEmergencyContact | undefined>;
+  createStaffEmergencyContact(contact: InsertStaffEmergencyContact): Promise<StaffEmergencyContact>;
+  updateStaffEmergencyContact(id: string, contact: Partial<InsertStaffEmergencyContact>): Promise<StaffEmergencyContact | undefined>;
+  deleteStaffEmergencyContact(id: string): Promise<boolean>;
+  unsetPrimaryStaffEmergencyContacts(staffId: string): Promise<void>;
 
   // Workforce Management - Staff Blacklist
   getStaffBlacklist(staffId: string): Promise<StaffBlacklist[]>;
@@ -5178,6 +5189,50 @@ export class DbStorage implements IStorage {
       .where(eq(staffQualifications.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // Staff Emergency Contacts
+  async getStaffEmergencyContacts(staffId: string): Promise<StaffEmergencyContact[]> {
+    return await db.select()
+      .from(staffEmergencyContacts)
+      .where(eq(staffEmergencyContacts.staffId, staffId))
+      .orderBy(staffEmergencyContacts.priority);
+  }
+
+  async getStaffEmergencyContactById(id: string): Promise<StaffEmergencyContact | undefined> {
+    const result = await db.select()
+      .from(staffEmergencyContacts)
+      .where(eq(staffEmergencyContacts.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createStaffEmergencyContact(contact: InsertStaffEmergencyContact): Promise<StaffEmergencyContact> {
+    const result = await db.insert(staffEmergencyContacts)
+      .values(contact)
+      .returning();
+    return result[0];
+  }
+
+  async updateStaffEmergencyContact(id: string, contact: Partial<InsertStaffEmergencyContact>): Promise<StaffEmergencyContact | undefined> {
+    const result = await db.update(staffEmergencyContacts)
+      .set({ ...contact, updatedAt: new Date() })
+      .where(eq(staffEmergencyContacts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffEmergencyContact(id: string): Promise<boolean> {
+    const result = await db.delete(staffEmergencyContacts)
+      .where(eq(staffEmergencyContacts.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async unsetPrimaryStaffEmergencyContacts(staffId: string): Promise<void> {
+    await db.update(staffEmergencyContacts)
+      .set({ isPrimary: "no" })
+      .where(eq(staffEmergencyContacts.staffId, staffId));
   }
 
   // Workforce Management - Staff Blacklist

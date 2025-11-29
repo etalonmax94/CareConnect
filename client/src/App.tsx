@@ -157,10 +157,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
       <div className="flex h-screen w-full">
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between gap-4 px-4 py-2 border-b sticky top-0 bg-background z-50">
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-            </div>
+          <header className="flex items-center justify-between w-full px-4 py-2 border-b sticky top-0 bg-background z-50">
             <div className="flex-1 flex justify-center max-w-2xl mx-auto">
               <GlobalSearch />
             </div>
