@@ -210,6 +210,41 @@ const uploadChatAttachment = multer({
   }
 });
 
+// Chat room avatar upload configuration
+const chatAvatarDir = path.join(uploadsDir, 'chat-avatars');
+if (!fs.existsSync(chatAvatarDir)) {
+  fs.mkdirSync(chatAvatarDir, { recursive: true });
+}
+
+const chatAvatarStorageConfig = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, chatAvatarDir);
+  },
+  filename: (req, file, cb) => {
+    const roomId = (req as any).params.roomId;
+    // Validate extension from whitelist only
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+    const safeExt = allowedExtensions.includes(ext) ? ext : '.jpg';
+    // Sanitize room ID to prevent path traversal
+    const sanitizedRoomId = sanitizeFilename(roomId);
+    cb(null, `${sanitizedRoomId}${safeExt}`);
+  }
+});
+
+const uploadChatAvatar = multer({
+  storage: chatAvatarStorageConfig,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for avatars
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+    }
+  }
+});
+
 // Audit logging helper function
 interface AuditLogOptions {
   entityType: string;
@@ -8819,6 +8854,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating chat room:", error);
       res.status(500).json({ error: "Failed to update chat room" });
+    }
+  });
+
+  // Upload chat room avatar
+  app.post("/api/chat/rooms/:roomId/avatar", requireAuth, uploadChatAvatar.single("avatar"), async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userRoles = req.session?.user?.roles || [];
+      const { roomId } = req.params;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Verify room exists
+      const room = await storage.getChatRoomById(roomId);
+      if (!room) {
+        // Clean up uploaded file
+        if (req.file.path && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(404).json({ error: "Chat room not found" });
+      }
+
+      // Authorization: Check if user is room admin or app admin
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      const participants = await storage.getChatRoomParticipants(roomId);
+      const userParticipant = participants.find(p => p.staffId === userId);
+      const isRoomAdmin = userParticipant?.role === "admin";
+      
+      if (!isAppAdmin && !isRoomAdmin) {
+        // Clean up uploaded file
+        if (req.file.path && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(403).json({ error: "Only room admins can change the chat photo" });
+      }
+
+      // Delete previous avatar file if exists
+      if (room.avatarUrl) {
+        const oldAvatarPath = path.join(process.cwd(), room.avatarUrl.replace(/^\//, ''));
+        if (fs.existsSync(oldAvatarPath)) {
+          try {
+            fs.unlinkSync(oldAvatarPath);
+          } catch (err) {
+            console.error("Failed to delete old avatar:", err);
+          }
+        }
+      }
+
+      // Build avatar URL - relative path for serving
+      const avatarUrl = `/uploads/chat-avatars/${req.file.filename}`;
+      
+      // Update room with new avatar URL
+      const updatedRoom = await storage.updateChatRoom(roomId, { avatarUrl });
+      
+      res.json({ avatarUrl, room: updatedRoom });
+    } catch (error) {
+      console.error("Error uploading chat avatar:", error);
+      // Clean up uploaded file on error
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (err) {
+          console.error("Failed to clean up file:", err);
+        }
+      }
+      res.status(500).json({ error: "Failed to upload avatar" });
+    }
+  });
+
+  // Delete chat room avatar
+  app.delete("/api/chat/rooms/:roomId/avatar", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const userRoles = req.session?.user?.roles || [];
+      const { roomId } = req.params;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const room = await storage.getChatRoomById(roomId);
+      if (!room) {
+        return res.status(404).json({ error: "Chat room not found" });
+      }
+
+      // Authorization: Check if user is room admin or app admin
+      const isAppAdmin = userRoles.some((role: string) => 
+        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+      );
+      const participants = await storage.getChatRoomParticipants(roomId);
+      const userParticipant = participants.find(p => p.staffId === userId);
+      const isRoomAdmin = userParticipant?.role === "admin";
+      
+      if (!isAppAdmin && !isRoomAdmin) {
+        return res.status(403).json({ error: "Only room admins can remove the chat photo" });
+      }
+
+      // Delete avatar file if exists
+      if (room.avatarUrl) {
+        const avatarPath = path.join(process.cwd(), room.avatarUrl.replace(/^\//, ''));
+        if (fs.existsSync(avatarPath)) {
+          try {
+            fs.unlinkSync(avatarPath);
+          } catch (err) {
+            console.error("Failed to delete avatar file:", err);
+          }
+        }
+      }
+
+      // Clear avatar URL from room
+      const updatedRoom = await storage.updateChatRoom(roomId, { avatarUrl: null });
+      
+      res.json({ success: true, room: updatedRoom });
+    } catch (error) {
+      console.error("Error deleting chat avatar:", error);
+      res.status(500).json({ error: "Failed to delete avatar" });
     }
   });
 

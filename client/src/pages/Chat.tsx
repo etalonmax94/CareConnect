@@ -47,7 +47,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -199,6 +199,12 @@ export default function Chat() {
 
   const { data: staff = [] } = useQuery<Staff[]>({
     queryKey: ["/api/staff"],
+  });
+
+  // Fetch clients to get their photos for client chats
+  const { data: clients = [] } = useQuery<{ id: string; photo?: string | null }[]>({
+    queryKey: ["/api/clients"],
+    select: (data: any[]) => data.map(c => ({ id: c.id, photo: c.photo })),
   });
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);
@@ -893,6 +899,25 @@ export default function Chat() {
     }
   };
 
+  // Get avatar URL for a chat room - prioritizes room avatar, then client photo for client chats
+  const getRoomAvatarUrl = (room: ChatRoomWithParticipants): string | undefined => {
+    // If room has a custom avatar set, use it
+    if (room.avatarUrl) {
+      return room.avatarUrl;
+    }
+    
+    // For client chats, try to get the client's photo
+    if (room.type === "client" && room.clientId) {
+      const client = clients.find(c => c.id === room.clientId);
+      if (client?.photo) {
+        return client.photo;
+      }
+    }
+    
+    // No avatar available - will use fallback
+    return undefined;
+  };
+
   const formatMessageDate = (date: Date | string) => {
     const d = new Date(date);
     if (isToday(d)) {
@@ -951,7 +976,7 @@ export default function Chat() {
   const pinMutation = useMutation({
     mutationFn: async (roomId: string) => {
       const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/pin`);
-      return response as { isPinned: boolean };
+      return response as unknown as { isPinned: boolean };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
@@ -968,7 +993,7 @@ export default function Chat() {
   const muteMutation = useMutation({
     mutationFn: async (roomId: string) => {
       const response = await apiRequest("POST", `/api/chat/rooms/${roomId}/mute`);
-      return response as { isMuted: boolean };
+      return response as unknown as { isMuted: boolean };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
@@ -1277,6 +1302,7 @@ export default function Chat() {
                     
                     <div className="relative shrink-0">
                       <Avatar className="h-11 w-11 shadow-sm">
+                        <AvatarImage src={getRoomAvatarUrl(room)} alt={getRoomDisplayName(room)} />
                         <AvatarFallback className={`${getRoomBgColor(room)} text-sm font-medium`}>
                           {getRoomAvatar(room)}
                         </AvatarFallback>
@@ -1462,6 +1488,7 @@ export default function Chat() {
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Avatar className="h-10 w-10 md:h-11 md:w-11 shadow-sm shrink-0">
+                  <AvatarImage src={getRoomAvatarUrl(selectedRoom)} alt={getRoomDisplayName(selectedRoom)} />
                   <AvatarFallback className={`${getRoomBgColor(selectedRoom)} text-sm font-medium`}>
                     {getRoomAvatar(selectedRoom)}
                   </AvatarFallback>
@@ -1557,6 +1584,91 @@ export default function Chat() {
                       </SheetDescription>
                     </SheetHeader>
                     <div className="space-y-6 mt-6">
+                      {/* Chat Avatar */}
+                      <div className="space-y-3">
+                        <Label>Chat Photo</Label>
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-16 w-16 shadow-md">
+                            <AvatarImage src={getRoomAvatarUrl(selectedRoom)} alt={getRoomDisplayName(selectedRoom)} />
+                            <AvatarFallback className={`${getRoomBgColor(selectedRoom)} text-lg font-medium`}>
+                              {getRoomAvatar(selectedRoom)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col gap-2">
+                            <input
+                              type="file"
+                              id="chat-avatar-upload"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file && selectedRoom) {
+                                  const formData = new FormData();
+                                  formData.append("avatar", file);
+                                  try {
+                                    const response = await fetch(`/api/chat/rooms/${selectedRoom.id}/avatar`, {
+                                      method: "POST",
+                                      body: formData,
+                                      credentials: "include",
+                                    });
+                                    if (response.ok) {
+                                      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+                                      toast({ title: "Chat photo updated" });
+                                    } else {
+                                      toast({ title: "Failed to upload photo", variant: "destructive" });
+                                    }
+                                  } catch (err) {
+                                    toast({ title: "Failed to upload photo", variant: "destructive" });
+                                  }
+                                }
+                                e.target.value = "";
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => document.getElementById("chat-avatar-upload")?.click()}
+                              data-testid="button-upload-chat-avatar"
+                            >
+                              <ImageIcon className="h-4 w-4 mr-2" />
+                              {selectedRoom.avatarUrl ? "Change Photo" : "Upload Photo"}
+                            </Button>
+                            {selectedRoom.avatarUrl && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch(`/api/chat/rooms/${selectedRoom.id}/avatar`, {
+                                      method: "DELETE",
+                                      credentials: "include",
+                                    });
+                                    if (response.ok) {
+                                      queryClient.invalidateQueries({ queryKey: ["/api/chat/rooms"] });
+                                      toast({ title: "Chat photo removed" });
+                                    }
+                                  } catch (err) {
+                                    toast({ title: "Failed to remove photo", variant: "destructive" });
+                                  }
+                                }}
+                                data-testid="button-remove-chat-avatar"
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {selectedRoom.type === "client" && !selectedRoom.avatarUrl && (
+                          <p className="text-xs text-muted-foreground">
+                            Using client's profile photo. Upload a custom photo to override.
+                          </p>
+                        )}
+                      </div>
+
+                      <Separator />
+
                       {/* Room Name */}
                       <div className="space-y-2">
                         <Label>Chat Name</Label>
