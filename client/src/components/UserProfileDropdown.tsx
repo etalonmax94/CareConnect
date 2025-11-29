@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, Monitor, Settings, LogOut, ChevronDown, BarChart3, History } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Moon, Sun, Monitor, Settings, LogOut, ChevronDown, BarChart3, History, Shield, UserCheck } from "lucide-react";
 import { removeAuthToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +21,11 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 
 type Theme = "light" | "dark" | "system";
 
+interface User {
+  id: string;
+  approvalStatus?: string;
+}
+
 interface UserProfileDropdownProps {
   user: {
     id: string;
@@ -33,6 +40,20 @@ interface UserProfileDropdownProps {
 export default function UserProfileDropdown({ user }: UserProfileDropdownProps) {
   const [theme, setTheme] = useState<Theme>("system");
   const [, setLocation] = useLocation();
+
+  // Check if user can approve users (director or operations_manager)
+  const canApproveUsers = user.roles?.some(role =>
+    ["director", "operations_manager"].includes(role)
+  ) ?? false;
+
+  // Fetch pending users count if user has approval permissions
+  const { data: pendingUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users/pending"],
+    enabled: canApproveUsers,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const pendingCount = pendingUsers.filter(u => u.approvalStatus === "pending").length;
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null;
@@ -62,23 +83,23 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
 
   const handleSignOut = () => {
     console.log('[Auth] Sign out initiated from profile dropdown');
-    
+
     // Clear JWT token from localStorage first
     removeAuthToken();
     console.log('[Auth] Token removed from localStorage');
-    
+
     // Clear query cache
     queryClient.clear();
     console.log('[Auth] Query cache cleared');
-    
+
     // Call logout API asynchronously but don't wait for it
-    fetch("/api/auth/logout", { 
+    fetch("/api/auth/logout", {
       method: "POST",
       credentials: "include"
     }).catch(() => {
       // Ignore errors - logout API is optional
     });
-    
+
     // Force full page redirect to login immediately
     console.log('[Auth] Redirecting to /login');
     window.location.href = "/login";
@@ -119,16 +140,25 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          className="flex items-center gap-2 px-2 py-1.5 h-auto"
+        <Button
+          variant="ghost"
+          className="flex items-center gap-2 px-2 py-1.5 h-auto relative"
           data-testid="button-user-profile"
         >
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
-              {getInitials()}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
+            {/* Orange dot indicator for pending approvals */}
+            {canApproveUsers && pendingCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-orange-500" />
+              </span>
+            )}
+          </div>
           <div className="hidden md:flex flex-col items-start">
             <span className="text-sm font-medium leading-none">{getDisplayName()}</span>
             <span className="text-xs text-muted-foreground leading-none mt-0.5">
@@ -146,14 +176,35 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem 
+
+        {/* User Approvals - Only show if user has permission */}
+        {canApproveUsers && (
+          <DropdownMenuItem
+            onClick={() => setLocation("/user-approvals")}
+            data-testid="menu-item-user-approvals"
+            className="relative"
+          >
+            <UserCheck className="mr-2 h-4 w-4" />
+            <span>User Approvals</span>
+            {pendingCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="ml-auto bg-orange-500 hover:bg-orange-600 text-white text-xs px-1.5 py-0 h-5 min-w-[20px] flex items-center justify-center"
+              >
+                {pendingCount}
+              </Badge>
+            )}
+          </DropdownMenuItem>
+        )}
+
+        <DropdownMenuItem
           onClick={() => setLocation("/reports")}
           data-testid="menu-item-reports"
         >
           <BarChart3 className="mr-2 h-4 w-4" />
           <span>Reports</span>
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => setLocation("/audit-log")}
           data-testid="menu-item-audit-log"
         >
@@ -161,7 +212,7 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
           <span>Audit Log</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => setLocation("/settings")}
           data-testid="menu-item-settings"
         >
@@ -174,7 +225,7 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
             <span className="ml-2">Theme</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => handleThemeChange("light")}
               data-testid="menu-item-theme-light"
             >
@@ -182,7 +233,7 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
               <span>Light</span>
               {theme === "light" && <span className="ml-auto text-primary">✓</span>}
             </DropdownMenuItem>
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => handleThemeChange("dark")}
               data-testid="menu-item-theme-dark"
             >
@@ -190,7 +241,7 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
               <span>Dark</span>
               {theme === "dark" && <span className="ml-auto text-primary">✓</span>}
             </DropdownMenuItem>
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => handleThemeChange("system")}
               data-testid="menu-item-theme-system"
             >
@@ -201,7 +252,7 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={handleSignOut}
           className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
           data-testid="menu-item-signout"

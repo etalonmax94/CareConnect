@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck, ChevronRight, FileCheck, GraduationCap } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, History, HeartPulse, ClipboardList, HomeIcon, ListTodo, MessageSquare, Network, Clock, MapPin, ClipboardCheck, ChevronRight, GraduationCap, CalendarRange, LayoutTemplate, TrendingUp } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -55,9 +55,6 @@ const menuCategories: MenuCategory[] = [
     label: "Clients",
     items: [
       { title: "Clients", url: "/clients", icon: Users, iconColor: "text-emerald-500" },
-      { title: "Appointments", url: "/appointments", icon: Calendar, iconColor: "text-sky-500" },
-      { title: "Quotes", url: "/quotes", icon: Calculator, iconColor: "text-purple-500" },
-      { title: "Documents", url: "/documents", icon: FileText, iconColor: "text-amber-500" },
       { title: "SIL Houses", url: "/sil-houses", icon: HomeIcon, iconColor: "text-indigo-500" },
     ],
   },
@@ -72,20 +69,17 @@ const menuCategories: MenuCategory[] = [
     ],
   },
   {
-    label: "Workforce",
+    label: "Operations",
     items: [
-      { title: "Mobile Clock", url: "/mobile-clock", icon: Clock, iconColor: "text-blue-500" },
-      { title: "Timesheet Approval", url: "/timesheet-approval", icon: ClipboardCheck, iconColor: "text-green-500" },
-      { title: "GPS Compliance", url: "/gps-compliance", icon: MapPin, iconColor: "text-red-500" },
-      { title: "Staff Qualifications", url: "/staff-qualifications", icon: Award, iconColor: "text-yellow-600" },
-      { title: "Staff Documents", url: "/staff-documents", icon: FileCheck, iconColor: "text-purple-500" },
+      { title: "Scheduling", url: "/ascs-calendar", icon: CalendarRange, iconColor: "text-sky-500" },
+      { title: "Quotes", url: "/quotes", icon: Calculator, iconColor: "text-purple-500" },
+      { title: "Documents", url: "/documents", icon: FileText, iconColor: "text-amber-500" },
     ],
   },
   {
     label: "System",
     items: [
       { title: "Form Templates", url: "/form-templates", icon: ClipboardList, iconColor: "text-lime-500" },
-      { title: "Help Desk", url: "/help-desk", icon: LifeBuoy, iconColor: "text-cyan-500" },
     ],
   },
 ];
@@ -142,14 +136,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
   };
 
   const displayName = user?.firstName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
-
-  const canApproveUsers = user?.roles?.some(role => 
-    ["director", "operations_manager"].includes(role)
-  ) ?? false;
-
-  const adminItems: MenuItem[] = canApproveUsers ? [
-    { title: "User Approvals", url: "/user-approvals", icon: Shield, iconColor: "text-red-500" },
-  ] : [];
 
   const renderMenuItem = (item: MenuItem) => {
     const isActive = location === item.url;
@@ -249,31 +235,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
           </div>
         ))}
         
-        {adminItems.length > 0 && (
-          <div>
-            {isCollapsed && (
-              <div className="my-1 px-2">
-                <div className="border-b border-sidebar-border/50"></div>
-              </div>
-            )}
-            <SidebarGroup className="py-1">
-              {!isCollapsed && (
-                <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
-                  Admin
-                </SidebarGroupLabel>
-              )}
-              <SidebarGroupContent>
-                <SidebarMenu className="space-y-0.5">
-                  {adminItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      {renderMenuItem(item)}
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </div>
-        )}
       </SidebarContent>
       
       {user && (

@@ -11,6 +11,7 @@ import { Plus, X, Clock, Calendar, Save, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { TimePicker } from "@/components/ui/time-picker";
 
 type TimeSlot = {
   startTime: string;
@@ -426,22 +427,22 @@ function WeekView({
                     <div className="space-y-1">
                       <div>
                         <Label className="text-[10px] text-muted-foreground">Start</Label>
-                        <Input
-                          type="time"
+                        <TimePicker
                           value={slot.startTime}
-                          onChange={(e) => onUpdateSlot(week, day, index, "startTime", e.target.value)}
+                          onChange={(value) => onUpdateSlot(week, day, index, "startTime", value)}
                           className="h-7 text-xs"
-                          data-testid={`input-start-time-${week}-${day}-${index}`}
+                          placeholder="Start"
+                          minuteStep={15}
                         />
                       </div>
                       <div>
                         <Label className="text-[10px] text-muted-foreground">End</Label>
-                        <Input
-                          type="time"
+                        <TimePicker
                           value={slot.endTime}
-                          onChange={(e) => onUpdateSlot(week, day, index, "endTime", e.target.value)}
+                          onChange={(value) => onUpdateSlot(week, day, index, "endTime", value)}
                           className="h-7 text-xs"
-                          data-testid={`input-end-time-${week}-${day}-${index}`}
+                          placeholder="End"
+                          minuteStep={15}
                         />
                       </div>
                     </div>

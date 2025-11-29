@@ -582,9 +582,9 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="text-center sm:text-left">
-        <h1 className="text-xl sm:text-2xl font-semibold flex items-center justify-center sm:justify-start gap-2">
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground flex items-center justify-center sm:justify-start gap-2">
           <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
           Reports
         </h1>

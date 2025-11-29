@@ -50,6 +50,11 @@ import StaffQualifications from "@/pages/StaffQualifications";
 import StaffDocumentReview from "@/pages/StaffDocumentReview";
 import MobileClockPortal from "@/pages/MobileClockPortal";
 import LearningManagement from "@/pages/LearningManagement";
+import PolicyManagement from "@/pages/PolicyManagement";
+import Scheduling from "@/pages/Scheduling";
+import ASCSCalendar from "@/pages/ASCSCalendar";
+import ShiftTemplates from "@/pages/ShiftTemplates";
+import SchedulingAnalytics from "@/pages/SchedulingAnalytics";
 import NotFound from "@/pages/not-found";
 import NotificationBell from "@/components/NotificationBell";
 import QuickChatPanel from "@/components/QuickChatPanel";
@@ -89,10 +94,10 @@ function ProtectedRouter() {
       <Route path="/gps" component={GPs} />
       <Route path="/pharmacies" component={Pharmacies} />
       <Route path="/allied-health-professionals" component={AlliedHealthProfessionals} />
-      <Route path="/documents" component={() => <div className="p-6"><h1 className="text-2xl font-semibold">Documents</h1><p className="text-muted-foreground mt-2">Document management coming soon</p></div>} />
+      <Route path="/documents" component={PolicyManagement} />
       <Route path="/quotes" component={Quotes} />
       <Route path="/quotes/:id" component={QuoteEditor} />
-      <Route path="/appointments" component={Appointments} />
+      <Route path="/appointments" component={Scheduling} />
       <Route path="/form-templates" component={FormTemplates} />
       <Route path="/sil-houses" component={SilHouses} />
       <Route path="/reports" component={Reports} />
@@ -112,6 +117,9 @@ function ProtectedRouter() {
       <Route path="/staff-documents" component={StaffDocumentReview} />
       <Route path="/mobile-clock" component={MobileClockPortal} />
       <Route path="/learning" component={LearningManagement} />
+      <Route path="/ascs-calendar" component={ASCSCalendar} />
+      <Route path="/shift-templates" component={ShiftTemplates} />
+      <Route path="/scheduling-analytics" component={SchedulingAnalytics} />
       <Route component={NotFound} />
     </Switch>
   );

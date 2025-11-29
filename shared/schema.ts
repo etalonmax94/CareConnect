@@ -5157,3 +5157,1751 @@ export const insertPolicySavedReportSchema = createInsertSchema(policySavedRepor
 
 export type InsertPolicySavedReport = z.infer<typeof insertPolicySavedReportSchema>;
 export type PolicySavedReport = typeof policySavedReports.$inferSelect;
+
+// ============================================
+// COMPREHENSIVE SCHEDULING SYSTEM (CSS)
+// ============================================
+
+// Shift Types for different client categories
+export type ShiftCategory = "NDIS" | "Support at Home" | "Private";
+export type ShiftStatus = "draft" | "published" | "assigned" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show";
+export type ShiftType = "standard" | "sleepover" | "active_night" | "community_access" | "nursing" | "transport" | "respite" | "group";
+export type RecurrencePattern = "daily" | "weekly" | "fortnightly" | "monthly" | "custom";
+export type AllocationStatus = "pending" | "offered" | "accepted" | "declined" | "reassigned" | "cancelled";
+
+// Shift Templates - Reusable shift configurations
+export const shiftTemplates = pgTable("shift_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+
+  // Shift category & type
+  category: varchar("category", { length: 50 }).notNull().$type<ShiftCategory>(),
+  shiftType: varchar("shift_type", { length: 50 }).default("standard").$type<ShiftType>(),
+
+  // Default timing
+  defaultStartTime: varchar("default_start_time", { length: 10 }).notNull(), // HH:MM
+  defaultEndTime: varchar("default_end_time", { length: 10 }).notNull(), // HH:MM
+  defaultDurationMinutes: integer("default_duration_minutes").notNull(),
+
+  // Service details
+  serviceType: varchar("service_type", { length: 100 }),
+  ndisSupportCategory: varchar("ndis_support_category", { length: 100 }),
+  ndisFundingCode: varchar("ndis_funding_code", { length: 50 }),
+  sahServiceCode: varchar("sah_service_code", { length: 50 }),
+
+  // Staffing requirements
+  requiredStaffCount: integer("required_staff_count").default(1),
+  requiredQualifications: text("required_qualifications"), // JSON array
+  requiredCapabilities: text("required_capabilities"), // JSON array
+
+  // Rates
+  defaultHourlyRate: text("default_hourly_rate"),
+  overtimeMultiplier: text("overtime_multiplier").default("1.5"),
+  publicHolidayMultiplier: text("public_holiday_multiplier").default("2.0"),
+
+  // Defaults
+  defaultLocation: text("default_location"), // JSON {address, lat, lng}
+  defaultNotes: text("default_notes"),
+  defaultTasks: text("default_tasks"), // JSON array of task descriptions
+
+  // Metadata
+  color: varchar("color", { length: 20 }).default("#3b82f6"),
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  usageCount: integer("usage_count").default(0),
+
+  createdById: varchar("created_by_id", { length: 255 }),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertShiftTemplateSchema = createInsertSchema(shiftTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  usageCount: true,
+});
+
+export type InsertShiftTemplate = z.infer<typeof insertShiftTemplateSchema>;
+export type ShiftTemplate = typeof shiftTemplates.$inferSelect;
+
+// Shifts - Core shift management
+export const shifts = pgTable("shifts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Client assignment
+  clientId: varchar("client_id", { length: 255 }).references(() => clients.id, { onDelete: "cascade" }),
+
+  // Shift details
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }).notNull().$type<ShiftCategory>(),
+  shiftType: varchar("shift_type", { length: 50 }).default("standard").$type<ShiftType>(),
+  status: varchar("status", { length: 50 }).default("draft").$type<ShiftStatus>(),
+
+  // Template reference
+  templateId: uuid("template_id").references(() => shiftTemplates.id, { onDelete: "set null" }),
+
+  // Scheduling
+  scheduledDate: date("scheduled_date").notNull(),
+  scheduledStartTime: varchar("scheduled_start_time", { length: 10 }).notNull(), // HH:MM
+  scheduledEndTime: varchar("scheduled_end_time", { length: 10 }).notNull(), // HH:MM
+  durationMinutes: integer("duration_minutes").notNull(),
+
+  // Actual times (filled during/after shift)
+  actualStartTime: timestamp("actual_start_time"),
+  actualEndTime: timestamp("actual_end_time"),
+  actualDurationMinutes: integer("actual_duration_minutes"),
+
+  // Break time
+  breakDurationMinutes: integer("break_duration_minutes").default(0),
+  isPaidBreak: varchar("is_paid_break", { length: 10 }).default("no"),
+
+  // Location
+  locationAddress: text("location_address"),
+  locationLatitude: text("location_latitude"),
+  locationLongitude: text("location_longitude"),
+  useClientAddress: varchar("use_client_address", { length: 10 }).default("yes"),
+  locationNotes: text("location_notes"),
+
+  // Travel buffer
+  travelTimeBefore: integer("travel_time_before").default(0), // minutes
+  travelTimeAfter: integer("travel_time_after").default(0), // minutes
+
+  // Service details
+  serviceType: varchar("service_type", { length: 100 }),
+  ndisSupportCategory: varchar("ndis_support_category", { length: 100 }),
+  ndisFundingCode: varchar("ndis_funding_code", { length: 50 }),
+  sahServiceCode: varchar("sah_service_code", { length: 50 }),
+  privateRateCode: varchar("private_rate_code", { length: 50 }),
+
+  // Staffing requirements
+  requiredStaffCount: integer("required_staff_count").default(1),
+  assignedStaffCount: integer("assigned_staff_count").default(0),
+  requiredQualifications: text("required_qualifications"), // JSON array
+  requiredCapabilities: text("required_capabilities"), // JSON array
+
+  // Rates & billing
+  hourlyRate: text("hourly_rate"),
+  totalBillable: text("total_billable"),
+  overtimeHours: text("overtime_hours"),
+  overtimeRate: text("overtime_rate"),
+
+  // Budget tracking
+  budgetId: varchar("budget_id", { length: 255 }).references(() => budgets.id, { onDelete: "set null" }),
+  estimatedCost: text("estimated_cost"),
+  actualCost: text("actual_cost"),
+
+  // Notes & tasks
+  notes: text("notes"),
+  internalNotes: text("internal_notes"), // Admin only
+  tasks: text("tasks"), // JSON array of task objects
+  completedTasks: text("completed_tasks"), // JSON array
+
+  // Recurrence
+  isRecurring: varchar("is_recurring", { length: 10 }).default("no"),
+  recurrencePattern: varchar("recurrence_pattern", { length: 50 }).$type<RecurrencePattern>(),
+  recurrenceEndDate: date("recurrence_end_date"),
+  recurrenceParentId: uuid("recurrence_parent_id"),
+  recurrenceExceptions: text("recurrence_exceptions"), // JSON array of excluded dates
+
+  // Cancellation
+  cancellationReason: text("cancellation_reason"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelledById: varchar("cancelled_by_id", { length: 255 }),
+  cancelledByName: varchar("cancelled_by_name", { length: 255 }),
+
+  // Publishing
+  publishedAt: timestamp("published_at"),
+  publishedById: varchar("published_by_id", { length: 255 }),
+  publishedByName: varchar("published_by_name", { length: 255 }),
+
+  // Priority & flags
+  priority: varchar("priority", { length: 20 }).default("normal"), // low, normal, high, urgent
+  isBillable: varchar("is_billable", { length: 10 }).default("yes"),
+  requiresConfirmation: varchar("requires_confirmation", { length: 10 }).default("yes"),
+
+  // Metadata
+  color: varchar("color", { length: 20 }),
+  tags: text("tags"), // JSON array
+
+  // Audit
+  createdById: varchar("created_by_id", { length: 255 }),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  lastModifiedById: varchar("last_modified_by_id", { length: 255 }),
+  lastModifiedByName: varchar("last_modified_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertShiftSchema = createInsertSchema(shifts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  assignedStaffCount: true,
+});
+
+export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type Shift = typeof shifts.$inferSelect;
+
+// Shift Allocations - Staff assigned to shifts
+export const shiftAllocations = pgTable("shift_allocations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  shiftId: uuid("shift_id").notNull().references(() => shifts.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id", { length: 255 }).notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  // Allocation details
+  status: varchar("status", { length: 50 }).default("pending").$type<AllocationStatus>(),
+  role: varchar("role", { length: 50 }).default("primary"), // primary, secondary, backup, trainee
+
+  // Response tracking
+  offeredAt: timestamp("offered_at"),
+  respondedAt: timestamp("responded_at"),
+  declineReason: text("decline_reason"),
+
+  // Confirmation
+  confirmedAt: timestamp("confirmed_at"),
+  confirmedVia: varchar("confirmed_via", { length: 50 }), // app, email, sms, phone
+
+  // Check in/out
+  checkedInAt: timestamp("checked_in_at"),
+  checkedInLatitude: text("checked_in_latitude"),
+  checkedInLongitude: text("checked_in_longitude"),
+  checkedInDistance: text("checked_in_distance"), // meters from expected location
+
+  checkedOutAt: timestamp("checked_out_at"),
+  checkedOutLatitude: text("checked_out_latitude"),
+  checkedOutLongitude: text("checked_out_longitude"),
+  checkedOutDistance: text("checked_out_distance"),
+
+  // Time worked
+  actualMinutesWorked: integer("actual_minutes_worked"),
+  breakMinutesTaken: integer("break_minutes_taken"),
+
+  // Notes
+  notes: text("notes"),
+  staffNotes: text("staff_notes"), // Notes from staff
+
+  // Billable tracking
+  billableMinutes: integer("billable_minutes"),
+  hourlyRate: text("hourly_rate"),
+  totalPay: text("total_pay"),
+
+  // Assignment audit
+  assignedById: varchar("assigned_by_id", { length: 255 }),
+  assignedByName: varchar("assigned_by_name", { length: 255 }),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertShiftAllocationSchema = createInsertSchema(shiftAllocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShiftAllocation = z.infer<typeof insertShiftAllocationSchema>;
+export type ShiftAllocation = typeof shiftAllocations.$inferSelect;
+
+// Shift Attachments - Files attached to shifts
+export const shiftAttachments = pgTable("shift_attachments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  shiftId: uuid("shift_id").notNull().references(() => shifts.id, { onDelete: "cascade" }),
+
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: varchar("file_type", { length: 100 }),
+  fileSize: integer("file_size"),
+
+  // Attachment type
+  attachmentType: varchar("attachment_type", { length: 50 }).default("general"), // care_plan, risk_assessment, photo, receipt, other
+  description: text("description"),
+
+  // Access control
+  isVisibleToStaff: varchar("is_visible_to_staff", { length: 10 }).default("yes"),
+  isVisibleToClient: varchar("is_visible_to_client", { length: 10 }).default("no"),
+
+  // Version control
+  version: integer("version").default(1),
+  previousVersionId: uuid("previous_version_id"),
+
+  uploadedById: varchar("uploaded_by_id", { length: 255 }),
+  uploadedByName: varchar("uploaded_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertShiftAttachmentSchema = createInsertSchema(shiftAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertShiftAttachment = z.infer<typeof insertShiftAttachmentSchema>;
+export type ShiftAttachment = typeof shiftAttachments.$inferSelect;
+
+// Shift Notes/Activity Log - Detailed shift activity tracking
+export const shiftActivityLog = pgTable("shift_activity_log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  shiftId: uuid("shift_id").notNull().references(() => shifts.id, { onDelete: "cascade" }),
+
+  activityType: varchar("activity_type", { length: 50 }).notNull(), // created, published, assigned, confirmed, started, completed, cancelled, note_added, modified
+  description: text("description").notNull(),
+
+  // Change details
+  previousValue: text("previous_value"), // JSON
+  newValue: text("new_value"), // JSON
+  changedFields: text("changed_fields"), // JSON array
+
+  // Actor
+  userId: varchar("user_id", { length: 255 }),
+  userName: varchar("user_name", { length: 255 }),
+
+  // Metadata
+  ipAddress: varchar("ip_address", { length: 50 }),
+  userAgent: text("user_agent"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertShiftActivityLogSchema = createInsertSchema(shiftActivityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertShiftActivityLog = z.infer<typeof insertShiftActivityLogSchema>;
+export type ShiftActivityLog = typeof shiftActivityLog.$inferSelect;
+
+// Shift Swap Requests - Staff requesting to swap shifts
+export const shiftSwapRequests = pgTable("shift_swap_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Original allocation
+  originalAllocationId: uuid("original_allocation_id").notNull().references(() => shiftAllocations.id, { onDelete: "cascade" }),
+  requestingStaffId: varchar("requesting_staff_id", { length: 255 }).notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  // Swap details
+  swapType: varchar("swap_type", { length: 50 }).default("swap"), // swap, give_away, find_cover
+  targetStaffId: varchar("target_staff_id", { length: 255 }).references(() => staff.id, { onDelete: "set null" }), // null for find_cover
+
+  // Status
+  status: varchar("status", { length: 50 }).default("pending"), // pending, approved, rejected, cancelled
+  reason: text("reason"),
+
+  // Response
+  respondedAt: timestamp("responded_at"),
+  responseNote: text("response_note"),
+
+  // Approval
+  approvedById: varchar("approved_by_id", { length: 255 }),
+  approvedByName: varchar("approved_by_name", { length: 255 }),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertShiftSwapRequestSchema = createInsertSchema(shiftSwapRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShiftSwapRequest = z.infer<typeof insertShiftSwapRequestSchema>;
+export type ShiftSwapRequest = typeof shiftSwapRequests.$inferSelect;
+
+// Note: schedulingConflicts table is defined earlier in this file
+// The existing table supports shift conflicts via the appointmentId/assignmentId fields
+
+// Shift Coverage Requirements - Define minimum staffing needs
+export const shiftCoverageRequirements = pgTable("shift_coverage_requirements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Scope
+  clientId: varchar("client_id", { length: 255 }).references(() => clients.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id", { length: 255 }), // For facility-based coverage
+
+  // Time window
+  dayOfWeek: varchar("day_of_week", { length: 10 }), // 0-6, or null for all days
+  startTime: varchar("start_time", { length: 10 }).notNull(), // HH:MM
+  endTime: varchar("end_time", { length: 10 }).notNull(), // HH:MM
+
+  // Requirements
+  minimumStaffCount: integer("minimum_staff_count").default(1),
+  requiredQualifications: text("required_qualifications"), // JSON array
+  requiredCapabilities: text("required_capabilities"), // JSON array
+
+  // Metadata
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertShiftCoverageRequirementSchema = createInsertSchema(shiftCoverageRequirements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShiftCoverageRequirement = z.infer<typeof insertShiftCoverageRequirementSchema>;
+export type ShiftCoverageRequirement = typeof shiftCoverageRequirements.$inferSelect;
+
+// Staff Shift Preferences - Staff preferences for scheduling
+export const staffShiftPreferences = pgTable("staff_shift_preferences", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  staffId: varchar("staff_id", { length: 255 }).notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  // Work preferences
+  preferredShiftTypes: text("preferred_shift_types"), // JSON array
+  preferredCategories: text("preferred_categories"), // JSON array of client categories
+  preferredDaysOfWeek: text("preferred_days_of_week"), // JSON array 0-6
+  preferredStartTime: varchar("preferred_start_time", { length: 10 }),
+  preferredEndTime: varchar("preferred_end_time", { length: 10 }),
+
+  // Location preferences
+  maxTravelDistanceKm: integer("max_travel_distance_km"),
+  preferredSuburbs: text("preferred_suburbs"), // JSON array
+  hasOwnTransport: varchar("has_own_transport", { length: 10 }).default("no"),
+
+  // Hour preferences
+  preferredWeeklyHours: integer("preferred_weekly_hours"),
+  minWeeklyHours: integer("min_weekly_hours"),
+  maxWeeklyHours: integer("max_weekly_hours"),
+
+  // Client preferences (optional - specific clients)
+  preferredClientIds: text("preferred_client_ids"), // JSON array
+  avoidClientIds: text("avoid_client_ids"), // JSON array (soft avoidance, not restriction)
+
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffShiftPreferenceSchema = createInsertSchema(staffShiftPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffShiftPreference = z.infer<typeof insertStaffShiftPreferenceSchema>;
+export type StaffShiftPreference = typeof staffShiftPreferences.$inferSelect;
+
+// Scheduling Rules - Configurable business rules
+export const schedulingRules = pgTable("scheduling_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  ruleType: varchar("rule_type", { length: 50 }).notNull(), // hours_limit, gap_requirement, qualification, restriction, budget
+
+  // Rule configuration
+  config: text("config").notNull(), // JSON with rule-specific settings
+
+  // Scope
+  appliesTo: varchar("applies_to", { length: 50 }).default("all"), // all, category, client, staff
+  appliesToIds: text("applies_to_ids"), // JSON array of specific IDs
+
+  // Enforcement
+  isRequired: varchar("is_required", { length: 10 }).default("yes"), // yes = error, no = warning
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  priority: integer("priority").default(100), // Lower = higher priority
+
+  // Violation handling
+  allowOverride: varchar("allow_override", { length: 10 }).default("yes"),
+  overrideRequiresApproval: varchar("override_requires_approval", { length: 10 }).default("yes"),
+
+  createdById: varchar("created_by_id", { length: 255 }),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSchedulingRuleSchema = createInsertSchema(schedulingRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSchedulingRule = z.infer<typeof insertSchedulingRuleSchema>;
+export type SchedulingRule = typeof schedulingRules.$inferSelect;
+
+// Scheduling Analytics Snapshots - Periodic analytics snapshots
+export const schedulingAnalytics = pgTable("scheduling_analytics", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  snapshotDate: date("snapshot_date").notNull(),
+  snapshotType: varchar("snapshot_type", { length: 50 }).default("daily"), // hourly, daily, weekly, monthly
+
+  // Shift metrics
+  totalShifts: integer("total_shifts").default(0),
+  publishedShifts: integer("published_shifts").default(0),
+  assignedShifts: integer("assigned_shifts").default(0),
+  completedShifts: integer("completed_shifts").default(0),
+  cancelledShifts: integer("cancelled_shifts").default(0),
+  noShowShifts: integer("no_show_shifts").default(0),
+
+  // Staff metrics
+  totalStaffScheduled: integer("total_staff_scheduled").default(0),
+  totalHoursScheduled: text("total_hours_scheduled"),
+  totalHoursWorked: text("total_hours_worked"),
+  averageUtilization: text("average_utilization"), // percentage
+
+  // Coverage metrics
+  coverageRate: text("coverage_rate"), // percentage of required coverage met
+  understaffedPeriods: integer("understaffed_periods").default(0),
+  overstaffedPeriods: integer("overstaffed_periods").default(0),
+
+  // Conflict metrics
+  conflictsDetected: integer("conflicts_detected").default(0),
+  conflictsResolved: integer("conflicts_resolved").default(0),
+  conflictsOverridden: integer("conflicts_overridden").default(0),
+
+  // Budget metrics
+  totalBudgetAllocated: text("total_budget_allocated"),
+  totalActualCost: text("total_actual_cost"),
+  budgetVariance: text("budget_variance"),
+
+  // Breakdown by category
+  metricsByCategory: text("metrics_by_category"), // JSON {NDIS: {...}, SupportAtHome: {...}, Private: {...}}
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSchedulingAnalyticsSchema = createInsertSchema(schedulingAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSchedulingAnalytics = z.infer<typeof insertSchedulingAnalyticsSchema>;
+export type SchedulingAnalytics = typeof schedulingAnalytics.$inferSelect;
+
+// ============================================================================
+// Organizational Chart System (OCS) Schema
+// ============================================================================
+
+// OCS Type Definitions
+export type OrgNodeType = "organization" | "department" | "team" | "role" | "position";
+export type OrgLayoutType = "tree-vertical" | "tree-horizontal" | "radial" | "compact";
+export type ReportingType = "direct" | "matrix" | "dotted";
+
+// Departments/Teams - Organizational units
+export const orgDepartments = pgTable("org_departments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  name: varchar("name", { length: 255 }).notNull(),
+  code: varchar("code", { length: 50 }), // Short code e.g., "HR", "OPS", "CARE"
+  description: text("description"),
+
+  // Hierarchy
+  parentDepartmentId: uuid("parent_department_id"), // For nested departments
+  level: integer("level").default(0), // 0 = root, 1 = child, etc.
+  sortOrder: integer("sort_order").default(0),
+
+  // Display settings
+  color: varchar("color", { length: 20 }).default("#3B82F6"), // Department color for chart
+  icon: varchar("icon", { length: 50 }), // Icon name
+
+  // Leadership
+  headOfDepartmentId: varchar("head_of_department_id", { length: 255 }), // Staff ID
+  deputyHeadId: varchar("deputy_head_id", { length: 255 }), // Staff ID
+
+  // Settings
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  isExpanded: varchar("is_expanded", { length: 10 }).default("yes"), // Default expanded in chart
+  showInChart: varchar("show_in_chart", { length: 10 }).default("yes"),
+
+  // Metadata
+  notes: text("notes"),
+  customFields: text("custom_fields"), // JSON for additional fields
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOrgDepartmentSchema = createInsertSchema(orgDepartments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOrgDepartment = z.infer<typeof insertOrgDepartmentSchema>;
+export type OrgDepartment = typeof orgDepartments.$inferSelect;
+
+// Org Positions - Defined positions/roles in the org structure
+export const orgPositions = pgTable("org_positions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  title: varchar("title", { length: 255 }).notNull(),
+  code: varchar("code", { length: 50 }), // Position code
+  description: text("description"),
+  responsibilities: text("responsibilities"), // JSON array of responsibilities
+
+  // Hierarchy
+  departmentId: uuid("department_id"), // Which department this belongs to
+  reportsToPositionId: uuid("reports_to_position_id"), // Direct reporting position
+  level: integer("level").default(0), // Hierarchy level
+  sortOrder: integer("sort_order").default(0),
+
+  // Requirements
+  requiredQualifications: text("required_qualifications"), // JSON array
+  requiredCertifications: text("required_certifications"), // JSON array
+  requiredExperienceYears: integer("required_experience_years"),
+  requiredSkills: text("required_skills"), // JSON array
+
+  // Capacity
+  maxHeadcount: integer("max_headcount").default(1), // How many can hold this position
+  currentHeadcount: integer("current_headcount").default(0),
+  isVacant: varchar("is_vacant", { length: 10 }).default("no"),
+
+  // Compensation (optional, admin-only)
+  salaryRangeMin: text("salary_range_min"),
+  salaryRangeMax: text("salary_range_max"),
+  salaryType: varchar("salary_type", { length: 20 }), // annual, hourly, etc.
+
+  // Display
+  color: varchar("color", { length: 20 }),
+  icon: varchar("icon", { length: 50 }),
+  showInChart: varchar("show_in_chart", { length: 10 }).default("yes"),
+
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOrgPositionSchema = createInsertSchema(orgPositions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOrgPosition = z.infer<typeof insertOrgPositionSchema>;
+export type OrgPosition = typeof orgPositions.$inferSelect;
+
+// Staff Position Assignments - Links staff to positions
+export const staffPositionAssignments = pgTable("staff_position_assignments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+  positionId: uuid("position_id").notNull(),
+  departmentId: uuid("department_id"),
+
+  // Assignment details
+  assignmentType: varchar("assignment_type", { length: 20 }).default("primary"), // primary, secondary, acting, interim
+  reportingType: varchar("reporting_type", { length: 20 }).default("direct"), // direct, matrix, dotted
+
+  // Time period
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"), // null = current
+
+  // Work allocation
+  fte: text("fte").default("1.0"), // Full-time equivalent (0.5 = half-time)
+
+  // Status
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  isPrimary: varchar("is_primary", { length: 10 }).default("yes"), // Primary position for this staff
+
+  // Approval
+  approvedById: varchar("approved_by_id", { length: 255 }),
+  approvedByName: varchar("approved_by_name", { length: 255 }),
+  approvedAt: timestamp("approved_at"),
+
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffPositionAssignmentSchema = createInsertSchema(staffPositionAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffPositionAssignment = z.infer<typeof insertStaffPositionAssignmentSchema>;
+export type StaffPositionAssignment = typeof staffPositionAssignments.$inferSelect;
+
+// Org Chart Snapshots - For versioning and history
+export const orgChartSnapshots = pgTable("org_chart_snapshots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  snapshotType: varchar("snapshot_type", { length: 50 }).default("manual"), // manual, auto, scheduled
+
+  // Full org structure snapshot
+  departmentsSnapshot: text("departments_snapshot"), // JSON
+  positionsSnapshot: text("positions_snapshot"), // JSON
+  assignmentsSnapshot: text("assignments_snapshot"), // JSON
+  staffSnapshot: text("staff_snapshot"), // JSON with relevant staff data
+
+  // Statistics at snapshot time
+  totalDepartments: integer("total_departments").default(0),
+  totalPositions: integer("total_positions").default(0),
+  totalStaff: integer("total_staff").default(0),
+  vacancies: integer("vacancies").default(0),
+
+  // Metadata
+  createdById: varchar("created_by_id", { length: 255 }),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOrgChartSnapshotSchema = createInsertSchema(orgChartSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertOrgChartSnapshot = z.infer<typeof insertOrgChartSnapshotSchema>;
+export type OrgChartSnapshot = typeof orgChartSnapshots.$inferSelect;
+
+// Org Chart Change Log - Audit trail
+export const orgChartChangeLogs = pgTable("org_chart_change_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // What changed
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // department, position, assignment, staff
+  entityId: varchar("entity_id", { length: 255 }).notNull(),
+  entityName: varchar("entity_name", { length: 255 }),
+
+  // Change details
+  changeType: varchar("change_type", { length: 50 }).notNull(), // create, update, delete, move, reassign
+  changeDescription: text("change_description"),
+
+  // Before/after
+  previousData: text("previous_data"), // JSON
+  newData: text("new_data"), // JSON
+  changedFields: text("changed_fields"), // JSON array of field names
+
+  // Who made the change
+  changedById: varchar("changed_by_id", { length: 255 }),
+  changedByName: varchar("changed_by_name", { length: 255 }),
+  changedByRole: varchar("changed_by_role", { length: 100 }),
+
+  // Approval (if required)
+  requiresApproval: varchar("requires_approval", { length: 10 }).default("no"),
+  approvalStatus: varchar("approval_status", { length: 20 }), // pending, approved, rejected
+  approvedById: varchar("approved_by_id", { length: 255 }),
+  approvedAt: timestamp("approved_at"),
+
+  // Can this be undone?
+  canUndo: varchar("can_undo", { length: 10 }).default("yes"),
+  undoneById: varchar("undone_by_id", { length: 255 }),
+  undoneAt: timestamp("undone_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOrgChartChangeLogSchema = createInsertSchema(orgChartChangeLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertOrgChartChangeLog = z.infer<typeof insertOrgChartChangeLogSchema>;
+export type OrgChartChangeLog = typeof orgChartChangeLogs.$inferSelect;
+
+// Org Chart Settings - User preferences and global settings
+export const orgChartSettings = pgTable("org_chart_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  userId: varchar("user_id", { length: 255 }), // null = global setting
+  settingType: varchar("setting_type", { length: 50 }).notNull(), // layout, display, filters, etc.
+
+  // Layout preferences
+  defaultLayout: varchar("default_layout", { length: 50 }).default("tree-vertical"),
+  defaultZoom: text("default_zoom").default("1.0"),
+  showPhotos: varchar("show_photos", { length: 10 }).default("yes"),
+  showVacancies: varchar("show_vacancies", { length: 10 }).default("yes"),
+  showInactiveStaff: varchar("show_inactive_staff", { length: 10 }).default("no"),
+
+  // Card display preferences
+  cardFields: text("card_fields"), // JSON array of fields to show on cards
+  compactMode: varchar("compact_mode", { length: 10 }).default("no"),
+
+  // Color coding preferences
+  colorBy: varchar("color_by", { length: 50 }).default("department"), // department, role, compliance, custom
+  customColors: text("custom_colors"), // JSON
+
+  // Filter presets
+  savedFilters: text("saved_filters"), // JSON array of filter presets
+  defaultFilter: text("default_filter"), // JSON
+
+  // Other settings
+  autoRefresh: varchar("auto_refresh", { length: 10 }).default("yes"),
+  refreshIntervalSeconds: integer("refresh_interval_seconds").default(60),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOrgChartSettingsSchema = createInsertSchema(orgChartSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOrgChartSettings = z.infer<typeof insertOrgChartSettingsSchema>;
+export type OrgChartSettings = typeof orgChartSettings.$inferSelect;
+
+// Staff Profile Extended Data - Additional data for org chart cards
+export const staffProfileExtended = pgTable("staff_profile_extended", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  staffId: varchar("staff_id", { length: 255 }).notNull().unique(),
+
+  // Professional info
+  jobTitle: varchar("job_title", { length: 255 }),
+  professionalSummary: text("professional_summary"),
+  specializations: text("specializations"), // JSON array
+  certifications: text("certifications"), // JSON array with details
+
+  // Work metrics (synced from other systems)
+  currentClientCount: integer("current_client_count").default(0),
+  currentShiftCount: integer("current_shift_count").default(0),
+  hoursThisWeek: text("hours_this_week"),
+  hoursThisMonth: text("hours_this_month"),
+  utilizationRate: text("utilization_rate"), // percentage
+
+  // Compliance status (synced from LMS)
+  complianceStatus: varchar("compliance_status", { length: 20 }).default("compliant"), // compliant, warning, non_compliant
+  pendingTrainings: integer("pending_trainings").default(0),
+  overdueTrainings: integer("overdue_trainings").default(0),
+  lastComplianceCheck: timestamp("last_compliance_check"),
+
+  // Policy status (synced from Policy system)
+  policiesAcknowledged: integer("policies_acknowledged").default(0),
+  policiesPending: integer("policies_pending").default(0),
+  lastPolicyAcknowledgment: timestamp("last_policy_acknowledgment"),
+
+  // Performance metrics (optional)
+  performanceRating: text("performance_rating"),
+  lastReviewDate: date("last_review_date"),
+
+  // Availability preferences
+  preferredWorkDays: text("preferred_work_days"), // JSON array
+  preferredWorkHours: text("preferred_work_hours"), // JSON
+  maxHoursPerWeek: integer("max_hours_per_week"),
+
+  // Social/Team info
+  teamMemberships: text("team_memberships"), // JSON array of team IDs
+  mentorId: varchar("mentor_id", { length: 255 }),
+  menteeIds: text("mentee_ids"), // JSON array
+
+  // Visibility settings
+  showPhone: varchar("show_phone", { length: 10 }).default("yes"),
+  showEmail: varchar("show_email", { length: 10 }).default("yes"),
+  showMetrics: varchar("show_metrics", { length: 10 }).default("no"), // Admin only by default
+
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffProfileExtendedSchema = createInsertSchema(staffProfileExtended).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffProfileExtended = z.infer<typeof insertStaffProfileExtendedSchema>;
+export type StaffProfileExtended = typeof staffProfileExtended.$inferSelect;
+
+// ============================================================================
+// Advanced Scheduling and Calendar System (ASCS) Schema
+// ============================================================================
+
+// ASCS Type Definitions
+export type CalendarViewType = "weekly" | "monthly" | "daily";
+export type ShiftSwapStatusType = "pending" | "approved" | "rejected" | "cancelled" | "expired";
+export type OpenShiftStatusType = "open" | "claimed" | "assigned" | "cancelled" | "expired";
+export type ScheduleTaskStatusType = "pending" | "in_progress" | "completed" | "skipped" | "overdue";
+export type ScheduleTaskPriorityType = "low" | "medium" | "high" | "urgent";
+export type AutoScheduleStatusType = "pending" | "processing" | "completed" | "failed" | "cancelled";
+export type ScheduleSuggestionTypeValue = "auto_fill" | "conflict_resolution" | "optimization" | "coverage" | "preference_match";
+
+// Calendar User Preferences - Stores user-specific calendar settings
+export const calendarPreferences = pgTable("calendar_preferences", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull().unique(),
+
+  // View preferences
+  defaultView: varchar("default_view", { length: 20 }).default("weekly"), // weekly, monthly, daily
+  weekStartDay: integer("week_start_day").default(1), // 0=Sunday, 1=Monday, etc.
+  defaultTimeRange: varchar("default_time_range", { length: 20 }).default("business"), // business (6AM-10PM), full (24hr), custom
+  customStartHour: integer("custom_start_hour").default(6),
+  customEndHour: integer("custom_end_hour").default(22),
+
+  // Display preferences
+  showWeekends: varchar("show_weekends", { length: 10 }).default("yes"),
+  showCancelledShifts: varchar("show_cancelled_shifts", { length: 10 }).default("no"),
+  showBufferTime: varchar("show_buffer_time", { length: 10 }).default("yes"),
+  compactMode: varchar("compact_mode", { length: 10 }).default("no"),
+  colorScheme: varchar("color_scheme", { length: 50 }).default("category"), // category, status, client, staff
+
+  // Filter preferences
+  defaultFilters: text("default_filters"), // JSON: { clientIds: [], staffIds: [], categories: [], statuses: [] }
+  savedFilterPresets: text("saved_filter_presets"), // JSON array of named filter presets
+
+  // Notification preferences (calendar-specific)
+  shiftReminders: varchar("shift_reminders", { length: 10 }).default("yes"),
+  reminderMinutesBefore: integer("reminder_minutes_before").default(30),
+  swapRequestAlerts: varchar("swap_request_alerts", { length: 10 }).default("yes"),
+  openShiftAlerts: varchar("open_shift_alerts", { length: 10 }).default("yes"),
+  conflictAlerts: varchar("conflict_alerts", { length: 10 }).default("yes"),
+
+  // Mobile preferences
+  enablePushNotifications: varchar("enable_push_notifications", { length: 10 }).default("yes"),
+  syncToDeviceCalendar: varchar("sync_to_device_calendar", { length: 10 }).default("no"),
+  deviceCalendarType: varchar("device_calendar_type", { length: 50 }), // google, apple, outlook
+
+  // Display density
+  rowHeight: varchar("row_height", { length: 20 }).default("medium"), // compact, medium, comfortable
+  showAvatars: varchar("show_avatars", { length: 10 }).default("yes"),
+  showClientInfo: varchar("show_client_info", { length: 10 }).default("yes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCalendarPreferencesSchema = createInsertSchema(calendarPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCalendarPreferences = z.infer<typeof insertCalendarPreferencesSchema>;
+export type CalendarPreferences = typeof calendarPreferences.$inferSelect;
+
+// Open Shifts Marketplace - Unassigned shifts staff can claim
+export const openShifts = pgTable("open_shifts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  shiftId: uuid("shift_id").notNull(), // Reference to original shift
+
+  // Shift details (denormalized for quick display)
+  clientId: varchar("client_id", { length: 255 }).notNull(),
+  clientName: varchar("client_name", { length: 255 }),
+  scheduledDate: date("scheduled_date").notNull(),
+  startTime: varchar("start_time", { length: 10 }).notNull(),
+  endTime: varchar("end_time", { length: 10 }).notNull(),
+  category: varchar("category", { length: 50 }), // NDIS, Support at Home, Private
+  shiftType: varchar("shift_type", { length: 50 }),
+  location: text("location"),
+
+  // Requirements
+  requiredQualifications: text("required_qualifications"), // JSON array
+  preferredStaffIds: text("preferred_staff_ids"), // JSON array
+  excludedStaffIds: text("excluded_staff_ids"), // JSON array (restricted)
+  minExperienceMonths: integer("min_experience_months"),
+
+  // Marketplace settings
+  status: varchar("status", { length: 20 }).default("open"), // open, claimed, assigned, cancelled, expired
+  priority: varchar("priority", { length: 20 }).default("normal"), // low, normal, high, urgent
+  expiresAt: timestamp("expires_at"),
+  claimDeadline: timestamp("claim_deadline"),
+
+  // Incentives
+  bonusAmount: text("bonus_amount"),
+  bonusReason: varchar("bonus_reason", { length: 255 }),
+
+  // Claim tracking
+  claimCount: integer("claim_count").default(0),
+  viewCount: integer("view_count").default(0),
+
+  // Who posted
+  postedById: varchar("posted_by_id", { length: 255 }),
+  postedByName: varchar("posted_by_name", { length: 255 }),
+  postedAt: timestamp("posted_at").defaultNow(),
+
+  // Assignment (if claimed)
+  assignedToId: varchar("assigned_to_id", { length: 255 }),
+  assignedToName: varchar("assigned_to_name", { length: 255 }),
+  assignedAt: timestamp("assigned_at"),
+  assignedById: varchar("assigned_by_id", { length: 255 }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOpenShiftSchema = createInsertSchema(openShifts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOpenShift = z.infer<typeof insertOpenShiftSchema>;
+export type OpenShift = typeof openShifts.$inferSelect;
+
+// Open Shift Claims - Track who claims open shifts
+export const openShiftClaims = pgTable("open_shift_claims", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  openShiftId: uuid("open_shift_id").notNull(),
+
+  // Claimant info
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+
+  // Claim details
+  claimedAt: timestamp("claimed_at").defaultNow().notNull(),
+  status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected, withdrawn
+  note: text("note"), // Staff can add note with claim
+
+  // Response
+  respondedAt: timestamp("responded_at"),
+  respondedById: varchar("responded_by_id", { length: 255 }),
+  respondedByName: varchar("responded_by_name", { length: 255 }),
+  responseNote: text("response_note"),
+  rejectionReason: varchar("rejection_reason", { length: 255 }),
+
+  // Match score (AI calculated)
+  matchScore: integer("match_score"), // 0-100
+  matchReasons: text("match_reasons"), // JSON array of reasons
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOpenShiftClaimSchema = createInsertSchema(openShiftClaims).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertOpenShiftClaim = z.infer<typeof insertOpenShiftClaimSchema>;
+export type OpenShiftClaim = typeof openShiftClaims.$inferSelect;
+
+// Enhanced Shift Swap Requests with full workflow
+export const ascsShiftSwapRequests = pgTable("ascs_shift_swap_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Original shift info
+  originalShiftId: uuid("original_shift_id").notNull(),
+  originalStaffId: varchar("original_staff_id", { length: 255 }).notNull(),
+  originalStaffName: varchar("original_staff_name", { length: 255 }),
+
+  // Swap type
+  swapType: varchar("swap_type", { length: 20 }).default("swap"), // swap, give_away, trade
+
+  // Target (if direct swap request)
+  targetStaffId: varchar("target_staff_id", { length: 255 }),
+  targetStaffName: varchar("target_staff_name", { length: 255 }),
+  targetShiftId: uuid("target_shift_id"), // For true swap (trading shifts)
+
+  // If open to anyone
+  openToAll: varchar("open_to_all", { length: 10 }).default("no"),
+  eligibleStaffIds: text("eligible_staff_ids"), // JSON array of staff who can accept
+
+  // Request details
+  reason: text("reason"),
+  urgency: varchar("urgency", { length: 20 }).default("normal"), // low, normal, high, urgent
+  status: varchar("status", { length: 20 }).default("pending"), // pending, accepted, approved, rejected, cancelled, expired
+
+  // Workflow
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+
+  // Peer response (target staff)
+  peerResponseStatus: varchar("peer_response_status", { length: 20 }), // pending, accepted, declined
+  peerRespondedAt: timestamp("peer_responded_at"),
+  peerNote: text("peer_note"),
+
+  // Manager approval
+  requiresManagerApproval: varchar("requires_manager_approval", { length: 10 }).default("yes"),
+  managerApprovalStatus: varchar("manager_approval_status", { length: 20 }), // pending, approved, rejected
+  approvedById: varchar("approved_by_id", { length: 255 }),
+  approvedByName: varchar("approved_by_name", { length: 255 }),
+  approvedAt: timestamp("approved_at"),
+  approvalNote: text("approval_note"),
+
+  // Validation
+  validationResult: text("validation_result"), // JSON with conflict checks
+  hasConflicts: varchar("has_conflicts", { length: 10 }).default("no"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAscsShiftSwapRequestSchema = createInsertSchema(ascsShiftSwapRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAscsShiftSwapRequest = z.infer<typeof insertAscsShiftSwapRequestSchema>;
+export type AscsShiftSwapRequest = typeof ascsShiftSwapRequests.$inferSelect;
+
+// Schedule Tasks & Checklists - Tasks linked to shifts
+export const scheduleTasks = pgTable("schedule_tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Link to shift or appointment
+  shiftId: uuid("shift_id"),
+  appointmentId: varchar("appointment_id", { length: 255 }),
+
+  // Task source
+  templateId: uuid("template_id"), // If from a task template
+  clientId: varchar("client_id", { length: 255 }),
+
+  // Task details
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }), // medication, personal_care, meals, documentation, safety, other
+  priority: varchar("priority", { length: 20 }).default("medium"), // low, medium, high, urgent
+
+  // Timing
+  dueTime: varchar("due_time", { length: 10 }), // Time within shift (HH:MM)
+  estimatedMinutes: integer("estimated_minutes"),
+  orderIndex: integer("order_index").default(0),
+
+  // Requirements
+  requiresPhoto: varchar("requires_photo", { length: 10 }).default("no"),
+  requiresSignature: varchar("requires_signature", { length: 10 }).default("no"),
+  requiresNote: varchar("requires_note", { length: 10 }).default("no"),
+  requiresGps: varchar("requires_gps", { length: 10 }).default("no"),
+
+  // Checklist items (sub-tasks)
+  checklistItems: text("checklist_items"), // JSON array: [{id, text, checked, checkedAt}]
+
+  // Status
+  status: varchar("status", { length: 20 }).default("pending"), // pending, in_progress, completed, skipped, overdue
+
+  // Completion details
+  completedById: varchar("completed_by_id", { length: 255 }),
+  completedByName: varchar("completed_by_name", { length: 255 }),
+  completedAt: timestamp("completed_at"),
+  completionNote: text("completion_note"),
+  completionPhotoUrl: text("completion_photo_url"),
+  completionSignatureUrl: text("completion_signature_url"),
+  completionGpsLatitude: text("completion_gps_latitude"),
+  completionGpsLongitude: text("completion_gps_longitude"),
+
+  // Skip details (if skipped)
+  skippedById: varchar("skipped_by_id", { length: 255 }),
+  skippedAt: timestamp("skipped_at"),
+  skipReason: text("skip_reason"),
+
+  // Verification (for compliance)
+  requiresVerification: varchar("requires_verification", { length: 10 }).default("no"),
+  verifiedById: varchar("verified_by_id", { length: 255 }),
+  verifiedAt: timestamp("verified_at"),
+  verificationNote: text("verification_note"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertScheduleTaskSchema = createInsertSchema(scheduleTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertScheduleTask = z.infer<typeof insertScheduleTaskSchema>;
+export type ScheduleTask = typeof scheduleTasks.$inferSelect;
+
+// Schedule Task Templates - Reusable task configurations
+export const scheduleTaskTemplates = pgTable("schedule_task_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Template info
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }),
+
+  // Scope
+  isGlobal: varchar("is_global", { length: 10 }).default("no"), // Available to all clients
+  clientId: varchar("client_id", { length: 255 }), // Client-specific template
+  shiftCategory: varchar("shift_category", { length: 50 }), // NDIS, Support at Home, Private
+  shiftType: varchar("shift_type", { length: 50 }), // home_visit, community_access, etc.
+
+  // Tasks in template
+  tasks: text("tasks").notNull(), // JSON array of task definitions
+
+  // Auto-assignment rules
+  autoAssign: varchar("auto_assign", { length: 10 }).default("no"),
+  autoAssignConditions: text("auto_assign_conditions"), // JSON: { shiftTypes: [], clientIds: [], categories: [] }
+
+  // Usage tracking
+  usageCount: integer("usage_count").default(0),
+  lastUsedAt: timestamp("last_used_at"),
+
+  // Metadata
+  createdById: varchar("created_by_id", { length: 255 }),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertScheduleTaskTemplateSchema = createInsertSchema(scheduleTaskTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertScheduleTaskTemplate = z.infer<typeof insertScheduleTaskTemplateSchema>;
+export type ScheduleTaskTemplate = typeof scheduleTaskTemplates.$inferSelect;
+
+// AI Scheduling Suggestions - Auto-generated scheduling recommendations
+export const scheduleSuggestions = pgTable("schedule_suggestions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Suggestion type
+  suggestionType: varchar("suggestion_type", { length: 50 }).notNull(), // auto_fill, conflict_resolution, optimization, coverage, preference_match
+
+  // Context
+  shiftId: uuid("shift_id"),
+  clientId: varchar("client_id", { length: 255 }),
+  dateRange: text("date_range"), // JSON: { start, end }
+
+  // Suggestion details
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  suggestedAction: text("suggested_action").notNull(), // JSON describing the action
+
+  // Recommended staff
+  suggestedStaffId: varchar("suggested_staff_id", { length: 255 }),
+  suggestedStaffName: varchar("suggested_staff_name", { length: 255 }),
+  alternativeStaffIds: text("alternative_staff_ids"), // JSON array
+
+  // Scoring
+  confidenceScore: integer("confidence_score"), // 0-100
+  matchScore: integer("match_score"), // 0-100
+  reasoningFactors: text("reasoning_factors"), // JSON: [{ factor, weight, score, explanation }]
+
+  // Impact analysis
+  impactAnalysis: text("impact_analysis"), // JSON: { budgetImpact, coverageImpact, staffLoadImpact }
+  potentialConflicts: text("potential_conflicts"), // JSON array
+
+  // Status
+  status: varchar("status", { length: 20 }).default("pending"), // pending, accepted, rejected, expired, applied
+
+  // Response
+  respondedById: varchar("responded_by_id", { length: 255 }),
+  respondedByName: varchar("responded_by_name", { length: 255 }),
+  respondedAt: timestamp("responded_at"),
+  responseNote: text("response_note"),
+
+  // If applied
+  appliedAt: timestamp("applied_at"),
+  resultingShiftId: uuid("resulting_shift_id"),
+
+  // Expiry
+  expiresAt: timestamp("expires_at"),
+
+  // Generation metadata
+  generatedBySystem: varchar("generated_by_system", { length: 10 }).default("yes"),
+  generationContext: text("generation_context"), // JSON with generation parameters
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertScheduleSuggestionSchema = createInsertSchema(scheduleSuggestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertScheduleSuggestion = z.infer<typeof insertScheduleSuggestionSchema>;
+export type ScheduleSuggestion = typeof scheduleSuggestions.$inferSelect;
+
+// Auto-Scheduling Jobs - Track automated scheduling runs
+export const autoSchedulingJobs = pgTable("auto_scheduling_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Job configuration
+  jobType: varchar("job_type", { length: 50 }).notNull(), // fill_gaps, optimize, weekly_schedule, daily_schedule
+  scope: text("scope").notNull(), // JSON: { clientIds, staffIds, dateRange, categories }
+
+  // Constraints
+  constraints: text("constraints"), // JSON: { maxHoursPerStaff, preferredStaff, excludeStaff, budgetLimit }
+  preferences: text("preferences"), // JSON: { prioritizeExperience, balanceWorkload, minimizeTravel }
+
+  // Status
+  status: varchar("status", { length: 20 }).default("pending"), // pending, processing, completed, failed, cancelled
+  progress: integer("progress").default(0), // 0-100
+  progressMessage: text("progress_message"),
+
+  // Results
+  shiftsCreated: integer("shifts_created").default(0),
+  shiftsModified: integer("shifts_modified").default(0),
+  suggestionsGenerated: integer("suggestions_generated").default(0),
+  conflictsFound: integer("conflicts_found").default(0),
+  conflictsResolved: integer("conflicts_resolved").default(0),
+
+  // Detailed results
+  resultSummary: text("result_summary"), // JSON summary
+  resultDetails: text("result_details"), // JSON detailed results
+  errors: text("errors"), // JSON array of errors
+
+  // Timing
+  scheduledFor: timestamp("scheduled_for"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+
+  // Who triggered
+  triggeredById: varchar("triggered_by_id", { length: 255 }),
+  triggeredByName: varchar("triggered_by_name", { length: 255 }),
+  triggeredBySystem: varchar("triggered_by_system", { length: 10 }).default("no"),
+
+  // Approval workflow
+  requiresApproval: varchar("requires_approval", { length: 10 }).default("yes"),
+  approvalStatus: varchar("approval_status", { length: 20 }), // pending, approved, rejected
+  approvedById: varchar("approved_by_id", { length: 255 }),
+  approvedAt: timestamp("approved_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAutoSchedulingJobSchema = createInsertSchema(autoSchedulingJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAutoSchedulingJob = z.infer<typeof insertAutoSchedulingJobSchema>;
+export type AutoSchedulingJob = typeof autoSchedulingJobs.$inferSelect;
+
+// Schedule Communications - In-app messages for shifts
+export const scheduleCommunications = pgTable("schedule_communications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Context
+  shiftId: uuid("shift_id"),
+  clientId: varchar("client_id", { length: 255 }),
+  threadId: uuid("thread_id"), // For threaded conversations
+
+  // Message type
+  messageType: varchar("message_type", { length: 50 }).default("message"), // message, announcement, alert, reminder, update
+
+  // Content
+  subject: varchar("subject", { length: 255 }),
+  content: text("content").notNull(),
+  contentFormat: varchar("content_format", { length: 20 }).default("text"), // text, markdown, html
+
+  // Attachments
+  attachments: text("attachments"), // JSON array: [{ name, url, type, size }]
+
+  // Sender
+  senderId: varchar("sender_id", { length: 255 }).notNull(),
+  senderName: varchar("sender_name", { length: 255 }),
+  senderRole: varchar("sender_role", { length: 100 }),
+
+  // Recipients
+  recipientType: varchar("recipient_type", { length: 50 }).default("individual"), // individual, group, shift_team, all_staff
+  recipientIds: text("recipient_ids"), // JSON array of user IDs
+  recipientGroupId: varchar("recipient_group_id", { length: 255 }),
+
+  // Delivery status
+  sentAt: timestamp("sent_at").defaultNow(),
+  deliveryStatus: text("delivery_status"), // JSON: { userId: status }
+  readBy: text("read_by"), // JSON array: [{ userId, readAt }]
+
+  // Priority
+  priority: varchar("priority", { length: 20 }).default("normal"), // low, normal, high, urgent
+  isPinned: varchar("is_pinned", { length: 10 }).default("no"),
+
+  // Scheduling
+  scheduledFor: timestamp("scheduled_for"), // For scheduled messages
+  expiresAt: timestamp("expires_at"),
+
+  // Reactions
+  reactions: text("reactions"), // JSON: { emoji: [userIds] }
+
+  // Moderation
+  isEdited: varchar("is_edited", { length: 10 }).default("no"),
+  editedAt: timestamp("edited_at"),
+  isDeleted: varchar("is_deleted", { length: 10 }).default("no"),
+  deletedAt: timestamp("deleted_at"),
+  deletedById: varchar("deleted_by_id", { length: 255 }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertScheduleCommunicationSchema = createInsertSchema(scheduleCommunications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertScheduleCommunication = z.infer<typeof insertScheduleCommunicationSchema>;
+export type ScheduleCommunication = typeof scheduleCommunications.$inferSelect;
+
+// Scheduling Analytics Extended - Enhanced analytics for ASCS
+export const schedulingAnalyticsExtended = pgTable("scheduling_analytics_extended", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Time period
+  periodType: varchar("period_type", { length: 20 }).notNull(), // daily, weekly, monthly, quarterly
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+
+  // Scope
+  scope: varchar("scope", { length: 50 }).default("organization"), // organization, department, team, staff, client
+  scopeId: varchar("scope_id", { length: 255 }),
+
+  // Shift metrics
+  totalShifts: integer("total_shifts").default(0),
+  completedShifts: integer("completed_shifts").default(0),
+  cancelledShifts: integer("cancelled_shifts").default(0),
+  noShowShifts: integer("no_show_shifts").default(0),
+  lateStarts: integer("late_starts").default(0),
+  earlyEnds: integer("early_ends").default(0),
+
+  // Staff metrics
+  uniqueStaffScheduled: integer("unique_staff_scheduled").default(0),
+  totalHoursScheduled: text("total_hours_scheduled"),
+  totalHoursWorked: text("total_hours_worked"),
+  overtimeHours: text("overtime_hours"),
+  averageShiftsPerStaff: text("average_shifts_per_staff"),
+
+  // Client metrics
+  uniqueClientsServed: integer("unique_clients_served").default(0),
+  totalClientHours: text("total_client_hours"),
+  averageHoursPerClient: text("average_hours_per_client"),
+
+  // Coverage metrics
+  coverageRate: text("coverage_rate"), // percentage
+  understaffedPeriods: integer("understaffed_periods").default(0),
+  gapMinutes: integer("gap_minutes").default(0),
+
+  // Swap & marketplace metrics
+  swapRequestsCreated: integer("swap_requests_created").default(0),
+  swapRequestsApproved: integer("swap_requests_approved").default(0),
+  openShiftsPosted: integer("open_shifts_posted").default(0),
+  openShiftsFilled: integer("open_shifts_filled").default(0),
+  averageTimeToFill: text("average_time_to_fill"), // in minutes
+
+  // Task metrics
+  tasksAssigned: integer("tasks_assigned").default(0),
+  tasksCompleted: integer("tasks_completed").default(0),
+  tasksOverdue: integer("tasks_overdue").default(0),
+  taskCompletionRate: text("task_completion_rate"),
+
+  // AI/Auto-scheduling metrics
+  aiSuggestionsGenerated: integer("ai_suggestions_generated").default(0),
+  aiSuggestionsAccepted: integer("ai_suggestions_accepted").default(0),
+  autoScheduleJobsRun: integer("auto_schedule_jobs_run").default(0),
+  autoScheduleSuccessRate: text("auto_schedule_success_rate"),
+
+  // Conflict metrics
+  conflictsDetected: integer("conflicts_detected").default(0),
+  conflictsAutoResolved: integer("conflicts_auto_resolved").default(0),
+  conflictsManuallyResolved: integer("conflicts_manually_resolved").default(0),
+
+  // Budget metrics
+  budgetAllocated: text("budget_allocated"),
+  actualSpend: text("actual_spend"),
+  budgetVariance: text("budget_variance"),
+  costPerHour: text("cost_per_hour"),
+
+  // Satisfaction metrics
+  staffSatisfactionScore: text("staff_satisfaction_score"),
+  clientSatisfactionScore: text("client_satisfaction_score"),
+
+  // Breakdown data
+  metricsByCategory: text("metrics_by_category"), // JSON
+  metricsByShiftType: text("metrics_by_shift_type"), // JSON
+  metricsByDayOfWeek: text("metrics_by_day_of_week"), // JSON
+  metricsByTimeOfDay: text("metrics_by_time_of_day"), // JSON
+
+  // Trends
+  trendData: text("trend_data"), // JSON time series data
+  forecastData: text("forecast_data"), // JSON predicted values
+
+  calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSchedulingAnalyticsExtendedSchema = createInsertSchema(schedulingAnalyticsExtended).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSchedulingAnalyticsExtended = z.infer<typeof insertSchedulingAnalyticsExtendedSchema>;
+export type SchedulingAnalyticsExtended = typeof schedulingAnalyticsExtended.$inferSelect;
+
+// Staff Scheduling Preferences - Staff's own scheduling preferences
+export const staffSchedulingPreferences = pgTable("staff_scheduling_preferences", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  staffId: varchar("staff_id", { length: 255 }).notNull().unique(),
+
+  // Workload preferences
+  preferredHoursPerWeek: integer("preferred_hours_per_week"),
+  maxHoursPerWeek: integer("max_hours_per_week"),
+  minHoursPerWeek: integer("min_hours_per_week"),
+  maxShiftsPerDay: integer("max_shifts_per_day").default(2),
+  maxConsecutiveDays: integer("max_consecutive_days").default(6),
+
+  // Time preferences
+  preferredShiftTypes: text("preferred_shift_types"), // JSON array
+  preferredDaysOfWeek: text("preferred_days_of_week"), // JSON array
+  preferredTimeSlots: text("preferred_time_slots"), // JSON: { morning: true, afternoon: false, evening: true, overnight: false }
+  avoidDaysOfWeek: text("avoid_days_of_week"), // JSON array
+
+  // Location preferences
+  maxTravelMinutes: integer("max_travel_minutes").default(60),
+  preferredAreas: text("preferred_areas"), // JSON array of suburbs/regions
+  avoidAreas: text("avoid_areas"), // JSON array
+  hasOwnTransport: varchar("has_own_transport", { length: 10 }).default("yes"),
+
+  // Client preferences
+  preferredClientIds: text("preferred_client_ids"), // JSON array
+  avoidClientIds: text("avoid_client_ids"), // JSON array (soft preference, not restriction)
+  preferredCategories: text("preferred_categories"), // JSON array: NDIS, Support at Home, Private
+
+  // Shift preferences
+  preferBackToBack: varchar("prefer_back_to_back", { length: 10 }).default("no"),
+  minimumBreakMinutes: integer("minimum_break_minutes").default(30),
+  preferConsistentSchedule: varchar("prefer_consistent_schedule", { length: 10 }).default("yes"),
+
+  // Notification preferences
+  notifyNewShifts: varchar("notify_new_shifts", { length: 10 }).default("yes"),
+  notifyOpenShifts: varchar("notify_open_shifts", { length: 10 }).default("yes"),
+  notifySwapRequests: varchar("notify_swap_requests", { length: 10 }).default("yes"),
+
+  // Notes
+  additionalNotes: text("additional_notes"),
+
+  // Approval
+  lastUpdatedById: varchar("last_updated_by_id", { length: 255 }),
+  approvedById: varchar("approved_by_id", { length: 255 }),
+  approvedAt: timestamp("approved_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffSchedulingPreferencesSchema = createInsertSchema(staffSchedulingPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffSchedulingPreferences = z.infer<typeof insertStaffSchedulingPreferencesSchema>;
+export type StaffSchedulingPreferences = typeof staffSchedulingPreferences.$inferSelect;
+
+// Schedule Calendar Events - For non-shift events on calendar
+export const scheduleCalendarEvents = pgTable("schedule_calendar_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Event basics
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // meeting, training, holiday, blocked, reminder, milestone
+
+  // Timing
+  allDay: varchar("all_day", { length: 10 }).default("no"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  startTime: varchar("start_time", { length: 10 }),
+  endTime: varchar("end_time", { length: 10 }),
+  timezone: varchar("timezone", { length: 50 }).default("Australia/Sydney"),
+
+  // Recurrence
+  isRecurring: varchar("is_recurring", { length: 10 }).default("no"),
+  recurrenceRule: text("recurrence_rule"), // RRULE format
+  recurrenceEndDate: date("recurrence_end_date"),
+  parentEventId: uuid("parent_event_id"),
+
+  // Scope
+  scope: varchar("scope", { length: 50 }).default("personal"), // personal, team, organization
+  visibleTo: text("visible_to"), // JSON array of user/role IDs
+
+  // Location
+  location: text("location"),
+  isVirtual: varchar("is_virtual", { length: 10 }).default("no"),
+  virtualMeetingUrl: text("virtual_meeting_url"),
+
+  // Participants
+  organizerId: varchar("organizer_id", { length: 255 }),
+  organizerName: varchar("organizer_name", { length: 255 }),
+  participantIds: text("participant_ids"), // JSON array
+
+  // Status
+  status: varchar("status", { length: 20 }).default("active"), // active, cancelled, completed
+
+  // Display
+  color: varchar("color", { length: 20 }),
+  icon: varchar("icon", { length: 50 }),
+
+  // Reminders
+  reminders: text("reminders"), // JSON array: [{ type, minutesBefore }]
+
+  // Attachments
+  attachments: text("attachments"), // JSON array
+
+  // Notes
+  notes: text("notes"),
+
+  createdById: varchar("created_by_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertScheduleCalendarEventSchema = createInsertSchema(scheduleCalendarEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertScheduleCalendarEvent = z.infer<typeof insertScheduleCalendarEventSchema>;
+export type ScheduleCalendarEvent = typeof scheduleCalendarEvents.$inferSelect;
+
+// Gamification - Badges and achievements for staff
+export const schedulingBadges = pgTable("scheduling_badges", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Badge definition
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 100 }),
+  color: varchar("color", { length: 20 }),
+  category: varchar("category", { length: 50 }), // reliability, performance, teamwork, milestone
+
+  // Criteria
+  criteriaType: varchar("criteria_type", { length: 50 }).notNull(), // count, streak, percentage, milestone
+  criteriaField: varchar("criteria_field", { length: 100 }), // shifts_completed, on_time_arrivals, etc.
+  criteriaThreshold: integer("criteria_threshold"),
+  criteriaPercentage: text("criteria_percentage"),
+  criteriaPeriod: varchar("criteria_period", { length: 20 }), // weekly, monthly, quarterly, all_time
+
+  // Display
+  tier: varchar("tier", { length: 20 }).default("bronze"), // bronze, silver, gold, platinum
+  points: integer("points").default(0),
+  isVisible: varchar("is_visible", { length: 10 }).default("yes"),
+
+  // Availability
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSchedulingBadgeSchema = createInsertSchema(schedulingBadges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSchedulingBadge = z.infer<typeof insertSchedulingBadgeSchema>;
+export type SchedulingBadge = typeof schedulingBadges.$inferSelect;
+
+// Staff Badge Awards
+export const staffBadgeAwards = pgTable("staff_badge_awards", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  staffId: varchar("staff_id", { length: 255 }).notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+  badgeId: uuid("badge_id").notNull(),
+
+  // Award details
+  awardedAt: timestamp("awarded_at").defaultNow().notNull(),
+  awardedForPeriod: varchar("awarded_for_period", { length: 50 }), // e.g., "2024-W45", "2024-11"
+
+  // Achievement data
+  achievementValue: text("achievement_value"), // The actual value that earned the badge
+  achievementDetails: text("achievement_details"), // JSON with details
+
+  // Notification
+  notifiedAt: timestamp("notified_at"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+
+  // Display
+  isDisplayed: varchar("is_displayed", { length: 10 }).default("yes"), // Staff can hide badges
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStaffBadgeAwardSchema = createInsertSchema(staffBadgeAwards).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStaffBadgeAward = z.infer<typeof insertStaffBadgeAwardSchema>;
+export type StaffBadgeAward = typeof staffBadgeAwards.$inferSelect;
+
+// Schedule Interaction Logs - Track user interactions for analytics
+export const scheduleInteractionLogs = pgTable("schedule_interaction_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // User
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  userRole: varchar("user_role", { length: 100 }),
+
+  // Action
+  actionType: varchar("action_type", { length: 50 }).notNull(), // view, create, edit, delete, accept, decline, swap, claim
+  actionTarget: varchar("action_target", { length: 50 }), // shift, open_shift, swap_request, task, etc.
+  targetId: varchar("target_id", { length: 255 }),
+
+  // Context
+  calendarView: varchar("calendar_view", { length: 20 }), // weekly, monthly, daily
+  deviceType: varchar("device_type", { length: 20 }), // desktop, mobile, tablet
+
+  // Details
+  actionDetails: text("action_details"), // JSON with action-specific data
+
+  // Result
+  wasSuccessful: varchar("was_successful", { length: 10 }).default("yes"),
+  errorMessage: text("error_message"),
+
+  // Timing
+  durationMs: integer("duration_ms"),
+
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const insertScheduleInteractionLogSchema = createInsertSchema(scheduleInteractionLogs).omit({
+  id: true,
+});
+
+export type InsertScheduleInteractionLog = z.infer<typeof insertScheduleInteractionLogSchema>;
+export type ScheduleInteractionLog = typeof scheduleInteractionLogs.$inferSelect;
+
+// Daily Notes - Notes visible to specific staff looking after a client
+export type DailyNoteVisibilityType = "all_staff" | "client_team" | "specific_staff" | "management_only";
+
+export const dailyNotes = pgTable("daily_notes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // What the note is for
+  clientId: varchar("client_id", { length: 255 }).notNull(),
+  date: date("date").notNull(), // The date this note applies to
+
+  // Note content
+  title: varchar("title", { length: 255 }),
+  content: text("content").notNull(),
+  priority: varchar("priority", { length: 20 }).default("normal"), // low, normal, high, urgent
+  category: varchar("category", { length: 50 }), // general, medication, behaviour, safety, handover, etc.
+
+  // Visibility controls
+  visibility: varchar("visibility", { length: 30 }).default("client_team").$type<DailyNoteVisibilityType>(),
+  visibleToStaffIds: text("visible_to_staff_ids"), // JSON array - specific staff IDs if visibility is "specific_staff"
+  visibleToRoles: text("visible_to_roles"), // JSON array - role names if limited by role
+
+  // Created by management
+  createdById: varchar("created_by_id", { length: 255 }).notNull(),
+  createdByName: varchar("created_by_name", { length: 255 }),
+
+  // Acknowledgement tracking
+  requiresAcknowledgement: varchar("requires_acknowledgement", { length: 10 }).default("no"),
+  acknowledgedByStaffIds: text("acknowledged_by_staff_ids"), // JSON array of staff who acknowledged
+
+  // Status
+  isActive: varchar("is_active", { length: 10 }).default("yes"),
+  isPinned: varchar("is_pinned", { length: 10 }).default("no"), // Pinned notes show at top
+  expiresAt: timestamp("expires_at"), // Optional expiry date
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDailyNoteSchema = createInsertSchema(dailyNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDailyNote = z.infer<typeof insertDailyNoteSchema>;
+export type DailyNote = typeof dailyNotes.$inferSelect;

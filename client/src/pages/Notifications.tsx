@@ -202,11 +202,11 @@ export default function Notifications() {
   const count = unreadCount?.count || 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Bell className="h-6 w-6" />
+        <div className="text-center sm:text-left">
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground flex items-center justify-center sm:justify-start gap-2">
+            <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
             Notifications
             {count > 0 && (
               <Badge variant="destructive" className="ml-2">
@@ -214,7 +214,7 @@ export default function Notifications() {
               </Badge>
             )}
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Stay updated with important alerts and activity
           </p>
         </div>

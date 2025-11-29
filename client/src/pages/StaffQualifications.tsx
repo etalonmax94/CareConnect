@@ -214,10 +214,10 @@ export default function StaffQualifications() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Staff Qualifications</h1>
-        <p className="text-muted-foreground">Manage staff certifications and training</p>
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Staff Qualifications</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage staff certifications and training</p>
       </div>
 
       {/* Staff selector */}

@@ -264,6 +264,19 @@ export default function StaffProfile() {
   const [ecEmail, setEcEmail] = useState("");
   const [ecIsPrimary, setEcIsPrimary] = useState(false);
 
+  // Qualification management
+  const [addQualificationOpen, setAddQualificationOpen] = useState(false);
+  const [editingQualification, setEditingQualification] = useState<StaffQualification | null>(null);
+  const [qualFormData, setQualFormData] = useState({
+    qualificationType: "",
+    qualificationName: "",
+    issuingOrganization: "",
+    certificationNumber: "",
+    issuedDate: "",
+    expiryDate: "",
+    status: "current" as "current" | "expired" | "pending_renewal" | "suspended",
+  });
+
   // Fetch full profile
   const { data: staff, isLoading } = useQuery<StaffFullProfile>({
     queryKey: [`/api/staff/${params?.id}/full-profile`],
@@ -320,6 +333,103 @@ export default function StaffProfile() {
       toast({ title: "Failed to delete emergency contact", variant: "destructive" });
     },
   });
+
+  // Create qualification mutation
+  const createQualificationMutation = useMutation({
+    mutationFn: async (data: typeof qualFormData) => {
+      const res = await fetch(`/api/staff/${params?.id}/qualifications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/staff/${params?.id}/full-profile`] });
+      toast({ title: "Qualification added successfully" });
+      setAddQualificationOpen(false);
+      resetQualificationForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add qualification", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Update qualification mutation
+  const updateQualificationMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof qualFormData> }) => {
+      const res = await fetch(`/api/staff/qualifications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/staff/${params?.id}/full-profile`] });
+      toast({ title: "Qualification updated successfully" });
+      setEditingQualification(null);
+      resetQualificationForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update qualification", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Delete qualification mutation
+  const deleteQualificationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/staff/qualifications/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/staff/${params?.id}/full-profile`] });
+      toast({ title: "Qualification deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete qualification", description: error.message, variant: "destructive" });
+    },
+  });
+
+  function resetQualificationForm() {
+    setQualFormData({
+      qualificationType: "",
+      qualificationName: "",
+      issuingOrganization: "",
+      certificationNumber: "",
+      issuedDate: "",
+      expiryDate: "",
+      status: "current",
+    });
+  }
+
+  function handleEditQualification(qual: StaffQualification) {
+    setEditingQualification(qual);
+    setQualFormData({
+      qualificationType: qual.qualificationType,
+      qualificationName: qual.qualificationName,
+      issuingOrganization: qual.issuingOrganization || "",
+      certificationNumber: qual.certificationNumber || "",
+      issuedDate: qual.issuedDate || "",
+      expiryDate: qual.expiryDate || "",
+      status: (qual.status as "current" | "expired" | "pending_renewal" | "suspended") || "current",
+    });
+  }
+
+  function handleSaveQualification() {
+    if (editingQualification) {
+      updateQualificationMutation.mutate({ id: editingQualification.id, data: qualFormData });
+    } else {
+      createQualificationMutation.mutate(qualFormData);
+    }
+  }
 
   function resetEmergencyContactForm() {
     setEcName("");
@@ -1405,53 +1515,171 @@ export default function StaffProfile() {
           {/* Qualifications Section */}
           {activeSection === "qualifications" && (
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              {/* Section Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Award className="w-5 h-5" />
                     Qualifications & Certifications
-                  </CardTitle>
-                  <CardDescription>
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
                     {staff.activeQualificationsCount} of {staff.qualificationsCount} qualifications are current
-                  </CardDescription>
+                  </p>
+                </div>
+                <Button onClick={() => {
+                  resetQualificationForm();
+                  setAddQualificationOpen(true);
+                }}>
+                  <Plus className="w-4 h-4 mr-2" /> Add Qualification
+                </Button>
+              </div>
+
+              {/* Qualification Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <Award className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{staff.qualificationsCount || 0}</p>
+                        <p className="text-xs text-muted-foreground">Total</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{staff.activeQualificationsCount || 0}</p>
+                        <p className="text-xs text-muted-foreground">Current</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{staff.expiringQualificationsCount || 0}</p>
+                        <p className="text-xs text-muted-foreground">Expiring Soon</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      <div>
+                        <p className="text-2xl font-bold">
+                          {(staff.qualifications?.filter(q => q.status === "expired")?.length || 0)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Expired</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Qualifications List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>All Qualifications</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {staff.qualifications?.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Award className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>No qualifications recorded</p>
+                      <p>No qualifications recorded yet</p>
+                      <Button variant="outline" className="mt-4" onClick={() => {
+                        resetQualificationForm();
+                        setAddQualificationOpen(true);
+                      }}>
+                        <Plus className="w-4 h-4 mr-2" /> Add First Qualification
+                      </Button>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {staff.qualifications?.map((qual) => (
-                        <div key={qual.id} className="p-4 border rounded-lg">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-semibold">{qual.qualificationName}</h4>
-                              <p className="text-sm text-muted-foreground">{qual.issuingOrganization}</p>
-                              {qual.certificationNumber && (
-                                <p className="text-xs text-muted-foreground">Cert #: {qual.certificationNumber}</p>
-                              )}
+                      {staff.qualifications?.map((qual) => {
+                        const daysUntilExpiry = qual.expiryDate
+                          ? Math.floor((new Date(qual.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                          : null;
+                        const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+
+                        return (
+                          <div key={qual.id} className={`p-4 border rounded-lg ${
+                            qual.status === "expired" ? "border-red-200 bg-red-50/30 dark:bg-red-900/10" :
+                            isExpiringSoon ? "border-yellow-200 bg-yellow-50/30 dark:bg-yellow-900/10" : ""
+                          }`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-semibold">{qual.qualificationName}</h4>
+                                  <Badge variant="outline" className="text-xs capitalize">
+                                    {qual.qualificationType?.replace(/_/g, " ") || "Other"}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{qual.issuingOrganization || "Not specified"}</p>
+                                {qual.certificationNumber && (
+                                  <p className="text-xs text-muted-foreground mt-1">Cert #: {qual.certificationNumber}</p>
+                                )}
+                                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                                  {qual.issuedDate && (
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" />
+                                      Issued: {new Date(qual.issuedDate).toLocaleDateString('en-AU')}
+                                    </span>
+                                  )}
+                                  {qual.expiryDate && (
+                                    <span className={`flex items-center gap-1 ${
+                                      qual.status === "expired" ? "text-red-600" :
+                                      isExpiringSoon ? "text-yellow-600" : ""
+                                    }`}>
+                                      <Clock className="w-3 h-3" />
+                                      {qual.status === "expired"
+                                        ? `Expired: ${new Date(qual.expiryDate).toLocaleDateString('en-AU')}`
+                                        : isExpiringSoon
+                                        ? `Expires in ${daysUntilExpiry} days`
+                                        : `Expires: ${new Date(qual.expiryDate).toLocaleDateString('en-AU')}`
+                                      }
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 ml-4">
+                                <Badge variant={
+                                  qual.status === "current" ? "default" :
+                                  qual.status === "expired" ? "destructive" :
+                                  qual.status === "pending_renewal" ? "secondary" : "outline"
+                                }>
+                                  {qual.status === "current" ? "Current" :
+                                   qual.status === "expired" ? "Expired" :
+                                   qual.status === "pending_renewal" ? "Pending Renewal" :
+                                   qual.status === "suspended" ? "Suspended" : qual.status}
+                                </Badge>
+                                <Button variant="ghost" size="icon" onClick={() => handleEditQualification(qual)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => {
+                                    if (confirm("Are you sure you want to delete this qualification?")) {
+                                      deleteQualificationMutation.mutate(qual.id);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <Badge variant={
-                              qual.status === "current" ? "default" :
-                              qual.status === "expired" ? "destructive" : "secondary"
-                            }>
-                              {qual.status === "current" ? "Current" : qual.status === "expired" ? "Expired" : "Pending Renewal"}
-                            </Badge>
                           </div>
-                          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                            {qual.issuedDate && (
-                              <span>Issued: {new Date(qual.issuedDate).toLocaleDateString('en-AU')}</span>
-                            )}
-                            {qual.expiryDate && (
-                              <span className={qual.status === "expired" ? "text-red-500" : ""}>
-                                Expires: {new Date(qual.expiryDate).toLocaleDateString('en-AU')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -1718,6 +1946,154 @@ export default function StaffProfile() {
         onOpenChange={setUploadDocumentOpen}
         preselectedType={preselectedDocType}
       />
+
+      {/* Add/Edit Qualification Dialog */}
+      <Dialog
+        open={addQualificationOpen || !!editingQualification}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAddQualificationOpen(false);
+            setEditingQualification(null);
+            resetQualificationForm();
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingQualification ? "Edit Qualification" : "Add New Qualification"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingQualification ? "Update qualification details" : "Add a new qualification for this staff member"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="qual-type">Qualification Type *</Label>
+              <Select
+                value={qualFormData.qualificationType}
+                onValueChange={(value) => setQualFormData({ ...qualFormData, qualificationType: value })}
+              >
+                <SelectTrigger id="qual-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nursing">Nursing</SelectItem>
+                  <SelectItem value="first_aid">First Aid</SelectItem>
+                  <SelectItem value="cpr">CPR</SelectItem>
+                  <SelectItem value="manual_handling">Manual Handling</SelectItem>
+                  <SelectItem value="medication_admin">Medication Administration</SelectItem>
+                  <SelectItem value="behavioral_support">Behavioural Support</SelectItem>
+                  <SelectItem value="complex_care">Complex Care</SelectItem>
+                  <SelectItem value="infection_control">Infection Control</SelectItem>
+                  <SelectItem value="food_safety">Food Safety</SelectItem>
+                  <SelectItem value="certificate">Certificate</SelectItem>
+                  <SelectItem value="license">License</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="qual-name">Qualification Name *</Label>
+              <Input
+                id="qual-name"
+                value={qualFormData.qualificationName}
+                onChange={(e) => setQualFormData({ ...qualFormData, qualificationName: e.target.value })}
+                placeholder="e.g., Registered Nurse, Certificate III in Individual Support"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="qual-org">Issuing Organisation</Label>
+              <Input
+                id="qual-org"
+                value={qualFormData.issuingOrganization}
+                onChange={(e) => setQualFormData({ ...qualFormData, issuingOrganization: e.target.value })}
+                placeholder="e.g., AHPRA, St John Ambulance, TAFE"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="qual-cert">Certification Number</Label>
+              <Input
+                id="qual-cert"
+                value={qualFormData.certificationNumber}
+                onChange={(e) => setQualFormData({ ...qualFormData, certificationNumber: e.target.value })}
+                placeholder="e.g., NUR123456"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="qual-issued">Issue Date</Label>
+              <Input
+                id="qual-issued"
+                type="date"
+                value={qualFormData.issuedDate}
+                onChange={(e) => setQualFormData({ ...qualFormData, issuedDate: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="qual-expiry">Expiry Date</Label>
+              <Input
+                id="qual-expiry"
+                type="date"
+                value={qualFormData.expiryDate}
+                onChange={(e) => setQualFormData({ ...qualFormData, expiryDate: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="qual-status">Status *</Label>
+              <Select
+                value={qualFormData.status}
+                onValueChange={(value: "current" | "expired" | "pending_renewal" | "suspended") =>
+                  setQualFormData({ ...qualFormData, status: value })
+                }
+              >
+                <SelectTrigger id="qual-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="current">Current</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="pending_renewal">Pending Renewal</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddQualificationOpen(false);
+                setEditingQualification(null);
+                resetQualificationForm();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveQualification}
+              disabled={
+                !qualFormData.qualificationType ||
+                !qualFormData.qualificationName ||
+                createQualificationMutation.isPending ||
+                updateQualificationMutation.isPending
+              }
+            >
+              {(createQualificationMutation.isPending || updateQualificationMutation.isPending) && (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              )}
+              {editingQualification ? "Update" : "Add"} Qualification
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

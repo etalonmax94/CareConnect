@@ -1,12 +1,12 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { 
-  HelpCircle, 
-  MessageSquarePlus, 
-  ClipboardList, 
-  X, 
-  Send, 
-  Camera, 
+import {
+  HelpCircle,
+  MessageSquarePlus,
+  ClipboardList,
+  X,
+  Send,
+  Camera,
   Trash2,
   ChevronUp,
   AlertCircle,
@@ -15,7 +15,9 @@ import {
   HelpCircle as QuestionIcon,
   Lock,
   Database,
-  MoreHorizontal
+  MoreHorizontal,
+  Inbox,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +38,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -57,6 +64,16 @@ const TICKET_PRIORITIES = [
   { value: "urgent", label: "Urgent", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
 ];
 
+interface AuthResponse {
+  authenticated: boolean;
+  user: {
+    id: string;
+    email: string;
+    displayName: string;
+    roles: string[];
+  } | null;
+}
+
 export default function HelpWidget() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTicketDialog, setShowTicketDialog] = useState(false);
@@ -65,7 +82,7 @@ export default function HelpWidget() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
-  
+
   // Hide widget on chat page to avoid overlapping with chat controls
   const isOnChatPage = location.startsWith("/chat");
 
@@ -79,6 +96,28 @@ export default function HelpWidget() {
   // Get current page URL for context
   const pageUrl = typeof window !== "undefined" ? window.location.href : "";
 
+  // Fetch current user to check if they're admin
+  const { data: auth } = useQuery<AuthResponse>({
+    queryKey: ["/api/auth/me"],
+    staleTime: 30000,
+  });
+
+  const isAdmin = auth?.user?.roles?.some(role =>
+    ["director", "operations_manager", "admin"].includes(role)
+  ) ?? false;
+
+  // Fetch all tickets if admin (to show pending count)
+  const { data: allTickets = [] } = useQuery<SupportTicket[]>({
+    queryKey: ["/api/tickets"],
+    enabled: isAdmin,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Count open tickets (excluding resolved/closed)
+  const openTicketsCount = allTickets.filter(t =>
+    ["open", "in_progress", "waiting_response"].includes(t.status)
+  ).length;
+
   const { data: myTickets = [] } = useQuery<SupportTicket[]>({
     queryKey: ["/api/tickets/my"],
     enabled: showMyTicketsDialog,
@@ -91,6 +130,7 @@ export default function HelpWidget() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       toast({
         title: "Ticket Submitted!",
@@ -140,7 +180,7 @@ export default function HelpWidget() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!title.trim() || !description.trim()) {
       toast({
         title: "Missing Information",
@@ -213,7 +253,7 @@ export default function HelpWidget() {
             </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-2 mb-1"
               onClick={() => {
                 setShowMyTicketsDialog(true);
                 setIsExpanded(false);
@@ -223,22 +263,68 @@ export default function HelpWidget() {
               <ClipboardList className="h-4 w-4" />
               My Tickets
             </Button>
+            {/* Help Desk link for admins */}
+            {isAdmin && (
+              <>
+                <div className="border-t my-1" />
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 relative"
+                  onClick={() => {
+                    setLocation("/help-desk");
+                    setIsExpanded(false);
+                  }}
+                  data-testid="button-help-desk"
+                >
+                  <Inbox className="h-4 w-4" />
+                  <span>Help Desk</span>
+                  {openTicketsCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="ml-auto bg-cyan-500 hover:bg-cyan-600 text-white text-xs px-1.5 py-0 h-5 min-w-[20px] flex items-center justify-center"
+                    >
+                      {openTicketsCount}
+                    </Badge>
+                  )}
+                  <ExternalLink className="h-3 w-3 ml-1 text-muted-foreground" />
+                </Button>
+              </>
+            )}
           </div>
         )}
 
         {/* Main Button */}
-        <Button
-          size="icon"
-          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow"
-          onClick={() => setIsExpanded(!isExpanded)}
-          data-testid="button-help-widget"
-        >
-          {isExpanded ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <HelpCircle className="h-6 w-6" />
-          )}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow relative"
+              onClick={() => setIsExpanded(!isExpanded)}
+              data-testid="button-help-widget"
+            >
+              {isExpanded ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <HelpCircle className="h-6 w-6" />
+              )}
+              {/* Cyan indicator dot for admins with open tickets */}
+              {!isExpanded && isAdmin && openTicketsCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+                  <span className="relative inline-flex h-4 w-4 rounded-full bg-cyan-500 text-[10px] font-bold text-white items-center justify-center">
+                    {openTicketsCount > 9 ? "9+" : openTicketsCount}
+                  </span>
+                </span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>Help & Support</p>
+            {isAdmin && openTicketsCount > 0 && (
+              <p className="text-xs text-cyan-400">{openTicketsCount} open tickets</p>
+            )}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Report Issue Dialog */}
@@ -425,7 +511,7 @@ export default function HelpWidget() {
               myTickets.map((ticket) => (
                 <div
                   key={ticket.id}
-                  className="border rounded-lg p-4 hover-elevate cursor-pointer"
+                  className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors"
                   onClick={() => {
                     setLocation(`/help-desk?ticket=${ticket.id}`);
                     setShowMyTicketsDialog(false);

@@ -214,11 +214,11 @@ export default function FormTemplates() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+        <div className="text-center sm:text-left">
           <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Form Templates</h1>
-          <p className="text-muted-foreground">Create and manage customisable form templates</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Create and manage customisable form templates</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>

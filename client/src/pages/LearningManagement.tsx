@@ -211,7 +211,13 @@ export default function LearningManagement() {
   const categories = [...new Set(courses?.map(c => c.category).filter(Boolean))] as string[];
 
   return (
-    <div className="space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+      {/* Page Title */}
+      <div className="text-center sm:text-left">
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Learning Management</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Track your training progress and earn certifications</p>
+      </div>
+
       {/* Header with Gamification Stats */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* User Stats Card */}

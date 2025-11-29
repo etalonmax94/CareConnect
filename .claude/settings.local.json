@@ -14,7 +14,8 @@
       "Bash(xargs:*)",
       "Bash(npm run check:client:*)",
       "Bash(npm run:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

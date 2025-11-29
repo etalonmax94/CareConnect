@@ -108,6 +108,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimePicker } from "@/components/ui/time-picker";
 
 interface ChatRoomWithParticipants extends ChatRoom {
   participants: ChatRoomParticipant[];
@@ -1821,16 +1823,17 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background" data-testid="chat-page">
-      {/* Sidebar - Conversation List */}
-      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} ${isMobileView ? "w-full" : "w-64 lg:w-80 xl:w-96"} flex-col h-full overflow-hidden bg-card md:border-r shrink-0`}>
-        {/* Header - Fixed at top */}
-        <div className="shrink-0 bg-card border-b">
-          <div className="px-4 pt-4 pb-3 md:px-5 md:pt-5">
+    <div className="p-3 sm:p-6" data-testid="chat-page">
+      <div className="flex h-[calc(100vh-7rem)] sm:h-[calc(100vh-8.5rem)] overflow-hidden bg-background rounded-lg border">
+        {/* Sidebar - Conversation List */}
+        <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} ${isMobileView ? "w-full" : "w-64 lg:w-80 xl:w-96"} flex-col h-full overflow-hidden bg-card md:border-r shrink-0`}>
+          {/* Header - Fixed at top */}
+          <div className="shrink-0 bg-card border-b">
+            <div className="px-4 pt-4 pb-3 md:px-5 md:pt-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight" data-testid="text-page-title">Messages</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">Team communication</p>
+                <h1 className="text-xl sm:text-2xl font-semibold text-foreground" data-testid="text-page-title">Messages</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">Team communication</p>
               </div>
               <div className="flex items-center gap-1">
                 {isAppAdmin && (
@@ -3947,23 +3950,21 @@ export default function Chat() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="schedule-date">Date</Label>
-                <Input
+                <DatePicker
                   id="schedule-date"
-                  type="date"
                   value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  data-testid="input-schedule-date"
+                  onChange={(value) => setScheduleDate(value)}
+                  placeholder="Select date"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="schedule-time">Time</Label>
-                <Input
+                <TimePicker
                   id="schedule-time"
-                  type="time"
                   value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                  data-testid="input-schedule-time"
+                  onChange={(value) => setScheduleTime(value)}
+                  placeholder="Select time"
+                  minuteStep={15}
                 />
               </div>
             </div>
@@ -4096,22 +4097,20 @@ export default function Chat() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="search-date-from">From Date</Label>
-                <Input
+                <DatePicker
                   id="search-date-from"
-                  type="date"
                   value={searchDateFrom}
-                  onChange={(e) => setSearchDateFrom(e.target.value)}
-                  data-testid="input-search-date-from"
+                  onChange={(value) => setSearchDateFrom(value)}
+                  placeholder="From date"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="search-date-to">To Date</Label>
-                <Input
+                <DatePicker
                   id="search-date-to"
-                  type="date"
                   value={searchDateTo}
-                  onChange={(e) => setSearchDateTo(e.target.value)}
-                  data-testid="input-search-date-to"
+                  onChange={(value) => setSearchDateTo(value)}
+                  placeholder="To date"
                 />
               </div>
             </div>
@@ -4315,6 +4314,7 @@ export default function Chat() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

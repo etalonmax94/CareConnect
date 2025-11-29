@@ -39,6 +39,7 @@ import {
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import multer from "multer";
+import { processAIWritingRequest, QUICK_TEMPLATES, type WritingContext, type WritingAction } from "./services/aiWritingAssistant";
 import path from "path";
 import fs from "fs";
 import jwt from "jsonwebtoken";
@@ -241,6 +242,43 @@ const uploadChatAvatar = multer({
       cb(null, true);
     } else {
       cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+    }
+  }
+});
+
+// Policy document upload configuration
+const policyDocumentsDir = path.join(uploadsDir, 'policy-documents');
+if (!fs.existsSync(policyDocumentsDir)) {
+  fs.mkdirSync(policyDocumentsDir, { recursive: true });
+}
+
+const policyDocumentStorageConfig = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, policyDocumentsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const safeOriginalName = sanitizeFilename(file.originalname);
+    cb(null, `policy-${uniqueSuffix}-${safeOriginalName}`);
+  }
+});
+
+const uploadPolicyDocument = multer({
+  storage: policyDocumentStorageConfig,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for policy documents
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain'
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, Word, Excel, and text files are allowed'));
     }
   }
 });
@@ -13795,6 +13833,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POLICY MANAGEMENT SYSTEM (PMS) ROUTES
   // ============================================
 
+  // Policy Document Upload
+  app.post("/api/pms/policies/upload", requireAuth, (req: any, res, next) => {
+    uploadPolicyDocument.single("file")(req, res, (err: any) => {
+      if (err) {
+        if (err.message?.includes('Only PDF')) {
+          return res.status(400).json({ error: "Only PDF, Word, Excel, and text files are allowed" });
+        }
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: "File is too large. Maximum size is 50MB." });
+        }
+        return res.status(400).json({ error: err.message || "File upload failed" });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const fileUrl = `/uploads/policy-documents/${req.file.filename}`;
+
+      res.json({
+        fileUrl,
+        fileName: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size
+      });
+    } catch (error) {
+      console.error("Error uploading policy document:", error);
+      res.status(500).json({ error: "Failed to upload policy document" });
+    }
+  });
+
+  // Serve policy documents
+  app.get("/api/pms/documents/:filename", requireAuth, (req: any, res) => {
+    const filename = sanitizeFilename(req.params.filename);
+    const filePath = path.join(policyDocumentsDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    res.sendFile(filePath);
+  });
+
   // Dashboard & Analytics
   app.get("/api/pms/stats", requireAuth, async (req: any, res) => {
     try {
@@ -14639,10 +14723,2279 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // COMPREHENSIVE SCHEDULING SYSTEM (CSS) ROUTES
+  // ============================================
+
+  // Shift Templates
+  app.get("/api/css/templates", requireAuth, async (req: any, res) => {
+    try {
+      const { category } = req.query;
+      let templates;
+      if (category) {
+        templates = await storage.getShiftTemplatesByCategory(category);
+      } else {
+        templates = await storage.getAllShiftTemplates();
+      }
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching shift templates:", error);
+      res.status(500).json({ error: "Failed to fetch shift templates" });
+    }
+  });
+
+  app.get("/api/css/templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const template = await storage.getShiftTemplateById(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching shift template:", error);
+      res.status(500).json({ error: "Failed to fetch shift template" });
+    }
+  });
+
+  app.post("/api/css/templates", requireAuth, async (req: any, res) => {
+    try {
+      const template = await storage.createShiftTemplate({
+        ...req.body,
+        createdById: req.user.id,
+        createdByName: req.user.displayName
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating shift template:", error);
+      res.status(500).json({ error: "Failed to create shift template" });
+    }
+  });
+
+  app.put("/api/css/templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const template = await storage.updateShiftTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating shift template:", error);
+      res.status(500).json({ error: "Failed to update shift template" });
+    }
+  });
+
+  app.delete("/api/css/templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteShiftTemplate(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting shift template:", error);
+      res.status(500).json({ error: "Failed to delete shift template" });
+    }
+  });
+
+  // Shifts
+  app.get("/api/css/shifts", requireAuth, async (req: any, res) => {
+    try {
+      const { status, category, clientId, startDate, endDate, staffId } = req.query;
+
+      // If staffId is provided, get shifts for that staff member
+      if (staffId) {
+        const shiftsWithAllocations = await storage.getShiftsByStaff(staffId, startDate, endDate);
+        return res.json(shiftsWithAllocations);
+      }
+
+      const shifts = await storage.getAllShifts({
+        status,
+        category,
+        clientId,
+        startDate,
+        endDate
+      });
+      res.json(shifts);
+    } catch (error) {
+      console.error("Error fetching shifts:", error);
+      res.status(500).json({ error: "Failed to fetch shifts" });
+    }
+  });
+
+  app.get("/api/css/shifts/calendar", requireAuth, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const shifts = await storage.getShiftsByDateRange(startDate, endDate);
+
+      // Fetch allocations for all shifts
+      const shiftsWithAllocations = await Promise.all(
+        shifts.map(async (shift) => {
+          const allocations = await storage.getShiftAllocations(shift.id);
+          return { ...shift, allocations };
+        })
+      );
+
+      res.json(shiftsWithAllocations);
+    } catch (error) {
+      console.error("Error fetching calendar shifts:", error);
+      res.status(500).json({ error: "Failed to fetch calendar shifts" });
+    }
+  });
+
+  app.get("/api/css/shifts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const shift = await storage.getShiftById(req.params.id);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      // Get allocations and attachments
+      const [allocations, attachments, activityLog] = await Promise.all([
+        storage.getShiftAllocations(shift.id),
+        storage.getShiftAttachments(shift.id),
+        storage.getShiftActivityLog(shift.id)
+      ]);
+
+      res.json({ ...shift, allocations, attachments, activityLog });
+    } catch (error) {
+      console.error("Error fetching shift:", error);
+      res.status(500).json({ error: "Failed to fetch shift" });
+    }
+  });
+
+  app.post("/api/css/shifts", requireAuth, async (req: any, res) => {
+    try {
+      const shiftData = {
+        ...req.body,
+        createdById: req.user.id,
+        createdByName: req.user.displayName
+      };
+
+      // If using a template, increment usage count
+      if (shiftData.templateId) {
+        await storage.incrementTemplateUsage(shiftData.templateId);
+      }
+
+      const shift = await storage.createShift(shiftData);
+
+      // Log activity
+      await storage.createShiftActivityLog({
+        shiftId: shift.id,
+        activityType: 'created',
+        description: 'Shift created',
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.status(201).json(shift);
+    } catch (error) {
+      console.error("Error creating shift:", error);
+      res.status(500).json({ error: "Failed to create shift" });
+    }
+  });
+
+  app.post("/api/css/shifts/bulk", requireAuth, async (req: any, res) => {
+    try {
+      const { shifts: shiftsData } = req.body;
+
+      const shiftsToCreate = shiftsData.map((s: any) => ({
+        ...s,
+        createdById: req.user.id,
+        createdByName: req.user.displayName
+      }));
+
+      const createdShifts = await storage.bulkCreateShifts(shiftsToCreate);
+
+      res.status(201).json(createdShifts);
+    } catch (error) {
+      console.error("Error bulk creating shifts:", error);
+      res.status(500).json({ error: "Failed to bulk create shifts" });
+    }
+  });
+
+  app.put("/api/css/shifts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const previousShift = await storage.getShiftById(req.params.id);
+
+      const shift = await storage.updateShift(req.params.id, {
+        ...req.body,
+        lastModifiedById: req.user.id,
+        lastModifiedByName: req.user.displayName
+      });
+
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      // Log activity
+      await storage.createShiftActivityLog({
+        shiftId: shift.id,
+        activityType: 'modified',
+        description: 'Shift updated',
+        previousValue: JSON.stringify(previousShift),
+        newValue: JSON.stringify(shift),
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.json(shift);
+    } catch (error) {
+      console.error("Error updating shift:", error);
+      res.status(500).json({ error: "Failed to update shift" });
+    }
+  });
+
+  app.post("/api/css/shifts/:id/publish", requireAuth, async (req: any, res) => {
+    try {
+      const shift = await storage.publishShift(req.params.id, req.user.id, req.user.displayName);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      await storage.createShiftActivityLog({
+        shiftId: shift.id,
+        activityType: 'published',
+        description: 'Shift published',
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.json(shift);
+    } catch (error) {
+      console.error("Error publishing shift:", error);
+      res.status(500).json({ error: "Failed to publish shift" });
+    }
+  });
+
+  app.post("/api/css/shifts/:id/cancel", requireAuth, async (req: any, res) => {
+    try {
+      const { reason } = req.body;
+      const shift = await storage.cancelShift(req.params.id, req.user.id, req.user.displayName, reason);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      await storage.createShiftActivityLog({
+        shiftId: shift.id,
+        activityType: 'cancelled',
+        description: `Shift cancelled: ${reason}`,
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.json(shift);
+    } catch (error) {
+      console.error("Error cancelling shift:", error);
+      res.status(500).json({ error: "Failed to cancel shift" });
+    }
+  });
+
+  app.delete("/api/css/shifts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteShift(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting shift:", error);
+      res.status(500).json({ error: "Failed to delete shift" });
+    }
+  });
+
+  // Shift Allocations
+  app.get("/api/css/shifts/:shiftId/allocations", requireAuth, async (req: any, res) => {
+    try {
+      const allocations = await storage.getShiftAllocations(req.params.shiftId);
+      res.json(allocations);
+    } catch (error) {
+      console.error("Error fetching shift allocations:", error);
+      res.status(500).json({ error: "Failed to fetch shift allocations" });
+    }
+  });
+
+  app.get("/api/css/shifts/:shiftId/available-staff", requireAuth, async (req: any, res) => {
+    try {
+      const availableStaff = await storage.getAvailableStaffForShift(req.params.shiftId);
+      res.json(availableStaff);
+    } catch (error) {
+      console.error("Error fetching available staff:", error);
+      res.status(500).json({ error: "Failed to fetch available staff" });
+    }
+  });
+
+  app.post("/api/css/shifts/:shiftId/allocations", requireAuth, async (req: any, res) => {
+    try {
+      const allocation = await storage.createShiftAllocation({
+        ...req.body,
+        shiftId: req.params.shiftId,
+        assignedById: req.user.id,
+        assignedByName: req.user.displayName
+      });
+
+      // Update shift status if needed
+      const shift = await storage.getShiftById(req.params.shiftId);
+      if (shift && shift.status === 'published') {
+        await storage.updateShift(req.params.shiftId, { status: 'assigned' });
+      }
+
+      await storage.createShiftActivityLog({
+        shiftId: req.params.shiftId,
+        activityType: 'assigned',
+        description: `Staff assigned to shift`,
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.status(201).json(allocation);
+    } catch (error) {
+      console.error("Error creating shift allocation:", error);
+      res.status(500).json({ error: "Failed to create shift allocation" });
+    }
+  });
+
+  app.put("/api/css/allocations/:id", requireAuth, async (req: any, res) => {
+    try {
+      const allocation = await storage.updateShiftAllocation(req.params.id, req.body);
+      if (!allocation) {
+        return res.status(404).json({ error: "Allocation not found" });
+      }
+      res.json(allocation);
+    } catch (error) {
+      console.error("Error updating shift allocation:", error);
+      res.status(500).json({ error: "Failed to update shift allocation" });
+    }
+  });
+
+  app.post("/api/css/allocations/:id/accept", requireAuth, async (req: any, res) => {
+    try {
+      const allocation = await storage.acceptAllocation(req.params.id);
+      if (!allocation) {
+        return res.status(404).json({ error: "Allocation not found" });
+      }
+
+      // Update shift status to confirmed
+      await storage.updateShift(allocation.shiftId, { status: 'confirmed' });
+
+      await storage.createShiftActivityLog({
+        shiftId: allocation.shiftId,
+        activityType: 'confirmed',
+        description: 'Staff confirmed shift',
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.json(allocation);
+    } catch (error) {
+      console.error("Error accepting allocation:", error);
+      res.status(500).json({ error: "Failed to accept allocation" });
+    }
+  });
+
+  app.post("/api/css/allocations/:id/decline", requireAuth, async (req: any, res) => {
+    try {
+      const { reason } = req.body;
+      const allocation = await storage.declineAllocation(req.params.id, reason);
+      if (!allocation) {
+        return res.status(404).json({ error: "Allocation not found" });
+      }
+
+      await storage.createShiftActivityLog({
+        shiftId: allocation.shiftId,
+        activityType: 'modified',
+        description: `Staff declined shift: ${reason}`,
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.json(allocation);
+    } catch (error) {
+      console.error("Error declining allocation:", error);
+      res.status(500).json({ error: "Failed to decline allocation" });
+    }
+  });
+
+  app.post("/api/css/allocations/:id/check-in", requireAuth, async (req: any, res) => {
+    try {
+      const { latitude, longitude, distance } = req.body;
+      const allocation = await storage.checkInAllocation(req.params.id, latitude, longitude, distance);
+      if (!allocation) {
+        return res.status(404).json({ error: "Allocation not found" });
+      }
+
+      // Update shift status to in_progress
+      await storage.updateShift(allocation.shiftId, { status: 'in_progress' });
+
+      await storage.createShiftActivityLog({
+        shiftId: allocation.shiftId,
+        activityType: 'started',
+        description: 'Staff checked in',
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.json(allocation);
+    } catch (error) {
+      console.error("Error checking in:", error);
+      res.status(500).json({ error: "Failed to check in" });
+    }
+  });
+
+  app.post("/api/css/allocations/:id/check-out", requireAuth, async (req: any, res) => {
+    try {
+      const { latitude, longitude, distance } = req.body;
+      const allocation = await storage.checkOutAllocation(req.params.id, latitude, longitude, distance);
+      if (!allocation) {
+        return res.status(404).json({ error: "Allocation not found or not checked in" });
+      }
+
+      // Check if all allocations are checked out
+      const allAllocations = await storage.getShiftAllocations(allocation.shiftId);
+      const allCheckedOut = allAllocations.every(a => a.checkedOutAt);
+      if (allCheckedOut) {
+        await storage.updateShift(allocation.shiftId, { status: 'completed' });
+      }
+
+      await storage.createShiftActivityLog({
+        shiftId: allocation.shiftId,
+        activityType: 'completed',
+        description: 'Staff checked out',
+        userId: req.user.id,
+        userName: req.user.displayName
+      });
+
+      res.json(allocation);
+    } catch (error) {
+      console.error("Error checking out:", error);
+      res.status(500).json({ error: "Failed to check out" });
+    }
+  });
+
+  app.delete("/api/css/allocations/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteShiftAllocation(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting allocation:", error);
+      res.status(500).json({ error: "Failed to delete allocation" });
+    }
+  });
+
+  // Shift Attachments
+  app.get("/api/css/shifts/:shiftId/attachments", requireAuth, async (req: any, res) => {
+    try {
+      const attachments = await storage.getShiftAttachments(req.params.shiftId);
+      res.json(attachments);
+    } catch (error) {
+      console.error("Error fetching shift attachments:", error);
+      res.status(500).json({ error: "Failed to fetch shift attachments" });
+    }
+  });
+
+  app.post("/api/css/shifts/:shiftId/attachments", requireAuth, async (req: any, res) => {
+    try {
+      const attachment = await storage.createShiftAttachment({
+        ...req.body,
+        shiftId: req.params.shiftId,
+        uploadedById: req.user.id,
+        uploadedByName: req.user.displayName
+      });
+      res.status(201).json(attachment);
+    } catch (error) {
+      console.error("Error creating shift attachment:", error);
+      res.status(500).json({ error: "Failed to create shift attachment" });
+    }
+  });
+
+  app.delete("/api/css/attachments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteShiftAttachment(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting attachment:", error);
+      res.status(500).json({ error: "Failed to delete attachment" });
+    }
+  });
+
+  // Shift Swap Requests
+  app.get("/api/css/swap-requests", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId, pending } = req.query;
+      let requests;
+      if (pending === 'true') {
+        requests = await storage.getPendingSwapRequests();
+      } else {
+        requests = await storage.getShiftSwapRequests(staffId);
+      }
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching swap requests:", error);
+      res.status(500).json({ error: "Failed to fetch swap requests" });
+    }
+  });
+
+  app.post("/api/css/swap-requests", requireAuth, async (req: any, res) => {
+    try {
+      const request = await storage.createShiftSwapRequest({
+        ...req.body,
+        requestingStaffId: req.user.staffId || req.body.requestingStaffId
+      });
+      res.status(201).json(request);
+    } catch (error) {
+      console.error("Error creating swap request:", error);
+      res.status(500).json({ error: "Failed to create swap request" });
+    }
+  });
+
+  app.post("/api/css/swap-requests/:id/approve", requireAuth, async (req: any, res) => {
+    try {
+      const request = await storage.approveSwapRequest(req.params.id, req.user.id, req.user.displayName);
+      if (!request) {
+        return res.status(404).json({ error: "Swap request not found" });
+      }
+      res.json(request);
+    } catch (error) {
+      console.error("Error approving swap request:", error);
+      res.status(500).json({ error: "Failed to approve swap request" });
+    }
+  });
+
+  app.post("/api/css/swap-requests/:id/reject", requireAuth, async (req: any, res) => {
+    try {
+      const { reason } = req.body;
+      const request = await storage.rejectSwapRequest(req.params.id, req.user.id, req.user.displayName, reason);
+      if (!request) {
+        return res.status(404).json({ error: "Swap request not found" });
+      }
+      res.json(request);
+    } catch (error) {
+      console.error("Error rejecting swap request:", error);
+      res.status(500).json({ error: "Failed to reject swap request" });
+    }
+  });
+
+  // Coverage Requirements
+  app.get("/api/css/coverage-requirements", requireAuth, async (req: any, res) => {
+    try {
+      const { clientId } = req.query;
+      const requirements = await storage.getShiftCoverageRequirements(clientId);
+      res.json(requirements);
+    } catch (error) {
+      console.error("Error fetching coverage requirements:", error);
+      res.status(500).json({ error: "Failed to fetch coverage requirements" });
+    }
+  });
+
+  app.post("/api/css/coverage-requirements", requireAuth, async (req: any, res) => {
+    try {
+      const requirement = await storage.createShiftCoverageRequirement(req.body);
+      res.status(201).json(requirement);
+    } catch (error) {
+      console.error("Error creating coverage requirement:", error);
+      res.status(500).json({ error: "Failed to create coverage requirement" });
+    }
+  });
+
+  app.put("/api/css/coverage-requirements/:id", requireAuth, async (req: any, res) => {
+    try {
+      const requirement = await storage.updateShiftCoverageRequirement(req.params.id, req.body);
+      if (!requirement) {
+        return res.status(404).json({ error: "Coverage requirement not found" });
+      }
+      res.json(requirement);
+    } catch (error) {
+      console.error("Error updating coverage requirement:", error);
+      res.status(500).json({ error: "Failed to update coverage requirement" });
+    }
+  });
+
+  app.delete("/api/css/coverage-requirements/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteShiftCoverageRequirement(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting coverage requirement:", error);
+      res.status(500).json({ error: "Failed to delete coverage requirement" });
+    }
+  });
+
+  // Staff Shift Preferences
+  app.get("/api/css/staff/:staffId/preferences", requireAuth, async (req: any, res) => {
+    try {
+      const preferences = await storage.getStaffShiftPreferences(req.params.staffId);
+      res.json(preferences || {});
+    } catch (error) {
+      console.error("Error fetching staff preferences:", error);
+      res.status(500).json({ error: "Failed to fetch staff preferences" });
+    }
+  });
+
+  app.put("/api/css/staff/:staffId/preferences", requireAuth, async (req: any, res) => {
+    try {
+      const preferences = await storage.createOrUpdateStaffShiftPreferences(req.params.staffId, req.body);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error updating staff preferences:", error);
+      res.status(500).json({ error: "Failed to update staff preferences" });
+    }
+  });
+
+  // Scheduling Rules
+  app.get("/api/css/rules", requireAuth, async (req: any, res) => {
+    try {
+      const rules = await storage.getSchedulingRules();
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching scheduling rules:", error);
+      res.status(500).json({ error: "Failed to fetch scheduling rules" });
+    }
+  });
+
+  app.post("/api/css/rules", requireAuth, async (req: any, res) => {
+    try {
+      const rule = await storage.createSchedulingRule({
+        ...req.body,
+        createdById: req.user.id,
+        createdByName: req.user.displayName
+      });
+      res.status(201).json(rule);
+    } catch (error) {
+      console.error("Error creating scheduling rule:", error);
+      res.status(500).json({ error: "Failed to create scheduling rule" });
+    }
+  });
+
+  app.put("/api/css/rules/:id", requireAuth, async (req: any, res) => {
+    try {
+      const rule = await storage.updateSchedulingRule(req.params.id, req.body);
+      if (!rule) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      res.json(rule);
+    } catch (error) {
+      console.error("Error updating scheduling rule:", error);
+      res.status(500).json({ error: "Failed to update scheduling rule" });
+    }
+  });
+
+  app.delete("/api/css/rules/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteSchedulingRule(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting scheduling rule:", error);
+      res.status(500).json({ error: "Failed to delete scheduling rule" });
+    }
+  });
+
+  // Analytics & Statistics
+  app.get("/api/css/stats", requireAuth, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const stats = await storage.getSchedulingStats(startDate, endDate);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching scheduling stats:", error);
+      res.status(500).json({ error: "Failed to fetch scheduling stats" });
+    }
+  });
+
+  app.get("/api/css/analytics", requireAuth, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      const analytics = await storage.getSchedulingAnalytics(startDate, endDate);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching scheduling analytics:", error);
+      res.status(500).json({ error: "Failed to fetch scheduling analytics" });
+    }
+  });
+
+  // ============================================
+  // ORGANIZATIONAL CHART SYSTEM (OCS) API ROUTES
+  // ============================================
+
+  // Helper function to log OCS changes
+  async function logOcsChange(
+    entityType: string,
+    entityId: string,
+    entityName: string | undefined,
+    changeType: string,
+    changeDescription: string,
+    previousData: any,
+    newData: any,
+    changedFields: string[],
+    userId: string,
+    userName: string,
+    userRole: string,
+    requiresApproval: boolean = false
+  ) {
+    return await storage.createOrgChartChangeLog({
+      entityType,
+      entityId,
+      entityName,
+      changeType,
+      changeDescription,
+      previousData: previousData ? JSON.stringify(previousData) : null,
+      newData: newData ? JSON.stringify(newData) : null,
+      changedFields: JSON.stringify(changedFields),
+      changedById: userId,
+      changedByName: userName,
+      changedByRole: userRole,
+      requiresApproval: requiresApproval ? 'yes' : 'no',
+      approvalStatus: requiresApproval ? 'pending' : undefined
+    });
+  }
+
+  // --- Org Departments ---
+  app.get("/api/ocs/departments", requireAuth, async (req: any, res) => {
+    try {
+      const { activeOnly, parentId } = req.query;
+      let departments;
+
+      if (parentId !== undefined) {
+        departments = await storage.getOrgDepartmentsByParent(parentId === 'null' ? null : parentId);
+      } else if (activeOnly === 'true') {
+        departments = await storage.getActiveOrgDepartments();
+      } else {
+        departments = await storage.getAllOrgDepartments();
+      }
+
+      res.json(departments);
+    } catch (error) {
+      console.error("Error fetching org departments:", error);
+      res.status(500).json({ error: "Failed to fetch org departments" });
+    }
+  });
+
+  app.get("/api/ocs/departments/hierarchy", requireAuth, async (req: any, res) => {
+    try {
+      const departments = await storage.getOrgDepartmentHierarchy();
+      res.json(departments);
+    } catch (error) {
+      console.error("Error fetching department hierarchy:", error);
+      res.status(500).json({ error: "Failed to fetch department hierarchy" });
+    }
+  });
+
+  app.get("/api/ocs/departments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const department = await storage.getOrgDepartmentById(req.params.id);
+      if (!department) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+      res.json(department);
+    } catch (error) {
+      console.error("Error fetching org department:", error);
+      res.status(500).json({ error: "Failed to fetch org department" });
+    }
+  });
+
+  app.get("/api/ocs/departments/:id/stats", requireAuth, async (req: any, res) => {
+    try {
+      const stats = await storage.getDepartmentStats(req.params.id);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching department stats:", error);
+      res.status(500).json({ error: "Failed to fetch department stats" });
+    }
+  });
+
+  app.get("/api/ocs/departments/:id/staff", requireAuth, async (req: any, res) => {
+    try {
+      const staff = await storage.getStaffByDepartment(req.params.id);
+      res.json(staff);
+    } catch (error) {
+      console.error("Error fetching department staff:", error);
+      res.status(500).json({ error: "Failed to fetch department staff" });
+    }
+  });
+
+  app.post("/api/ocs/departments", requireAuth, async (req: any, res) => {
+    try {
+      const department = await storage.createOrgDepartment(req.body);
+
+      await logOcsChange(
+        'department',
+        department.id,
+        department.name,
+        'create',
+        `Created department: ${department.name}`,
+        null,
+        department,
+        Object.keys(req.body),
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.status(201).json(department);
+    } catch (error) {
+      console.error("Error creating org department:", error);
+      res.status(500).json({ error: "Failed to create org department" });
+    }
+  });
+
+  app.put("/api/ocs/departments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const existing = await storage.getOrgDepartmentById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      const department = await storage.updateOrgDepartment(req.params.id, req.body);
+
+      const changedFields = Object.keys(req.body).filter(
+        key => JSON.stringify((existing as any)[key]) !== JSON.stringify(req.body[key])
+      );
+
+      await logOcsChange(
+        'department',
+        req.params.id,
+        department?.name,
+        'update',
+        `Updated department: ${department?.name}`,
+        existing,
+        department,
+        changedFields,
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.json(department);
+    } catch (error) {
+      console.error("Error updating org department:", error);
+      res.status(500).json({ error: "Failed to update org department" });
+    }
+  });
+
+  app.delete("/api/ocs/departments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const existing = await storage.getOrgDepartmentById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      const deleted = await storage.deleteOrgDepartment(req.params.id);
+
+      if (deleted) {
+        await logOcsChange(
+          'department',
+          req.params.id,
+          existing.name,
+          'delete',
+          `Deleted department: ${existing.name}`,
+          existing,
+          null,
+          [],
+          req.user.id,
+          req.user.displayName,
+          req.user.roles?.[0] || 'user'
+        );
+      }
+
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting org department:", error);
+      res.status(500).json({ error: "Failed to delete org department" });
+    }
+  });
+
+  // --- Org Positions ---
+  app.get("/api/ocs/positions", requireAuth, async (req: any, res) => {
+    try {
+      const { activeOnly, departmentId, vacantOnly } = req.query;
+      let positions;
+
+      if (vacantOnly === 'true') {
+        positions = await storage.getVacantPositions();
+      } else if (departmentId) {
+        positions = await storage.getOrgPositionsByDepartment(departmentId);
+      } else if (activeOnly === 'true') {
+        positions = await storage.getActiveOrgPositions();
+      } else {
+        positions = await storage.getAllOrgPositions();
+      }
+
+      res.json(positions);
+    } catch (error) {
+      console.error("Error fetching org positions:", error);
+      res.status(500).json({ error: "Failed to fetch org positions" });
+    }
+  });
+
+  app.get("/api/ocs/positions/:id", requireAuth, async (req: any, res) => {
+    try {
+      const position = await storage.getOrgPositionById(req.params.id);
+      if (!position) {
+        return res.status(404).json({ error: "Position not found" });
+      }
+      res.json(position);
+    } catch (error) {
+      console.error("Error fetching org position:", error);
+      res.status(500).json({ error: "Failed to fetch org position" });
+    }
+  });
+
+  app.post("/api/ocs/positions", requireAuth, async (req: any, res) => {
+    try {
+      const position = await storage.createOrgPosition(req.body);
+
+      await logOcsChange(
+        'position',
+        position.id,
+        position.title,
+        'create',
+        `Created position: ${position.title}`,
+        null,
+        position,
+        Object.keys(req.body),
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.status(201).json(position);
+    } catch (error) {
+      console.error("Error creating org position:", error);
+      res.status(500).json({ error: "Failed to create org position" });
+    }
+  });
+
+  app.put("/api/ocs/positions/:id", requireAuth, async (req: any, res) => {
+    try {
+      const existing = await storage.getOrgPositionById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Position not found" });
+      }
+
+      const position = await storage.updateOrgPosition(req.params.id, req.body);
+
+      const changedFields = Object.keys(req.body).filter(
+        key => JSON.stringify((existing as any)[key]) !== JSON.stringify(req.body[key])
+      );
+
+      await logOcsChange(
+        'position',
+        req.params.id,
+        position?.title,
+        'update',
+        `Updated position: ${position?.title}`,
+        existing,
+        position,
+        changedFields,
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.json(position);
+    } catch (error) {
+      console.error("Error updating org position:", error);
+      res.status(500).json({ error: "Failed to update org position" });
+    }
+  });
+
+  app.delete("/api/ocs/positions/:id", requireAuth, async (req: any, res) => {
+    try {
+      const existing = await storage.getOrgPositionById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Position not found" });
+      }
+
+      const deleted = await storage.deleteOrgPosition(req.params.id);
+
+      if (deleted) {
+        await logOcsChange(
+          'position',
+          req.params.id,
+          existing.title,
+          'delete',
+          `Deleted position: ${existing.title}`,
+          existing,
+          null,
+          [],
+          req.user.id,
+          req.user.displayName,
+          req.user.roles?.[0] || 'user'
+        );
+      }
+
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting org position:", error);
+      res.status(500).json({ error: "Failed to delete org position" });
+    }
+  });
+
+  // --- Staff Position Assignments ---
+  app.get("/api/ocs/assignments", requireAuth, async (req: any, res) => {
+    try {
+      const { activeOnly, staffId, positionId, departmentId } = req.query;
+      let assignments;
+
+      if (staffId) {
+        assignments = await storage.getStaffPositionAssignmentsByStaff(staffId);
+      } else if (positionId) {
+        assignments = await storage.getStaffPositionAssignmentsByPosition(positionId);
+      } else if (departmentId) {
+        assignments = await storage.getStaffPositionAssignmentsByDepartment(departmentId);
+      } else if (activeOnly === 'true') {
+        assignments = await storage.getActiveStaffPositionAssignments();
+      } else {
+        assignments = await storage.getAllStaffPositionAssignments();
+      }
+
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching staff position assignments:", error);
+      res.status(500).json({ error: "Failed to fetch staff position assignments" });
+    }
+  });
+
+  app.get("/api/ocs/assignments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const assignment = await storage.getStaffPositionAssignmentById(req.params.id);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error fetching staff position assignment:", error);
+      res.status(500).json({ error: "Failed to fetch staff position assignment" });
+    }
+  });
+
+  app.get("/api/ocs/staff/:staffId/primary-position", requireAuth, async (req: any, res) => {
+    try {
+      const assignment = await storage.getPrimaryPositionForStaff(req.params.staffId);
+      res.json(assignment || null);
+    } catch (error) {
+      console.error("Error fetching primary position:", error);
+      res.status(500).json({ error: "Failed to fetch primary position" });
+    }
+  });
+
+  app.post("/api/ocs/assignments", requireAuth, async (req: any, res) => {
+    try {
+      const assignment = await storage.createStaffPositionAssignment(req.body);
+
+      const staffMember = await storage.getStaffById(req.body.staffId);
+      const position = await storage.getOrgPositionById(req.body.positionId);
+
+      await logOcsChange(
+        'assignment',
+        assignment.id,
+        `${staffMember?.name} - ${position?.title}`,
+        'create',
+        `Assigned ${staffMember?.name} to ${position?.title}`,
+        null,
+        assignment,
+        Object.keys(req.body),
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating staff position assignment:", error);
+      res.status(500).json({ error: "Failed to create staff position assignment" });
+    }
+  });
+
+  app.put("/api/ocs/assignments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const existing = await storage.getStaffPositionAssignmentById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+
+      const assignment = await storage.updateStaffPositionAssignment(req.params.id, req.body);
+
+      const changedFields = Object.keys(req.body).filter(
+        key => JSON.stringify((existing as any)[key]) !== JSON.stringify(req.body[key])
+      );
+
+      const staffMember = await storage.getStaffById(existing.staffId);
+
+      await logOcsChange(
+        'assignment',
+        req.params.id,
+        staffMember?.name,
+        'update',
+        `Updated assignment for ${staffMember?.name}`,
+        existing,
+        assignment,
+        changedFields,
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error updating staff position assignment:", error);
+      res.status(500).json({ error: "Failed to update staff position assignment" });
+    }
+  });
+
+  app.delete("/api/ocs/assignments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const existing = await storage.getStaffPositionAssignmentById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+
+      const staffMember = await storage.getStaffById(existing.staffId);
+      const deleted = await storage.deleteStaffPositionAssignment(req.params.id);
+
+      if (deleted) {
+        await logOcsChange(
+          'assignment',
+          req.params.id,
+          staffMember?.name,
+          'delete',
+          `Removed ${staffMember?.name} from position`,
+          existing,
+          null,
+          [],
+          req.user.id,
+          req.user.displayName,
+          req.user.roles?.[0] || 'user'
+        );
+      }
+
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting staff position assignment:", error);
+      res.status(500).json({ error: "Failed to delete staff position assignment" });
+    }
+  });
+
+  // --- Org Chart Snapshots ---
+  app.get("/api/ocs/snapshots", requireAuth, async (req: any, res) => {
+    try {
+      const { limit } = req.query;
+      const snapshots = limit
+        ? await storage.getRecentOrgChartSnapshots(parseInt(limit))
+        : await storage.getAllOrgChartSnapshots();
+      res.json(snapshots);
+    } catch (error) {
+      console.error("Error fetching org chart snapshots:", error);
+      res.status(500).json({ error: "Failed to fetch org chart snapshots" });
+    }
+  });
+
+  app.get("/api/ocs/snapshots/:id", requireAuth, async (req: any, res) => {
+    try {
+      const snapshot = await storage.getOrgChartSnapshotById(req.params.id);
+      if (!snapshot) {
+        return res.status(404).json({ error: "Snapshot not found" });
+      }
+      res.json(snapshot);
+    } catch (error) {
+      console.error("Error fetching org chart snapshot:", error);
+      res.status(500).json({ error: "Failed to fetch org chart snapshot" });
+    }
+  });
+
+  app.post("/api/ocs/snapshots", requireAuth, async (req: any, res) => {
+    try {
+      const { name, description } = req.body;
+      const snapshot = await storage.captureCurrentOrgSnapshot(
+        name || `Snapshot ${new Date().toISOString()}`,
+        description || '',
+        req.user.id,
+        req.user.displayName
+      );
+      res.status(201).json(snapshot);
+    } catch (error) {
+      console.error("Error creating org chart snapshot:", error);
+      res.status(500).json({ error: "Failed to create org chart snapshot" });
+    }
+  });
+
+  app.delete("/api/ocs/snapshots/:id", requireAuth, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteOrgChartSnapshot(req.params.id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting org chart snapshot:", error);
+      res.status(500).json({ error: "Failed to delete org chart snapshot" });
+    }
+  });
+
+  // --- Org Chart Change Logs ---
+  app.get("/api/ocs/change-logs", requireAuth, async (req: any, res) => {
+    try {
+      const { entityType, entityId, limit, pendingOnly } = req.query;
+      let logs;
+
+      if (pendingOnly === 'true') {
+        logs = await storage.getPendingOrgChartApprovals();
+      } else if (entityType && entityId) {
+        logs = await storage.getOrgChartChangeLogsByEntity(entityType, entityId);
+      } else if (limit) {
+        logs = await storage.getRecentOrgChartChanges(parseInt(limit));
+      } else {
+        logs = await storage.getAllOrgChartChangeLogs();
+      }
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching org chart change logs:", error);
+      res.status(500).json({ error: "Failed to fetch org chart change logs" });
+    }
+  });
+
+  app.get("/api/ocs/change-logs/:id", requireAuth, async (req: any, res) => {
+    try {
+      const log = await storage.getOrgChartChangeLogById(req.params.id);
+      if (!log) {
+        return res.status(404).json({ error: "Change log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Error fetching org chart change log:", error);
+      res.status(500).json({ error: "Failed to fetch org chart change log" });
+    }
+  });
+
+  app.post("/api/ocs/change-logs/:id/approve", requireAuth, async (req: any, res) => {
+    try {
+      const log = await storage.approveOrgChartChange(req.params.id, req.user.id);
+      res.json(log);
+    } catch (error) {
+      console.error("Error approving org chart change:", error);
+      res.status(500).json({ error: "Failed to approve org chart change" });
+    }
+  });
+
+  app.post("/api/ocs/change-logs/:id/undo", requireAuth, async (req: any, res) => {
+    try {
+      const success = await storage.undoOrgChartChange(req.params.id, req.user.id);
+      res.json({ success });
+    } catch (error) {
+      console.error("Error undoing org chart change:", error);
+      res.status(500).json({ error: "Failed to undo org chart change" });
+    }
+  });
+
+  // --- Org Chart Settings ---
+  app.get("/api/ocs/settings", requireAuth, async (req: any, res) => {
+    try {
+      const { userId, global } = req.query;
+      let settings;
+
+      if (global === 'true') {
+        settings = await storage.getGlobalOrgChartSettings();
+      } else {
+        settings = await storage.getOrgChartSettings(userId || req.user.id);
+      }
+
+      res.json(settings || {});
+    } catch (error) {
+      console.error("Error fetching org chart settings:", error);
+      res.status(500).json({ error: "Failed to fetch org chart settings" });
+    }
+  });
+
+  app.put("/api/ocs/settings", requireAuth, async (req: any, res) => {
+    try {
+      const { global, ...settingsData } = req.body;
+      const userId = global ? null : req.user.id;
+      const settings = await storage.upsertOrgChartSettings(userId, settingsData);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating org chart settings:", error);
+      res.status(500).json({ error: "Failed to update org chart settings" });
+    }
+  });
+
+  // --- Staff Profile Extended ---
+  app.get("/api/ocs/staff-profiles", requireAuth, async (req: any, res) => {
+    try {
+      const profiles = await storage.getAllStaffProfilesExtended();
+      res.json(profiles);
+    } catch (error) {
+      console.error("Error fetching staff profiles:", error);
+      res.status(500).json({ error: "Failed to fetch staff profiles" });
+    }
+  });
+
+  app.get("/api/ocs/staff-profiles/:staffId", requireAuth, async (req: any, res) => {
+    try {
+      const profile = await storage.getStaffProfileExtended(req.params.staffId);
+      res.json(profile || {});
+    } catch (error) {
+      console.error("Error fetching staff profile:", error);
+      res.status(500).json({ error: "Failed to fetch staff profile" });
+    }
+  });
+
+  app.put("/api/ocs/staff-profiles/:staffId", requireAuth, async (req: any, res) => {
+    try {
+      const profile = await storage.upsertStaffProfileExtended(req.params.staffId, req.body);
+      res.json(profile);
+    } catch (error) {
+      console.error("Error updating staff profile:", error);
+      res.status(500).json({ error: "Failed to update staff profile" });
+    }
+  });
+
+  app.post("/api/ocs/staff-profiles/:staffId/sync", requireAuth, async (req: any, res) => {
+    try {
+      const profile = await storage.syncStaffProfileMetrics(req.params.staffId);
+      res.json(profile || {});
+    } catch (error) {
+      console.error("Error syncing staff profile:", error);
+      res.status(500).json({ error: "Failed to sync staff profile" });
+    }
+  });
+
+  // --- OCS Dashboard & Analytics ---
+  app.get("/api/ocs/stats", requireAuth, async (req: any, res) => {
+    try {
+      const stats = await storage.getOrgChartStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching org chart stats:", error);
+      res.status(500).json({ error: "Failed to fetch org chart stats" });
+    }
+  });
+
+  app.get("/api/ocs/hierarchy", requireAuth, async (req: any, res) => {
+    try {
+      const hierarchy = await storage.getOrgHierarchyTree();
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("Error fetching org hierarchy:", error);
+      res.status(500).json({ error: "Failed to fetch org hierarchy" });
+    }
+  });
+
+  // --- Bulk Operations ---
+  app.post("/api/ocs/departments/bulk-sort", requireAuth, async (req: any, res) => {
+    try {
+      const { sortOrders } = req.body; // Array of { id, sortOrder }
+
+      for (const item of sortOrders) {
+        await storage.updateOrgDepartment(item.id, { sortOrder: item.sortOrder });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error bulk updating department sort orders:", error);
+      res.status(500).json({ error: "Failed to update sort orders" });
+    }
+  });
+
+  app.post("/api/ocs/positions/bulk-sort", requireAuth, async (req: any, res) => {
+    try {
+      const { sortOrders } = req.body; // Array of { id, sortOrder }
+
+      for (const item of sortOrders) {
+        await storage.updateOrgPosition(item.id, { sortOrder: item.sortOrder });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error bulk updating position sort orders:", error);
+      res.status(500).json({ error: "Failed to update sort orders" });
+    }
+  });
+
+  // Move department to new parent (drag-and-drop support)
+  app.post("/api/ocs/departments/:id/move", requireAuth, async (req: any, res) => {
+    try {
+      const { newParentId, newSortOrder } = req.body;
+
+      const existing = await storage.getOrgDepartmentById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      // Calculate new level based on parent
+      let newLevel = 0;
+      if (newParentId) {
+        const parent = await storage.getOrgDepartmentById(newParentId);
+        if (parent) {
+          newLevel = (parent.level || 0) + 1;
+        }
+      }
+
+      const department = await storage.updateOrgDepartment(req.params.id, {
+        parentDepartmentId: newParentId || null,
+        level: newLevel,
+        sortOrder: newSortOrder
+      });
+
+      await logOcsChange(
+        'department',
+        req.params.id,
+        department?.name,
+        'move',
+        `Moved department: ${department?.name}`,
+        { parentDepartmentId: existing.parentDepartmentId, level: existing.level, sortOrder: existing.sortOrder },
+        { parentDepartmentId: newParentId, level: newLevel, sortOrder: newSortOrder },
+        ['parentDepartmentId', 'level', 'sortOrder'],
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.json(department);
+    } catch (error) {
+      console.error("Error moving department:", error);
+      res.status(500).json({ error: "Failed to move department" });
+    }
+  });
+
+  // Reassign staff to different position
+  app.post("/api/ocs/staff/:staffId/reassign", requireAuth, async (req: any, res) => {
+    try {
+      const { newPositionId, newDepartmentId, endCurrentAssignment } = req.body;
+      const { staffId } = req.params;
+
+      const staffMember = await storage.getStaffById(staffId);
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // End current primary assignment if requested
+      if (endCurrentAssignment) {
+        const currentPrimary = await storage.getPrimaryPositionForStaff(staffId);
+        if (currentPrimary) {
+          await storage.updateStaffPositionAssignment(currentPrimary.id, {
+            isActive: 'no',
+            isPrimary: 'no',
+            endDate: new Date().toISOString().split('T')[0]
+          });
+        }
+      }
+
+      // Create new assignment
+      const newAssignment = await storage.createStaffPositionAssignment({
+        staffId,
+        positionId: newPositionId,
+        departmentId: newDepartmentId,
+        assignmentType: 'primary',
+        reportingType: 'direct',
+        startDate: new Date().toISOString().split('T')[0],
+        isPrimary: 'yes',
+        isActive: 'yes'
+      });
+
+      const newPosition = await storage.getOrgPositionById(newPositionId);
+
+      await logOcsChange(
+        'assignment',
+        newAssignment.id,
+        `${staffMember.name} - ${newPosition?.title}`,
+        'reassign',
+        `Reassigned ${staffMember.name} to ${newPosition?.title}`,
+        null,
+        newAssignment,
+        ['positionId', 'departmentId'],
+        req.user.id,
+        req.user.displayName,
+        req.user.roles?.[0] || 'user'
+      );
+
+      res.status(201).json(newAssignment);
+    } catch (error) {
+      console.error("Error reassigning staff:", error);
+      res.status(500).json({ error: "Failed to reassign staff" });
+    }
+  });
+
+  // ============================================================================
+  // ASCS - Advanced Scheduling and Calendar System Routes
+  // ============================================================================
+
+  // Calendar Preferences
+  app.get("/api/ascs/calendar-preferences", async (req, res) => {
+    try {
+      if (!req.user?.id) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const prefs = await storage.getCalendarPreferences(req.user.id);
+      res.json(prefs || { userId: req.user.id, defaultView: "weekly" });
+    } catch (error) {
+      console.error("Error getting calendar preferences:", error);
+      res.status(500).json({ error: "Failed to get calendar preferences" });
+    }
+  });
+
+  app.put("/api/ascs/calendar-preferences", async (req, res) => {
+    try {
+      if (!req.user?.id) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const prefs = await storage.upsertCalendarPreferences(req.user.id, req.body);
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error updating calendar preferences:", error);
+      res.status(500).json({ error: "Failed to update calendar preferences" });
+    }
+  });
+
+  // Unified Calendar Data
+  app.get("/api/ascs/calendar", async (req, res) => {
+    try {
+      const { startDate, endDate, staffId, clientId, category } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const data = await storage.getUnifiedCalendarData(
+        startDate as string,
+        endDate as string,
+        {
+          staffId: staffId as string | undefined,
+          clientId: clientId as string | undefined,
+          category: category as string | undefined
+        }
+      );
+
+      res.json(data);
+    } catch (error) {
+      console.error("Error getting unified calendar data:", error);
+      res.status(500).json({ error: "Failed to get calendar data" });
+    }
+  });
+
+  // Open Shifts Marketplace
+  app.get("/api/ascs/open-shifts", async (req, res) => {
+    try {
+      const { status, category, priority } = req.query;
+      const shifts = await storage.getAllOpenShifts({
+        status: status as string | undefined,
+        category: category as string | undefined,
+        priority: priority as string | undefined
+      });
+      res.json(shifts);
+    } catch (error) {
+      console.error("Error getting open shifts:", error);
+      res.status(500).json({ error: "Failed to get open shifts" });
+    }
+  });
+
+  app.get("/api/ascs/open-shifts/:id", async (req, res) => {
+    try {
+      const shift = await storage.getOpenShiftById(req.params.id);
+      if (!shift) {
+        return res.status(404).json({ error: "Open shift not found" });
+      }
+      await storage.incrementOpenShiftViewCount(req.params.id);
+      res.json(shift);
+    } catch (error) {
+      console.error("Error getting open shift:", error);
+      res.status(500).json({ error: "Failed to get open shift" });
+    }
+  });
+
+  app.post("/api/ascs/open-shifts", async (req, res) => {
+    try {
+      const shift = await storage.createOpenShift({
+        ...req.body,
+        postedById: req.user?.id,
+        postedByName: req.user?.displayName
+      });
+      res.status(201).json(shift);
+    } catch (error) {
+      console.error("Error creating open shift:", error);
+      res.status(500).json({ error: "Failed to create open shift" });
+    }
+  });
+
+  app.patch("/api/ascs/open-shifts/:id", async (req, res) => {
+    try {
+      const shift = await storage.updateOpenShift(req.params.id, req.body);
+      if (!shift) {
+        return res.status(404).json({ error: "Open shift not found" });
+      }
+      res.json(shift);
+    } catch (error) {
+      console.error("Error updating open shift:", error);
+      res.status(500).json({ error: "Failed to update open shift" });
+    }
+  });
+
+  // Open Shift Claims
+  app.get("/api/ascs/open-shifts/:id/claims", async (req, res) => {
+    try {
+      const claims = await storage.getOpenShiftClaims(req.params.id);
+      res.json(claims);
+    } catch (error) {
+      console.error("Error getting claims:", error);
+      res.status(500).json({ error: "Failed to get claims" });
+    }
+  });
+
+  app.post("/api/ascs/open-shifts/:id/claims", async (req, res) => {
+    try {
+      const claim = await storage.createOpenShiftClaim({
+        ...req.body,
+        openShiftId: req.params.id,
+        staffId: req.user?.id || req.body.staffId,
+        staffName: req.user?.displayName || req.body.staffName
+      });
+      res.status(201).json(claim);
+    } catch (error) {
+      console.error("Error creating claim:", error);
+      res.status(500).json({ error: "Failed to create claim" });
+    }
+  });
+
+  app.patch("/api/ascs/open-shift-claims/:id", async (req, res) => {
+    try {
+      const claim = await storage.updateOpenShiftClaim(req.params.id, {
+        ...req.body,
+        respondedById: req.user?.id,
+        respondedByName: req.user?.displayName,
+        respondedAt: new Date()
+      });
+      if (!claim) {
+        return res.status(404).json({ error: "Claim not found" });
+      }
+      res.json(claim);
+    } catch (error) {
+      console.error("Error updating claim:", error);
+      res.status(500).json({ error: "Failed to update claim" });
+    }
+  });
+
+  // Shift Swap Requests
+  app.get("/api/ascs/swap-requests", async (req, res) => {
+    try {
+      const { status, staffId } = req.query;
+      const requests = await storage.getAllAscsShiftSwapRequests({
+        status: status as string | undefined,
+        staffId: staffId as string | undefined
+      });
+      res.json(requests);
+    } catch (error) {
+      console.error("Error getting swap requests:", error);
+      res.status(500).json({ error: "Failed to get swap requests" });
+    }
+  });
+
+  app.post("/api/ascs/swap-requests", async (req, res) => {
+    try {
+      const request = await storage.createAscsShiftSwapRequest({
+        ...req.body,
+        originalStaffId: req.user?.id || req.body.originalStaffId,
+        originalStaffName: req.user?.displayName || req.body.originalStaffName
+      });
+      res.status(201).json(request);
+    } catch (error) {
+      console.error("Error creating swap request:", error);
+      res.status(500).json({ error: "Failed to create swap request" });
+    }
+  });
+
+  app.patch("/api/ascs/swap-requests/:id", async (req, res) => {
+    try {
+      const request = await storage.updateAscsShiftSwapRequest(req.params.id, req.body);
+      if (!request) {
+        return res.status(404).json({ error: "Swap request not found" });
+      }
+      res.json(request);
+    } catch (error) {
+      console.error("Error updating swap request:", error);
+      res.status(500).json({ error: "Failed to update swap request" });
+    }
+  });
+
+  app.post("/api/ascs/swap-requests/:id/approve", async (req, res) => {
+    try {
+      const request = await storage.updateAscsShiftSwapRequest(req.params.id, {
+        status: "approved",
+        managerApprovalStatus: "approved",
+        approvedById: req.user?.id,
+        approvedByName: req.user?.displayName,
+        approvedAt: new Date(),
+        approvalNote: req.body.note
+      });
+      res.json(request);
+    } catch (error) {
+      console.error("Error approving swap request:", error);
+      res.status(500).json({ error: "Failed to approve swap request" });
+    }
+  });
+
+  // Schedule Tasks
+  app.get("/api/ascs/shifts/:shiftId/tasks", async (req, res) => {
+    try {
+      const tasks = await storage.getScheduleTasksByShift(req.params.shiftId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error getting tasks:", error);
+      res.status(500).json({ error: "Failed to get tasks" });
+    }
+  });
+
+  app.post("/api/ascs/tasks", async (req, res) => {
+    try {
+      const task = await storage.createScheduleTask(req.body);
+      res.status(201).json(task);
+    } catch (error) {
+      console.error("Error creating task:", error);
+      res.status(500).json({ error: "Failed to create task" });
+    }
+  });
+
+  app.patch("/api/ascs/tasks/:id", async (req, res) => {
+    try {
+      const task = await storage.updateScheduleTask(req.params.id, req.body);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  app.post("/api/ascs/tasks/:id/complete", async (req, res) => {
+    try {
+      const task = await storage.updateScheduleTask(req.params.id, {
+        status: "completed",
+        completedById: req.user?.id,
+        completedByName: req.user?.displayName,
+        completedAt: new Date(),
+        completionNote: req.body.note
+      });
+      res.json(task);
+    } catch (error) {
+      console.error("Error completing task:", error);
+      res.status(500).json({ error: "Failed to complete task" });
+    }
+  });
+
+  // Task Templates
+  app.get("/api/ascs/task-templates", async (req, res) => {
+    try {
+      const { isGlobal, clientId, isActive } = req.query;
+      const templates = await storage.getAllScheduleTaskTemplates({
+        isGlobal: isGlobal as string | undefined,
+        clientId: clientId as string | undefined,
+        isActive: isActive as string | undefined
+      });
+      res.json(templates);
+    } catch (error) {
+      console.error("Error getting task templates:", error);
+      res.status(500).json({ error: "Failed to get task templates" });
+    }
+  });
+
+  app.post("/api/ascs/task-templates", async (req, res) => {
+    try {
+      const template = await storage.createScheduleTaskTemplate({
+        ...req.body,
+        createdById: req.user?.id,
+        createdByName: req.user?.displayName
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating template:", error);
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  // AI Scheduling Suggestions
+  app.get("/api/ascs/suggestions", async (req, res) => {
+    try {
+      const { status, suggestionType } = req.query;
+      const suggestions = await storage.getAllScheduleSuggestions({
+        status: status as string | undefined,
+        suggestionType: suggestionType as string | undefined
+      });
+      res.json(suggestions);
+    } catch (error) {
+      console.error("Error getting suggestions:", error);
+      res.status(500).json({ error: "Failed to get suggestions" });
+    }
+  });
+
+  app.post("/api/ascs/shifts/:shiftId/generate-suggestions", async (req, res) => {
+    try {
+      const suggestions = await storage.generateSchedulingSuggestions(req.params.shiftId);
+      res.json(suggestions);
+    } catch (error) {
+      console.error("Error generating suggestions:", error);
+      res.status(500).json({ error: "Failed to generate suggestions" });
+    }
+  });
+
+  app.post("/api/ascs/suggestions/:id/accept", async (req, res) => {
+    try {
+      const suggestion = await storage.updateScheduleSuggestion(req.params.id, {
+        status: "accepted",
+        respondedById: req.user?.id,
+        respondedByName: req.user?.displayName,
+        respondedAt: new Date()
+      });
+      res.json(suggestion);
+    } catch (error) {
+      console.error("Error accepting suggestion:", error);
+      res.status(500).json({ error: "Failed to accept suggestion" });
+    }
+  });
+
+  // Auto-Scheduling Jobs
+  app.get("/api/ascs/auto-scheduling-jobs", async (req, res) => {
+    try {
+      const { status } = req.query;
+      const jobs = await storage.getAllAutoSchedulingJobs({
+        status: status as string | undefined
+      });
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error getting jobs:", error);
+      res.status(500).json({ error: "Failed to get jobs" });
+    }
+  });
+
+  app.post("/api/ascs/auto-scheduling-jobs", async (req, res) => {
+    try {
+      const job = await storage.createAutoSchedulingJob({
+        ...req.body,
+        triggeredById: req.user?.id,
+        triggeredByName: req.user?.displayName
+      });
+      res.status(201).json(job);
+    } catch (error) {
+      console.error("Error creating job:", error);
+      res.status(500).json({ error: "Failed to create job" });
+    }
+  });
+
+  // Schedule Communications
+  app.get("/api/ascs/communications", async (req, res) => {
+    try {
+      const { shiftId, threadId } = req.query;
+      const communications = await storage.getScheduleCommunications({
+        shiftId: shiftId as string | undefined,
+        threadId: threadId as string | undefined
+      });
+      res.json(communications);
+    } catch (error) {
+      console.error("Error getting communications:", error);
+      res.status(500).json({ error: "Failed to get communications" });
+    }
+  });
+
+  app.post("/api/ascs/communications", async (req, res) => {
+    try {
+      const communication = await storage.createScheduleCommunication({
+        ...req.body,
+        senderId: req.user?.id || req.body.senderId,
+        senderName: req.user?.displayName || req.body.senderName
+      });
+      res.status(201).json(communication);
+    } catch (error) {
+      console.error("Error creating communication:", error);
+      res.status(500).json({ error: "Failed to create communication" });
+    }
+  });
+
+  // Staff Scheduling Preferences
+  app.get("/api/ascs/staff/:staffId/scheduling-preferences", async (req, res) => {
+    try {
+      const prefs = await storage.getStaffSchedulingPreferences(req.params.staffId);
+      res.json(prefs || { staffId: req.params.staffId });
+    } catch (error) {
+      console.error("Error getting staff preferences:", error);
+      res.status(500).json({ error: "Failed to get staff preferences" });
+    }
+  });
+
+  app.put("/api/ascs/staff/:staffId/scheduling-preferences", async (req, res) => {
+    try {
+      const prefs = await storage.upsertStaffSchedulingPreferences(req.params.staffId, {
+        ...req.body,
+        lastUpdatedById: req.user?.id
+      });
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error updating staff preferences:", error);
+      res.status(500).json({ error: "Failed to update staff preferences" });
+    }
+  });
+
+  // Calendar Events
+  app.get("/api/ascs/calendar-events", async (req, res) => {
+    try {
+      const { startDate, endDate, scope, organizerId } = req.query;
+      const events = await storage.getScheduleCalendarEvents({
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        scope: scope as string | undefined,
+        organizerId: organizerId as string | undefined
+      });
+      res.json(events);
+    } catch (error) {
+      console.error("Error getting calendar events:", error);
+      res.status(500).json({ error: "Failed to get calendar events" });
+    }
+  });
+
+  app.post("/api/ascs/calendar-events", async (req, res) => {
+    try {
+      const event = await storage.createScheduleCalendarEvent({
+        ...req.body,
+        organizerId: req.user?.id || req.body.organizerId,
+        organizerName: req.user?.displayName || req.body.organizerName,
+        createdById: req.user?.id
+      });
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+
+  app.patch("/api/ascs/calendar-events/:id", async (req, res) => {
+    try {
+      const event = await storage.updateScheduleCalendarEvent(req.params.id, req.body);
+      res.json(event);
+    } catch (error) {
+      console.error("Error updating event:", error);
+      res.status(500).json({ error: "Failed to update event" });
+    }
+  });
+
+  app.delete("/api/ascs/calendar-events/:id", async (req, res) => {
+    try {
+      await storage.deleteScheduleCalendarEvent(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      res.status(500).json({ error: "Failed to delete event" });
+    }
+  });
+
+  // Badges
+  app.get("/api/ascs/badges", async (req, res) => {
+    try {
+      const badges = await storage.getAllSchedulingBadges({});
+      res.json(badges);
+    } catch (error) {
+      console.error("Error getting badges:", error);
+      res.status(500).json({ error: "Failed to get badges" });
+    }
+  });
+
+  app.get("/api/ascs/staff/:staffId/badges", async (req, res) => {
+    try {
+      const awards = await storage.getStaffBadgeAwards(req.params.staffId);
+      res.json(awards);
+    } catch (error) {
+      console.error("Error getting staff badges:", error);
+      res.status(500).json({ error: "Failed to get staff badges" });
+    }
+  });
+
+  // Analytics
+  app.get("/api/ascs/analytics", async (req, res) => {
+    try {
+      const { periodType, scope, scopeId } = req.query;
+      const analytics = await storage.getSchedulingAnalyticsExtended({
+        periodType: periodType as string | undefined,
+        scope: scope as string | undefined,
+        scopeId: scopeId as string | undefined
+      });
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error getting analytics:", error);
+      res.status(500).json({ error: "Failed to get analytics" });
+    }
+  });
+
+  // Interaction Logging
+  app.post("/api/ascs/interactions", async (req, res) => {
+    try {
+      const log = await storage.createScheduleInteractionLog({
+        ...req.body,
+        userId: req.user?.id || req.body.userId
+      });
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("Error logging interaction:", error);
+      res.status(500).json({ error: "Failed to log interaction" });
+    }
+  });
+
+  // ==== Daily Notes Routes ====
+  // Get daily notes for a date range (for calendar view)
+  app.get("/api/daily-notes", async (req, res) => {
+    try {
+      const { startDate, endDate, date, clientId } = req.query;
+
+      if (clientId) {
+        const notes = await storage.getDailyNotesForClient(
+          clientId as string,
+          date as string | undefined
+        );
+        return res.json(notes);
+      }
+
+      if (startDate && endDate) {
+        const notes = await storage.getDailyNotesForDateRange(
+          startDate as string,
+          endDate as string
+        );
+        return res.json(notes);
+      }
+
+      if (date) {
+        const notes = await storage.getDailyNotesForDate(date as string);
+        return res.json(notes);
+      }
+
+      // Default: get today's notes
+      const today = new Date().toISOString().split('T')[0];
+      const notes = await storage.getDailyNotesForDate(today);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching daily notes:", error);
+      res.status(500).json({ error: "Failed to fetch daily notes" });
+    }
+  });
+
+  // Get notes visible to a specific staff member
+  app.get("/api/daily-notes/staff/:staffId", async (req, res) => {
+    try {
+      const { staffId } = req.params;
+      const { date, clientIds } = req.query;
+      const dateStr = (date as string) || new Date().toISOString().split('T')[0];
+      const clientIdArray = clientIds ? (clientIds as string).split(',') : undefined;
+
+      const notes = await storage.getDailyNotesVisibleToStaff(staffId, dateStr, clientIdArray);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching staff daily notes:", error);
+      res.status(500).json({ error: "Failed to fetch daily notes for staff" });
+    }
+  });
+
+  // Get a specific daily note
+  app.get("/api/daily-notes/:id", async (req, res) => {
+    try {
+      const note = await storage.getDailyNoteById(req.params.id);
+      if (!note) {
+        return res.status(404).json({ error: "Daily note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error fetching daily note:", error);
+      res.status(500).json({ error: "Failed to fetch daily note" });
+    }
+  });
+
+  // Create a daily note
+  app.post("/api/daily-notes", async (req, res) => {
+    try {
+      console.log("Creating daily note with data:", JSON.stringify(req.body, null, 2));
+
+      // Ensure required fields are present
+      if (!req.body.clientId || !req.body.content || !req.body.date) {
+        return res.status(400).json({ error: "Missing required fields: clientId, content, date" });
+      }
+
+      // Validate date format (YYYY-MM-DD)
+      let dateValue = req.body.date;
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(dateValue)) {
+        // Try to parse and reformat the date
+        const parsedDate = new Date(dateValue);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ error: "Invalid date format. Expected YYYY-MM-DD" });
+        }
+        dateValue = parsedDate.toISOString().split('T')[0];
+      }
+
+      const noteData = {
+        clientId: String(req.body.clientId),
+        date: dateValue,
+        content: String(req.body.content),
+        title: req.body.title ? String(req.body.title) : null,
+        priority: req.body.priority || "normal",
+        category: req.body.category || "general",
+        visibility: req.body.visibility || "client_team",
+        visibleToStaffIds: req.body.visibleToStaffIds || null,
+        visibleToRoles: req.body.visibleToRoles || null,
+        createdById: req.user?.id || req.body.createdById || "system",
+        createdByName: req.user?.displayName || req.body.createdByName || "System",
+        requiresAcknowledgement: req.body.requiresAcknowledgement || "no",
+        isPinned: req.body.isPinned || "no",
+      };
+
+      console.log("Processed note data:", JSON.stringify(noteData, null, 2));
+
+      const note = await storage.createDailyNote(noteData);
+      res.status(201).json(note);
+    } catch (error: any) {
+      console.error("Error creating daily note:", error);
+      res.status(500).json({ error: "Failed to create daily note", details: error.message });
+    }
+  });
+
+  // Update a daily note
+  app.patch("/api/daily-notes/:id", async (req, res) => {
+    try {
+      const note = await storage.updateDailyNote(req.params.id, req.body);
+      if (!note) {
+        return res.status(404).json({ error: "Daily note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating daily note:", error);
+      res.status(500).json({ error: "Failed to update daily note" });
+    }
+  });
+
+  // Delete a daily note (soft delete)
+  app.delete("/api/daily-notes/:id", async (req, res) => {
+    try {
+      await storage.deleteDailyNote(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting daily note:", error);
+      res.status(500).json({ error: "Failed to delete daily note" });
+    }
+  });
+
+  // Acknowledge a daily note
+  app.post("/api/daily-notes/:id/acknowledge", async (req, res) => {
+    try {
+      const { staffId } = req.body;
+      const note = await storage.acknowledgeDailyNote(
+        req.params.id,
+        staffId || req.user?.id
+      );
+      if (!note) {
+        return res.status(404).json({ error: "Daily note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error acknowledging daily note:", error);
+      res.status(500).json({ error: "Failed to acknowledge daily note" });
+    }
+  });
+
+  // Toggle pinned status
+  app.post("/api/daily-notes/:id/toggle-pin", async (req, res) => {
+    try {
+      const note = await storage.toggleDailyNotePinned(req.params.id);
+      if (!note) {
+        return res.status(404).json({ error: "Daily note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error toggling pin:", error);
+      res.status(500).json({ error: "Failed to toggle pin" });
+    }
+  });
+
+  // ============================================
+  // AI Writing Assistant
+  // ============================================
+
+  // Process AI writing request
+  app.post("/api/ai/writing-assist", requireAuth, async (req: any, res) => {
+    try {
+      const { action, context, content, prompt, tone } = req.body;
+
+      // Validate required fields
+      if (!action || !context) {
+        return res.status(400).json({ error: "Action and context are required" });
+      }
+
+      // Validate action
+      const validActions: WritingAction[] = [
+        "improve", "expand", "summarize", "make_professional",
+        "simplify", "generate", "check_compliance", "suggest_structure"
+      ];
+      if (!validActions.includes(action)) {
+        return res.status(400).json({ error: "Invalid action" });
+      }
+
+      // Validate context
+      const validContexts: WritingContext[] = [
+        "progress_note", "incident_report", "daily_summary", "care_plan",
+        "policy", "procedure", "email_template", "sms_template",
+        "family_update", "staff_announcement", "general"
+      ];
+      if (!validContexts.includes(context)) {
+        return res.status(400).json({ error: "Invalid context" });
+      }
+
+      // For generate action, prompt is required
+      if (action === "generate" && !prompt) {
+        return res.status(400).json({ error: "Prompt is required for generate action" });
+      }
+
+      // For other actions, content is required
+      if (action !== "generate" && action !== "suggest_structure" && !content) {
+        return res.status(400).json({ error: "Content is required for this action" });
+      }
+
+      const result = await processAIWritingRequest({
+        action,
+        context,
+        content,
+        prompt,
+        tone,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("AI Writing assist error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to process AI writing request"
+      });
+    }
+  });
+
+  // Get quick templates
+  app.get("/api/ai/quick-templates", requireAuth, async (req: any, res) => {
+    try {
+      res.json(QUICK_TEMPLATES);
+    } catch (error) {
+      console.error("Error fetching quick templates:", error);
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  // Check if AI is configured
+  app.get("/api/ai/status", requireAuth, async (req: any, res) => {
+    try {
+      const isConfigured = !!process.env.ANTHROPIC_API_KEY;
+      res.json({
+        configured: isConfigured,
+        message: isConfigured
+          ? "AI Writing Assistant is ready"
+          : "AI Writing Assistant requires ANTHROPIC_API_KEY to be configured"
+      });
+    } catch (error) {
+      console.error("Error checking AI status:", error);
+      res.status(500).json({ error: "Failed to check AI status" });
+    }
+  });
+
   const httpServer = createServer(app);
-  
+
   // Set up WebSocket server for real-time chat
   setupWebSocket(httpServer);
-  
+
   return httpServer;
 }

@@ -211,18 +211,18 @@ export default function HelpDesk() {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           {selectedTicketId && (
             <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          <div>
+          <div className="text-center sm:text-left">
             <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Help Desk</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               {selectedTicketId ? `Ticket #${selectedTicket?.ticketNumber}` : "Manage support tickets and issues"}
             </p>
           </div>
@@ -231,7 +231,7 @@ export default function HelpDesk() {
 
       {/* Stats Cards - only show when no ticket selected */}
       {!selectedTicketId && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4">
           <Card className="cursor-pointer hover-elevate" onClick={() => setStatusFilter("open")}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">

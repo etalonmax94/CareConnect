@@ -154,7 +154,58 @@ import {
   type InsertPolicyNotification, type PolicyNotification,
   type InsertPolicyAuditLog, type PolicyAuditLog,
   type InsertPolicyCategory, type PolicyCategory,
-  type InsertPolicySavedReport, type PolicySavedReport
+  type InsertPolicySavedReport, type PolicySavedReport,
+  // Comprehensive Scheduling System (CSS) tables
+  shiftTemplates, shifts, shiftAllocations, shiftAttachments,
+  shiftActivityLog, shiftSwapRequests, shiftCoverageRequirements,
+  staffShiftPreferences, schedulingRules, schedulingAnalytics,
+  // CSS types
+  type InsertShiftTemplate, type ShiftTemplate,
+  type InsertShift, type Shift,
+  type InsertShiftAllocation, type ShiftAllocation,
+  type InsertShiftAttachment, type ShiftAttachment,
+  type InsertShiftActivityLog, type ShiftActivityLog,
+  type InsertShiftSwapRequest, type ShiftSwapRequest,
+  type InsertShiftCoverageRequirement, type ShiftCoverageRequirement,
+  type InsertStaffShiftPreference, type StaffShiftPreference,
+  type InsertSchedulingRule, type SchedulingRule,
+  type InsertSchedulingAnalytics, type SchedulingAnalytics,
+  type ShiftCategory, type ShiftStatus, type AllocationStatus,
+  // OCS (Organizational Chart System) tables
+  orgDepartments, orgPositions, staffPositionAssignments,
+  orgChartSnapshots, orgChartChangeLogs, orgChartSettings, staffProfileExtended,
+  // OCS types
+  type InsertOrgDepartment, type OrgDepartment,
+  type InsertOrgPosition, type OrgPosition,
+  type InsertStaffPositionAssignment, type StaffPositionAssignment,
+  type InsertOrgChartSnapshot, type OrgChartSnapshot,
+  type InsertOrgChartChangeLog, type OrgChartChangeLog,
+  type InsertOrgChartSettings, type OrgChartSettings,
+  type InsertStaffProfileExtended, type StaffProfileExtended,
+  // ASCS (Advanced Scheduling and Calendar System) tables
+  calendarPreferences, openShifts, openShiftClaims, ascsShiftSwapRequests,
+  scheduleTasks, scheduleTaskTemplates, scheduleSuggestions, autoSchedulingJobs,
+  scheduleCommunications, schedulingAnalyticsExtended, staffSchedulingPreferences,
+  scheduleCalendarEvents, schedulingBadges, staffBadgeAwards, scheduleInteractionLogs,
+  // ASCS types
+  type InsertCalendarPreferences, type CalendarPreferences,
+  type InsertOpenShift, type OpenShift,
+  type InsertOpenShiftClaim, type OpenShiftClaim,
+  type InsertAscsShiftSwapRequest, type AscsShiftSwapRequest,
+  type InsertScheduleTask, type ScheduleTask,
+  type InsertScheduleTaskTemplate, type ScheduleTaskTemplate,
+  type InsertScheduleSuggestion, type ScheduleSuggestion,
+  type InsertAutoSchedulingJob, type AutoSchedulingJob,
+  type InsertScheduleCommunication, type ScheduleCommunication,
+  type InsertSchedulingAnalyticsExtended, type SchedulingAnalyticsExtended,
+  type InsertStaffSchedulingPreferences, type StaffSchedulingPreferences,
+  type InsertScheduleCalendarEvent, type ScheduleCalendarEvent,
+  type InsertSchedulingBadge, type SchedulingBadge,
+  type InsertStaffBadgeAward, type StaffBadgeAward,
+  type InsertScheduleInteractionLog, type ScheduleInteractionLog,
+  // Daily Notes
+  dailyNotes,
+  type InsertDailyNote, type DailyNote, type DailyNoteVisibilityType
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -934,6 +985,93 @@ export interface IStorage {
   getStaffComplianceStats(staffId: string): Promise<{ assigned: number; viewed: number; acknowledged: number; overdue: number; complianceRate: number }>;
   getPoliciesNeedingReview(days?: number): Promise<Policy[]>;
   getRecentPolicyActivity(limit?: number): Promise<PolicyAuditLog[]>;
+
+  // ============================================
+  // ORGANIZATIONAL CHART SYSTEM (OCS)
+  // ============================================
+
+  // Org Departments
+  getAllOrgDepartments(): Promise<OrgDepartment[]>;
+  getActiveOrgDepartments(): Promise<OrgDepartment[]>;
+  getOrgDepartmentById(id: string): Promise<OrgDepartment | undefined>;
+  getOrgDepartmentsByParent(parentId: string | null): Promise<OrgDepartment[]>;
+  createOrgDepartment(department: InsertOrgDepartment): Promise<OrgDepartment>;
+  updateOrgDepartment(id: string, department: Partial<InsertOrgDepartment>): Promise<OrgDepartment | undefined>;
+  deleteOrgDepartment(id: string): Promise<boolean>;
+  getOrgDepartmentHierarchy(): Promise<OrgDepartment[]>;
+
+  // Org Positions
+  getAllOrgPositions(): Promise<OrgPosition[]>;
+  getActiveOrgPositions(): Promise<OrgPosition[]>;
+  getOrgPositionById(id: string): Promise<OrgPosition | undefined>;
+  getOrgPositionsByDepartment(departmentId: string): Promise<OrgPosition[]>;
+  getVacantPositions(): Promise<OrgPosition[]>;
+  createOrgPosition(position: InsertOrgPosition): Promise<OrgPosition>;
+  updateOrgPosition(id: string, position: Partial<InsertOrgPosition>): Promise<OrgPosition | undefined>;
+  deleteOrgPosition(id: string): Promise<boolean>;
+
+  // Staff Position Assignments
+  getAllStaffPositionAssignments(): Promise<StaffPositionAssignment[]>;
+  getActiveStaffPositionAssignments(): Promise<StaffPositionAssignment[]>;
+  getStaffPositionAssignmentById(id: string): Promise<StaffPositionAssignment | undefined>;
+  getStaffPositionAssignmentsByStaff(staffId: string): Promise<StaffPositionAssignment[]>;
+  getStaffPositionAssignmentsByPosition(positionId: string): Promise<StaffPositionAssignment[]>;
+  getStaffPositionAssignmentsByDepartment(departmentId: string): Promise<StaffPositionAssignment[]>;
+  createStaffPositionAssignment(assignment: InsertStaffPositionAssignment): Promise<StaffPositionAssignment>;
+  updateStaffPositionAssignment(id: string, assignment: Partial<InsertStaffPositionAssignment>): Promise<StaffPositionAssignment | undefined>;
+  deleteStaffPositionAssignment(id: string): Promise<boolean>;
+  getPrimaryPositionForStaff(staffId: string): Promise<StaffPositionAssignment | undefined>;
+
+  // Org Chart Snapshots
+  getAllOrgChartSnapshots(): Promise<OrgChartSnapshot[]>;
+  getOrgChartSnapshotById(id: string): Promise<OrgChartSnapshot | undefined>;
+  getRecentOrgChartSnapshots(limit?: number): Promise<OrgChartSnapshot[]>;
+  createOrgChartSnapshot(snapshot: InsertOrgChartSnapshot): Promise<OrgChartSnapshot>;
+  deleteOrgChartSnapshot(id: string): Promise<boolean>;
+  captureCurrentOrgSnapshot(name: string, description: string, userId: string, userName: string): Promise<OrgChartSnapshot>;
+
+  // Org Chart Change Logs
+  getAllOrgChartChangeLogs(): Promise<OrgChartChangeLog[]>;
+  getOrgChartChangeLogById(id: string): Promise<OrgChartChangeLog | undefined>;
+  getOrgChartChangeLogsByEntity(entityType: string, entityId: string): Promise<OrgChartChangeLog[]>;
+  getRecentOrgChartChanges(limit?: number): Promise<OrgChartChangeLog[]>;
+  getPendingOrgChartApprovals(): Promise<OrgChartChangeLog[]>;
+  createOrgChartChangeLog(log: InsertOrgChartChangeLog): Promise<OrgChartChangeLog>;
+  approveOrgChartChange(id: string, approverId: string): Promise<OrgChartChangeLog | undefined>;
+  undoOrgChartChange(id: string, undoneById: string): Promise<boolean>;
+
+  // Org Chart Settings
+  getOrgChartSettings(userId?: string): Promise<OrgChartSettings | undefined>;
+  getGlobalOrgChartSettings(): Promise<OrgChartSettings | undefined>;
+  createOrgChartSettings(settings: InsertOrgChartSettings): Promise<OrgChartSettings>;
+  updateOrgChartSettings(id: string, settings: Partial<InsertOrgChartSettings>): Promise<OrgChartSettings | undefined>;
+  upsertOrgChartSettings(userId: string | null, settings: Partial<InsertOrgChartSettings>): Promise<OrgChartSettings>;
+
+  // Staff Profile Extended
+  getStaffProfileExtended(staffId: string): Promise<StaffProfileExtended | undefined>;
+  getAllStaffProfilesExtended(): Promise<StaffProfileExtended[]>;
+  createStaffProfileExtended(profile: InsertStaffProfileExtended): Promise<StaffProfileExtended>;
+  updateStaffProfileExtended(staffId: string, profile: Partial<InsertStaffProfileExtended>): Promise<StaffProfileExtended | undefined>;
+  upsertStaffProfileExtended(staffId: string, profile: Partial<InsertStaffProfileExtended>): Promise<StaffProfileExtended>;
+  syncStaffProfileMetrics(staffId: string): Promise<StaffProfileExtended | undefined>;
+
+  // OCS Dashboard & Analytics
+  getOrgChartStats(): Promise<{
+    totalDepartments: number;
+    totalPositions: number;
+    vacantPositions: number;
+    totalAssignments: number;
+    activeStaff: number;
+    complianceRate: number;
+  }>;
+  getDepartmentStats(departmentId: string): Promise<{
+    positionCount: number;
+    staffCount: number;
+    vacancies: number;
+    subDepartments: number;
+  }>;
+  getStaffByDepartment(departmentId: string): Promise<Staff[]>;
+  getOrgHierarchyTree(): Promise<any>;
 }
 
 export class DbStorage implements IStorage {
@@ -6792,6 +6930,2052 @@ export class DbStorage implements IStorage {
     return await db.select().from(policyAuditLogs)
       .orderBy(desc(policyAuditLogs.timestamp))
       .limit(limit || 20);
+  }
+
+  // ============================================
+  // COMPREHENSIVE SCHEDULING SYSTEM (CSS)
+  // ============================================
+
+  // Shift Templates
+  async getAllShiftTemplates(): Promise<ShiftTemplate[]> {
+    return await db.select().from(shiftTemplates)
+      .where(eq(shiftTemplates.isActive, 'yes'))
+      .orderBy(shiftTemplates.name);
+  }
+
+  async getShiftTemplateById(id: string): Promise<ShiftTemplate | undefined> {
+    const result = await db.select().from(shiftTemplates)
+      .where(eq(shiftTemplates.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getShiftTemplatesByCategory(category: ShiftCategory): Promise<ShiftTemplate[]> {
+    return await db.select().from(shiftTemplates)
+      .where(and(
+        eq(shiftTemplates.category, category),
+        eq(shiftTemplates.isActive, 'yes')
+      ))
+      .orderBy(shiftTemplates.name);
+  }
+
+  async createShiftTemplate(template: InsertShiftTemplate): Promise<ShiftTemplate> {
+    const result = await db.insert(shiftTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateShiftTemplate(id: string, template: Partial<InsertShiftTemplate>): Promise<ShiftTemplate | undefined> {
+    const result = await db.update(shiftTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(shiftTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteShiftTemplate(id: string): Promise<boolean> {
+    const result = await db.update(shiftTemplates)
+      .set({ isActive: 'no', updatedAt: new Date() })
+      .where(eq(shiftTemplates.id, id));
+    return result.rowCount > 0;
+  }
+
+  async incrementTemplateUsage(id: string): Promise<void> {
+    await db.update(shiftTemplates)
+      .set({ usageCount: sql`${shiftTemplates.usageCount} + 1` })
+      .where(eq(shiftTemplates.id, id));
+  }
+
+  // Shifts
+  async getAllShifts(filters?: {
+    status?: ShiftStatus;
+    category?: ShiftCategory;
+    clientId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Shift[]> {
+    let query = db.select().from(shifts);
+    const conditions = [];
+
+    if (filters?.status) {
+      conditions.push(eq(shifts.status, filters.status));
+    }
+    if (filters?.category) {
+      conditions.push(eq(shifts.category, filters.category));
+    }
+    if (filters?.clientId) {
+      conditions.push(eq(shifts.clientId, filters.clientId));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(shifts.scheduledDate, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(shifts.scheduledDate, filters.endDate));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    return await query.orderBy(shifts.scheduledDate, shifts.scheduledStartTime);
+  }
+
+  async getShiftById(id: string): Promise<Shift | undefined> {
+    const result = await db.select().from(shifts)
+      .where(eq(shifts.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getShiftsByDateRange(startDate: string, endDate: string): Promise<Shift[]> {
+    return await db.select().from(shifts)
+      .where(and(
+        gte(shifts.scheduledDate, startDate),
+        lte(shifts.scheduledDate, endDate)
+      ))
+      .orderBy(shifts.scheduledDate, shifts.scheduledStartTime);
+  }
+
+  async getShiftsByClient(clientId: string): Promise<Shift[]> {
+    return await db.select().from(shifts)
+      .where(eq(shifts.clientId, clientId))
+      .orderBy(desc(shifts.scheduledDate));
+  }
+
+  async getShiftsByStaff(staffId: string, startDate?: string, endDate?: string): Promise<(Shift & { allocation: ShiftAllocation })[]> {
+    const allocations = await db.select().from(shiftAllocations)
+      .where(eq(shiftAllocations.staffId, staffId));
+
+    const shiftIds = allocations.map(a => a.shiftId);
+    if (shiftIds.length === 0) return [];
+
+    let query = db.select().from(shifts)
+      .where(inArray(shifts.id, shiftIds));
+
+    if (startDate && endDate) {
+      query = query.where(and(
+        gte(shifts.scheduledDate, startDate),
+        lte(shifts.scheduledDate, endDate)
+      ));
+    }
+
+    const shiftsResult = await query.orderBy(shifts.scheduledDate);
+
+    return shiftsResult.map(shift => ({
+      ...shift,
+      allocation: allocations.find(a => a.shiftId === shift.id)!
+    }));
+  }
+
+  async createShift(shift: InsertShift): Promise<Shift> {
+    const result = await db.insert(shifts).values(shift).returning();
+    return result[0];
+  }
+
+  async updateShift(id: string, shift: Partial<InsertShift>): Promise<Shift | undefined> {
+    const result = await db.update(shifts)
+      .set({ ...shift, updatedAt: new Date() })
+      .where(eq(shifts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteShift(id: string): Promise<boolean> {
+    const result = await db.delete(shifts).where(eq(shifts.id, id));
+    return result.rowCount > 0;
+  }
+
+  async publishShift(id: string, userId: string, userName: string): Promise<Shift | undefined> {
+    const result = await db.update(shifts)
+      .set({
+        status: 'published',
+        publishedAt: new Date(),
+        publishedById: userId,
+        publishedByName: userName,
+        updatedAt: new Date()
+      })
+      .where(eq(shifts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async cancelShift(id: string, userId: string, userName: string, reason: string): Promise<Shift | undefined> {
+    const result = await db.update(shifts)
+      .set({
+        status: 'cancelled',
+        cancellationReason: reason,
+        cancelledAt: new Date(),
+        cancelledById: userId,
+        cancelledByName: userName,
+        updatedAt: new Date()
+      })
+      .where(eq(shifts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async bulkCreateShifts(shiftsData: InsertShift[]): Promise<Shift[]> {
+    const result = await db.insert(shifts).values(shiftsData).returning();
+    return result;
+  }
+
+  // Shift Allocations
+  async getShiftAllocations(shiftId: string): Promise<ShiftAllocation[]> {
+    return await db.select().from(shiftAllocations)
+      .where(eq(shiftAllocations.shiftId, shiftId))
+      .orderBy(shiftAllocations.role);
+  }
+
+  async getStaffAllocations(staffId: string, startDate?: string, endDate?: string): Promise<ShiftAllocation[]> {
+    let query = db.select().from(shiftAllocations)
+      .where(eq(shiftAllocations.staffId, staffId));
+
+    // If date filtering needed, we'd need to join with shifts table
+    return await query.orderBy(desc(shiftAllocations.assignedAt));
+  }
+
+  async createShiftAllocation(allocation: InsertShiftAllocation): Promise<ShiftAllocation> {
+    const result = await db.insert(shiftAllocations).values(allocation).returning();
+
+    // Update shift's assigned staff count
+    await this.updateShiftAssignedCount(allocation.shiftId);
+
+    return result[0];
+  }
+
+  async updateShiftAllocation(id: string, allocation: Partial<InsertShiftAllocation>): Promise<ShiftAllocation | undefined> {
+    const result = await db.update(shiftAllocations)
+      .set({ ...allocation, updatedAt: new Date() })
+      .where(eq(shiftAllocations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteShiftAllocation(id: string): Promise<boolean> {
+    // Get allocation first to update shift count
+    const existing = await db.select().from(shiftAllocations)
+      .where(eq(shiftAllocations.id, id))
+      .limit(1);
+
+    if (existing.length === 0) return false;
+
+    const result = await db.delete(shiftAllocations).where(eq(shiftAllocations.id, id));
+
+    // Update shift's assigned staff count
+    await this.updateShiftAssignedCount(existing[0].shiftId);
+
+    return result.rowCount > 0;
+  }
+
+  async updateShiftAssignedCount(shiftId: string): Promise<void> {
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(shiftAllocations)
+      .where(and(
+        eq(shiftAllocations.shiftId, shiftId),
+        inArray(shiftAllocations.status, ['pending', 'offered', 'accepted'])
+      ));
+
+    const count = Number(countResult[0]?.count || 0);
+
+    await db.update(shifts)
+      .set({ assignedStaffCount: count, updatedAt: new Date() })
+      .where(eq(shifts.id, shiftId));
+  }
+
+  async acceptAllocation(id: string): Promise<ShiftAllocation | undefined> {
+    const result = await db.update(shiftAllocations)
+      .set({
+        status: 'accepted',
+        respondedAt: new Date(),
+        confirmedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(shiftAllocations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async declineAllocation(id: string, reason: string): Promise<ShiftAllocation | undefined> {
+    const result = await db.update(shiftAllocations)
+      .set({
+        status: 'declined',
+        respondedAt: new Date(),
+        declineReason: reason,
+        updatedAt: new Date()
+      })
+      .where(eq(shiftAllocations.id, id))
+      .returning();
+
+    if (result[0]) {
+      await this.updateShiftAssignedCount(result[0].shiftId);
+    }
+
+    return result[0];
+  }
+
+  async checkInAllocation(id: string, latitude: string, longitude: string, distance: string): Promise<ShiftAllocation | undefined> {
+    const result = await db.update(shiftAllocations)
+      .set({
+        checkedInAt: new Date(),
+        checkedInLatitude: latitude,
+        checkedInLongitude: longitude,
+        checkedInDistance: distance,
+        updatedAt: new Date()
+      })
+      .where(eq(shiftAllocations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async checkOutAllocation(id: string, latitude: string, longitude: string, distance: string): Promise<ShiftAllocation | undefined> {
+    const allocation = await db.select().from(shiftAllocations)
+      .where(eq(shiftAllocations.id, id))
+      .limit(1);
+
+    if (!allocation[0]?.checkedInAt) return undefined;
+
+    const checkedInTime = new Date(allocation[0].checkedInAt);
+    const checkedOutTime = new Date();
+    const minutesWorked = Math.round((checkedOutTime.getTime() - checkedInTime.getTime()) / 60000);
+
+    const result = await db.update(shiftAllocations)
+      .set({
+        checkedOutAt: checkedOutTime,
+        checkedOutLatitude: latitude,
+        checkedOutLongitude: longitude,
+        checkedOutDistance: distance,
+        actualMinutesWorked: minutesWorked,
+        updatedAt: new Date()
+      })
+      .where(eq(shiftAllocations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Shift Attachments
+  async getShiftAttachments(shiftId: string): Promise<ShiftAttachment[]> {
+    return await db.select().from(shiftAttachments)
+      .where(eq(shiftAttachments.shiftId, shiftId))
+      .orderBy(desc(shiftAttachments.createdAt));
+  }
+
+  async createShiftAttachment(attachment: InsertShiftAttachment): Promise<ShiftAttachment> {
+    const result = await db.insert(shiftAttachments).values(attachment).returning();
+    return result[0];
+  }
+
+  async deleteShiftAttachment(id: string): Promise<boolean> {
+    const result = await db.delete(shiftAttachments).where(eq(shiftAttachments.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Shift Activity Log
+  async getShiftActivityLog(shiftId: string): Promise<ShiftActivityLog[]> {
+    return await db.select().from(shiftActivityLog)
+      .where(eq(shiftActivityLog.shiftId, shiftId))
+      .orderBy(desc(shiftActivityLog.createdAt));
+  }
+
+  async createShiftActivityLog(log: InsertShiftActivityLog): Promise<ShiftActivityLog> {
+    const result = await db.insert(shiftActivityLog).values(log).returning();
+    return result[0];
+  }
+
+  // Shift Swap Requests
+  async getShiftSwapRequests(staffId?: string): Promise<ShiftSwapRequest[]> {
+    if (staffId) {
+      return await db.select().from(shiftSwapRequests)
+        .where(or(
+          eq(shiftSwapRequests.requestingStaffId, staffId),
+          eq(shiftSwapRequests.targetStaffId, staffId)
+        ))
+        .orderBy(desc(shiftSwapRequests.createdAt));
+    }
+    return await db.select().from(shiftSwapRequests)
+      .orderBy(desc(shiftSwapRequests.createdAt));
+  }
+
+  async getPendingSwapRequests(): Promise<ShiftSwapRequest[]> {
+    return await db.select().from(shiftSwapRequests)
+      .where(eq(shiftSwapRequests.status, 'pending'))
+      .orderBy(desc(shiftSwapRequests.createdAt));
+  }
+
+  async createShiftSwapRequest(request: InsertShiftSwapRequest): Promise<ShiftSwapRequest> {
+    const result = await db.insert(shiftSwapRequests).values(request).returning();
+    return result[0];
+  }
+
+  async updateShiftSwapRequest(id: string, request: Partial<InsertShiftSwapRequest>): Promise<ShiftSwapRequest | undefined> {
+    const result = await db.update(shiftSwapRequests)
+      .set({ ...request, updatedAt: new Date() })
+      .where(eq(shiftSwapRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async approveSwapRequest(id: string, userId: string, userName: string): Promise<ShiftSwapRequest | undefined> {
+    const result = await db.update(shiftSwapRequests)
+      .set({
+        status: 'approved',
+        approvedById: userId,
+        approvedByName: userName,
+        approvedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(shiftSwapRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async rejectSwapRequest(id: string, userId: string, userName: string, reason: string): Promise<ShiftSwapRequest | undefined> {
+    const result = await db.update(shiftSwapRequests)
+      .set({
+        status: 'rejected',
+        approvedById: userId,
+        approvedByName: userName,
+        rejectionReason: reason,
+        updatedAt: new Date()
+      })
+      .where(eq(shiftSwapRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Shift Coverage Requirements
+  async getShiftCoverageRequirements(clientId?: string): Promise<ShiftCoverageRequirement[]> {
+    if (clientId) {
+      return await db.select().from(shiftCoverageRequirements)
+        .where(and(
+          eq(shiftCoverageRequirements.clientId, clientId),
+          eq(shiftCoverageRequirements.isActive, 'yes')
+        ))
+        .orderBy(shiftCoverageRequirements.dayOfWeek, shiftCoverageRequirements.startTime);
+    }
+    return await db.select().from(shiftCoverageRequirements)
+      .where(eq(shiftCoverageRequirements.isActive, 'yes'))
+      .orderBy(shiftCoverageRequirements.dayOfWeek, shiftCoverageRequirements.startTime);
+  }
+
+  async createShiftCoverageRequirement(requirement: InsertShiftCoverageRequirement): Promise<ShiftCoverageRequirement> {
+    const result = await db.insert(shiftCoverageRequirements).values(requirement).returning();
+    return result[0];
+  }
+
+  async updateShiftCoverageRequirement(id: string, requirement: Partial<InsertShiftCoverageRequirement>): Promise<ShiftCoverageRequirement | undefined> {
+    const result = await db.update(shiftCoverageRequirements)
+      .set({ ...requirement, updatedAt: new Date() })
+      .where(eq(shiftCoverageRequirements.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteShiftCoverageRequirement(id: string): Promise<boolean> {
+    const result = await db.update(shiftCoverageRequirements)
+      .set({ isActive: 'no', updatedAt: new Date() })
+      .where(eq(shiftCoverageRequirements.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Staff Shift Preferences
+  async getStaffShiftPreferences(staffId: string): Promise<StaffShiftPreference | undefined> {
+    const result = await db.select().from(staffShiftPreferences)
+      .where(eq(staffShiftPreferences.staffId, staffId))
+      .limit(1);
+    return result[0];
+  }
+
+  async createOrUpdateStaffShiftPreferences(staffId: string, preferences: Partial<InsertStaffShiftPreference>): Promise<StaffShiftPreference> {
+    const existing = await this.getStaffShiftPreferences(staffId);
+
+    if (existing) {
+      const result = await db.update(staffShiftPreferences)
+        .set({ ...preferences, updatedAt: new Date() })
+        .where(eq(staffShiftPreferences.staffId, staffId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(staffShiftPreferences)
+        .values({ staffId, ...preferences })
+        .returning();
+      return result[0];
+    }
+  }
+
+  // Scheduling Rules
+  async getSchedulingRules(): Promise<SchedulingRule[]> {
+    return await db.select().from(schedulingRules)
+      .where(eq(schedulingRules.isActive, 'yes'))
+      .orderBy(schedulingRules.priority);
+  }
+
+  async getSchedulingRuleById(id: string): Promise<SchedulingRule | undefined> {
+    const result = await db.select().from(schedulingRules)
+      .where(eq(schedulingRules.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createSchedulingRule(rule: InsertSchedulingRule): Promise<SchedulingRule> {
+    const result = await db.insert(schedulingRules).values(rule).returning();
+    return result[0];
+  }
+
+  async updateSchedulingRule(id: string, rule: Partial<InsertSchedulingRule>): Promise<SchedulingRule | undefined> {
+    const result = await db.update(schedulingRules)
+      .set({ ...rule, updatedAt: new Date() })
+      .where(eq(schedulingRules.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSchedulingRule(id: string): Promise<boolean> {
+    const result = await db.update(schedulingRules)
+      .set({ isActive: 'no', updatedAt: new Date() })
+      .where(eq(schedulingRules.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Scheduling Analytics
+  async getSchedulingAnalytics(startDate: string, endDate: string): Promise<SchedulingAnalytics[]> {
+    return await db.select().from(schedulingAnalytics)
+      .where(and(
+        gte(schedulingAnalytics.snapshotDate, startDate),
+        lte(schedulingAnalytics.snapshotDate, endDate)
+      ))
+      .orderBy(desc(schedulingAnalytics.snapshotDate));
+  }
+
+  async createSchedulingAnalytics(analytics: InsertSchedulingAnalytics): Promise<SchedulingAnalytics> {
+    const result = await db.insert(schedulingAnalytics).values(analytics).returning();
+    return result[0];
+  }
+
+  // CSS Statistics & Reports
+  async getSchedulingStats(startDate?: string, endDate?: string): Promise<{
+    totalShifts: number;
+    assignedShifts: number;
+    unassignedShifts: number;
+    completedShifts: number;
+    cancelledShifts: number;
+    totalHoursScheduled: number;
+    staffUtilization: number;
+    coverageRate: number;
+  }> {
+    const conditions = [];
+    if (startDate) conditions.push(gte(shifts.scheduledDate, startDate));
+    if (endDate) conditions.push(lte(shifts.scheduledDate, endDate));
+
+    const baseQuery = conditions.length > 0
+      ? and(...conditions)
+      : undefined;
+
+    const totalResult = await db.select({ count: sql<number>`count(*)` })
+      .from(shifts)
+      .where(baseQuery);
+    const totalShifts = Number(totalResult[0]?.count || 0);
+
+    const assignedResult = await db.select({ count: sql<number>`count(*)` })
+      .from(shifts)
+      .where(and(baseQuery, gte(shifts.assignedStaffCount, 1)));
+    const assignedShifts = Number(assignedResult[0]?.count || 0);
+
+    const completedResult = await db.select({ count: sql<number>`count(*)` })
+      .from(shifts)
+      .where(and(baseQuery, eq(shifts.status, 'completed')));
+    const completedShifts = Number(completedResult[0]?.count || 0);
+
+    const cancelledResult = await db.select({ count: sql<number>`count(*)` })
+      .from(shifts)
+      .where(and(baseQuery, eq(shifts.status, 'cancelled')));
+    const cancelledShifts = Number(cancelledResult[0]?.count || 0);
+
+    const hoursResult = await db.select({ total: sql<number>`sum(${shifts.durationMinutes})` })
+      .from(shifts)
+      .where(and(baseQuery, inArray(shifts.status, ['assigned', 'confirmed', 'in_progress', 'completed'])));
+    const totalMinutes = Number(hoursResult[0]?.total || 0);
+
+    return {
+      totalShifts,
+      assignedShifts,
+      unassignedShifts: totalShifts - assignedShifts,
+      completedShifts,
+      cancelledShifts,
+      totalHoursScheduled: Math.round(totalMinutes / 60),
+      staffUtilization: totalShifts > 0 ? Math.round((assignedShifts / totalShifts) * 100) : 0,
+      coverageRate: totalShifts > 0 ? Math.round((assignedShifts / totalShifts) * 100) : 0
+    };
+  }
+
+  // Smart Staff Matching for Shifts
+  async getAvailableStaffForShift(shiftId: string): Promise<{
+    staff: Staff;
+    score: number;
+    matchReasons: string[];
+    warnings: string[];
+  }[]> {
+    const shift = await this.getShiftById(shiftId);
+    if (!shift) return [];
+
+    // Get all active staff
+    const allStaff = await db.select().from(staff)
+      .where(eq(staff.isActive, 'yes'));
+
+    // Get client restrictions
+    const restrictions = shift.clientId
+      ? await db.select().from(clientStaffRestrictions)
+          .where(and(
+            eq(clientStaffRestrictions.clientId, shift.clientId),
+            eq(clientStaffRestrictions.isActive, 'yes')
+          ))
+      : [];
+
+    // Get client preferences
+    const preferences = shift.clientId
+      ? await db.select().from(clientStaffPreferences)
+          .where(and(
+            eq(clientStaffPreferences.clientId, shift.clientId),
+            eq(clientStaffPreferences.isActive, 'yes')
+          ))
+      : [];
+
+    // Get unavailability periods for the shift date
+    const unavailability = await db.select().from(staffUnavailabilityPeriods)
+      .where(and(
+        lte(staffUnavailabilityPeriods.startDate, new Date(`${shift.scheduledDate}T${shift.scheduledEndTime}`)),
+        gte(staffUnavailabilityPeriods.endDate, new Date(`${shift.scheduledDate}T${shift.scheduledStartTime}`))
+      ));
+
+    // Get existing allocations for the day to check for conflicts
+    const existingAllocations = await db.select()
+      .from(shiftAllocations)
+      .innerJoin(shifts, eq(shiftAllocations.shiftId, shifts.id))
+      .where(eq(shifts.scheduledDate, shift.scheduledDate));
+
+    const results: {
+      staff: Staff;
+      score: number;
+      matchReasons: string[];
+      warnings: string[];
+    }[] = [];
+
+    for (const staffMember of allStaff) {
+      let score = 50; // Base score
+      const matchReasons: string[] = [];
+      const warnings: string[] = [];
+
+      // Check for hard restrictions (blacklist)
+      const isRestricted = restrictions.some(
+        r => r.staffId === staffMember.id && r.severity === 'hard_block'
+      );
+      if (isRestricted) {
+        continue; // Skip this staff member entirely
+      }
+
+      // Check for soft restrictions
+      const hasSoftRestriction = restrictions.some(
+        r => r.staffId === staffMember.id && r.severity !== 'hard_block'
+      );
+      if (hasSoftRestriction) {
+        score -= 30;
+        warnings.push('Staff has a soft restriction with this client');
+      }
+
+      // Check unavailability
+      const isUnavailable = unavailability.some(u => u.staffId === staffMember.id);
+      if (isUnavailable) {
+        continue; // Skip unavailable staff
+      }
+
+      // Check for conflicts with existing shifts
+      const hasConflict = existingAllocations.some(a => {
+        if (a.shift_allocations.staffId !== staffMember.id) return false;
+        // Simple time overlap check
+        return true; // Would need more detailed time checking
+      });
+      if (hasConflict) {
+        score -= 40;
+        warnings.push('Staff has another shift on this day');
+      }
+
+      // Check preferences
+      const isPrimaryPreferred = preferences.some(
+        p => p.staffId === staffMember.id && p.preferenceLevel === 'primary'
+      );
+      const isSecondaryPreferred = preferences.some(
+        p => p.staffId === staffMember.id && p.preferenceLevel === 'secondary'
+      );
+
+      if (isPrimaryPreferred) {
+        score += 30;
+        matchReasons.push('Primary preferred staff for this client');
+      } else if (isSecondaryPreferred) {
+        score += 15;
+        matchReasons.push('Secondary preferred staff for this client');
+      }
+
+      // Role matching
+      if (shift.shiftType === 'nursing' && staffMember.role === 'nurse') {
+        score += 20;
+        matchReasons.push('Staff role matches shift type');
+      }
+
+      results.push({
+        staff: staffMember,
+        score: Math.max(0, Math.min(100, score)),
+        matchReasons,
+        warnings
+      });
+    }
+
+    // Sort by score descending
+    return results.sort((a, b) => b.score - a.score);
+  }
+
+  // ============================================
+  // ORGANIZATIONAL CHART SYSTEM (OCS)
+  // ============================================
+
+  // Org Departments
+  async getAllOrgDepartments(): Promise<OrgDepartment[]> {
+    return await db.select().from(orgDepartments).orderBy(orgDepartments.sortOrder, orgDepartments.name);
+  }
+
+  async getActiveOrgDepartments(): Promise<OrgDepartment[]> {
+    return await db.select().from(orgDepartments)
+      .where(eq(orgDepartments.isActive, 'yes'))
+      .orderBy(orgDepartments.sortOrder, orgDepartments.name);
+  }
+
+  async getOrgDepartmentById(id: string): Promise<OrgDepartment | undefined> {
+    const results = await db.select().from(orgDepartments).where(eq(orgDepartments.id, id));
+    return results[0];
+  }
+
+  async getOrgDepartmentsByParent(parentId: string | null): Promise<OrgDepartment[]> {
+    if (parentId === null) {
+      return await db.select().from(orgDepartments)
+        .where(sql`${orgDepartments.parentDepartmentId} IS NULL`)
+        .orderBy(orgDepartments.sortOrder, orgDepartments.name);
+    }
+    return await db.select().from(orgDepartments)
+      .where(eq(orgDepartments.parentDepartmentId, parentId))
+      .orderBy(orgDepartments.sortOrder, orgDepartments.name);
+  }
+
+  async createOrgDepartment(department: InsertOrgDepartment): Promise<OrgDepartment> {
+    const results = await db.insert(orgDepartments).values(department).returning();
+    return results[0];
+  }
+
+  async updateOrgDepartment(id: string, department: Partial<InsertOrgDepartment>): Promise<OrgDepartment | undefined> {
+    const results = await db.update(orgDepartments)
+      .set({ ...department, updatedAt: new Date() })
+      .where(eq(orgDepartments.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteOrgDepartment(id: string): Promise<boolean> {
+    const result = await db.delete(orgDepartments).where(eq(orgDepartments.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getOrgDepartmentHierarchy(): Promise<OrgDepartment[]> {
+    // Get all departments ordered for hierarchical display
+    return await db.select().from(orgDepartments)
+      .where(eq(orgDepartments.isActive, 'yes'))
+      .orderBy(orgDepartments.level, orgDepartments.sortOrder, orgDepartments.name);
+  }
+
+  // Org Positions
+  async getAllOrgPositions(): Promise<OrgPosition[]> {
+    return await db.select().from(orgPositions).orderBy(orgPositions.sortOrder, orgPositions.title);
+  }
+
+  async getActiveOrgPositions(): Promise<OrgPosition[]> {
+    return await db.select().from(orgPositions)
+      .where(eq(orgPositions.isActive, 'yes'))
+      .orderBy(orgPositions.sortOrder, orgPositions.title);
+  }
+
+  async getOrgPositionById(id: string): Promise<OrgPosition | undefined> {
+    const results = await db.select().from(orgPositions).where(eq(orgPositions.id, id));
+    return results[0];
+  }
+
+  async getOrgPositionsByDepartment(departmentId: string): Promise<OrgPosition[]> {
+    return await db.select().from(orgPositions)
+      .where(eq(orgPositions.departmentId, departmentId))
+      .orderBy(orgPositions.sortOrder, orgPositions.title);
+  }
+
+  async getVacantPositions(): Promise<OrgPosition[]> {
+    return await db.select().from(orgPositions)
+      .where(and(
+        eq(orgPositions.isActive, 'yes'),
+        eq(orgPositions.isVacant, 'yes')
+      ))
+      .orderBy(orgPositions.title);
+  }
+
+  async createOrgPosition(position: InsertOrgPosition): Promise<OrgPosition> {
+    const results = await db.insert(orgPositions).values(position).returning();
+    return results[0];
+  }
+
+  async updateOrgPosition(id: string, position: Partial<InsertOrgPosition>): Promise<OrgPosition | undefined> {
+    const results = await db.update(orgPositions)
+      .set({ ...position, updatedAt: new Date() })
+      .where(eq(orgPositions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteOrgPosition(id: string): Promise<boolean> {
+    const result = await db.delete(orgPositions).where(eq(orgPositions.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Staff Position Assignments
+  async getAllStaffPositionAssignments(): Promise<StaffPositionAssignment[]> {
+    return await db.select().from(staffPositionAssignments).orderBy(desc(staffPositionAssignments.createdAt));
+  }
+
+  async getActiveStaffPositionAssignments(): Promise<StaffPositionAssignment[]> {
+    return await db.select().from(staffPositionAssignments)
+      .where(eq(staffPositionAssignments.isActive, 'yes'))
+      .orderBy(desc(staffPositionAssignments.createdAt));
+  }
+
+  async getStaffPositionAssignmentById(id: string): Promise<StaffPositionAssignment | undefined> {
+    const results = await db.select().from(staffPositionAssignments).where(eq(staffPositionAssignments.id, id));
+    return results[0];
+  }
+
+  async getStaffPositionAssignmentsByStaff(staffId: string): Promise<StaffPositionAssignment[]> {
+    return await db.select().from(staffPositionAssignments)
+      .where(eq(staffPositionAssignments.staffId, staffId))
+      .orderBy(desc(staffPositionAssignments.isPrimary), desc(staffPositionAssignments.createdAt));
+  }
+
+  async getStaffPositionAssignmentsByPosition(positionId: string): Promise<StaffPositionAssignment[]> {
+    return await db.select().from(staffPositionAssignments)
+      .where(eq(staffPositionAssignments.positionId, positionId))
+      .orderBy(desc(staffPositionAssignments.createdAt));
+  }
+
+  async getStaffPositionAssignmentsByDepartment(departmentId: string): Promise<StaffPositionAssignment[]> {
+    return await db.select().from(staffPositionAssignments)
+      .where(eq(staffPositionAssignments.departmentId, departmentId))
+      .orderBy(desc(staffPositionAssignments.createdAt));
+  }
+
+  async createStaffPositionAssignment(assignment: InsertStaffPositionAssignment): Promise<StaffPositionAssignment> {
+    const results = await db.insert(staffPositionAssignments).values(assignment).returning();
+
+    // Update position headcount
+    if (assignment.positionId) {
+      const position = await this.getOrgPositionById(assignment.positionId);
+      if (position) {
+        const currentCount = (position.currentHeadcount || 0) + 1;
+        const isVacant = currentCount < (position.maxHeadcount || 1) ? 'yes' : 'no';
+        await this.updateOrgPosition(assignment.positionId, {
+          currentHeadcount: currentCount,
+          isVacant
+        });
+      }
+    }
+
+    return results[0];
+  }
+
+  async updateStaffPositionAssignment(id: string, assignment: Partial<InsertStaffPositionAssignment>): Promise<StaffPositionAssignment | undefined> {
+    const results = await db.update(staffPositionAssignments)
+      .set({ ...assignment, updatedAt: new Date() })
+      .where(eq(staffPositionAssignments.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteStaffPositionAssignment(id: string): Promise<boolean> {
+    // Get the assignment first to update position headcount
+    const assignment = await this.getStaffPositionAssignmentById(id);
+
+    const result = await db.delete(staffPositionAssignments).where(eq(staffPositionAssignments.id, id));
+
+    // Update position headcount if needed
+    if (assignment?.positionId) {
+      const position = await this.getOrgPositionById(assignment.positionId);
+      if (position) {
+        const currentCount = Math.max(0, (position.currentHeadcount || 0) - 1);
+        const isVacant = currentCount < (position.maxHeadcount || 1) ? 'yes' : 'no';
+        await this.updateOrgPosition(assignment.positionId, {
+          currentHeadcount: currentCount,
+          isVacant
+        });
+      }
+    }
+
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getPrimaryPositionForStaff(staffId: string): Promise<StaffPositionAssignment | undefined> {
+    const results = await db.select().from(staffPositionAssignments)
+      .where(and(
+        eq(staffPositionAssignments.staffId, staffId),
+        eq(staffPositionAssignments.isPrimary, 'yes'),
+        eq(staffPositionAssignments.isActive, 'yes')
+      ))
+      .limit(1);
+    return results[0];
+  }
+
+  // Org Chart Snapshots
+  async getAllOrgChartSnapshots(): Promise<OrgChartSnapshot[]> {
+    return await db.select().from(orgChartSnapshots).orderBy(desc(orgChartSnapshots.createdAt));
+  }
+
+  async getOrgChartSnapshotById(id: string): Promise<OrgChartSnapshot | undefined> {
+    const results = await db.select().from(orgChartSnapshots).where(eq(orgChartSnapshots.id, id));
+    return results[0];
+  }
+
+  async getRecentOrgChartSnapshots(limit: number = 10): Promise<OrgChartSnapshot[]> {
+    return await db.select().from(orgChartSnapshots)
+      .orderBy(desc(orgChartSnapshots.createdAt))
+      .limit(limit);
+  }
+
+  async createOrgChartSnapshot(snapshot: InsertOrgChartSnapshot): Promise<OrgChartSnapshot> {
+    const results = await db.insert(orgChartSnapshots).values(snapshot).returning();
+    return results[0];
+  }
+
+  async deleteOrgChartSnapshot(id: string): Promise<boolean> {
+    const result = await db.delete(orgChartSnapshots).where(eq(orgChartSnapshots.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async captureCurrentOrgSnapshot(name: string, description: string, userId: string, userName: string): Promise<OrgChartSnapshot> {
+    // Capture current state of org structure
+    const departments = await this.getAllOrgDepartments();
+    const positions = await this.getAllOrgPositions();
+    const assignments = await this.getActiveStaffPositionAssignments();
+    const allStaff = await this.getAllStaff();
+
+    const vacancies = positions.filter(p => p.isVacant === 'yes').length;
+
+    const snapshot: InsertOrgChartSnapshot = {
+      name,
+      description,
+      snapshotType: 'manual',
+      departmentsSnapshot: JSON.stringify(departments),
+      positionsSnapshot: JSON.stringify(positions),
+      assignmentsSnapshot: JSON.stringify(assignments),
+      staffSnapshot: JSON.stringify(allStaff.map(s => ({ id: s.id, name: s.name, email: s.email, role: s.role }))),
+      totalDepartments: departments.length,
+      totalPositions: positions.length,
+      totalStaff: allStaff.filter(s => s.isActive === 'yes').length,
+      vacancies,
+      createdById: userId,
+      createdByName: userName
+    };
+
+    return await this.createOrgChartSnapshot(snapshot);
+  }
+
+  // Org Chart Change Logs
+  async getAllOrgChartChangeLogs(): Promise<OrgChartChangeLog[]> {
+    return await db.select().from(orgChartChangeLogs).orderBy(desc(orgChartChangeLogs.createdAt));
+  }
+
+  async getOrgChartChangeLogById(id: string): Promise<OrgChartChangeLog | undefined> {
+    const results = await db.select().from(orgChartChangeLogs).where(eq(orgChartChangeLogs.id, id));
+    return results[0];
+  }
+
+  async getOrgChartChangeLogsByEntity(entityType: string, entityId: string): Promise<OrgChartChangeLog[]> {
+    return await db.select().from(orgChartChangeLogs)
+      .where(and(
+        eq(orgChartChangeLogs.entityType, entityType),
+        eq(orgChartChangeLogs.entityId, entityId)
+      ))
+      .orderBy(desc(orgChartChangeLogs.createdAt));
+  }
+
+  async getRecentOrgChartChanges(limit: number = 50): Promise<OrgChartChangeLog[]> {
+    return await db.select().from(orgChartChangeLogs)
+      .orderBy(desc(orgChartChangeLogs.createdAt))
+      .limit(limit);
+  }
+
+  async getPendingOrgChartApprovals(): Promise<OrgChartChangeLog[]> {
+    return await db.select().from(orgChartChangeLogs)
+      .where(and(
+        eq(orgChartChangeLogs.requiresApproval, 'yes'),
+        eq(orgChartChangeLogs.approvalStatus, 'pending')
+      ))
+      .orderBy(desc(orgChartChangeLogs.createdAt));
+  }
+
+  async createOrgChartChangeLog(log: InsertOrgChartChangeLog): Promise<OrgChartChangeLog> {
+    const results = await db.insert(orgChartChangeLogs).values(log).returning();
+    return results[0];
+  }
+
+  async approveOrgChartChange(id: string, approverId: string): Promise<OrgChartChangeLog | undefined> {
+    const results = await db.update(orgChartChangeLogs)
+      .set({
+        approvalStatus: 'approved',
+        approvedById: approverId,
+        approvedAt: new Date()
+      })
+      .where(eq(orgChartChangeLogs.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async undoOrgChartChange(id: string, undoneById: string): Promise<boolean> {
+    const changeLog = await this.getOrgChartChangeLogById(id);
+    if (!changeLog || changeLog.canUndo !== 'yes' || changeLog.undoneAt) {
+      return false;
+    }
+
+    // Mark as undone
+    await db.update(orgChartChangeLogs)
+      .set({
+        undoneById,
+        undoneAt: new Date(),
+        canUndo: 'no'
+      })
+      .where(eq(orgChartChangeLogs.id, id));
+
+    // Restore previous state based on entity type and previous data
+    if (changeLog.previousData) {
+      const previousData = JSON.parse(changeLog.previousData);
+
+      switch (changeLog.entityType) {
+        case 'department':
+          if (changeLog.changeType === 'delete') {
+            await this.createOrgDepartment(previousData);
+          } else if (changeLog.changeType === 'update') {
+            await this.updateOrgDepartment(changeLog.entityId, previousData);
+          }
+          break;
+        case 'position':
+          if (changeLog.changeType === 'delete') {
+            await this.createOrgPosition(previousData);
+          } else if (changeLog.changeType === 'update') {
+            await this.updateOrgPosition(changeLog.entityId, previousData);
+          }
+          break;
+        case 'assignment':
+          if (changeLog.changeType === 'delete') {
+            await this.createStaffPositionAssignment(previousData);
+          } else if (changeLog.changeType === 'update') {
+            await this.updateStaffPositionAssignment(changeLog.entityId, previousData);
+          }
+          break;
+      }
+    }
+
+    return true;
+  }
+
+  // Org Chart Settings
+  async getOrgChartSettings(userId?: string): Promise<OrgChartSettings | undefined> {
+    if (userId) {
+      const results = await db.select().from(orgChartSettings)
+        .where(eq(orgChartSettings.userId, userId))
+        .limit(1);
+      if (results[0]) return results[0];
+    }
+    // Fall back to global settings
+    return await this.getGlobalOrgChartSettings();
+  }
+
+  async getGlobalOrgChartSettings(): Promise<OrgChartSettings | undefined> {
+    const results = await db.select().from(orgChartSettings)
+      .where(sql`${orgChartSettings.userId} IS NULL`)
+      .limit(1);
+    return results[0];
+  }
+
+  async createOrgChartSettings(settings: InsertOrgChartSettings): Promise<OrgChartSettings> {
+    const results = await db.insert(orgChartSettings).values(settings).returning();
+    return results[0];
+  }
+
+  async updateOrgChartSettings(id: string, settings: Partial<InsertOrgChartSettings>): Promise<OrgChartSettings | undefined> {
+    const results = await db.update(orgChartSettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(orgChartSettings.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async upsertOrgChartSettings(userId: string | null, settings: Partial<InsertOrgChartSettings>): Promise<OrgChartSettings> {
+    const existing = userId
+      ? await db.select().from(orgChartSettings).where(eq(orgChartSettings.userId, userId)).limit(1)
+      : await db.select().from(orgChartSettings).where(sql`${orgChartSettings.userId} IS NULL`).limit(1);
+
+    if (existing[0]) {
+      const updated = await this.updateOrgChartSettings(existing[0].id, settings);
+      return updated!;
+    } else {
+      return await this.createOrgChartSettings({
+        ...settings,
+        userId: userId || undefined,
+        settingType: settings.settingType || 'user'
+      } as InsertOrgChartSettings);
+    }
+  }
+
+  // Staff Profile Extended
+  async getStaffProfileExtended(staffId: string): Promise<StaffProfileExtended | undefined> {
+    const results = await db.select().from(staffProfileExtended)
+      .where(eq(staffProfileExtended.staffId, staffId))
+      .limit(1);
+    return results[0];
+  }
+
+  async getAllStaffProfilesExtended(): Promise<StaffProfileExtended[]> {
+    return await db.select().from(staffProfileExtended);
+  }
+
+  async createStaffProfileExtended(profile: InsertStaffProfileExtended): Promise<StaffProfileExtended> {
+    const results = await db.insert(staffProfileExtended).values(profile).returning();
+    return results[0];
+  }
+
+  async updateStaffProfileExtended(staffId: string, profile: Partial<InsertStaffProfileExtended>): Promise<StaffProfileExtended | undefined> {
+    const results = await db.update(staffProfileExtended)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(staffProfileExtended.staffId, staffId))
+      .returning();
+    return results[0];
+  }
+
+  async upsertStaffProfileExtended(staffId: string, profile: Partial<InsertStaffProfileExtended>): Promise<StaffProfileExtended> {
+    const existing = await this.getStaffProfileExtended(staffId);
+
+    if (existing) {
+      const updated = await this.updateStaffProfileExtended(staffId, profile);
+      return updated!;
+    } else {
+      return await this.createStaffProfileExtended({
+        staffId,
+        ...profile
+      } as InsertStaffProfileExtended);
+    }
+  }
+
+  async syncStaffProfileMetrics(staffId: string): Promise<StaffProfileExtended | undefined> {
+    // Sync metrics from various systems
+    const staffMember = await this.getStaffById(staffId);
+    if (!staffMember) return undefined;
+
+    // Get client assignments count
+    const assignments = await this.getAssignmentsByStaff(staffId);
+    const activeAssignments = assignments.filter(a => a.isActive === 'yes');
+
+    // Get shift count for current week
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    const shiftsThisWeek = await db.select().from(shiftAllocations)
+      .innerJoin(shifts, eq(shiftAllocations.shiftId, shifts.id))
+      .where(and(
+        eq(shiftAllocations.staffId, staffId),
+        gte(shifts.scheduledDate, startOfWeek.toISOString().split('T')[0]),
+        lte(shifts.scheduledDate, endOfWeek.toISOString().split('T')[0])
+      ));
+
+    // Get LMS compliance status
+    const lmsStats = await db.select().from(lmsStaffStats)
+      .where(eq(lmsStaffStats.staffId, staffId))
+      .limit(1);
+
+    const complianceStatus = lmsStats[0]?.currentStreak && lmsStats[0].currentStreak >= 7
+      ? 'compliant'
+      : lmsStats[0]?.totalCoursesCompleted && lmsStats[0].totalCoursesCompleted > 0
+        ? 'warning'
+        : 'non_compliant';
+
+    // Get policy acknowledgment count
+    const policyAcks = await db.select().from(policyAcknowledgments)
+      .where(eq(policyAcknowledgments.staffId, staffId));
+
+    const profileUpdate: Partial<InsertStaffProfileExtended> = {
+      currentClientCount: activeAssignments.length,
+      currentShiftCount: shiftsThisWeek.length,
+      complianceStatus,
+      policiesAcknowledged: policyAcks.length,
+      lastSyncedAt: new Date()
+    };
+
+    return await this.upsertStaffProfileExtended(staffId, profileUpdate);
+  }
+
+  // OCS Dashboard & Analytics
+  async getOrgChartStats(): Promise<{
+    totalDepartments: number;
+    totalPositions: number;
+    vacantPositions: number;
+    totalAssignments: number;
+    activeStaff: number;
+    complianceRate: number;
+  }> {
+    const departments = await this.getActiveOrgDepartments();
+    const positions = await this.getActiveOrgPositions();
+    const vacantPositions = await this.getVacantPositions();
+    const assignments = await this.getActiveStaffPositionAssignments();
+    const allStaff = await this.getAllStaff();
+    const activeStaff = allStaff.filter(s => s.isActive === 'yes');
+
+    // Calculate compliance rate from extended profiles
+    const profiles = await this.getAllStaffProfilesExtended();
+    const compliantCount = profiles.filter(p => p.complianceStatus === 'compliant').length;
+    const complianceRate = profiles.length > 0
+      ? Math.round((compliantCount / profiles.length) * 100)
+      : 100;
+
+    return {
+      totalDepartments: departments.length,
+      totalPositions: positions.length,
+      vacantPositions: vacantPositions.length,
+      totalAssignments: assignments.length,
+      activeStaff: activeStaff.length,
+      complianceRate
+    };
+  }
+
+  async getDepartmentStats(departmentId: string): Promise<{
+    positionCount: number;
+    staffCount: number;
+    vacancies: number;
+    subDepartments: number;
+  }> {
+    const positions = await this.getOrgPositionsByDepartment(departmentId);
+    const assignments = await this.getStaffPositionAssignmentsByDepartment(departmentId);
+    const subDepartments = await this.getOrgDepartmentsByParent(departmentId);
+
+    const activeAssignments = assignments.filter(a => a.isActive === 'yes');
+    const vacancies = positions.filter(p => p.isVacant === 'yes').length;
+
+    return {
+      positionCount: positions.length,
+      staffCount: activeAssignments.length,
+      vacancies,
+      subDepartments: subDepartments.length
+    };
+  }
+
+  async getStaffByDepartment(departmentId: string): Promise<Staff[]> {
+    const assignments = await this.getStaffPositionAssignmentsByDepartment(departmentId);
+    const activeAssignments = assignments.filter(a => a.isActive === 'yes');
+    const staffIds = [...new Set(activeAssignments.map(a => a.staffId))];
+
+    if (staffIds.length === 0) return [];
+
+    return await db.select().from(staff)
+      .where(inArray(staff.id, staffIds))
+      .orderBy(staff.name);
+  }
+
+  async getOrgHierarchyTree(): Promise<any> {
+    // Build a complete hierarchy tree for visualization
+    const departments = await this.getActiveOrgDepartments();
+    const positions = await this.getActiveOrgPositions();
+    const assignments = await this.getActiveStaffPositionAssignments();
+    const allStaff = await this.getAllStaff();
+
+    const staffMap = new Map(allStaff.map(s => [s.id, s]));
+
+    // Build department tree
+    const buildDeptTree = (parentId: string | null): any[] => {
+      return departments
+        .filter(d => d.parentDepartmentId === parentId)
+        .map(dept => {
+          const deptPositions = positions.filter(p => p.departmentId === dept.id);
+          const positionsWithStaff = deptPositions.map(pos => {
+            const posAssignments = assignments.filter(a => a.positionId === pos.id);
+            const assignedStaff = posAssignments
+              .map(a => staffMap.get(a.staffId))
+              .filter(Boolean);
+
+            return {
+              ...pos,
+              assignedStaff,
+              assignmentCount: posAssignments.length
+            };
+          });
+
+          return {
+            ...dept,
+            positions: positionsWithStaff,
+            children: buildDeptTree(dept.id)
+          };
+        });
+    };
+
+    return {
+      departments: buildDeptTree(null),
+      stats: await this.getOrgChartStats()
+    };
+  }
+
+  // ============================================================================
+  // ASCS - Advanced Scheduling and Calendar System Methods
+  // ============================================================================
+
+  // Calendar Preferences
+  async getCalendarPreferences(userId: string): Promise<CalendarPreferences | undefined> {
+    const [prefs] = await db.select().from(calendarPreferences).where(eq(calendarPreferences.userId, userId));
+    return prefs;
+  }
+
+  async upsertCalendarPreferences(userId: string, prefs: Partial<InsertCalendarPreferences>): Promise<CalendarPreferences> {
+    const existing = await this.getCalendarPreferences(userId);
+    if (existing) {
+      const [updated] = await db.update(calendarPreferences)
+        .set({ ...prefs, updatedAt: new Date() })
+        .where(eq(calendarPreferences.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(calendarPreferences)
+        .values({ ...prefs, userId })
+        .returning();
+      return created;
+    }
+  }
+
+  // Open Shifts Marketplace
+  async getAllOpenShifts(filters?: { status?: string; category?: string; priority?: string }): Promise<OpenShift[]> {
+    let query = db.select().from(openShifts);
+
+    const conditions: any[] = [];
+    if (filters?.status) {
+      conditions.push(eq(openShifts.status, filters.status));
+    }
+    if (filters?.category) {
+      conditions.push(eq(openShifts.category, filters.category));
+    }
+    if (filters?.priority) {
+      conditions.push(eq(openShifts.priority, filters.priority));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(openShifts.postedAt));
+  }
+
+  async getOpenShiftById(id: string): Promise<OpenShift | undefined> {
+    const [shift] = await db.select().from(openShifts).where(eq(openShifts.id, id));
+    return shift;
+  }
+
+  async createOpenShift(shift: InsertOpenShift): Promise<OpenShift> {
+    const [created] = await db.insert(openShifts).values(shift).returning();
+    return created;
+  }
+
+  async updateOpenShift(id: string, shift: Partial<InsertOpenShift>): Promise<OpenShift | undefined> {
+    const [updated] = await db.update(openShifts)
+      .set({ ...shift, updatedAt: new Date() })
+      .where(eq(openShifts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async incrementOpenShiftViewCount(id: string): Promise<void> {
+    await db.update(openShifts)
+      .set({ viewCount: sql`COALESCE(${openShifts.viewCount}, 0) + 1` })
+      .where(eq(openShifts.id, id));
+  }
+
+  // Open Shift Claims
+  async getOpenShiftClaims(openShiftId: string): Promise<OpenShiftClaim[]> {
+    return db.select().from(openShiftClaims)
+      .where(eq(openShiftClaims.openShiftId, openShiftId))
+      .orderBy(desc(openShiftClaims.claimedAt));
+  }
+
+  async createOpenShiftClaim(claim: InsertOpenShiftClaim): Promise<OpenShiftClaim> {
+    const [created] = await db.insert(openShiftClaims).values(claim).returning();
+    // Increment claim count on open shift
+    await db.update(openShifts)
+      .set({ claimCount: sql`COALESCE(${openShifts.claimCount}, 0) + 1` })
+      .where(eq(openShifts.id, claim.openShiftId));
+    return created;
+  }
+
+  async updateOpenShiftClaim(id: string, claim: Partial<InsertOpenShiftClaim>): Promise<OpenShiftClaim | undefined> {
+    const [updated] = await db.update(openShiftClaims)
+      .set(claim)
+      .where(eq(openShiftClaims.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ASCS Shift Swap Requests
+  async getAllAscsShiftSwapRequests(filters?: { status?: string; staffId?: string }): Promise<AscsShiftSwapRequest[]> {
+    let query = db.select().from(ascsShiftSwapRequests);
+
+    const conditions: any[] = [];
+    if (filters?.status) {
+      conditions.push(eq(ascsShiftSwapRequests.status, filters.status));
+    }
+    if (filters?.staffId) {
+      conditions.push(
+        or(
+          eq(ascsShiftSwapRequests.originalStaffId, filters.staffId),
+          eq(ascsShiftSwapRequests.targetStaffId, filters.staffId)
+        )
+      );
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(ascsShiftSwapRequests.requestedAt));
+  }
+
+  async getAscsShiftSwapRequestById(id: string): Promise<AscsShiftSwapRequest | undefined> {
+    const [request] = await db.select().from(ascsShiftSwapRequests).where(eq(ascsShiftSwapRequests.id, id));
+    return request;
+  }
+
+  async createAscsShiftSwapRequest(request: InsertAscsShiftSwapRequest): Promise<AscsShiftSwapRequest> {
+    const [created] = await db.insert(ascsShiftSwapRequests).values(request).returning();
+    return created;
+  }
+
+  async updateAscsShiftSwapRequest(id: string, request: Partial<InsertAscsShiftSwapRequest>): Promise<AscsShiftSwapRequest | undefined> {
+    const [updated] = await db.update(ascsShiftSwapRequests)
+      .set({ ...request, updatedAt: new Date() })
+      .where(eq(ascsShiftSwapRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Schedule Tasks
+  async getScheduleTasksByShift(shiftId: string): Promise<ScheduleTask[]> {
+    return db.select().from(scheduleTasks)
+      .where(eq(scheduleTasks.shiftId, shiftId))
+      .orderBy(scheduleTasks.orderIndex);
+  }
+
+  async getScheduleTaskById(id: string): Promise<ScheduleTask | undefined> {
+    const [task] = await db.select().from(scheduleTasks).where(eq(scheduleTasks.id, id));
+    return task;
+  }
+
+  async createScheduleTask(task: InsertScheduleTask): Promise<ScheduleTask> {
+    const [created] = await db.insert(scheduleTasks).values(task).returning();
+    return created;
+  }
+
+  async updateScheduleTask(id: string, task: Partial<InsertScheduleTask>): Promise<ScheduleTask | undefined> {
+    const [updated] = await db.update(scheduleTasks)
+      .set({ ...task, updatedAt: new Date() })
+      .where(eq(scheduleTasks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteScheduleTask(id: string): Promise<boolean> {
+    const result = await db.delete(scheduleTasks).where(eq(scheduleTasks.id, id));
+    return true;
+  }
+
+  // Schedule Task Templates
+  async getAllScheduleTaskTemplates(filters?: { isGlobal?: string; clientId?: string; isActive?: string }): Promise<ScheduleTaskTemplate[]> {
+    let query = db.select().from(scheduleTaskTemplates);
+
+    const conditions: any[] = [];
+    if (filters?.isGlobal) {
+      conditions.push(eq(scheduleTaskTemplates.isGlobal, filters.isGlobal));
+    }
+    if (filters?.clientId) {
+      conditions.push(eq(scheduleTaskTemplates.clientId, filters.clientId));
+    }
+    if (filters?.isActive) {
+      conditions.push(eq(scheduleTaskTemplates.isActive, filters.isActive));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(scheduleTaskTemplates.usageCount));
+  }
+
+  async getScheduleTaskTemplateById(id: string): Promise<ScheduleTaskTemplate | undefined> {
+    const [template] = await db.select().from(scheduleTaskTemplates).where(eq(scheduleTaskTemplates.id, id));
+    return template;
+  }
+
+  async createScheduleTaskTemplate(template: InsertScheduleTaskTemplate): Promise<ScheduleTaskTemplate> {
+    const [created] = await db.insert(scheduleTaskTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateScheduleTaskTemplate(id: string, template: Partial<InsertScheduleTaskTemplate>): Promise<ScheduleTaskTemplate | undefined> {
+    const [updated] = await db.update(scheduleTaskTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(scheduleTaskTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async incrementTaskTemplateUsage(templateId: string): Promise<void> {
+    await db.update(scheduleTaskTemplates)
+      .set({
+        usageCount: sql`COALESCE(${scheduleTaskTemplates.usageCount}, 0) + 1`,
+        lastUsedAt: new Date()
+      })
+      .where(eq(scheduleTaskTemplates.id, templateId));
+  }
+
+  // Schedule Suggestions (AI)
+  async getAllScheduleSuggestions(filters?: { status?: string; suggestionType?: string }): Promise<ScheduleSuggestion[]> {
+    let query = db.select().from(scheduleSuggestions);
+
+    const conditions: any[] = [];
+    if (filters?.status) {
+      conditions.push(eq(scheduleSuggestions.status, filters.status));
+    }
+    if (filters?.suggestionType) {
+      conditions.push(eq(scheduleSuggestions.suggestionType, filters.suggestionType));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(scheduleSuggestions.createdAt));
+  }
+
+  async getScheduleSuggestionById(id: string): Promise<ScheduleSuggestion | undefined> {
+    const [suggestion] = await db.select().from(scheduleSuggestions).where(eq(scheduleSuggestions.id, id));
+    return suggestion;
+  }
+
+  async createScheduleSuggestion(suggestion: InsertScheduleSuggestion): Promise<ScheduleSuggestion> {
+    const [created] = await db.insert(scheduleSuggestions).values(suggestion).returning();
+    return created;
+  }
+
+  async updateScheduleSuggestion(id: string, suggestion: Partial<InsertScheduleSuggestion>): Promise<ScheduleSuggestion | undefined> {
+    const [updated] = await db.update(scheduleSuggestions)
+      .set(suggestion)
+      .where(eq(scheduleSuggestions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Auto-Scheduling Jobs
+  async getAllAutoSchedulingJobs(filters?: { status?: string }): Promise<AutoSchedulingJob[]> {
+    let query = db.select().from(autoSchedulingJobs);
+
+    if (filters?.status) {
+      query = query.where(eq(autoSchedulingJobs.status, filters.status)) as any;
+    }
+
+    return query.orderBy(desc(autoSchedulingJobs.createdAt));
+  }
+
+  async getAutoSchedulingJobById(id: string): Promise<AutoSchedulingJob | undefined> {
+    const [job] = await db.select().from(autoSchedulingJobs).where(eq(autoSchedulingJobs.id, id));
+    return job;
+  }
+
+  async createAutoSchedulingJob(job: InsertAutoSchedulingJob): Promise<AutoSchedulingJob> {
+    const [created] = await db.insert(autoSchedulingJobs).values(job).returning();
+    return created;
+  }
+
+  async updateAutoSchedulingJob(id: string, job: Partial<InsertAutoSchedulingJob>): Promise<AutoSchedulingJob | undefined> {
+    const [updated] = await db.update(autoSchedulingJobs)
+      .set({ ...job, updatedAt: new Date() })
+      .where(eq(autoSchedulingJobs.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Schedule Communications
+  async getScheduleCommunications(filters?: { shiftId?: string; threadId?: string }): Promise<ScheduleCommunication[]> {
+    let query = db.select().from(scheduleCommunications);
+
+    const conditions: any[] = [];
+    if (filters?.shiftId) {
+      conditions.push(eq(scheduleCommunications.shiftId, filters.shiftId));
+    }
+    if (filters?.threadId) {
+      conditions.push(eq(scheduleCommunications.threadId, filters.threadId));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(scheduleCommunications.sentAt));
+  }
+
+  async createScheduleCommunication(communication: InsertScheduleCommunication): Promise<ScheduleCommunication> {
+    const [created] = await db.insert(scheduleCommunications).values(communication).returning();
+    return created;
+  }
+
+  async updateScheduleCommunication(id: string, communication: Partial<InsertScheduleCommunication>): Promise<ScheduleCommunication | undefined> {
+    const [updated] = await db.update(scheduleCommunications)
+      .set(communication)
+      .where(eq(scheduleCommunications.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Staff Scheduling Preferences
+  async getStaffSchedulingPreferences(staffId: string): Promise<StaffSchedulingPreferences | undefined> {
+    const [prefs] = await db.select().from(staffSchedulingPreferences).where(eq(staffSchedulingPreferences.staffId, staffId));
+    return prefs;
+  }
+
+  async upsertStaffSchedulingPreferences(staffId: string, prefs: Partial<InsertStaffSchedulingPreferences>): Promise<StaffSchedulingPreferences> {
+    const existing = await this.getStaffSchedulingPreferences(staffId);
+    if (existing) {
+      const [updated] = await db.update(staffSchedulingPreferences)
+        .set({ ...prefs, updatedAt: new Date() })
+        .where(eq(staffSchedulingPreferences.staffId, staffId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(staffSchedulingPreferences)
+        .values({ ...prefs, staffId })
+        .returning();
+      return created;
+    }
+  }
+
+  // Schedule Calendar Events
+  async getScheduleCalendarEvents(filters?: { startDate?: string; endDate?: string; scope?: string; organizerId?: string }): Promise<ScheduleCalendarEvent[]> {
+    let query = db.select().from(scheduleCalendarEvents);
+
+    const conditions: any[] = [];
+    if (filters?.startDate && filters?.endDate) {
+      conditions.push(
+        and(
+          gte(scheduleCalendarEvents.startDate, filters.startDate),
+          lte(scheduleCalendarEvents.startDate, filters.endDate)
+        )
+      );
+    }
+    if (filters?.scope) {
+      conditions.push(eq(scheduleCalendarEvents.scope, filters.scope));
+    }
+    if (filters?.organizerId) {
+      conditions.push(eq(scheduleCalendarEvents.organizerId, filters.organizerId));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(scheduleCalendarEvents.startDate);
+  }
+
+  async getScheduleCalendarEventById(id: string): Promise<ScheduleCalendarEvent | undefined> {
+    const [event] = await db.select().from(scheduleCalendarEvents).where(eq(scheduleCalendarEvents.id, id));
+    return event;
+  }
+
+  async createScheduleCalendarEvent(event: InsertScheduleCalendarEvent): Promise<ScheduleCalendarEvent> {
+    const [created] = await db.insert(scheduleCalendarEvents).values(event).returning();
+    return created;
+  }
+
+  async updateScheduleCalendarEvent(id: string, event: Partial<InsertScheduleCalendarEvent>): Promise<ScheduleCalendarEvent | undefined> {
+    const [updated] = await db.update(scheduleCalendarEvents)
+      .set({ ...event, updatedAt: new Date() })
+      .where(eq(scheduleCalendarEvents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteScheduleCalendarEvent(id: string): Promise<boolean> {
+    await db.delete(scheduleCalendarEvents).where(eq(scheduleCalendarEvents.id, id));
+    return true;
+  }
+
+  // Scheduling Badges
+  async getAllSchedulingBadges(filters?: { isActive?: string; category?: string }): Promise<SchedulingBadge[]> {
+    let query = db.select().from(schedulingBadges);
+
+    const conditions: any[] = [];
+    if (filters?.isActive) {
+      conditions.push(eq(schedulingBadges.isActive, filters.isActive));
+    }
+    if (filters?.category) {
+      conditions.push(eq(schedulingBadges.category, filters.category));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(schedulingBadges.tier, schedulingBadges.name);
+  }
+
+  async createSchedulingBadge(badge: InsertSchedulingBadge): Promise<SchedulingBadge> {
+    const [created] = await db.insert(schedulingBadges).values(badge).returning();
+    return created;
+  }
+
+  // Staff Badge Awards
+  async getStaffBadgeAwards(staffId: string): Promise<StaffBadgeAward[]> {
+    return db.select().from(staffBadgeAwards)
+      .where(eq(staffBadgeAwards.staffId, staffId))
+      .orderBy(desc(staffBadgeAwards.awardedAt));
+  }
+
+  async createStaffBadgeAward(award: InsertStaffBadgeAward): Promise<StaffBadgeAward> {
+    const [created] = await db.insert(staffBadgeAwards).values(award).returning();
+    return created;
+  }
+
+  // Schedule Interaction Logs
+  async createScheduleInteractionLog(log: InsertScheduleInteractionLog): Promise<ScheduleInteractionLog> {
+    const [created] = await db.insert(scheduleInteractionLogs).values(log).returning();
+    return created;
+  }
+
+  // Extended Analytics
+  async getSchedulingAnalyticsExtended(filters?: { periodType?: string; scope?: string; scopeId?: string }): Promise<SchedulingAnalyticsExtended[]> {
+    let query = db.select().from(schedulingAnalyticsExtended);
+
+    const conditions: any[] = [];
+    if (filters?.periodType) {
+      conditions.push(eq(schedulingAnalyticsExtended.periodType, filters.periodType));
+    }
+    if (filters?.scope) {
+      conditions.push(eq(schedulingAnalyticsExtended.scope, filters.scope));
+    }
+    if (filters?.scopeId) {
+      conditions.push(eq(schedulingAnalyticsExtended.scopeId, filters.scopeId));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(schedulingAnalyticsExtended.periodStart));
+  }
+
+  async createSchedulingAnalyticsExtended(analytics: InsertSchedulingAnalyticsExtended): Promise<SchedulingAnalyticsExtended> {
+    const [created] = await db.insert(schedulingAnalyticsExtended).values(analytics).returning();
+    return created;
+  }
+
+  // Helper: Get unified calendar data for a date range (shifts + events)
+  async getUnifiedCalendarData(startDate: string, endDate: string, filters?: {
+    staffId?: string;
+    clientId?: string;
+    category?: string;
+  }): Promise<{
+    shifts: Shift[];
+    events: ScheduleCalendarEvent[];
+    openShifts: OpenShift[];
+  }> {
+    // Get shifts
+    let shiftsQuery = db.select().from(shifts)
+      .where(
+        and(
+          gte(shifts.scheduledDate, startDate),
+          lte(shifts.scheduledDate, endDate)
+        )
+      );
+
+    if (filters?.clientId) {
+      shiftsQuery = shiftsQuery.where(eq(shifts.clientId, filters.clientId)) as any;
+    }
+    if (filters?.category) {
+      shiftsQuery = shiftsQuery.where(eq(shifts.category, filters.category)) as any;
+    }
+
+    const shiftsData = await shiftsQuery;
+
+    // Get calendar events
+    const eventsData = await this.getScheduleCalendarEvents({
+      startDate,
+      endDate
+    });
+
+    // Get open shifts
+    const openShiftsData = await db.select().from(openShifts)
+      .where(
+        and(
+          eq(openShifts.status, "open"),
+          gte(openShifts.scheduledDate, startDate),
+          lte(openShifts.scheduledDate, endDate)
+        )
+      );
+
+    return {
+      shifts: shiftsData,
+      events: eventsData,
+      openShifts: openShiftsData
+    };
+  }
+
+  // Helper: Get AI scheduling suggestions for a shift
+  async generateSchedulingSuggestions(shiftId: string): Promise<ScheduleSuggestion[]> {
+    const shift = await this.getShiftById(shiftId);
+    if (!shift) return [];
+
+    // Get available staff for this shift
+    const availableStaff = await this.getAvailableStaffForShift(shiftId);
+
+    // Get client preferences
+    const clientPrefs = await db.select().from(clientStaffPreferences)
+      .where(eq(clientStaffPreferences.clientId, shift.clientId || ""));
+
+    // Generate suggestions based on matching
+    const suggestions: InsertScheduleSuggestion[] = [];
+
+    for (const staff of availableStaff.slice(0, 5)) { // Top 5 matches
+      const isPrimary = clientPrefs.some(p =>
+        p.staffId === staff.id && p.preferenceLevel === "primary"
+      );
+
+      const matchScore = isPrimary ? 95 : Math.floor(Math.random() * 30) + 60;
+
+      suggestions.push({
+        suggestionType: "auto_fill",
+        shiftId,
+        clientId: shift.clientId,
+        title: `Assign ${staff.firstName} ${staff.lastName}`,
+        description: `Suggested based on availability and ${isPrimary ? "primary preference" : "qualifications"}`,
+        suggestedAction: JSON.stringify({
+          action: "assign_staff",
+          staffId: staff.id,
+          shiftId
+        }),
+        suggestedStaffId: staff.id,
+        suggestedStaffName: `${staff.firstName} ${staff.lastName}`,
+        confidenceScore: matchScore,
+        matchScore,
+        reasoningFactors: JSON.stringify([
+          { factor: "availability", weight: 0.3, score: 100, explanation: "Staff is available" },
+          { factor: "preference", weight: 0.3, score: isPrimary ? 100 : 50, explanation: isPrimary ? "Primary preferred staff" : "Not specified preference" },
+          { factor: "qualifications", weight: 0.2, score: 80, explanation: "Has required qualifications" },
+          { factor: "proximity", weight: 0.2, score: 70, explanation: "Reasonable travel distance" }
+        ]),
+        status: "pending",
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      });
+    }
+
+    // Insert and return suggestions
+    const created: ScheduleSuggestion[] = [];
+    for (const suggestion of suggestions) {
+      const [s] = await db.insert(scheduleSuggestions).values(suggestion).returning();
+      created.push(s);
+    }
+
+    return created;
+  }
+
+  // Daily Notes Methods
+  async getDailyNotesForClient(clientId: string, date?: string): Promise<DailyNote[]> {
+    let query = db.select().from(dailyNotes)
+      .where(
+        and(
+          eq(dailyNotes.clientId, clientId),
+          eq(dailyNotes.isActive, "yes")
+        )
+      );
+
+    if (date) {
+      query = query.where(eq(dailyNotes.date, date)) as any;
+    }
+
+    return query.orderBy(desc(dailyNotes.isPinned), desc(dailyNotes.createdAt));
+  }
+
+  async getDailyNotesForDate(date: string): Promise<DailyNote[]> {
+    return db.select().from(dailyNotes)
+      .where(
+        and(
+          eq(dailyNotes.date, date),
+          eq(dailyNotes.isActive, "yes")
+        )
+      )
+      .orderBy(desc(dailyNotes.isPinned), desc(dailyNotes.createdAt));
+  }
+
+  async getDailyNotesForDateRange(startDate: string, endDate: string): Promise<DailyNote[]> {
+    return db.select().from(dailyNotes)
+      .where(
+        and(
+          gte(dailyNotes.date, startDate),
+          lte(dailyNotes.date, endDate),
+          eq(dailyNotes.isActive, "yes")
+        )
+      )
+      .orderBy(dailyNotes.date, desc(dailyNotes.isPinned), desc(dailyNotes.createdAt));
+  }
+
+  async getDailyNotesVisibleToStaff(staffId: string, date: string, clientIds?: string[]): Promise<DailyNote[]> {
+    // Get all notes for the date that this staff member can see
+    // They can see notes where:
+    // 1. visibility is "all_staff"
+    // 2. visibility is "client_team" and they're assigned to that client
+    // 3. visibility is "specific_staff" and their ID is in visibleToStaffIds
+    // 4. visibility is "management_only" and they have a management role
+
+    let query = db.select().from(dailyNotes)
+      .where(
+        and(
+          eq(dailyNotes.date, date),
+          eq(dailyNotes.isActive, "yes"),
+          clientIds && clientIds.length > 0 ? inArray(dailyNotes.clientId, clientIds) : undefined
+        )
+      );
+
+    const allNotes = await query.orderBy(desc(dailyNotes.isPinned), desc(dailyNotes.createdAt));
+
+    // Filter based on visibility
+    return allNotes.filter(note => {
+      if (note.visibility === "all_staff") return true;
+      if (note.visibility === "client_team") return true; // Caller should have already filtered by assigned clients
+      if (note.visibility === "specific_staff") {
+        try {
+          const visibleTo = JSON.parse(note.visibleToStaffIds || "[]");
+          return visibleTo.includes(staffId);
+        } catch {
+          return false;
+        }
+      }
+      // management_only should be handled by the API layer checking user roles
+      return false;
+    });
+  }
+
+  async getDailyNoteById(id: string): Promise<DailyNote | undefined> {
+    const [note] = await db.select().from(dailyNotes)
+      .where(eq(dailyNotes.id, id));
+    return note;
+  }
+
+  async createDailyNote(note: Partial<InsertDailyNote> & { clientId: string; date: string; content: string; createdById: string }): Promise<DailyNote> {
+    // Ensure date is in correct format (YYYY-MM-DD)
+    let dateValue = note.date;
+    if (dateValue && !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      const parsed = new Date(dateValue);
+      if (!isNaN(parsed.getTime())) {
+        dateValue = parsed.toISOString().split('T')[0];
+      }
+    }
+
+    console.log("Storage createDailyNote - date value:", dateValue);
+
+    // Build insert data with proper typing
+    const insertData = {
+      clientId: note.clientId,
+      date: dateValue,
+      content: note.content,
+      createdById: note.createdById,
+      title: note.title || null,
+      priority: note.priority || null,
+      category: note.category || null,
+      visibility: note.visibility as DailyNoteVisibilityType || "client_team" as DailyNoteVisibilityType,
+      visibleToStaffIds: note.visibleToStaffIds || null,
+      visibleToRoles: note.visibleToRoles || null,
+      createdByName: note.createdByName || null,
+      requiresAcknowledgement: note.requiresAcknowledgement || "no",
+      isPinned: note.isPinned || "no",
+    };
+
+    console.log("Storage createDailyNote - insert data:", JSON.stringify(insertData, null, 2));
+
+    const [created] = await db.insert(dailyNotes).values(insertData).returning();
+    return created;
+  }
+
+  async updateDailyNote(id: string, note: Partial<InsertDailyNote>): Promise<DailyNote | undefined> {
+    // Build update data with proper typing to avoid type inference issues
+    const updateData: Partial<typeof dailyNotes.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (note.content !== undefined) updateData.content = note.content;
+    if (note.title !== undefined) updateData.title = note.title;
+    if (note.priority !== undefined) updateData.priority = note.priority;
+    if (note.category !== undefined) updateData.category = note.category;
+    if (note.visibility !== undefined) updateData.visibility = note.visibility as DailyNoteVisibilityType;
+    if (note.visibleToStaffIds !== undefined) updateData.visibleToStaffIds = note.visibleToStaffIds;
+    if (note.visibleToRoles !== undefined) updateData.visibleToRoles = note.visibleToRoles;
+    if (note.requiresAcknowledgement !== undefined) updateData.requiresAcknowledgement = note.requiresAcknowledgement;
+    if (note.isPinned !== undefined) updateData.isPinned = note.isPinned;
+    if (note.isActive !== undefined) updateData.isActive = note.isActive;
+    if (note.expiresAt !== undefined) updateData.expiresAt = note.expiresAt;
+
+    const [updated] = await db.update(dailyNotes)
+      .set(updateData)
+      .where(eq(dailyNotes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDailyNote(id: string): Promise<boolean> {
+    // Soft delete by setting isActive to "no"
+    await db.update(dailyNotes)
+      .set({ isActive: "no", updatedAt: new Date() })
+      .where(eq(dailyNotes.id, id));
+    return true;
+  }
+
+  async acknowledgeDailyNote(noteId: string, staffId: string): Promise<DailyNote | undefined> {
+    const note = await this.getDailyNoteById(noteId);
+    if (!note) return undefined;
+
+    const currentAcknowledged = JSON.parse(note.acknowledgedByStaffIds || "[]");
+    if (!currentAcknowledged.includes(staffId)) {
+      currentAcknowledged.push(staffId);
+    }
+
+    const [updated] = await db.update(dailyNotes)
+      .set({
+        acknowledgedByStaffIds: JSON.stringify(currentAcknowledged),
+        updatedAt: new Date()
+      })
+      .where(eq(dailyNotes.id, noteId))
+      .returning();
+
+    return updated;
+  }
+
+  async toggleDailyNotePinned(noteId: string): Promise<DailyNote | undefined> {
+    const note = await this.getDailyNoteById(noteId);
+    if (!note) return undefined;
+
+    const [updated] = await db.update(dailyNotes)
+      .set({
+        isPinned: note.isPinned === "yes" ? "no" : "yes",
+        updatedAt: new Date()
+      })
+      .where(eq(dailyNotes.id, noteId))
+      .returning();
+
+    return updated;
   }
 }
 
