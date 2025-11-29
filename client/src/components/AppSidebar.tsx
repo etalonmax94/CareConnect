@@ -197,7 +197,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             data-testid="button-sidebar-toggle"
             className="absolute right-0 top-0 h-full w-2 bg-sidebar-accent/30 hover:bg-sidebar-accent/90 cursor-pointer transition-colors group flex items-center justify-center"
           >
-            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <ChevronRight className={cn("h-3 w-3 transition-transform", !isCollapsed ? "rotate-180" : "")} />
               <ChevronRight className={cn("h-3 w-3 transition-transform", !isCollapsed ? "rotate-180" : "")} />
               <ChevronRight className={cn("h-3 w-3 transition-transform", !isCollapsed ? "rotate-180" : "")} />

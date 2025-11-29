@@ -5247,6 +5247,74 @@ export class DbStorage implements IStorage {
       .where(eq(staffEmergencyContacts.staffId, staffId));
   }
 
+  // Staff Documents
+  async getStaffDocuments(staffId: string): Promise<StaffDocument[]> {
+    return await db.select()
+      .from(staffDocuments)
+      .where(eq(staffDocuments.staffId, staffId))
+      .orderBy(desc(staffDocuments.createdAt));
+  }
+
+  async getStaffDocumentById(id: string): Promise<StaffDocument | undefined> {
+    const result = await db.select()
+      .from(staffDocuments)
+      .where(eq(staffDocuments.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getStaffDocumentByType(staffId: string, documentType: StaffDocumentType): Promise<StaffDocument | undefined> {
+    const result = await db.select()
+      .from(staffDocuments)
+      .where(and(
+        eq(staffDocuments.staffId, staffId),
+        eq(staffDocuments.documentType, documentType)
+      ))
+      .orderBy(desc(staffDocuments.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async getAllPendingStaffDocuments(): Promise<StaffDocument[]> {
+    return await db.select()
+      .from(staffDocuments)
+      .where(eq(staffDocuments.status, "pending"))
+      .orderBy(desc(staffDocuments.createdAt));
+  }
+
+  async getAllExpiredStaffDocuments(): Promise<StaffDocument[]> {
+    const today = new Date().toISOString().split('T')[0];
+    return await db.select()
+      .from(staffDocuments)
+      .where(and(
+        eq(staffDocuments.status, "approved"),
+        lte(staffDocuments.expiryDate, today)
+      ))
+      .orderBy(desc(staffDocuments.expiryDate));
+  }
+
+  async createStaffDocument(document: InsertStaffDocument): Promise<StaffDocument> {
+    const result = await db.insert(staffDocuments)
+      .values(document)
+      .returning();
+    return result[0];
+  }
+
+  async updateStaffDocument(id: string, document: Partial<InsertStaffDocument>): Promise<StaffDocument | undefined> {
+    const result = await db.update(staffDocuments)
+      .set({ ...document, updatedAt: new Date() })
+      .where(eq(staffDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffDocument(id: string): Promise<boolean> {
+    const result = await db.delete(staffDocuments)
+      .where(eq(staffDocuments.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
   // Workforce Management - Staff Blacklist
   async getStaffBlacklist(staffId: string): Promise<StaffBlacklist[]> {
     return await db.select()

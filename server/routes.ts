@@ -12384,6 +12384,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // Staff Documents Management
+  // ============================================
+
+  // Get all documents for a staff member
+  app.get("/api/staff/:staffId/documents", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const documents = await storage.getStaffDocuments(staffId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching staff documents:", error);
+      res.status(500).json({ error: "Failed to fetch staff documents" });
+    }
+  });
+
+  // Get all pending documents (for admin review)
+  app.get("/api/staff/documents/pending", requireAuth, async (req: any, res) => {
+    try {
+      const documents = await storage.getAllPendingStaffDocuments();
+      // Enrich with staff names
+      const enrichedDocuments = await Promise.all(
+        documents.map(async (doc) => {
+          const staffMember = await storage.getStaffById(doc.staffId);
+          return {
+            ...doc,
+            staffName: staffMember?.name || "Unknown Staff",
+          };
+        })
+      );
+      res.json(enrichedDocuments);
+    } catch (error) {
+      console.error("Error fetching pending documents:", error);
+      res.status(500).json({ error: "Failed to fetch pending documents" });
+    }
+  });
+
+  // Get all expired documents (for admin review)
+  app.get("/api/staff/documents/expired", requireAuth, async (req: any, res) => {
+    try {
+      const documents = await storage.getAllExpiredStaffDocuments();
+      // Enrich with staff names
+      const enrichedDocuments = await Promise.all(
+        documents.map(async (doc) => {
+          const staffMember = await storage.getStaffById(doc.staffId);
+          return {
+            ...doc,
+            staffName: staffMember?.name || "Unknown Staff",
+          };
+        })
+      );
+      res.json(enrichedDocuments);
+    } catch (error) {
+      console.error("Error fetching expired documents:", error);
+      res.status(500).json({ error: "Failed to fetch expired documents" });
+    }
+  });
+
+  // Get single document by ID
+  app.get("/api/staff/documents/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const document = await storage.getStaffDocumentById(id);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json(document);
+    } catch (error) {
+      console.error("Error fetching staff document:", error);
+      res.status(500).json({ error: "Failed to fetch staff document" });
+    }
+  });
+
+  // Upload/create a new document
+  app.post("/api/staff/:staffId/documents", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const user = req.user;
+
+      const document = await storage.createStaffDocument({
+        ...req.body,
+        staffId,
+        status: "pending",
+        uploadedById: user?.id,
+        uploadedByName: user?.displayName || user?.email,
+      });
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error creating staff document:", error);
+      res.status(500).json({ error: "Failed to create staff document" });
+    }
+  });
+
+  // Update a document
+  app.patch("/api/staff/documents/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const document = await storage.updateStaffDocument(id, req.body);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json(document);
+    } catch (error) {
+      console.error("Error updating staff document:", error);
+      res.status(500).json({ error: "Failed to update staff document" });
+    }
+  });
+
+  // Approve a document (admin only)
+  app.patch("/api/staff/documents/:id/approve", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      const document = await storage.updateStaffDocument(id, {
+        status: "approved",
+        reviewedById: user?.id,
+        reviewedByName: user?.displayName || user?.email,
+        reviewedAt: new Date(),
+        rejectionReason: null,
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json(document);
+    } catch (error) {
+      console.error("Error approving staff document:", error);
+      res.status(500).json({ error: "Failed to approve staff document" });
+    }
+  });
+
+  // Reject a document (admin only)
+  app.patch("/api/staff/documents/:id/reject", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+      const { reason } = req.body;
+
+      const document = await storage.updateStaffDocument(id, {
+        status: "rejected",
+        reviewedById: user?.id,
+        reviewedByName: user?.displayName || user?.email,
+        reviewedAt: new Date(),
+        rejectionReason: reason || "No reason provided",
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json(document);
+    } catch (error) {
+      console.error("Error rejecting staff document:", error);
+      res.status(500).json({ error: "Failed to reject staff document" });
+    }
+  });
+
+  // Delete a document
+  app.delete("/api/staff/documents/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteStaffDocument(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting staff document:", error);
+      res.status(500).json({ error: "Failed to delete staff document" });
+    }
+  });
+
+  // ============================================
   // Workforce Management - Staff Blacklist
   // ============================================
 
