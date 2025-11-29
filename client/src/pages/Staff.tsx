@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Phone, Mail, User, Loader2, ChevronDown, ChevronRight, Pencil, Trash2, Award, AlertCircle, Edit, X } from "lucide-react";
-import { useSearch } from "wouter";
+import { Plus, Phone, Mail, User, Loader2, ChevronDown, ChevronRight, Pencil, Trash2, Award, AlertCircle, Edit, X, ExternalLink } from "lucide-react";
+import { useSearch, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -355,7 +355,9 @@ export default function StaffPage() {
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold truncate">{staff.name}</h3>
+                              <Link href={`/staff/${staff.id}`} onClick={(e) => e.stopPropagation()}>
+                                <h3 className="font-semibold truncate hover:text-primary hover:underline cursor-pointer">{staff.name}</h3>
+                              </Link>
                               {staff.role && (
                                 <Badge variant="secondary" className="text-xs">
                                   {staff.role === 'support_worker' ? 'Support Worker' :
@@ -412,6 +414,17 @@ export default function StaffPage() {
 
                         {/* Action buttons */}
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          <Link href={`/staff/${staff.id}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => e.stopPropagation()}
+                              className="gap-1.5"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">View Profile</span>
+                            </Button>
+                          </Link>
                           <Button
                             variant="ghost"
                             size="icon"

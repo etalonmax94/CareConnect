@@ -195,7 +195,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <button
             onClick={() => toggleSidebar()}
             data-testid="button-sidebar-toggle"
-            className="absolute right-0 top-0 h-full w-2 bg-sidebar-accent/30 hover:bg-sidebar-accent/70 cursor-pointer transition-colors group flex items-center justify-center"
+            className="absolute right-0 top-0 h-full w-2 bg-sidebar-accent/30 hover:bg-sidebar-accent/90 cursor-pointer transition-colors group flex items-center justify-center"
           >
             <ChevronRight className={cn("h-4 w-4 transition-transform opacity-0 group-hover:opacity-100", isCollapsed ? "rotate-180" : "")} />
           </button>

@@ -79,6 +79,7 @@ function ProtectedRouter() {
       <Route path="/clients/:id/edit" component={EditClient} />
       <Route path="/clients/:id" component={ClientProfile} />
       <Route path="/staff" component={Staff} />
+      <Route path="/staff/:id" component={StaffProfile} />
       <Route path="/org-chart" component={OrgChart} />
       <Route path="/care-team" component={CareTeam} />
       <Route path="/support-coordinators" component={SupportCoordinators} />

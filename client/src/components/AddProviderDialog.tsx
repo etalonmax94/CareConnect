@@ -171,7 +171,7 @@ const providerConfig = {
     description: "Add a new staff member to your team",
     endpoint: "/api/staff",
     queryKey: "/api/staff",
-    fields: ["name", "role", "email", "phoneNumber", "isActive"],
+    fields: ["name", "role", "email", "phoneNumber", "isActive", "employmentType", "department", "employmentStartDate"],
     requiredFields: ["name"],
     labels: {
       name: "Full Name",
@@ -179,6 +179,9 @@ const providerConfig = {
       email: "Email",
       phoneNumber: "Phone Number",
       isActive: "Status",
+      employmentType: "Employment Type",
+      department: "Department",
+      employmentStartDate: "Start Date",
     },
     placeholders: {
       name: "John Smith",
@@ -190,6 +193,19 @@ const providerConfig = {
       { value: "nurse", label: "Nurse" },
       { value: "care_manager", label: "Care Manager" },
       { value: "admin", label: "Admin" },
+    ],
+    employmentTypes: [
+      { value: "full_time", label: "Full Time" },
+      { value: "part_time", label: "Part Time" },
+      { value: "casual", label: "Casual" },
+      { value: "contractor", label: "Contractor" },
+    ],
+    departments: [
+      { value: "nursing", label: "Nursing" },
+      { value: "support_work", label: "Support Work" },
+      { value: "management", label: "Management" },
+      { value: "administration", label: "Administration" },
+      { value: "clinical", label: "Clinical" },
     ],
   },
 };
