@@ -3270,3 +3270,60 @@ export const insertChatAuditLogSchema = createInsertSchema(chatAuditLogs, {
 
 export type InsertChatAuditLog = z.infer<typeof insertChatAuditLogSchema>;
 export type ChatAuditLog = typeof chatAuditLogs.$inferSelect;
+
+// Chat Message Reactions
+export type ChatReactionEmoji = "heart" | "thumbs_up" | "thumbs_down" | "diamond" | "party";
+
+export const chatMessageReactions = pgTable("chat_message_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  messageId: varchar("message_id").notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  roomId: varchar("room_id").notNull().references(() => chatRooms.id, { onDelete: "cascade" }),
+  
+  // Reactor info
+  staffId: varchar("staff_id").notNull(),
+  staffName: text("staff_name").notNull(),
+  
+  // Reaction type
+  emoji: text("emoji").$type<ChatReactionEmoji>().notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  // Prevent duplicate reactions of the same emoji by same user on same message
+  uniqueReaction: sql`UNIQUE(message_id, staff_id, emoji)`,
+}));
+
+export const insertChatMessageReactionSchema = createInsertSchema(chatMessageReactions, {
+  emoji: z.enum(["heart", "thumbs_up", "thumbs_down", "diamond", "party"]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatMessageReaction = z.infer<typeof insertChatMessageReactionSchema>;
+export type ChatMessageReaction = typeof chatMessageReactions.$inferSelect;
+
+// Chat Message Read Receipts - per-message tracking of who has read
+export const chatMessageReads = pgTable("chat_message_reads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  messageId: varchar("message_id").notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  roomId: varchar("room_id").notNull().references(() => chatRooms.id, { onDelete: "cascade" }),
+  
+  // Reader info
+  staffId: varchar("staff_id").notNull(),
+  staffName: text("staff_name").notNull(),
+  
+  readAt: timestamp("read_at").defaultNow().notNull(),
+}, (table) => ({
+  // Prevent duplicate read entries
+  uniqueRead: sql`UNIQUE(message_id, staff_id)`,
+}));
+
+export const insertChatMessageReadSchema = createInsertSchema(chatMessageReads).omit({
+  id: true,
+  readAt: true,
+});
+
+export type InsertChatMessageRead = z.infer<typeof insertChatMessageReadSchema>;
+export type ChatMessageRead = typeof chatMessageReads.$inferSelect;

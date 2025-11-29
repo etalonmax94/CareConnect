@@ -25,6 +25,7 @@ import {
   tasks, taskComments, taskChecklists,
   // Chat
   chatRooms, chatRoomParticipants, chatMessages, chatMessageAttachments, chatAuditLogs,
+  chatMessageReactions, chatMessageReads,
   // Scheduling Conflicts
   schedulingConflicts,
   computeFullName,
@@ -95,6 +96,8 @@ import {
   type InsertChatMessage, type ChatMessage,
   type InsertChatMessageAttachment, type ChatMessageAttachment,
   type InsertChatAuditLog, type ChatAuditLog,
+  type InsertChatMessageReaction, type ChatMessageReaction,
+  type InsertChatMessageRead, type ChatMessageRead,
   // Scheduling Conflicts types
   type InsertSchedulingConflict, type SchedulingConflict,
   type SchedulingConflictType, type ConflictSeverity, type ConflictStatus
@@ -669,6 +672,19 @@ export interface IStorage {
   // Chat Audit Logs
   createChatAuditLog(log: InsertChatAuditLog): Promise<ChatAuditLog>;
   getChatAuditLogs(roomId?: string, limit?: number): Promise<ChatAuditLog[]>;
+  
+  // Chat Message Reactions
+  getMessageReactions(messageId: string): Promise<ChatMessageReaction[]>;
+  getReactionsForMessages(messageIds: string[]): Promise<Record<string, ChatMessageReaction[]>>;
+  addReaction(reaction: InsertChatMessageReaction): Promise<ChatMessageReaction>;
+  removeReaction(messageId: string, staffId: string, emoji: string): Promise<boolean>;
+  getUserReactionOnMessage(messageId: string, staffId: string, emoji: string): Promise<ChatMessageReaction | undefined>;
+  
+  // Chat Message Read Receipts
+  getMessageReads(messageId: string): Promise<ChatMessageRead[]>;
+  getReadsForMessages(messageIds: string[]): Promise<Record<string, ChatMessageRead[]>>;
+  markMessageAsRead(read: InsertChatMessageRead): Promise<ChatMessageRead>;
+  markMessagesAsRead(roomId: string, messageIds: string[], staffId: string, staffName: string): Promise<number>;
   
   // Scheduling Conflicts
   getSchedulingConflicts(filters?: {
@@ -3958,6 +3974,131 @@ export class DbStorage implements IStorage {
     return await query
       .orderBy(desc(chatAuditLogs.createdAt))
       .limit(limit || 100);
+  }
+
+  // Chat Message Reactions
+  async getMessageReactions(messageId: string): Promise<ChatMessageReaction[]> {
+    return await db.select().from(chatMessageReactions)
+      .where(eq(chatMessageReactions.messageId, messageId))
+      .orderBy(chatMessageReactions.createdAt);
+  }
+
+  async getReactionsForMessages(messageIds: string[]): Promise<Record<string, ChatMessageReaction[]>> {
+    if (messageIds.length === 0) return {};
+    
+    const reactions = await db.select().from(chatMessageReactions)
+      .where(inArray(chatMessageReactions.messageId, messageIds))
+      .orderBy(chatMessageReactions.createdAt);
+    
+    const result: Record<string, ChatMessageReaction[]> = {};
+    for (const reaction of reactions) {
+      if (!result[reaction.messageId]) {
+        result[reaction.messageId] = [];
+      }
+      result[reaction.messageId].push(reaction);
+    }
+    return result;
+  }
+
+  async addReaction(reaction: InsertChatMessageReaction): Promise<ChatMessageReaction> {
+    // Use ON CONFLICT to handle duplicate reactions gracefully
+    const result = await db.insert(chatMessageReactions)
+      .values(reaction)
+      .onConflictDoNothing()
+      .returning();
+    
+    // If nothing was inserted (duplicate), fetch the existing one
+    if (result.length === 0) {
+      const existing = await this.getUserReactionOnMessage(reaction.messageId, reaction.staffId, reaction.emoji);
+      if (existing) return existing;
+      throw new Error("Failed to add reaction");
+    }
+    
+    return result[0];
+  }
+
+  async removeReaction(messageId: string, staffId: string, emoji: string): Promise<boolean> {
+    const result = await db.delete(chatMessageReactions)
+      .where(and(
+        eq(chatMessageReactions.messageId, messageId),
+        eq(chatMessageReactions.staffId, staffId),
+        eq(chatMessageReactions.emoji, emoji)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getUserReactionOnMessage(messageId: string, staffId: string, emoji: string): Promise<ChatMessageReaction | undefined> {
+    const result = await db.select().from(chatMessageReactions)
+      .where(and(
+        eq(chatMessageReactions.messageId, messageId),
+        eq(chatMessageReactions.staffId, staffId),
+        eq(chatMessageReactions.emoji, emoji)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  // Chat Message Read Receipts
+  async getMessageReads(messageId: string): Promise<ChatMessageRead[]> {
+    return await db.select().from(chatMessageReads)
+      .where(eq(chatMessageReads.messageId, messageId))
+      .orderBy(chatMessageReads.readAt);
+  }
+
+  async getReadsForMessages(messageIds: string[]): Promise<Record<string, ChatMessageRead[]>> {
+    if (messageIds.length === 0) return {};
+    
+    const reads = await db.select().from(chatMessageReads)
+      .where(inArray(chatMessageReads.messageId, messageIds))
+      .orderBy(chatMessageReads.readAt);
+    
+    const result: Record<string, ChatMessageRead[]> = {};
+    for (const read of reads) {
+      if (!result[read.messageId]) {
+        result[read.messageId] = [];
+      }
+      result[read.messageId].push(read);
+    }
+    return result;
+  }
+
+  async markMessageAsRead(read: InsertChatMessageRead): Promise<ChatMessageRead> {
+    const result = await db.insert(chatMessageReads)
+      .values(read)
+      .onConflictDoNothing()
+      .returning();
+    
+    if (result.length === 0) {
+      // Already read, fetch existing
+      const existing = await db.select().from(chatMessageReads)
+        .where(and(
+          eq(chatMessageReads.messageId, read.messageId),
+          eq(chatMessageReads.staffId, read.staffId)
+        ))
+        .limit(1);
+      if (existing[0]) return existing[0];
+      throw new Error("Failed to mark message as read");
+    }
+    
+    return result[0];
+  }
+
+  async markMessagesAsRead(roomId: string, messageIds: string[], staffId: string, staffName: string): Promise<number> {
+    if (messageIds.length === 0) return 0;
+    
+    let marked = 0;
+    for (const messageId of messageIds) {
+      try {
+        await db.insert(chatMessageReads)
+          .values({ messageId, roomId, staffId, staffName })
+          .onConflictDoNothing();
+        marked++;
+      } catch (error) {
+        // Ignore duplicate errors
+      }
+    }
+    return marked;
   }
 
   async createClientChatRoom(clientId: string, clientName: string, createdById: string, createdByName: string): Promise<ChatRoom> {
