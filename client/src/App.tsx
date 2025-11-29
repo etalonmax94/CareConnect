@@ -52,6 +52,7 @@ import NotificationBell from "@/components/NotificationBell";
 import QuickChatPanel from "@/components/QuickChatPanel";
 import HelpWidget from "@/components/HelpWidget";
 import { Loader2, ExternalLink, Calendar, Mail } from "lucide-react";
+import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 
 interface AuthResponse {
   authenticated: boolean;
@@ -157,7 +158,10 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
       <div className="flex h-screen w-full">
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between w-full px-4 py-2 border-b sticky top-0 bg-background z-50">
+          <header className="flex items-center justify-between w-full px-4 py-2 border-b sticky top-0 bg-background z-50 gap-4">
+            <div className="flex items-center gap-4 flex-shrink-0">
+              <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto" />
+            </div>
             <div className="flex-1 flex justify-center max-w-2xl mx-auto">
               <GlobalSearch />
             </div>

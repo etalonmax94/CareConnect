@@ -2948,11 +2948,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ] = await Promise.all([
         storage.getStaffEmergencyContacts(staffId),
         storage.getStaffQualifications(staffId),
-        storage.getStaffAvailabilityWindows(staffId),
-        storage.getStaffUnavailabilityPeriods(staffId),
+        storage.getAvailabilityByStaff(staffId),
+        storage.getUnavailabilityByStaff(staffId),
         storage.getCurrentStaffStatus(staffId),
         storage.getStaffBlacklist(staffId),
-        storage.getClientStaffAssignmentsByStaff(staffId),
+        storage.getAssignmentsByStaff(staffId),
         staffMember.supervisorId ? storage.getStaffById(staffMember.supervisorId) : null
       ]);
 

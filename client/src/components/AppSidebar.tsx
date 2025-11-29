@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck, ChevronRight } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -9,16 +9,13 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarHeader,
   SidebarFooter,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
 import { removeAuthToken } from "@/lib/auth";
-import logoImage from "@assets/EmpowerLink Word_1764064625503.png";
 import { cn } from "@/lib/utils";
 
 interface UserInfo {
@@ -95,7 +92,7 @@ const menuCategories: MenuCategory[] = [
 
 export function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile, toggleSidebar } = useSidebar();
   // On mobile, always show expanded menu with text labels (never collapsed icons-only view)
   const isCollapsed = isMobile ? false : state === "collapsed";
 
@@ -192,24 +189,25 @@ export function AppSidebar({ user }: AppSidebarProps) {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className={cn(
-        "border-b border-sidebar-border sticky top-0 z-40",
-        isCollapsed ? "p-2" : "p-4"
-      )}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex-1 flex items-center justify-center">
-            {isCollapsed ? (
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-bold text-sm">E</span>
-              </div>
-            ) : (
-              <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto" />
-            )}
-          </div>
-          <SidebarTrigger className="ml-auto" data-testid="button-sidebar-toggle" />
-        </div>
-      </SidebarHeader>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border relative">
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 transform -translate-x-1/2 z-50">
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-full bg-sidebar-accent hover:bg-sidebar-accent/80"
+              onClick={() => toggleSidebar()}
+              data-testid="button-sidebar-toggle"
+            >
+              <ChevronRight className={cn("h-4 w-4 transition-transform", isCollapsed ? "rotate-180" : "")} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="font-medium">
+            {isCollapsed ? "Expand" : "Collapse"}
+          </TooltipContent>
+        </Tooltip>
+      </div>
       
       <SidebarContent className={cn("pt-2 scrollbar-hidden !overflow-y-auto", isCollapsed ? "px-1" : "px-2")}>
         {!isCollapsed && user && (
