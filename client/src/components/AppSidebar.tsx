@@ -211,42 +211,56 @@ export function AppSidebar({ user }: AppSidebarProps) {
           </div>
         )}
         
-        {menuCategories.map((category) => (
-          <SidebarGroup key={category.label} className="py-1">
-            {!isCollapsed && (
-              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
-                {category.label}
-              </SidebarGroupLabel>
+        {menuCategories.map((category, index) => (
+          <div key={category.label}>
+            <SidebarGroup className="py-1">
+              {!isCollapsed && (
+                <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
+                  {category.label}
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-0.5">
+                  {category.items.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      {renderMenuItem(item)}
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+            {isCollapsed && index < menuCategories.length - 1 && (
+              <div className="my-1 px-2">
+                <div className="border-b border-sidebar-border/50"></div>
+              </div>
             )}
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-0.5">
-                {category.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    {renderMenuItem(item)}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          </div>
         ))}
         
         {adminItems.length > 0 && (
-          <SidebarGroup className="py-1">
-            {!isCollapsed && (
-              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
-                Admin
-              </SidebarGroupLabel>
+          <div>
+            {isCollapsed && (
+              <div className="my-1 px-2">
+                <div className="border-b border-sidebar-border/50"></div>
+              </div>
             )}
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-0.5">
-                {adminItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    {renderMenuItem(item)}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+            <SidebarGroup className="py-1">
+              {!isCollapsed && (
+                <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
+                  Admin
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-0.5">
+                  {adminItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      {renderMenuItem(item)}
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </div>
         )}
       </SidebarContent>
       
