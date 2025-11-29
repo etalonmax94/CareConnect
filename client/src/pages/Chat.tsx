@@ -303,7 +303,22 @@ export default function Chat() {
     }
   }, [messageReactions, currentUser?.id, addReactionMutation, removeReactionMutation]);
 
-  // Fetch read receipts for a message on hover
+  // Fetch read receipts for all displayed messages (batch) when messages change
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const ownMessageIds = messages
+      .filter(m => m.senderId === currentUser?.id && !m.isDeleted)
+      .map(m => m.id);
+    if (ownMessageIds.length === 0) return;
+    
+    apiRequest("POST", "/api/chat/messages/batch/reads", { messageIds: ownMessageIds })
+      .then(res => res.json())
+      .then((reads: Record<string, ChatMessageRead[]>) => {
+        setMessageReads(reads);
+      }).catch(console.error);
+  }, [messages, currentUser?.id]);
+
+  // Fetch read receipts for a message on hover (fallback for non-batched)
   const fetchMessageReads = useCallback(async (messageId: string) => {
     if (messageReads[messageId]) return; // Already fetched
     try {
@@ -407,11 +422,39 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Track which messages have been marked as read to avoid redundant API calls
+  const markedAsReadRef = useRef<Set<string>>(new Set());
+  
   useEffect(() => {
-    if (selectedRoomId && currentUser) {
+    if (selectedRoomId && currentUser && messages.length > 0) {
+      // Mark room as read (updates lastReadAt for participant)
       apiRequest("POST", `/api/chat/rooms/${selectedRoomId}/read`);
+      
+      // Mark individual messages as read for read receipts
+      // Only mark messages from other users that haven't been marked yet
+      const messagesToMark = messages
+        .filter(m => 
+          m.senderId !== currentUser.id && 
+          !m.isDeleted && 
+          !markedAsReadRef.current.has(m.id)
+        )
+        .map(m => m.id);
+      
+      if (messagesToMark.length > 0) {
+        apiRequest("POST", `/api/chat/rooms/${selectedRoomId}/messages/read`, { messageIds: messagesToMark })
+          .then(() => {
+            // Track successfully marked messages
+            messagesToMark.forEach(id => markedAsReadRef.current.add(id));
+          })
+          .catch(err => console.error("Failed to mark messages as read:", err));
+      }
     }
   }, [selectedRoomId, currentUser, messages]);
+  
+  // Reset marked-as-read tracking when room changes
+  useEffect(() => {
+    markedAsReadRef.current = new Set();
+  }, [selectedRoomId]);
 
   const sendTypingIndicator = useCallback((isTyping: boolean) => {
     if (wsRef.current?.readyState === WebSocket.OPEN && selectedRoomId) {
