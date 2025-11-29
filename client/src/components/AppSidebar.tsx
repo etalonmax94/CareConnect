@@ -190,24 +190,20 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border relative">
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 transform -translate-x-1/2 z-50">
-        <Tooltip delayDuration={0}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-full bg-sidebar-accent hover:bg-sidebar-accent/80"
-              onClick={() => toggleSidebar()}
-              data-testid="button-sidebar-toggle"
-            >
-              <ChevronRight className={cn("h-4 w-4 transition-transform", isCollapsed ? "rotate-180" : "")} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="font-medium">
-            {isCollapsed ? "Expand" : "Collapse"}
-          </TooltipContent>
-        </Tooltip>
-      </div>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => toggleSidebar()}
+            data-testid="button-sidebar-toggle"
+            className="absolute right-0 top-0 h-full w-1 bg-sidebar-accent/30 hover:bg-sidebar-accent/70 cursor-pointer transition-colors group flex items-center justify-center"
+          >
+            <ChevronRight className={cn("h-4 w-4 transition-transform opacity-0 group-hover:opacity-100", isCollapsed ? "rotate-180" : "")} />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="font-medium">
+          {isCollapsed ? "Expand" : "Collapse"}
+        </TooltipContent>
+      </Tooltip>
       
       <SidebarContent className={cn("pt-2 scrollbar-hidden !overflow-y-auto", isCollapsed ? "px-1" : "px-2")}>
         {!isCollapsed && user && (
