@@ -14,7 +14,6 @@ import {
   clients,
   budgets,
   staff,
-  publicHolidays,
   type TimesheetStatus,
   type ServiceType,
 } from '../../shared/schema.js';
@@ -64,16 +63,11 @@ export interface TimesheetSummary {
 
 /**
  * Check if a date is a public holiday
+ * TODO: Implement with public holidays table when available
  */
 async function isPublicHoliday(date: Date): Promise<boolean> {
-  const dateStr = date.toISOString().split('T')[0];
-  const holiday = await db
-    .select()
-    .from(publicHolidays)
-    .where(eq(publicHolidays.date, dateStr))
-    .limit(1);
-
-  return holiday.length > 0;
+  // For now, return false. This can be enhanced later with a public holidays table
+  return false;
 }
 
 /**

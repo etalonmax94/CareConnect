@@ -29,7 +29,7 @@ import {
   // Scheduling Conflicts
   schedulingConflicts,
   // Workforce Management
-  staffQualifications, staffBlacklist, timeClockRecords, timesheets, timesheetEntries, gpsComplianceLogs, publicHolidays, clientStaffRestrictions,
+  staffQualifications, staffBlacklist, timeClockRecords, timesheets, timesheetEntries, gpsComplianceLogs, clientStaffRestrictions,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -113,8 +113,7 @@ import {
   type InsertTimeClockRecord, type TimeClockRecord,
   type InsertTimesheet, type Timesheet,
   type InsertTimesheetEntry, type TimesheetEntry,
-  type InsertGpsComplianceLog, type GpsComplianceLog,
-  type InsertPublicHoliday, type PublicHoliday
+  type InsertGpsComplianceLog, type GpsComplianceLog
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -751,6 +750,47 @@ export interface IStorage {
   dismissSchedulingConflict(id: string, userId: string, userName: string, notes?: string): Promise<SchedulingConflict | undefined>;
   deleteSchedulingConflict(id: string): Promise<boolean>;
   autoResolveConflictsForAppointment(appointmentId: string): Promise<number>;
+
+  // Workforce Management - Staff Qualifications
+  getStaffQualifications(staffId: string): Promise<StaffQualification[]>;
+  getStaffQualificationById(id: string): Promise<StaffQualification | undefined>;
+  createStaffQualification(qualification: InsertStaffQualification): Promise<StaffQualification>;
+  updateStaffQualification(id: string, qualification: Partial<InsertStaffQualification>): Promise<StaffQualification | undefined>;
+  deleteStaffQualification(id: string): Promise<boolean>;
+
+  // Workforce Management - Staff Blacklist
+  getStaffBlacklist(staffId: string): Promise<StaffBlacklist[]>;
+  getAllActiveBlacklists(): Promise<StaffBlacklist[]>;
+  getStaffBlacklistById(id: string): Promise<StaffBlacklist | undefined>;
+  createStaffBlacklist(blacklist: InsertStaffBlacklist): Promise<StaffBlacklist>;
+  updateStaffBlacklist(id: string, blacklist: Partial<InsertStaffBlacklist>): Promise<StaffBlacklist | undefined>;
+  deleteStaffBlacklist(id: string): Promise<boolean>;
+
+  // Workforce Management - Time Clock
+  getTimeClockRecords(staffId: string, startDate?: Date, endDate?: Date): Promise<TimeClockRecord[]>;
+  getTimeClockRecordById(id: string): Promise<TimeClockRecord | undefined>;
+  createTimeClockRecord(record: InsertTimeClockRecord): Promise<TimeClockRecord>;
+  updateTimeClockRecord(id: string, record: Partial<InsertTimeClockRecord>): Promise<TimeClockRecord | undefined>;
+
+  // Workforce Management - Timesheets
+  getTimesheets(staffId?: string, status?: string): Promise<Timesheet[]>;
+  getTimesheetById(id: string): Promise<Timesheet | undefined>;
+  createTimesheet(timesheet: InsertTimesheet): Promise<Timesheet>;
+  updateTimesheet(id: string, timesheet: Partial<InsertTimesheet>): Promise<Timesheet | undefined>;
+  deleteTimesheet(id: string): Promise<boolean>;
+
+  // Workforce Management - Timesheet Entries
+  getTimesheetEntries(timesheetId: string): Promise<TimesheetEntry[]>;
+  getTimesheetEntryById(id: string): Promise<TimesheetEntry | undefined>;
+  createTimesheetEntry(entry: InsertTimesheetEntry): Promise<TimesheetEntry>;
+  updateTimesheetEntry(id: string, entry: Partial<InsertTimesheetEntry>): Promise<TimesheetEntry | undefined>;
+  deleteTimesheetEntry(id: string): Promise<boolean>;
+
+  // Workforce Management - GPS Compliance
+  getGpsComplianceLogs(filters?: { staffId?: string; appointmentId?: string; isCompliant?: boolean }): Promise<GpsComplianceLog[]>;
+  getGpsComplianceLogById(id: string): Promise<GpsComplianceLog | undefined>;
+  createGpsComplianceLog(log: InsertGpsComplianceLog): Promise<GpsComplianceLog>;
+  updateGpsComplianceLog(id: string, log: Partial<InsertGpsComplianceLog>): Promise<GpsComplianceLog | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -5098,6 +5138,251 @@ export class DbStorage implements IStorage {
         status: "failed",
       })
       .where(eq(scheduledMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Workforce Management - Staff Qualifications
+  async getStaffQualifications(staffId: string): Promise<StaffQualification[]> {
+    return await db.select()
+      .from(staffQualifications)
+      .where(eq(staffQualifications.staffId, staffId))
+      .orderBy(desc(staffQualifications.issuedDate));
+  }
+
+  async getStaffQualificationById(id: string): Promise<StaffQualification | undefined> {
+    const result = await db.select()
+      .from(staffQualifications)
+      .where(eq(staffQualifications.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createStaffQualification(qualification: InsertStaffQualification): Promise<StaffQualification> {
+    const result = await db.insert(staffQualifications)
+      .values(qualification)
+      .returning();
+    return result[0];
+  }
+
+  async updateStaffQualification(id: string, qualification: Partial<InsertStaffQualification>): Promise<StaffQualification | undefined> {
+    const result = await db.update(staffQualifications)
+      .set(qualification)
+      .where(eq(staffQualifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffQualification(id: string): Promise<boolean> {
+    const result = await db.delete(staffQualifications)
+      .where(eq(staffQualifications.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Workforce Management - Staff Blacklist
+  async getStaffBlacklist(staffId: string): Promise<StaffBlacklist[]> {
+    return await db.select()
+      .from(staffBlacklist)
+      .where(eq(staffBlacklist.staffId, staffId))
+      .orderBy(desc(staffBlacklist.effectiveFrom));
+  }
+
+  async getAllActiveBlacklists(): Promise<StaffBlacklist[]> {
+    return await db.select()
+      .from(staffBlacklist)
+      .where(eq(staffBlacklist.isActive, 'yes'))
+      .orderBy(desc(staffBlacklist.effectiveFrom));
+  }
+
+  async getStaffBlacklistById(id: string): Promise<StaffBlacklist | undefined> {
+    const result = await db.select()
+      .from(staffBlacklist)
+      .where(eq(staffBlacklist.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createStaffBlacklist(blacklist: InsertStaffBlacklist): Promise<StaffBlacklist> {
+    const result = await db.insert(staffBlacklist)
+      .values(blacklist)
+      .returning();
+    return result[0];
+  }
+
+  async updateStaffBlacklist(id: string, blacklist: Partial<InsertStaffBlacklist>): Promise<StaffBlacklist | undefined> {
+    const result = await db.update(staffBlacklist)
+      .set(blacklist)
+      .where(eq(staffBlacklist.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffBlacklist(id: string): Promise<boolean> {
+    const result = await db.delete(staffBlacklist)
+      .where(eq(staffBlacklist.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Workforce Management - Time Clock
+  async getTimeClockRecords(staffId: string, startDate?: Date, endDate?: Date): Promise<TimeClockRecord[]> {
+    const conditions = [eq(timeClockRecords.staffId, staffId)];
+    if (startDate) {
+      conditions.push(gte(timeClockRecords.timestamp, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(timeClockRecords.timestamp, endDate));
+    }
+    return await db.select()
+      .from(timeClockRecords)
+      .where(and(...conditions))
+      .orderBy(desc(timeClockRecords.timestamp));
+  }
+
+  async getTimeClockRecordById(id: string): Promise<TimeClockRecord | undefined> {
+    const result = await db.select()
+      .from(timeClockRecords)
+      .where(eq(timeClockRecords.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createTimeClockRecord(record: InsertTimeClockRecord): Promise<TimeClockRecord> {
+    const result = await db.insert(timeClockRecords)
+      .values(record)
+      .returning();
+    return result[0];
+  }
+
+  async updateTimeClockRecord(id: string, record: Partial<InsertTimeClockRecord>): Promise<TimeClockRecord | undefined> {
+    const result = await db.update(timeClockRecords)
+      .set(record)
+      .where(eq(timeClockRecords.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Workforce Management - Timesheets
+  async getTimesheets(staffId?: string, status?: string): Promise<Timesheet[]> {
+    const conditions = [];
+    if (staffId) {
+      conditions.push(eq(timesheets.staffId, staffId));
+    }
+    if (status) {
+      conditions.push(eq(timesheets.status, status));
+    }
+    const query = conditions.length > 0
+      ? db.select().from(timesheets).where(and(...conditions))
+      : db.select().from(timesheets);
+    return await query.orderBy(desc(timesheets.periodStart));
+  }
+
+  async getTimesheetById(id: string): Promise<Timesheet | undefined> {
+    const result = await db.select()
+      .from(timesheets)
+      .where(eq(timesheets.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createTimesheet(timesheet: InsertTimesheet): Promise<Timesheet> {
+    const result = await db.insert(timesheets)
+      .values(timesheet)
+      .returning();
+    return result[0];
+  }
+
+  async updateTimesheet(id: string, timesheet: Partial<InsertTimesheet>): Promise<Timesheet | undefined> {
+    const result = await db.update(timesheets)
+      .set(timesheet)
+      .where(eq(timesheets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTimesheet(id: string): Promise<boolean> {
+    const result = await db.delete(timesheets)
+      .where(eq(timesheets.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Workforce Management - Timesheet Entries
+  async getTimesheetEntries(timesheetId: string): Promise<TimesheetEntry[]> {
+    return await db.select()
+      .from(timesheetEntries)
+      .where(eq(timesheetEntries.timesheetId, timesheetId))
+      .orderBy(timesheetEntries.date);
+  }
+
+  async getTimesheetEntryById(id: string): Promise<TimesheetEntry | undefined> {
+    const result = await db.select()
+      .from(timesheetEntries)
+      .where(eq(timesheetEntries.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createTimesheetEntry(entry: InsertTimesheetEntry): Promise<TimesheetEntry> {
+    const result = await db.insert(timesheetEntries)
+      .values(entry)
+      .returning();
+    return result[0];
+  }
+
+  async updateTimesheetEntry(id: string, entry: Partial<InsertTimesheetEntry>): Promise<TimesheetEntry | undefined> {
+    const result = await db.update(timesheetEntries)
+      .set(entry)
+      .where(eq(timesheetEntries.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTimesheetEntry(id: string): Promise<boolean> {
+    const result = await db.delete(timesheetEntries)
+      .where(eq(timesheetEntries.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Workforce Management - GPS Compliance
+  async getGpsComplianceLogs(filters?: { staffId?: string; appointmentId?: string; isCompliant?: boolean }): Promise<GpsComplianceLog[]> {
+    const conditions = [];
+    if (filters?.staffId) {
+      conditions.push(eq(gpsComplianceLogs.staffId, filters.staffId));
+    }
+    if (filters?.appointmentId) {
+      conditions.push(eq(gpsComplianceLogs.appointmentId, filters.appointmentId));
+    }
+    if (filters?.isCompliant !== undefined) {
+      conditions.push(eq(gpsComplianceLogs.isCompliant, filters.isCompliant ? 'yes' : 'no'));
+    }
+    const query = conditions.length > 0
+      ? db.select().from(gpsComplianceLogs).where(and(...conditions))
+      : db.select().from(gpsComplianceLogs);
+    return await query.orderBy(desc(gpsComplianceLogs.timestamp));
+  }
+
+  async getGpsComplianceLogById(id: string): Promise<GpsComplianceLog | undefined> {
+    const result = await db.select()
+      .from(gpsComplianceLogs)
+      .where(eq(gpsComplianceLogs.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createGpsComplianceLog(log: InsertGpsComplianceLog): Promise<GpsComplianceLog> {
+    const result = await db.insert(gpsComplianceLogs)
+      .values(log)
+      .returning();
+    return result[0];
+  }
+
+  async updateGpsComplianceLog(id: string, log: Partial<InsertGpsComplianceLog>): Promise<GpsComplianceLog | undefined> {
+    const result = await db.update(gpsComplianceLogs)
+      .set(log)
+      .where(eq(gpsComplianceLogs.id, id))
       .returning();
     return result[0];
   }

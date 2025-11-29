@@ -9324,7 +9324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(messages);
       } else {
         // Regular access - apply participant filtering
-        const isParticipant = await storage.isParticipant(roomId, userId);
+        const isParticipant = await storage.isRoomParticipant(roomId, userId);
         if (!isParticipant && !isAppAdmin) {
           return res.status(403).json({ error: "You are not a participant in this room" });
         }
@@ -12123,13 +12123,461 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/appointments/:appointmentId/conflicts/auto-resolve", requireAuth, async (req: any, res) => {
     try {
       const { appointmentId } = req.params;
-      
+
       const count = await storage.autoResolveConflictsForAppointment(appointmentId);
-      
+
       res.json({ resolvedCount: count });
     } catch (error) {
       console.error("Error auto-resolving conflicts:", error);
       res.status(500).json({ error: "Failed to auto-resolve conflicts" });
+    }
+  });
+
+  // ============================================
+  // Workforce Management - Staff Qualifications
+  // ============================================
+
+  app.get("/api/staff/:staffId/qualifications", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const qualifications = await storage.getStaffQualifications(staffId);
+      res.json(qualifications);
+    } catch (error) {
+      console.error("Error fetching staff qualifications:", error);
+      res.status(500).json({ error: "Failed to fetch staff qualifications" });
+    }
+  });
+
+  app.post("/api/staff/:staffId/qualifications", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const qualification = await storage.createStaffQualification({
+        ...req.body,
+        staffId,
+      });
+      res.status(201).json(qualification);
+    } catch (error) {
+      console.error("Error creating staff qualification:", error);
+      res.status(500).json({ error: "Failed to create staff qualification" });
+    }
+  });
+
+  app.patch("/api/staff/qualifications/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const qualification = await storage.updateStaffQualification(id, req.body);
+      if (!qualification) {
+        return res.status(404).json({ error: "Qualification not found" });
+      }
+      res.json(qualification);
+    } catch (error) {
+      console.error("Error updating staff qualification:", error);
+      res.status(500).json({ error: "Failed to update staff qualification" });
+    }
+  });
+
+  app.delete("/api/staff/qualifications/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteStaffQualification(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Qualification not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting staff qualification:", error);
+      res.status(500).json({ error: "Failed to delete staff qualification" });
+    }
+  });
+
+  // ============================================
+  // Workforce Management - Staff Blacklist
+  // ============================================
+
+  app.get("/api/staff/:staffId/blacklist", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const blacklist = await storage.getStaffBlacklist(staffId);
+      res.json(blacklist);
+    } catch (error) {
+      console.error("Error fetching staff blacklist:", error);
+      res.status(500).json({ error: "Failed to fetch staff blacklist" });
+    }
+  });
+
+  app.get("/api/staff/blacklist/all", requireAuth, async (req: any, res) => {
+    try {
+      const blacklist = await storage.getAllActiveBlacklists();
+      res.json(blacklist);
+    } catch (error) {
+      console.error("Error fetching all blacklists:", error);
+      res.status(500).json({ error: "Failed to fetch all blacklists" });
+    }
+  });
+
+  app.post("/api/staff/:staffId/blacklist", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const blacklist = await storage.createStaffBlacklist({
+        ...req.body,
+        staffId,
+      });
+      res.status(201).json(blacklist);
+    } catch (error) {
+      console.error("Error creating staff blacklist:", error);
+      res.status(500).json({ error: "Failed to create staff blacklist" });
+    }
+  });
+
+  app.patch("/api/staff/blacklist/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const blacklist = await storage.updateStaffBlacklist(id, req.body);
+      if (!blacklist) {
+        return res.status(404).json({ error: "Blacklist entry not found" });
+      }
+      res.json(blacklist);
+    } catch (error) {
+      console.error("Error updating staff blacklist:", error);
+      res.status(500).json({ error: "Failed to update staff blacklist" });
+    }
+  });
+
+  app.delete("/api/staff/blacklist/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteStaffBlacklist(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Blacklist entry not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting staff blacklist:", error);
+      res.status(500).json({ error: "Failed to delete staff blacklist" });
+    }
+  });
+
+  // ============================================
+  // Workforce Management - Time Clock
+  // ============================================
+
+  app.get("/api/staff/:staffId/time-clock-records", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const { startDate, endDate } = req.query;
+
+      const records = await storage.getTimeClockRecords(
+        staffId,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching time clock records:", error);
+      res.status(500).json({ error: "Failed to fetch time clock records" });
+    }
+  });
+
+  app.post("/api/staff/:staffId/clock-in", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const { clockIn } = await import('./services/time-clock.js');
+
+      const result = await clockIn({
+        staffId,
+        appointmentId: req.body.appointmentId,
+        latitude: req.body.latitude,
+        longitude: req.body.longitude,
+        accuracy: req.body.accuracy,
+        deviceType: req.body.deviceType,
+        notes: req.body.notes,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: "Clock in failed",
+          violations: result.errors,
+          warnings: result.warnings,
+        });
+      }
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error clocking in:", error);
+      res.status(500).json({ error: "Failed to clock in" });
+    }
+  });
+
+  app.post("/api/staff/:staffId/clock-out", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const { clockOut } = await import('./services/time-clock.js');
+
+      const result = await clockOut({
+        staffId,
+        appointmentId: req.body.appointmentId,
+        latitude: req.body.latitude,
+        longitude: req.body.longitude,
+        accuracy: req.body.accuracy,
+        deviceType: req.body.deviceType,
+        notes: req.body.notes,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: "Clock out failed",
+          violations: result.errors,
+          warnings: result.warnings,
+        });
+      }
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error clocking out:", error);
+      res.status(500).json({ error: "Failed to clock out" });
+    }
+  });
+
+  app.get("/api/staff/:staffId/clock-status", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId } = req.params;
+      const { getActiveClockIn } = await import('./services/time-clock.js');
+
+      const status = await getActiveClockIn(staffId);
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching clock status:", error);
+      res.status(500).json({ error: "Failed to fetch clock status" });
+    }
+  });
+
+  // ============================================
+  // Workforce Management - Timesheets
+  // ============================================
+
+  app.get("/api/timesheets", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId, status } = req.query;
+      const timesheets = await storage.getTimesheets(
+        staffId as string | undefined,
+        status as string | undefined
+      );
+      res.json(timesheets);
+    } catch (error) {
+      console.error("Error fetching timesheets:", error);
+      res.status(500).json({ error: "Failed to fetch timesheets" });
+    }
+  });
+
+  app.get("/api/timesheets/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const timesheet = await storage.getTimesheetById(id);
+      if (!timesheet) {
+        return res.status(404).json({ error: "Timesheet not found" });
+      }
+
+      const entries = await storage.getTimesheetEntries(id);
+      res.json({ ...timesheet, entries });
+    } catch (error) {
+      console.error("Error fetching timesheet:", error);
+      res.status(500).json({ error: "Failed to fetch timesheet" });
+    }
+  });
+
+  app.post("/api/timesheets/generate", requireAuth, async (req: any, res) => {
+    try {
+      const { generateTimesheet } = await import('./services/timesheet-generator.js');
+
+      const timesheet = await generateTimesheet({
+        staffId: req.body.staffId,
+        periodStart: new Date(req.body.periodStart),
+        periodEnd: new Date(req.body.periodEnd),
+        autoApprove: req.body.autoApprove || false,
+      });
+
+      res.status(201).json(timesheet);
+    } catch (error) {
+      console.error("Error generating timesheet:", error);
+      res.status(500).json({ error: "Failed to generate timesheet" });
+    }
+  });
+
+  app.post("/api/timesheets/:id/approve", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { approveTimesheet } = await import('./services/timesheet-generator.js');
+
+      const timesheet = await approveTimesheet(id, req.user.id);
+      res.json(timesheet);
+    } catch (error) {
+      console.error("Error approving timesheet:", error);
+      res.status(500).json({ error: "Failed to approve timesheet" });
+    }
+  });
+
+  app.post("/api/timesheets/:id/reject", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { rejectTimesheet } = await import('./services/timesheet-generator.js');
+
+      const timesheet = await rejectTimesheet(
+        id,
+        req.user.id,
+        req.body.rejectionReason
+      );
+      res.json(timesheet);
+    } catch (error) {
+      console.error("Error rejecting timesheet:", error);
+      res.status(500).json({ error: "Failed to reject timesheet" });
+    }
+  });
+
+  app.delete("/api/timesheets/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteTimesheet(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Timesheet not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting timesheet:", error);
+      res.status(500).json({ error: "Failed to delete timesheet" });
+    }
+  });
+
+  // ============================================
+  // Workforce Management - GPS Compliance
+  // ============================================
+
+  app.get("/api/gps-compliance-logs", requireAuth, async (req: any, res) => {
+    try {
+      const { staffId, appointmentId, isCompliant } = req.query;
+      const logs = await storage.getGpsComplianceLogs({
+        staffId: staffId as string | undefined,
+        appointmentId: appointmentId as string | undefined,
+        isCompliant: isCompliant === 'true' ? true : isCompliant === 'false' ? false : undefined,
+      });
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching GPS compliance logs:", error);
+      res.status(500).json({ error: "Failed to fetch GPS compliance logs" });
+    }
+  });
+
+  app.patch("/api/gps-compliance-logs/:id/review", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const log = await storage.updateGpsComplianceLog(id, {
+        reviewedAt: new Date(),
+        reviewedById: req.user.id,
+        reviewNotes: req.body.reviewNotes,
+        requiresReview: 'no',
+      });
+      if (!log) {
+        return res.status(404).json({ error: "GPS compliance log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Error reviewing GPS compliance log:", error);
+      res.status(500).json({ error: "Failed to review GPS compliance log" });
+    }
+  });
+
+  // ============================================
+  // Workforce Management - Public Holidays
+  // ============================================
+
+  app.get("/api/public-holidays", requireAuth, async (req: any, res) => {
+    try {
+      const { year } = req.query;
+      const holidays = await storage.getPublicHolidays(
+        year ? parseInt(year as string) : undefined
+      );
+      res.json(holidays);
+    } catch (error) {
+      console.error("Error fetching public holidays:", error);
+      res.status(500).json({ error: "Failed to fetch public holidays" });
+    }
+  });
+
+  app.post("/api/public-holidays", requireAuth, async (req: any, res) => {
+    try {
+      const holiday = await storage.createPublicHoliday(req.body);
+      res.status(201).json(holiday);
+    } catch (error) {
+      console.error("Error creating public holiday:", error);
+      res.status(500).json({ error: "Failed to create public holiday" });
+    }
+  });
+
+  app.patch("/api/public-holidays/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const holiday = await storage.updatePublicHoliday(id, req.body);
+      if (!holiday) {
+        return res.status(404).json({ error: "Public holiday not found" });
+      }
+      res.json(holiday);
+    } catch (error) {
+      console.error("Error updating public holiday:", error);
+      res.status(500).json({ error: "Failed to update public holiday" });
+    }
+  });
+
+  app.delete("/api/public-holidays/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deletePublicHoliday(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Public holiday not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting public holiday:", error);
+      res.status(500).json({ error: "Failed to delete public holiday" });
+    }
+  });
+
+  // ============================================
+  // Workforce Management - Staff Allocation Validation
+  // ============================================
+
+  app.post("/api/staff/validate-allocation", requireAuth, async (req: any, res) => {
+    try {
+      const { validateStaffAllocation } = await import('./services/staff-allocation-validator.js');
+
+      const validation = await validateStaffAllocation(
+        req.body.staffId,
+        req.body.clientId,
+        req.body.serviceType,
+        req.body.serviceCategory
+      );
+
+      res.json(validation);
+    } catch (error) {
+      console.error("Error validating staff allocation:", error);
+      res.status(500).json({ error: "Failed to validate staff allocation" });
+    }
+  });
+
+  app.get("/api/clients/:clientId/eligible-staff", requireAuth, async (req: any, res) => {
+    try {
+      const { clientId } = req.params;
+      const { serviceType, serviceCategory } = req.query;
+      const { getEligibleStaff } = await import('./services/staff-allocation-validator.js');
+
+      const eligibleStaff = await getEligibleStaff(
+        clientId,
+        serviceType as any,
+        serviceCategory as string | undefined
+      );
+
+      res.json(eligibleStaff);
+    } catch (error) {
+      console.error("Error fetching eligible staff:", error);
+      res.status(500).json({ error: "Failed to fetch eligible staff" });
     }
   });
 
