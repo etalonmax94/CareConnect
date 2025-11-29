@@ -2394,7 +2394,7 @@ export default function Chat() {
                       </div>
 
                       {/* Members */}
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Label>Members ({selectedRoom.participants.length})</Label>
                           <DropdownMenu>
@@ -2430,18 +2430,21 @@ export default function Chat() {
                         <ScrollArea className="h-48 border rounded-md">
                           {selectedRoom.participants.map(p => (
                             <div key={p.id} className="flex items-center justify-between p-2 hover:bg-muted">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-1">
                                 <Avatar className="h-8 w-8">
                                   <AvatarFallback>{p.staffName.charAt(0)}</AvatarFallback>
                                 </Avatar>
-                                <div>
+                                <div className="flex-1">
                                   <p className="text-sm font-medium">{p.staffName}</p>
-                                  {p.role === "admin" && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <Crown className="h-3 w-3 mr-1" />
-                                      Admin
-                                    </Badge>
-                                  )}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {p.role === "admin" && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        <Crown className="h-3 w-3 mr-1" />
+                                        Admin
+                                      </Badge>
+                                    )}
+                                    <p className="text-xs text-muted-foreground" title="Last seen online">Last seen info available via API</p>
+                                  </div>
                                 </div>
                               </div>
                               {p.staffId !== currentUser?.id && (

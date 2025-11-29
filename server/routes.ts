@@ -2889,6 +2889,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get staff last seen online
+  app.get("/api/staff/:id/last-seen", async (req, res) => {
+    try {
+      const status = await storage.getCurrentStaffStatus(req.params.id);
+      if (status) {
+        res.json({ lastSeen: status.timestamp, status: status.status });
+      } else {
+        res.json({ lastSeen: null, status: null });
+      }
+    } catch (error) {
+      console.error("Error fetching staff last seen:", error);
+      res.status(500).json({ error: "Failed to fetch staff last seen" });
+    }
+  });
+
   // Create staff
   app.post("/api/staff", async (req, res) => {
     try {
@@ -12482,61 +12497,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reviewing GPS compliance log:", error);
       res.status(500).json({ error: "Failed to review GPS compliance log" });
-    }
-  });
-
-  // ============================================
-  // Workforce Management - Public Holidays
-  // ============================================
-
-  app.get("/api/public-holidays", requireAuth, async (req: any, res) => {
-    try {
-      const { year } = req.query;
-      const holidays = await storage.getPublicHolidays(
-        year ? parseInt(year as string) : undefined
-      );
-      res.json(holidays);
-    } catch (error) {
-      console.error("Error fetching public holidays:", error);
-      res.status(500).json({ error: "Failed to fetch public holidays" });
-    }
-  });
-
-  app.post("/api/public-holidays", requireAuth, async (req: any, res) => {
-    try {
-      const holiday = await storage.createPublicHoliday(req.body);
-      res.status(201).json(holiday);
-    } catch (error) {
-      console.error("Error creating public holiday:", error);
-      res.status(500).json({ error: "Failed to create public holiday" });
-    }
-  });
-
-  app.patch("/api/public-holidays/:id", requireAuth, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const holiday = await storage.updatePublicHoliday(id, req.body);
-      if (!holiday) {
-        return res.status(404).json({ error: "Public holiday not found" });
-      }
-      res.json(holiday);
-    } catch (error) {
-      console.error("Error updating public holiday:", error);
-      res.status(500).json({ error: "Failed to update public holiday" });
-    }
-  });
-
-  app.delete("/api/public-holidays/:id", requireAuth, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const deleted = await storage.deletePublicHoliday(id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Public holiday not found" });
-      }
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting public holiday:", error);
-      res.status(500).json({ error: "Failed to delete public holiday" });
     }
   });
 
