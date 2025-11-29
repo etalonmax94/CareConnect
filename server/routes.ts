@@ -8884,7 +8884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Authorization: Check if user is room admin or app admin
       const isAppAdmin = userRoles.some((role: string) => 
-        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+        ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role)
       );
       const participants = await storage.getChatRoomParticipants(roomId);
       const userParticipant = participants.find(p => p.staffId === userId);
@@ -8949,7 +8949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Authorization: Check if user is room admin or app admin
       const isAppAdmin = userRoles.some((role: string) => 
-        ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+        ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role)
       );
       const participants = await storage.getChatRoomParticipants(roomId);
       const userParticipant = participants.find(p => p.staffId === userId);

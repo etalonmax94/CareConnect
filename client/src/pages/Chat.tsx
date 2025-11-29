@@ -189,7 +189,7 @@ export default function Chat() {
 
   const currentUser = authData?.user;
   const isAppAdmin = currentUser?.roles?.some((role: string) => 
-    ["admin", "director", "operations_manager", "clinical_manager"].includes(role)
+    ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role)
   ) || false;
 
   const { data: rooms = [], isLoading: roomsLoading } = useQuery<ChatRoomWithParticipants[]>({
