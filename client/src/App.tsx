@@ -103,6 +103,7 @@ function ProtectedRouter() {
 function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> }) {
   const [location] = useLocation();
   const isDashboard = location === "/";
+  const isChatPage = location === "/chat";
   const [userToggledSidebar, setUserToggledSidebar] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -189,7 +190,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
               <UserProfileDropdown user={user} />
             </div>
           </header>
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className={`flex-1 ${isChatPage ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}>
             <ProtectedRouter />
           </main>
           <HelpWidget />

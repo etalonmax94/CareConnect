@@ -9891,7 +9891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           senderName: userContext.userName,
           content: file.originalname,
           messageType: messageType,
-          attachmentUrl: file.path,
+          attachmentUrl: "", // Will be updated after attachment is created
           attachmentName: file.originalname,
           attachmentType: attachmentType,
         });
@@ -9911,9 +9911,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Mark as completed (in a real app, you'd do thumbnail generation here)
         const completedAttachment = await storage.updateChatMessageAttachmentStatus(
-          attachment.id, 
+          attachment.id,
           "completed"
         );
+
+        // Update message with proper attachment URL
+        await storage.updateChatMessage(message.id, {
+          attachmentUrl: `/api/chat/attachments/${attachment.id}/file`
+        });
 
         // Create audit log entry
         await storage.createChatAuditLog({
@@ -9992,7 +9997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           senderName: userContext.userName,
           content: `Voice message (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, "0")})`,
           messageType: "voice",
-          attachmentUrl: file.path,
+          attachmentUrl: "", // Will be updated after attachment is created
           attachmentName: file.originalname || file.filename,
           attachmentType: "audio",
         });
@@ -10009,6 +10014,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           uploadedByName: userContext.userName,
           status: "completed",
           duration: duration,
+        });
+
+        // Update message with proper attachment URL
+        await storage.updateChatMessage(message.id, {
+          attachmentUrl: `/api/chat/attachments/${attachment.id}/file`
         });
 
         await storage.createChatAuditLog({

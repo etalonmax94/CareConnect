@@ -57,6 +57,7 @@ import {
   FileCode,
   BookTemplate,
   CheckCheck,
+  Pencil,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -144,7 +145,7 @@ interface ChatAttachment {
 }
 
 interface WebSocketMessage {
-  type: "message" | "typing" | "read" | "presence" | "join" | "leave" | "error";
+  type: "message" | "typing" | "read" | "presence" | "join" | "leave" | "error" | "pinUpdate";
   roomId?: string;
   message?: ChatMessage;
   userId?: string;
@@ -662,17 +663,24 @@ export default function Chat() {
 
   // Get color for sender name based on hash of sender ID
   const getSenderNameColor = (senderId: string): string => {
+    // Vibrant, diverse color palette (avoiding yellow tones)
     const colors = [
-      "text-blue-600 dark:text-blue-400",
-      "text-purple-600 dark:text-purple-400",
-      "text-pink-600 dark:text-pink-400",
-      "text-indigo-600 dark:text-indigo-400",
-      "text-rose-600 dark:text-rose-400",
-      "text-cyan-600 dark:text-cyan-400",
-      "text-teal-600 dark:text-teal-400",
-      "text-orange-600 dark:text-orange-400",
+      "text-blue-600 dark:text-blue-400",           // Blue
+      "text-purple-600 dark:text-purple-400",       // Purple
+      "text-pink-600 dark:text-pink-400",           // Pink
+      "text-indigo-600 dark:text-indigo-400",       // Indigo
+      "text-rose-600 dark:text-rose-400",           // Rose
+      "text-cyan-600 dark:text-cyan-400",           // Cyan
+      "text-teal-600 dark:text-teal-400",           // Teal
+      "text-emerald-600 dark:text-emerald-400",     // Emerald
+      "text-green-600 dark:text-green-400",         // Green
+      "text-violet-600 dark:text-violet-400",       // Violet
+      "text-fuchsia-600 dark:text-fuchsia-400",     // Fuchsia
+      "text-red-600 dark:text-red-400",             // Red
+      "text-sky-600 dark:text-sky-400",             // Sky Blue
+      "text-lime-600 dark:text-lime-400",           // Lime
     ];
-    
+
     let hash = 0;
     for (let i = 0; i < senderId.length; i++) {
       hash = ((hash << 5) - hash) + senderId.charCodeAt(i);
@@ -1572,13 +1580,16 @@ export default function Chat() {
   const filteredRooms = (activeTab === "archived" ? archivedRooms : rooms)
     .filter(room => {
       const matchesSearch = !searchQuery || getRoomDisplayName(room).toLowerCase().includes(searchQuery.toLowerCase());
-      
+
+      // For archived tab, only show archived rooms (archivedRooms array already filtered)
+      if (activeTab === "archived") return matchesSearch;
+
+      // For other tabs, apply type filtering
       if (activeTab === "all") return matchesSearch;
       if (activeTab === "client") return room.type === "client" && matchesSearch;
       if (activeTab === "direct") return room.type === "direct" && matchesSearch;
       if (activeTab === "group") return (room.type === "group" || room.type === "announcement") && matchesSearch;
-      if (activeTab === "archived") return matchesSearch;
-      
+
       return matchesSearch;
     })
     .sort((a, b) => {
@@ -1798,7 +1809,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background" data-testid="chat-page">
+    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background" data-testid="chat-page">
       {/* Sidebar - Conversation List */}
       <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col h-full overflow-hidden bg-card md:border-r`}>
         {/* Header - Fixed at top */}
@@ -2210,85 +2221,38 @@ export default function Chat() {
                   )}
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
-                {/* Message Search */}
-                <div className="hidden sm:flex items-center gap-1 bg-muted/50 rounded-xl px-3 h-9 min-w-0">
-                  <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <Input
-                    placeholder="Search messages..."
-                    value={messageSearchQuery}
-                    onChange={(e) => {
-                      setMessageSearchQuery(e.target.value);
-                      setCurrentSearchResultIndex(0);
-                    }}
-                    className="border-0 bg-transparent text-sm focus-visible:ring-0 p-0 h-full w-32 placeholder:text-muted-foreground/50"
-                    data-testid="input-message-search"
-                  />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 rounded-full shrink-0"
-                        onClick={() => setShowAdvancedSearchDialog(true)}
-                        data-testid="button-advanced-search"
-                      >
-                        <Filter className="h-3.5 w-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Advanced search with filters</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  {searchResults.length > 0 && (
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {currentSearchResultIndex + 1}/{searchResults.length}
-                    </span>
-                  )}
-                  {searchResults.length > 1 && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded"
-                        onClick={() => setCurrentSearchResultIndex((currentSearchResultIndex - 1 + searchResults.length) % searchResults.length)}
-                        data-testid="button-search-prev"
-                      >
-                        <ArrowLeft className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded"
-                        onClick={() => setCurrentSearchResultIndex((currentSearchResultIndex + 1) % searchResults.length)}
-                        data-testid="button-search-next"
-                      >
-                        <ArrowLeft className="h-3 w-3 rotate-180" />
-                      </Button>
-                    </>
-                  )}
-                </div>
+                {/* More Options Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full shrink-0 min-w-[44px] min-h-[44px]"
+                      data-testid="button-chat-options"
+                    >
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {isAppAdmin && (
+                      <>
+                        <DropdownMenuItem onClick={handleExportChat} data-testid="button-export-chat">
+                          <Download className="h-4 w-4 mr-2" />
+                          Export Chat
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuItem onClick={() => setShowAdvancedSearchDialog(true)} data-testid="menu-advanced-search">
+                      <Search className="h-4 w-4 mr-2" />
+                      Advanced Search
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              
-              {/* Export Chat Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="rounded-full shrink-0 min-w-[44px] min-h-[44px]"
-                    onClick={handleExportChat}
-                    data-testid="button-export-chat"
-                  >
-                    <Download className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Export chat as text</p>
-                </TooltipContent>
-              </Tooltip>
-              
+
               {(isRoomAdmin || isAppAdmin) && selectedRoom.type !== "direct" && (
                 <Sheet open={showRoomSettings} onOpenChange={setShowRoomSettings}>
                   <SheetTrigger asChild>
@@ -2680,8 +2644,8 @@ export default function Chat() {
                         ) : null}
                         
                         <div className={`max-w-[75%] md:max-w-[65%] flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
-                          {!isOwn && showAvatar && (
-                            <p className={`text-[11px] font-semibold mb-1 ml-1 ${getSenderNameColor(message.senderId)}`}>
+                          {!isOwn && (
+                            <p className={`text-xs font-bold mb-1 ml-1 ${getSenderNameColor(message.senderId)}`}>
                               {message.senderName}
                             </p>
                           )}
@@ -2793,33 +2757,9 @@ export default function Chat() {
                                 </p>
                               )}
                             </div>
-                            
+
                             {!isDeleted && (
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                {/* Quick Reaction Picker - Most used emojis */}
-                                <div className="flex items-center gap-0.5 bg-background/95 backdrop-blur rounded-full px-1.5 py-0.5 shadow-sm border">
-                                  {[
-                                    { emoji: "heart", icon: Heart, color: "text-red-500 hover:text-red-600" },
-                                    { emoji: "thumbsup", icon: ThumbsUp, color: "text-blue-500 hover:text-blue-600" },
-                                    { emoji: "party", icon: PartyPopper, color: "text-yellow-500 hover:text-yellow-600" },
-                                  ].map(({ emoji, icon: Icon, color }) => {
-                                    const reactions = messageReactions[message.id] || [];
-                                    const hasReacted = reactions.some(r => r.staffId === currentUser?.id && r.emoji === emoji);
-                                    return (
-                                      <Button
-                                        key={emoji}
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`h-6 w-6 rounded-full ${hasReacted ? "bg-muted ring-1 ring-primary/30" : ""} ${color}`}
-                                        onClick={() => handleToggleReaction(message.id, emoji)}
-                                        data-testid={`quick-reaction-${emoji}-${message.id}`}
-                                      >
-                                        <Icon className="h-3.5 w-3.5" />
-                                      </Button>
-                                    );
-                                  })}
-                                </div>
-                                
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button 
@@ -3067,7 +3007,7 @@ export default function Chat() {
                     <div className="flex -space-x-2">
                       {typingInfo.participants.slice(0, 3).map(p => (
                         <Avatar key={p.id} className="h-5 w-5 border-2 border-background shadow-sm">
-                          <AvatarImage src={p.avatar} alt={p.fullName} />
+                          <AvatarImage src={p.avatar ?? undefined} alt={p.fullName} />
                           <AvatarFallback className="text-[8px] bg-muted">
                             {p.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
