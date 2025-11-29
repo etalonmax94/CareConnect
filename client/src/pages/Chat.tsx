@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatRoom, ChatMessage, ChatRoomParticipant, Staff, UserRole, User, ChatMessageReaction, ChatMessageRead } from "@shared/schema";
 import { USER_ROLES } from "@shared/schema";
@@ -84,6 +85,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -988,11 +992,18 @@ export default function Chat() {
   const canDeleteMessage = (message: ChatMessage) => {
     if (!currentUser) return false;
     const isOwn = message.senderId === currentUser.id;
-    if (isAppAdmin) return true;
-    if (!isOwn) return false;
     const messageAge = Date.now() - new Date(message.createdAt).getTime();
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-    return messageAge < twentyFourHours;
+    
+    // Admins can delete any message within 24 hours
+    if (isAppAdmin) {
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      return messageAge < twentyFourHours;
+    }
+    
+    // Regular users can only delete their own messages within 2 minutes
+    if (!isOwn) return false;
+    const twoMinutes = 2 * 60 * 1000;
+    return messageAge < twoMinutes;
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1406,7 +1417,7 @@ export default function Chat() {
           {/* Filter Tabs */}
           <div className="px-4 pb-3 md:px-5">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className={`w-full h-9 p-1 bg-muted/50 rounded-lg grid gap-0.5 ${isAppAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
+              <TabsList className={`w-full h-9 p-1 bg-muted/50 rounded-xl grid gap-0.5 ${isAppAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
                 <TabsTrigger value="all" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">All</TabsTrigger>
                 <TabsTrigger value="client" className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">
                   <Briefcase className="h-3 w-3 mr-1" />
@@ -1468,7 +1479,7 @@ export default function Chat() {
                 return (
                   <div
                     key={room.id}
-                    className={`group relative flex items-center gap-3 p-3 mb-1.5 cursor-pointer rounded-lg transition-colors ${
+                    className={`group relative flex items-center gap-3 p-3 mb-1.5 cursor-pointer rounded-xl transition-colors ${
                       isSelected 
                         ? "bg-primary/10 border border-primary/20" 
                         : "hover:bg-muted/50 border border-transparent"
@@ -1677,7 +1688,7 @@ export default function Chat() {
         {selectedRoom ? (
           <>
             {/* Chat Header - Premium Design */}
-            <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-3 md:px-5 md:py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b shadow-sm">
+            <div className="shrink-0 z-10 flex items-center justify-between px-3 py-3 md:px-5 md:py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b shadow-sm">
               <div className="flex items-center gap-3 min-w-0">
                 <Button
                   variant="ghost"
@@ -1700,9 +1711,33 @@ export default function Chat() {
                     <h2 className="font-semibold truncate">{getRoomDisplayName(selectedRoom)}</h2>
                   </div>
                   {selectedRoom.type === "client" && selectedRoom.clientName && (
-                    <p className="text-xs text-muted-foreground truncate">
-                      Care Team for {selectedRoom.clientName}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground truncate">
+                        Care Team for {selectedRoom.clientName}
+                      </p>
+                      {selectedRoom.clientId && (
+                        <div className="flex items-center gap-1 ml-2">
+                          <Link to={`/clients/${selectedRoom.clientId}`}>
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg hover-elevate">
+                              <UserIcon className="h-3 w-3 mr-1" />
+                              Profile
+                            </Button>
+                          </Link>
+                          <Link to={`/clients/${selectedRoom.clientId}/care-plan`}>
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg hover-elevate">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Care Plan
+                            </Button>
+                          </Link>
+                          <Link to={`/clients/${selectedRoom.clientId}/documents`}>
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg hover-elevate">
+                              <FolderOpen className="h-3 w-3 mr-1" />
+                              Docs
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
                   )}
                   {(selectedRoom.type === "group" || selectedRoom.type === "announcement") && (
                     <p className="text-xs text-muted-foreground">
@@ -1728,7 +1763,7 @@ export default function Chat() {
               
               <div className="flex items-center gap-2">
                 {/* Message Search */}
-                <div className="hidden sm:flex items-center gap-1 bg-muted/50 rounded-lg px-3 h-9 min-w-0">
+                <div className="hidden sm:flex items-center gap-1 bg-muted/50 rounded-xl px-3 h-9 min-w-0">
                   <Search className="h-4 w-4 text-muted-foreground shrink-0" />
                   <Input
                     placeholder="Search messages..."
@@ -2115,7 +2150,7 @@ export default function Chat() {
             </div>
 
             {/* Messages Area - Premium Design */}
-            <ScrollArea className="flex-1 px-3 py-4 md:px-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+            <ScrollArea className="flex-1 min-h-0 px-3 py-4 md:px-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
               {messagesLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex flex-col items-center gap-3">
@@ -2189,7 +2224,7 @@ export default function Chat() {
                           
                           <div className="flex items-end gap-1" title={isDeleted && (message as any).deletedByName ? `Deleted by ${(message as any).deletedByName} on ${format(new Date((message as any).deletedAt), 'MMM d, yyyy HH:mm')}` : undefined}>
                             <div
-                              className={`rounded-2xl shadow-sm ${
+                              className={`rounded-xl shadow-sm ${
                                 isDeleted
                                   ? "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 italic px-4 py-2.5"
                                   : (message as any).attachmentUrl && ((message as any).messageType === "gif" || (message as any).messageType === "image" || (message as any).messageType === "video")
@@ -2202,7 +2237,15 @@ export default function Chat() {
                               }`}
                             >
                               {isDeleted ? (
-                                <p className="text-sm">This message was deleted by {(message as any).deletedByName || 'someone'}</p>
+                                <div className="flex flex-col gap-0.5">
+                                  <p className="text-sm flex items-center gap-1.5">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    This message was deleted
+                                  </p>
+                                  <p className="text-xs text-muted-foreground/80">
+                                    by {(message as any).deletedByName || 'someone'} {(message as any).deletedAt && `on ${format(new Date((message as any).deletedAt), 'MMM d, yyyy HH:mm')}`}
+                                  </p>
+                                </div>
                               ) : (message as any).attachmentUrl && (message as any).messageType === "gif" ? (
                                 <img 
                                   src={(message as any).attachmentUrl} 
@@ -2248,33 +2291,7 @@ export default function Chat() {
                             </div>
                             
                             {!isDeleted && (
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                {/* Reaction Picker */}
-                                <div className="flex items-center bg-background/90 dark:bg-slate-800/90 rounded-full shadow-sm border px-1 py-0.5">
-                                  {[
-                                    { emoji: "heart", icon: Heart, color: "text-red-500 hover:text-red-600" },
-                                    { emoji: "thumbsup", icon: ThumbsUp, color: "text-blue-500 hover:text-blue-600" },
-                                    { emoji: "thumbsdown", icon: ThumbsDown, color: "text-orange-500 hover:text-orange-600" },
-                                    { emoji: "diamond", icon: Diamond, color: "text-cyan-500 hover:text-cyan-600" },
-                                    { emoji: "party", icon: PartyPopper, color: "text-yellow-500 hover:text-yellow-600" },
-                                  ].map(({ emoji, icon: Icon, color }) => {
-                                    const reactions = messageReactions[message.id] || [];
-                                    const hasReacted = reactions.some(r => r.staffId === currentUser?.id && r.emoji === emoji);
-                                    return (
-                                      <Button
-                                        key={emoji}
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`h-6 w-6 rounded-full ${hasReacted ? "bg-muted" : ""} ${color}`}
-                                        onClick={() => handleToggleReaction(message.id, emoji)}
-                                        data-testid={`button-reaction-${emoji}-${message.id}`}
-                                      >
-                                        <Icon className="h-3.5 w-3.5" />
-                                      </Button>
-                                    );
-                                  })}
-                                </div>
-                                
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button 
@@ -2286,7 +2303,47 @@ export default function Chat() {
                                       <MoreVertical className="h-3.5 w-3.5" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align={isOwn ? "end" : "start"} className="w-40">
+                                  <DropdownMenuContent align={isOwn ? "end" : "start"} className="w-48">
+                                    {/* Reactions Submenu */}
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger data-testid={`button-react-${message.id}`}>
+                                        <Heart className="h-4 w-4 mr-2" />
+                                        React
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuSubContent className="p-2">
+                                        <div className="flex items-center gap-1">
+                                          {[
+                                            { emoji: "heart", icon: Heart, color: "text-red-500 hover:text-red-600", label: "Love" },
+                                            { emoji: "thumbsup", icon: ThumbsUp, color: "text-blue-500 hover:text-blue-600", label: "Like" },
+                                            { emoji: "thumbsdown", icon: ThumbsDown, color: "text-orange-500 hover:text-orange-600", label: "Dislike" },
+                                            { emoji: "diamond", icon: Diamond, color: "text-cyan-500 hover:text-cyan-600", label: "Valuable" },
+                                            { emoji: "party", icon: PartyPopper, color: "text-yellow-500 hover:text-yellow-600", label: "Celebrate" },
+                                          ].map(({ emoji, icon: Icon, color, label }) => {
+                                            const reactions = messageReactions[message.id] || [];
+                                            const hasReacted = reactions.some(r => r.staffId === currentUser?.id && r.emoji === emoji);
+                                            return (
+                                              <Tooltip key={emoji}>
+                                                <TooltipTrigger asChild>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className={`h-8 w-8 rounded-full ${hasReacted ? "bg-muted ring-2 ring-primary/30" : ""} ${color}`}
+                                                    onClick={() => handleToggleReaction(message.id, emoji)}
+                                                    data-testid={`button-reaction-${emoji}-${message.id}`}
+                                                  >
+                                                    <Icon className="h-4 w-4" />
+                                                  </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="bottom">
+                                                  <p className="text-xs">{label}</p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            );
+                                          })}
+                                        </div>
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                    <DropdownMenuSeparator />
                                     <DropdownMenuItem 
                                       onClick={() => handleReplyToMessage(message)}
                                       data-testid={`button-reply-${message.id}`}
@@ -2426,7 +2483,7 @@ export default function Chat() {
             </ScrollArea>
 
             {/* Message Input - Premium Design */}
-            <div className="sticky bottom-0 p-3 md:p-4 bg-background border-t shadow-lg">
+            <div className="shrink-0 p-3 md:p-4 bg-background border-t shadow-lg">
               {/* Reply Preview */}
               {replyToMessage && (
                 <div className="flex items-center justify-between bg-muted/50 rounded-xl px-4 py-2.5 mb-3 border-l-4 border-primary">

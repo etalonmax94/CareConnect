@@ -253,19 +253,20 @@ export class ChatAuthorizationService {
     }
 
     const messageAge = Date.now() - new Date(message.createdAt).getTime();
-    const maxDeleteWindow = 24 * 60 * 60 * 1000;
+    // Regular users can delete their own messages within 2 minutes only
+    const maxDeleteWindow = 2 * 60 * 1000; // 2 minutes
 
     if (messageAge > maxDeleteWindow) {
       return { 
         allowed: false, 
-        reason: "Messages can only be deleted within 24 hours of sending" 
+        reason: "Messages can only be deleted within 2 minutes of sending" 
       };
     }
 
     return { allowed: true };
   }
 
-  private async checkDeleteAnyMessage(user: UserContext, roomId?: string): Promise<ChatPermissionResult> {
+  private async checkDeleteAnyMessage(user: UserContext, roomId?: string, messageId?: string): Promise<ChatPermissionResult> {
     if (!this.hasAdminRole(user.roles)) {
       return { 
         allowed: false, 
@@ -281,6 +282,22 @@ export class ChatAuthorizationService {
     const { isDeleted } = await this.getRoomContext(roomId);
     if (isDeleted) {
       return { allowed: false, reason: "Cannot modify messages in a deleted room" };
+    }
+
+    // Admins can delete any message within 24 hours
+    if (messageId) {
+      const message = await storage.getChatMessageById(messageId);
+      if (message) {
+        const messageAge = Date.now() - new Date(message.createdAt).getTime();
+        const maxDeleteWindow = 24 * 60 * 60 * 1000; // 24 hours
+
+        if (messageAge > maxDeleteWindow) {
+          return { 
+            allowed: false, 
+            reason: "Messages can only be deleted within 24 hours of sending" 
+          };
+        }
+      }
     }
 
     return { allowed: true };

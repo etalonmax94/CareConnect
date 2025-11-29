@@ -3598,6 +3598,47 @@ export class DbStorage implements IStorage {
     return rooms[0];
   }
 
+  // Find existing group chat with exact same participants (2-3 users)
+  async findExistingGroupChatWithParticipants(participantIds: string[]): Promise<ChatRoom | undefined> {
+    if (participantIds.length < 2 || participantIds.length > 3) {
+      return undefined; // Only check for 2-3 person groups
+    }
+    
+    // Get rooms for first participant
+    const firstUserRooms = await db.select({ roomId: chatRoomParticipants.roomId })
+      .from(chatRoomParticipants)
+      .where(eq(chatRoomParticipants.staffId, participantIds[0]));
+    
+    const potentialRoomIds = firstUserRooms.map(r => r.roomId);
+    if (potentialRoomIds.length === 0) return undefined;
+    
+    // Filter to only group rooms that are not archived
+    const groupRooms = await db.select().from(chatRooms)
+      .where(and(
+        inArray(chatRooms.id, potentialRoomIds),
+        eq(chatRooms.type, "group"),
+        eq(chatRooms.isArchived, "no")
+      ));
+    
+    // Check each room to see if participants match exactly
+    for (const room of groupRooms) {
+      const roomParticipants = await db.select({ staffId: chatRoomParticipants.staffId })
+        .from(chatRoomParticipants)
+        .where(eq(chatRoomParticipants.roomId, room.id));
+      
+      const roomParticipantIds = roomParticipants.map(p => p.staffId).sort();
+      const targetIds = [...participantIds].sort();
+      
+      // Check if exact match
+      if (roomParticipantIds.length === targetIds.length &&
+          roomParticipantIds.every((id, i) => id === targetIds[i])) {
+        return room;
+      }
+    }
+    
+    return undefined;
+  }
+
   async createChatRoom(room: InsertChatRoom): Promise<ChatRoom> {
     const result = await db.insert(chatRooms).values(room).returning();
     return result[0];

@@ -8824,6 +8824,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      // Check for duplicate group chats with same 2-3 participants
+      const participantIds = [userId];
+      if (req.body.participants && Array.isArray(req.body.participants)) {
+        for (const p of req.body.participants) {
+          if (p.staffId && p.staffId !== userId) {
+            participantIds.push(p.staffId);
+          }
+        }
+      }
+      
+      // For small groups (2-3 people), check if chat already exists
+      if (participantIds.length >= 2 && participantIds.length <= 3) {
+        const existingRoom = await storage.findExistingGroupChatWithParticipants(participantIds);
+        if (existingRoom) {
+          const participants = await storage.getChatRoomParticipants(existingRoom.id);
+          return res.json({ ...existingRoom, participants, alreadyExists: true });
+        }
+      }
+
       const validatedData = insertChatRoomSchema.parse({
         ...req.body,
         type: "group",
@@ -10791,7 +10810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         permission = await chatAuthorizationService.checkPermission(
           "delete_any_message", 
           userContext, 
-          message.roomId
+          message.roomId,
+          messageId
         );
       }
       
