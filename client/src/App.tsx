@@ -5,11 +5,12 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import GlobalSearch from "@/components/GlobalSearch";
 import UserProfileDropdown from "@/components/UserProfileDropdown";
 import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
 import { extractAndStoreTokenFromUrl } from "@/lib/auth";
 import Dashboard from "@/pages/Dashboard";
 import Clients from "@/pages/Clients";
@@ -125,6 +126,21 @@ function ProtectedRouter() {
   );
 }
 
+function MobileMenuButton() {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={toggleSidebar}
+      data-testid="button-sidebar-toggle"
+      className="md:hidden"
+    >
+      <Menu className="h-5 w-5" />
+    </Button>
+  );
+}
+
 function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> }) {
   const [location] = useLocation();
   const isDashboard = location === "/";
@@ -174,7 +190,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<AuthResponse["user"]> })
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between w-full px-4 py-2 border-b sticky top-0 bg-background z-50 gap-4">
             <div className="flex items-center gap-4 flex-shrink-0">
-              <SidebarTrigger data-testid="button-sidebar-toggle" className="md:hidden" />
+              <MobileMenuButton />
               <img src={logoImage} alt="EmpowerLink" className="h-7 w-auto hidden sm:block" />
             </div>
             <div className="flex-1 flex justify-center max-w-2xl mx-auto">
