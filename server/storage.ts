@@ -773,6 +773,7 @@ export interface IStorage {
   
   // Chat Message Attachments
   getChatMessageAttachments(messageId: string): Promise<ChatMessageAttachment[]>;
+  getChatMessageAttachmentById(id: string): Promise<ChatMessageAttachment | undefined>;
   createChatMessageAttachment(attachment: InsertChatMessageAttachment): Promise<ChatMessageAttachment>;
   updateChatMessageAttachmentStatus(id: string, status: string, error?: string): Promise<ChatMessageAttachment | undefined>;
   deleteChatMessageAttachment(id: string): Promise<boolean>;
@@ -4329,6 +4330,13 @@ export class DbStorage implements IStorage {
       .from(chatMessageAttachments)
       .where(eq(chatMessageAttachments.messageId, messageId))
       .orderBy(chatMessageAttachments.createdAt);
+  }
+
+  async getChatMessageAttachmentById(id: string): Promise<ChatMessageAttachment | undefined> {
+    const result = await db.select()
+      .from(chatMessageAttachments)
+      .where(eq(chatMessageAttachments.id, id));
+    return result[0];
   }
 
   async createChatMessageAttachment(attachment: InsertChatMessageAttachment): Promise<ChatMessageAttachment> {

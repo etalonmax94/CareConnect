@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
+import { AIWritingAssistant, AIWritingButton } from "@/components/AIWritingAssistant";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatRoom, ChatMessage, ChatRoomParticipant, Staff, UserRole, User, ChatMessageReaction, ChatMessageRead } from "@shared/schema";
 import { USER_ROLES } from "@shared/schema";
@@ -161,6 +162,7 @@ export default function Chat() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showCustomChatDialog, setShowCustomChatDialog] = useState(false);
@@ -1736,6 +1738,23 @@ export default function Chat() {
 
   const activeStaff = staff.filter(s => s.isActive === "yes");
 
+  // Helper to extract attachment URL from JSON content (fallback for corrupted messages)
+  const getAttachmentFromContent = (content: string): { url: string; type?: string } | null => {
+    if (!content) return null;
+    try {
+      // Check if content looks like JSON with attachmentUrl
+      if (content.startsWith("{") && content.includes("attachmentUrl")) {
+        const parsed = JSON.parse(content);
+        if (parsed.attachmentUrl) {
+          return { url: parsed.attachmentUrl, type: parsed.messageType || parsed.attachmentType };
+        }
+      }
+    } catch {
+      // Not valid JSON, that's fine
+    }
+    return null;
+  };
+
   const renderMessageContent = (content: string, isOwn: boolean) => {
     const mentionPattern = /@(\w+(?:\s+\w+)*)/g;
     const parts: (string | JSX.Element)[] = [];
@@ -2761,19 +2780,72 @@ export default function Chat() {
                                   <div className={`p-2 rounded-full ${isOwn ? "bg-white/20" : "bg-primary/10"}`}>
                                     <Mic className={`h-4 w-4 ${isOwn ? "text-white" : "text-primary"}`} />
                                   </div>
-                                  <audio 
-                                    src={(message as any).attachmentUrl} 
+                                  <audio
+                                    src={(message as any).attachmentUrl}
                                     controls
                                     className="h-8 max-w-[200px]"
                                   >
                                     Your browser does not support the audio tag.
                                   </audio>
                                 </div>
-                              ) : (
-                                <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
-                                  {renderMessageContent(message.content || "", isOwn)}
-                                </p>
-                              )}
+                              ) : (() => {
+                                // Fallback: Check if content contains JSON with attachmentUrl
+                                const embeddedAttachment = getAttachmentFromContent(message.content || "");
+                                if (embeddedAttachment) {
+                                  const url = embeddedAttachment.url;
+                                  const type = embeddedAttachment.type || (message as any).messageType;
+
+                                  // Render based on detected type or URL pattern
+                                  if (type === "voice" || url.includes("voice")) {
+                                    return (
+                                      <div className="flex items-center gap-3 py-1" data-testid={`voice-message-${message.id}`}>
+                                        <div className={`p-2 rounded-full ${isOwn ? "bg-white/20" : "bg-primary/10"}`}>
+                                          <Mic className={`h-4 w-4 ${isOwn ? "text-white" : "text-primary"}`} />
+                                        </div>
+                                        <audio src={url} controls className="h-8 max-w-[200px]">
+                                          Your browser does not support the audio tag.
+                                        </audio>
+                                      </div>
+                                    );
+                                  } else if (type === "image" || url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                                    return (
+                                      <img
+                                        src={url}
+                                        alt="Image"
+                                        className="max-w-[280px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                        loading="lazy"
+                                        onClick={() => window.open(url, '_blank')}
+                                      />
+                                    );
+                                  } else if (type === "video" || url.match(/\.(mp4|webm|mov)$/i)) {
+                                    return (
+                                      <video src={url} controls className="max-w-[280px] max-h-[200px] rounded-xl">
+                                        Your browser does not support the video tag.
+                                      </video>
+                                    );
+                                  } else {
+                                    // Generic file/attachment
+                                    return (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-[14px] hover:underline"
+                                      >
+                                        <Paperclip className="h-4 w-4" />
+                                        Download attachment
+                                      </a>
+                                    );
+                                  }
+                                }
+
+                                // Regular text message
+                                return (
+                                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
+                                    {renderMessageContent(message.content || "", isOwn)}
+                                  </p>
+                                );
+                              })()}
                             </div>
 
                             {!isDeleted && (
@@ -3089,87 +3161,145 @@ export default function Chat() {
                   data-testid="input-file-upload"
                 />
                 
-                {/* Attachment Buttons - Touch-friendly for mobile */}
+                {/* Combined Actions Dropdown */}
                 <div className="flex items-center shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full min-w-[44px] min-h-[44px]"
-                    onClick={() => selectedRoomId && fileInputRef.current?.click()}
-                    disabled={!selectedRoomId || uploadAttachmentMutation.isPending}
-                    data-testid="button-attach-file"
-                    title={!selectedRoomId ? "Select a chat first" : "Attach file"}
-                  >
-                    {uploadAttachmentMutation.isPending ? (
-                      <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Paperclip className="h-5 w-5" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full min-w-[44px] min-h-[44px]"
-                    onClick={() => selectedRoomId && setShowGifPicker(true)}
-                    disabled={!selectedRoomId || sendGifMutation.isPending}
-                    data-testid="button-gif-picker"
-                    title={!selectedRoomId ? "Select a chat first" : "Send GIF"}
-                  >
-                    <ImageIcon className="h-5 w-5" />
-                  </Button>
-                  {/* Templates Dropdown */}
-                  <DropdownMenu open={showTemplatesMenu} onOpenChange={setShowTemplatesMenu}>
+                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="rounded-full min-w-[44px] min-h-[44px]"
                         disabled={!selectedRoomId}
-                        data-testid="button-templates"
-                        title={!selectedRoomId ? "Select a chat first" : "Message templates"}
+                        data-testid="button-message-actions"
+                        title={!selectedRoomId ? "Select a chat first" : "Message options"}
                       >
-                        <FileCode className="h-5 w-5" />
+                        {uploadAttachmentMutation.isPending ? (
+                          <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Plus className="h-5 w-5" />
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-64">
-                      {templates.length === 0 ? (
-                        <div className="px-3 py-4 text-center text-muted-foreground">
-                          <FileCode className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm font-medium">No templates yet</p>
-                          <p className="text-xs">Save common messages for quick access</p>
-                        </div>
-                      ) : (
-                        templates.map((template) => (
-                          <DropdownMenuItem
-                            key={template.id}
-                            onClick={() => useTemplate(template.content)}
-                            className="flex items-start gap-2 py-2"
-                            data-testid={`template-item-${template.id}`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm">{template.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{template.content}</p>
-                            </div>
-                          </DropdownMenuItem>
-                        ))
-                      )}
-                      <DropdownMenuSeparator />
+                    <DropdownMenuContent align="start" className="w-56">
+                      {/* Attachment Option */}
                       <DropdownMenuItem
-                        onClick={() => setShowTemplatesDialog(true)}
-                        data-testid="button-manage-templates"
+                        onClick={() => selectedRoomId && fileInputRef.current?.click()}
+                        disabled={uploadAttachmentMutation.isPending}
+                        data-testid="menu-attach-file"
                       >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Manage Templates
+                        <Paperclip className="h-4 w-4 mr-3" />
+                        <div>
+                          <p className="font-medium">Attach File</p>
+                          <p className="text-xs text-muted-foreground">Images & videos</p>
+                        </div>
                       </DropdownMenuItem>
-                      {messageText.trim() && (
-                        <DropdownMenuItem
-                          onClick={saveCurrentAsTemplate}
-                          data-testid="button-save-as-template"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Save Current as Template
-                        </DropdownMenuItem>
-                      )}
+
+                      {/* GIF Option */}
+                      <DropdownMenuItem
+                        onClick={() => selectedRoomId && setShowGifPicker(true)}
+                        disabled={sendGifMutation.isPending}
+                        data-testid="menu-gif-picker"
+                      >
+                        <ImageIcon className="h-4 w-4 mr-3" />
+                        <div>
+                          <p className="font-medium">Send GIF</p>
+                          <p className="text-xs text-muted-foreground">Search & share GIFs</p>
+                        </div>
+                      </DropdownMenuItem>
+
+                      {/* Voice Recording Option */}
+                      <DropdownMenuItem
+                        onClick={startRecording}
+                        data-testid="menu-voice-recording"
+                      >
+                        <Mic className="h-4 w-4 mr-3" />
+                        <div>
+                          <p className="font-medium">Voice Message</p>
+                          <p className="text-xs text-muted-foreground">Record audio</p>
+                        </div>
+                      </DropdownMenuItem>
+
+                      {/* Schedule Message Option */}
+                      <DropdownMenuItem
+                        onClick={openScheduleDialog}
+                        data-testid="menu-schedule-message"
+                      >
+                        <Clock className="h-4 w-4 mr-3" />
+                        <div>
+                          <p className="font-medium">Schedule Message</p>
+                          <p className="text-xs text-muted-foreground">Send later</p>
+                        </div>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+
+                      {/* Templates Sub-menu */}
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <FileCode className="h-4 w-4 mr-3" />
+                          <span>Templates</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-56">
+                          {templates.length === 0 ? (
+                            <div className="px-3 py-4 text-center text-muted-foreground">
+                              <FileCode className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                              <p className="text-xs">No templates yet</p>
+                            </div>
+                          ) : (
+                            templates.map((template) => (
+                              <DropdownMenuItem
+                                key={template.id}
+                                onClick={() => useTemplate(template.content)}
+                                className="flex items-start gap-2 py-2"
+                                data-testid={`template-item-${template.id}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm">{template.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{template.content}</p>
+                                </div>
+                              </DropdownMenuItem>
+                            ))
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setShowTemplatesDialog(true)}
+                            data-testid="button-manage-templates"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Manage Templates
+                          </DropdownMenuItem>
+                          {messageText.trim() && (
+                            <DropdownMenuItem
+                              onClick={saveCurrentAsTemplate}
+                              data-testid="button-save-as-template"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Save as Template
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+
+                      <DropdownMenuSeparator />
+
+                      {/* AI Writing Assistant */}
+                      <DropdownMenuItem
+                        onClick={() => setAiChatOpen(true)}
+                        className="text-purple-600"
+                        data-testid="menu-ai-assist"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-3">
+                          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                          <path d="M5 3v4"/>
+                          <path d="M19 17v4"/>
+                          <path d="M3 5h4"/>
+                          <path d="M17 19h4"/>
+                        </svg>
+                        <div>
+                          <p className="font-medium">AI Writing Assist</p>
+                          <p className="text-xs text-muted-foreground">Get help composing</p>
+                        </div>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -3286,42 +3416,16 @@ export default function Chat() {
                     </Button>
                   </div>
                 ) : (
-                  <>
-                    {/* Schedule Message Button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full shrink-0 min-w-[44px] min-h-[44px]"
-                      onClick={openScheduleDialog}
-                      disabled={!selectedRoomId}
-                      data-testid="button-schedule-message"
-                      title={!selectedRoomId ? "Select a chat first" : "Schedule message"}
-                    >
-                      <Clock className="h-5 w-5" />
-                    </Button>
-                    {/* Voice Recording Button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full shrink-0 min-w-[44px] min-h-[44px]"
-                      onClick={startRecording}
-                      disabled={!selectedRoomId}
-                      data-testid="button-start-recording"
-                      title={!selectedRoomId ? "Select a chat first" : "Record voice message"}
-                    >
-                      <Mic className="h-5 w-5" />
-                    </Button>
-                    {/* Send Button - Touch-friendly for mobile */}
-                    <Button
-                      size="icon"
-                      className="rounded-full shrink-0 shadow-sm min-w-[44px] min-h-[44px]"
-                      onClick={handleSendMessage}
-                      disabled={!messageText.trim() || sendMessageMutation.isPending}
-                      data-testid="button-send-message"
-                    >
-                      <Send className="h-5 w-5" />
-                    </Button>
-                  </>
+                  /* Send Button - Touch-friendly for mobile */
+                  <Button
+                    size="icon"
+                    className="rounded-full shrink-0 shadow-sm min-w-[44px] min-h-[44px]"
+                    onClick={handleSendMessage}
+                    disabled={!messageText.trim() || sendMessageMutation.isPending}
+                    data-testid="button-send-message"
+                  >
+                    <Send className="h-5 w-5" />
+                  </Button>
                 )}
               </div>
             </div>
@@ -4314,6 +4418,15 @@ export default function Chat() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Writing Assistant Dialog */}
+      <AIWritingAssistant
+        open={aiChatOpen}
+        onOpenChange={setAiChatOpen}
+        initialContent={messageText}
+        initialContext="general"
+        onApply={(text) => setMessageText(text)}
+      />
       </div>
     </div>
   );

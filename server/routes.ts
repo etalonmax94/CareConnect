@@ -10342,16 +10342,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { attachmentId } = req.params;
-      const attachments = await storage.getChatMessageAttachments(attachmentId);
-      
-      if (!attachments || attachments.length === 0) {
+      const attachment = await storage.getChatMessageAttachmentById(attachmentId);
+
+      if (!attachment) {
         return res.status(404).json({ error: "Attachment not found" });
       }
 
-      const attachment = attachments[0];
-      
+      // Get the message to find the roomId
+      const message = await storage.getChatMessageById(attachment.messageId);
+      if (!message) {
+        return res.status(404).json({ error: "Associated message not found" });
+      }
+
       // Check if user has access to the room
-      const permission = await chatAuthorizationService.checkPermission("view_messages", userContext, attachment.roomId);
+      const permission = await chatAuthorizationService.checkPermission("view_messages", userContext, message.roomId);
       if (!permission.allowed) {
         return res.status(403).json({ error: permission.reason });
       }
@@ -10372,16 +10376,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { attachmentId } = req.params;
-      const attachments = await storage.getChatMessageAttachments(attachmentId);
-      
-      if (!attachments || attachments.length === 0) {
+      const attachment = await storage.getChatMessageAttachmentById(attachmentId);
+
+      if (!attachment) {
         return res.status(404).json({ error: "Attachment not found" });
       }
 
-      const attachment = attachments[0];
-      
+      // Get the message to find the roomId
+      const message = await storage.getChatMessageById(attachment.messageId);
+      if (!message) {
+        return res.status(404).json({ error: "Associated message not found" });
+      }
+
       // Check if user has access to the room
-      const permission = await chatAuthorizationService.checkPermission("view_messages", userContext, attachment.roomId);
+      const permission = await chatAuthorizationService.checkPermission("view_messages", userContext, message.roomId);
       if (!permission.allowed) {
         return res.status(403).json({ error: permission.reason });
       }
@@ -10410,18 +10418,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { attachmentId } = req.params;
-      const attachments = await storage.getChatMessageAttachments(attachmentId);
-      
-      if (!attachments || attachments.length === 0) {
+      const attachment = await storage.getChatMessageAttachmentById(attachmentId);
+
+      if (!attachment) {
         return res.status(404).json({ error: "Attachment not found" });
       }
 
-      const attachment = attachments[0];
-      
-      // Check if user is uploader or has admin delete permission
-      const isUploader = attachment.uploadedById === userContext.userId;
+      // Get the message to check ownership
+      const message = await storage.getChatMessageById(attachment.messageId);
+      if (!message) {
+        return res.status(404).json({ error: "Associated message not found" });
+      }
+
+      // Check if user is uploader (via message sender) or has admin delete permission
+      const isUploader = message.senderId === userContext.userId;
       const isAdmin = chatAuthorizationService.isPrivilegedUser(userContext);
-      
+
       if (!isUploader && !isAdmin) {
         return res.status(403).json({ error: "You can only delete your own attachments" });
       }
@@ -10436,7 +10448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log entry
       await storage.createChatAuditLog({
-        roomId: attachment.roomId,
+        roomId: message.roomId,
         action: "attachment_deleted",
         actorId: userContext.userId,
         actorName: userContext.userName,

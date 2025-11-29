@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AIWritingAssistant, AIWritingButton } from "@/components/AIWritingAssistant";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -183,6 +184,7 @@ export default function PolicyManagement() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [aiPolicyOpen, setAiPolicyOpen] = useState(false);
 
   // Form state for creating/editing policies
   const [formData, setFormData] = useState({
@@ -674,7 +676,10 @@ export default function PolicyManagement() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="content">Policy Content (Optional if document uploaded)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="content">Policy Content (Optional if document uploaded)</Label>
+                  <AIWritingButton onClick={() => setAiPolicyOpen(true)} />
+                </div>
                 <Textarea
                   id="content"
                   value={formData.content}
@@ -683,6 +688,13 @@ export default function PolicyManagement() {
                   rows={6}
                 />
               </div>
+              <AIWritingAssistant
+                open={aiPolicyOpen}
+                onOpenChange={setAiPolicyOpen}
+                initialContent={formData.content}
+                initialContext="policy"
+                onApply={(text) => setFormData({ ...formData, content: text })}
+              />
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="effectiveDate">Effective Date</Label>
@@ -1202,13 +1214,23 @@ export default function PolicyManagement() {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label>Policy Content</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Policy Content</Label>
+                      <AIWritingButton onClick={() => setAiPolicyOpen(true)} />
+                    </div>
                     <Textarea
                       value={formData.content}
                       onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                       rows={10}
                     />
                   </div>
+                  <AIWritingAssistant
+                    open={aiPolicyOpen}
+                    onOpenChange={setAiPolicyOpen}
+                    initialContent={formData.content}
+                    initialContext="policy"
+                    onApply={(text) => setFormData({ ...formData, content: text })}
+                  />
                 </div>
               ) : (
                 <div className="space-y-4">

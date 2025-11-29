@@ -32,6 +32,7 @@ import { FRAT_LABELS, getRiskCategoryColor } from "@shared/fallsRisk";
 import ClientLocationMap from "@/components/ClientLocationMap";
 import CarePlanTab from "@/components/CarePlanTab";
 import GoalsTab from "@/components/GoalsTab";
+import { AIWritingAssistant, AIWritingButton } from "@/components/AIWritingAssistant";
 
 function NotificationBadge({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
@@ -1182,6 +1183,7 @@ export default function ClientProfile() {
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [noteType, setNoteType] = useState<"progress" | "clinical" | "incident" | "complaint" | "feedback">("progress");
+  const [aiProgressNoteOpen, setAiProgressNoteOpen] = useState(false);
   const [noteAuthorId, setNoteAuthorId] = useState("");
 
   const [addIncidentOpen, setAddIncidentOpen] = useState(false);
@@ -5416,7 +5418,10 @@ export default function ClientProfile() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label>Note Content</Label>
+                          <div className="flex items-center justify-between">
+                            <Label>Note Content</Label>
+                            <AIWritingButton onClick={() => setAiProgressNoteOpen(true)} />
+                          </div>
                           <Textarea
                             value={noteContent}
                             onChange={(e) => setNoteContent(e.target.value)}
@@ -5425,6 +5430,13 @@ export default function ClientProfile() {
                             data-testid="textarea-note-content"
                           />
                         </div>
+                        <AIWritingAssistant
+                          open={aiProgressNoteOpen}
+                          onOpenChange={setAiProgressNoteOpen}
+                          initialContent={noteContent}
+                          initialContext="progress_note"
+                          onApply={(text) => setNoteContent(text)}
+                        />
                         <Button 
                           onClick={handleAddNote}
                           disabled={!noteContent.trim() || !noteAuthorId || addNoteMutation.isPending}
