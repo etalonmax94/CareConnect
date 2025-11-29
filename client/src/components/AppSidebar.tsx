@@ -153,7 +153,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       <Link href={item.url} onClick={handleNavigation} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
         <div className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-          isCollapsed ? "justify-center" : "",
+          isCollapsed ? "justify-center border-b border-sidebar-border/50" : "",
           isActive 
             ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm' 
             : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
