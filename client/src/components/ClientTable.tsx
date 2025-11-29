@@ -203,7 +203,7 @@ export default function ClientTable({
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-md bg-white dark:bg-card shadow-sm">
+      <div className="border rounded-md bg-white dark:bg-card shadow-sm overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

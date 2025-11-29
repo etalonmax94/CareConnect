@@ -268,10 +268,22 @@ export default function Chat() {
   });
 
   // Fetch archived rooms (admin only)
-  const { data: archivedRooms = [] } = useQuery<ChatRoomWithParticipants[]>({
+  const { data: archivedRooms = [], error: archivedRoomsError, isLoading: archivedRoomsLoading } = useQuery<ChatRoomWithParticipants[]>({
     queryKey: ["/api/chat/rooms/archived"],
     enabled: !!currentUser && isAppAdmin,
   });
+
+  // Debug logging for archived rooms
+  useEffect(() => {
+    if (isAppAdmin) {
+      console.log("Admin status:", isAppAdmin);
+      console.log("Current user:", currentUser);
+      console.log("Archived rooms loading:", archivedRoomsLoading);
+      console.log("Archived rooms error:", archivedRoomsError);
+      console.log("Archived rooms data:", archivedRooms);
+      console.log("Archived rooms count:", archivedRooms?.length);
+    }
+  }, [isAppAdmin, currentUser, archivedRoomsLoading, archivedRoomsError, archivedRooms]);
 
   const { data: staff = [] } = useQuery<Staff[]>({
     queryKey: ["/api/staff"],
@@ -1811,7 +1823,7 @@ export default function Chat() {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background" data-testid="chat-page">
       {/* Sidebar - Conversation List */}
-      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col h-full overflow-hidden bg-card md:border-r z-20 relative`}>
+      <div className={`${selectedRoomId && isMobileView ? "hidden" : "flex"} w-full md:w-80 lg:w-96 flex-col h-full overflow-hidden bg-card md:border-r flex-shrink-0`}>
         {/* Header - Fixed at top */}
         <div className="shrink-0 bg-card border-b">
           <div className="px-4 pt-4 pb-3 md:px-5 md:pt-5">
@@ -2145,7 +2157,7 @@ export default function Chat() {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col h-full overflow-hidden bg-muted/30`}>
+      <div className={`${!selectedRoomId && isMobileView ? "hidden" : "flex"} flex-1 flex-col h-full overflow-hidden bg-muted/30 min-w-0`}>
         {selectedRoom ? (
           <>
             {/* Chat Header - Premium Design */}

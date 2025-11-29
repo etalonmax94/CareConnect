@@ -228,7 +228,7 @@ export default function HelpWidget() {
 
         {/* Main Button */}
         <Button
-          size="lg"
+          size="icon"
           className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow"
           onClick={() => setIsExpanded(!isExpanded)}
           data-testid="button-help-widget"

@@ -8764,23 +8764,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.session?.user?.id;
       const userRoles = req.session?.user?.roles || [];
-      
+
+      console.log("📦 Archived rooms request - User ID:", userId);
+      console.log("📦 Archived rooms request - User roles:", userRoles);
+
       if (!userId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
-      
+
       // Check if user is app admin
-      const isAppAdmin = userRoles.some((role: string) => 
+      const isAppAdmin = userRoles.some((role: string) =>
         ["admin", "director", "operations_manager", "clinical_manager", "developer"].includes(role.toLowerCase())
       );
-      
+
+      console.log("📦 Is app admin:", isAppAdmin);
+
       if (!isAppAdmin) {
+        console.log("📦 Access denied - user is not an admin");
         return res.status(403).json({ error: "Only administrators can view archived chats" });
       }
-      
+
       // Get all archived rooms
       const { rooms } = await storage.getAllChatRoomsWithFilters({ isArchived: "yes" });
-      
+
+      console.log("📦 Found archived rooms:", rooms.length);
+
       // Get participants for each room
       const roomsWithParticipants = await Promise.all(
         rooms.map(async (room) => {
@@ -8788,10 +8796,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return { ...room, participants };
         })
       );
-      
+
+      console.log("📦 Returning archived rooms with participants:", roomsWithParticipants.length);
       res.json(roomsWithParticipants);
     } catch (error) {
-      console.error("Error fetching archived chat rooms:", error);
+      console.error("❌ Error fetching archived chat rooms:", error);
       res.status(500).json({ error: "Failed to fetch archived chat rooms" });
     }
   });

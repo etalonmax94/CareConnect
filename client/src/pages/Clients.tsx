@@ -162,90 +162,96 @@ export default function Clients() {
         </Link>
       </div>
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button
-            variant={activeTab === "active" ? "default" : "outline"}
-            onClick={() => setActiveTab("active")}
-            className="gap-2"
-            data-testid="tab-active-clients"
-          >
-            <Users className="w-4 h-4" />
-            Active
-            <Badge variant={activeTab === "active" ? "secondary" : "outline"} className="ml-1">
-              {activeClients.length}
-            </Badge>
-          </Button>
-          <Button
-            variant={activeTab === "archived" ? "default" : "outline"}
-            onClick={() => setActiveTab("archived")}
-            className="gap-2"
-            data-testid="tab-archived-clients"
-          >
-            <Archive className="w-4 h-4" />
-            Archived
-            <Badge variant={activeTab === "archived" ? "secondary" : "outline"} className="ml-1">
-              {archivedClients.length}
-            </Badge>
-          </Button>
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Tabs */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant={activeTab === "active" ? "default" : "outline"}
+              onClick={() => setActiveTab("active")}
+              className="gap-2 flex-1 sm:flex-initial"
+              data-testid="tab-active-clients"
+            >
+              <Users className="w-4 h-4" />
+              <span className="hidden xs:inline">Active</span>
+              <Badge variant={activeTab === "active" ? "secondary" : "outline"} className="ml-1">
+                {activeClients.length}
+              </Badge>
+            </Button>
+            <Button
+              variant={activeTab === "archived" ? "default" : "outline"}
+              onClick={() => setActiveTab("archived")}
+              className="gap-2 flex-1 sm:flex-initial"
+              data-testid="tab-archived-clients"
+            >
+              <Archive className="w-4 h-4" />
+              <span className="hidden xs:inline">Archived</span>
+              <Badge variant={activeTab === "archived" ? "secondary" : "outline"} className="ml-1">
+                {archivedClients.length}
+              </Badge>
+            </Button>
+          </div>
 
-          <div className="h-6 w-px bg-border mx-1" />
+          <div className="hidden sm:block h-6 w-px bg-border mx-1" />
 
-          <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as ClientCategory | "All")}>
-            <SelectTrigger className="w-[140px]" data-testid="filter-category">
-              <SelectValue placeholder="Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">Categories</SelectItem>
-              <SelectItem value="NDIS">NDIS</SelectItem>
-              <SelectItem value="Support at Home">Support at Home</SelectItem>
-              <SelectItem value="Private">Private</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Filters - stacked on mobile */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 w-full sm:w-auto">
+            <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as ClientCategory | "All")}>
+              <SelectTrigger className="w-full sm:w-[140px]" data-testid="filter-category">
+                <SelectValue placeholder="Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">Categories</SelectItem>
+                <SelectItem value="NDIS">NDIS</SelectItem>
+                <SelectItem value="Support at Home">Support at Home</SelectItem>
+                <SelectItem value="Private">Private</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={selectedCareManager} onValueChange={setSelectedCareManager}>
-            <SelectTrigger className="w-[160px]" data-testid="filter-care-manager">
-              <SelectValue placeholder="Care Managers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">Care Managers</SelectItem>
-              {careManagers.map(cm => (
-                <SelectItem key={cm} value={cm}>{cm}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={selectedCareManager} onValueChange={setSelectedCareManager}>
+              <SelectTrigger className="w-full sm:w-[160px]" data-testid="filter-care-manager">
+                <SelectValue placeholder="Care Managers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">Care Managers</SelectItem>
+                {careManagers.map(cm => (
+                  <SelectItem key={cm} value={cm}>{cm}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-[130px]" data-testid="filter-status">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">Status</SelectItem>
-              <SelectItem value="Active">Active</SelectItem>
-              <SelectItem value="Hospital">Hospital</SelectItem>
-              <SelectItem value="Paused">Paused</SelectItem>
-              <SelectItem value="Discharged">Discharged</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-full sm:w-[130px]" data-testid="filter-status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">Status</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Hospital">Hospital</SelectItem>
+                <SelectItem value="Paused">Paused</SelectItem>
+                <SelectItem value="Discharged">Discharged</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
-            <SelectTrigger className="w-[140px]" data-testid="filter-compliance">
-              <SelectValue placeholder="Compliance" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">Compliance</SelectItem>
-              <SelectItem value="compliant">Compliant</SelectItem>
-              <SelectItem value="due-soon">Due Soon</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
+              <SelectTrigger className="w-full sm:w-[140px]" data-testid="filter-compliance">
+                <SelectValue placeholder="Compliance" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">Compliance</SelectItem>
+                <SelectItem value="compliant">Compliant</SelectItem>
+                <SelectItem value="due-soon">Due Soon</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {hasActiveFilters && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={clearAllFilters}
-              className="text-muted-foreground"
+              className="text-muted-foreground w-full sm:w-auto"
               data-testid="button-clear-filters"
             >
               <Filter className="w-4 h-4 mr-1" />
@@ -256,10 +262,11 @@ export default function Clients() {
 
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" data-testid="button-display-options">
+            <Button variant="outline" size="sm" className="w-full lg:w-auto" data-testid="button-display-options">
               <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Display
-              <span className="ml-2 text-xs text-muted-foreground">
+              <span className="hidden sm:inline">Display</span>
+              <span className="sm:hidden">View</span>
+              <span className="ml-2 text-xs text-muted-foreground hidden md:inline">
                 {viewMode === "list" ? "List" : "Grid"} • {density.charAt(0).toUpperCase() + density.slice(1)}
               </span>
             </Button>
