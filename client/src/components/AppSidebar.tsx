@@ -207,7 +207,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
         </div>
       </SidebarHeader>
       
-      <SidebarContent className={cn("pt-2 overflow-y-auto", isCollapsed ? "px-1" : "px-2")}>
+      <SidebarContent className={cn("pt-2 overflow-y-auto !overflow-auto", isCollapsed ? "px-1" : "px-2")}>
         {!isCollapsed && user && (
           <div className="px-3 py-3 mb-1">
             <div className="flex items-center gap-2 text-sidebar-foreground">
