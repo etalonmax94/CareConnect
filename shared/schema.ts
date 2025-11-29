@@ -1726,6 +1726,298 @@ export type InsertStaffStatusLog = z.infer<typeof insertStaffStatusLogSchema>;
 export type StaffStatusLog = typeof staffStatusLogs.$inferSelect;
 
 // ============================================
+// WORKFORCE MANAGEMENT SYSTEM
+// ============================================
+
+// Staff Qualifications & Capabilities
+export type QualificationType = "nursing" | "first_aid" | "medication_admin" | "manual_handling" | "behavioral_support" | "complex_care" | "driver_license" | "other";
+export type QualificationStatus = "current" | "expired" | "pending_renewal";
+
+export const staffQualifications = pgTable("staff_qualifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  qualificationType: text("qualification_type").$type<QualificationType>().notNull(),
+  qualificationName: text("qualification_name").notNull(),
+  issuingOrganization: text("issuing_organization"),
+  certificationNumber: text("certification_number"),
+
+  // Validity
+  issuedDate: date("issued_date"),
+  expiryDate: date("expiry_date"),
+  status: text("status").$type<QualificationStatus>().default("current"),
+
+  // Documents
+  documentUrl: text("document_url"),
+  verifiedById: varchar("verified_by_id").references(() => users.id, { onDelete: "set null" }),
+  verifiedByName: text("verified_by_name"),
+  verifiedAt: timestamp("verified_at"),
+
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffQualificationSchema = createInsertSchema(staffQualifications, {
+  qualificationType: z.enum(["nursing", "first_aid", "medication_admin", "manual_handling", "behavioral_support", "complex_care", "driver_license", "other"]),
+  status: z.enum(["current", "expired", "pending_renewal"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffQualification = z.infer<typeof insertStaffQualificationSchema>;
+export type StaffQualification = typeof staffQualifications.$inferSelect;
+
+// Staff Blacklist - Service type, category, or general restrictions
+export type BlacklistType = "service_type" | "service_category" | "client_category" | "general";
+export type BlacklistSeverity = "warning" | "soft_block" | "hard_block";
+
+export const staffBlacklist = pgTable("staff_blacklist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  blacklistType: text("blacklist_type").$type<BlacklistType>().notNull(),
+  severity: text("severity").$type<BlacklistSeverity>().default("hard_block"),
+
+  // What's being restricted
+  serviceType: text("service_type").$type<ServiceType>(), // NDIS, Support at Home, Private
+  serviceCategory: text("service_category"), // e.g., "complex nursing", "high-risk", "behavioral support"
+  clientCategory: text("client_category").$type<ClientCategory>(), // NDIS, Support at Home, Private
+
+  reason: text("reason").notNull(),
+
+  // Effective period
+  effectiveFrom: timestamp("effective_from").defaultNow().notNull(),
+  effectiveTo: timestamp("effective_to"), // null = permanent
+
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+
+  createdById: varchar("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffBlacklistSchema = createInsertSchema(staffBlacklist, {
+  blacklistType: z.enum(["service_type", "service_category", "client_category", "general"]),
+  severity: z.enum(["warning", "soft_block", "hard_block"]).optional(),
+  serviceType: z.enum(["NDIS", "Support at Home", "Private"]).optional().nullable(),
+  clientCategory: z.enum(["NDIS", "Support at Home", "Private"]).optional().nullable(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffBlacklist = z.infer<typeof insertStaffBlacklistSchema>;
+export type StaffBlacklist = typeof staffBlacklist.$inferSelect;
+
+// Time Clock Records - Staff clock in/out with GPS
+export type ClockEventType = "clock_in" | "clock_out" | "break_start" | "break_end";
+export type ClockEventStatus = "valid" | "flagged_gps" | "flagged_overlap" | "flagged_manual" | "admin_override";
+
+export const timeClockRecords = pgTable("time_clock_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }),
+
+  eventType: text("event_type").$type<ClockEventType>().notNull(),
+  eventStatus: text("event_status").$type<ClockEventStatus>().default("valid"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+
+  // GPS Location
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  accuracy: text("accuracy"), // in meters
+
+  // Expected location (from appointment or client address)
+  expectedLatitude: text("expected_latitude"),
+  expectedLongitude: text("expected_longitude"),
+  distanceFromExpected: text("distance_from_expected"), // in meters
+
+  // Validation
+  isWithinRadius: text("is_within_radius").default("yes").$type<"yes" | "no">(),
+  radiusThreshold: text("radius_threshold").default("100"), // meters
+
+  // Device info
+  deviceType: text("device_type"), // "mobile", "desktop", "tablet"
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+
+  notes: text("notes"),
+  flagReason: text("flag_reason"),
+
+  // Admin review
+  reviewedById: varchar("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+  reviewedByName: text("reviewed_by_name"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTimeClockRecordSchema = createInsertSchema(timeClockRecords, {
+  eventType: z.enum(["clock_in", "clock_out", "break_start", "break_end"]),
+  eventStatus: z.enum(["valid", "flagged_gps", "flagged_overlap", "flagged_manual", "admin_override"]).optional(),
+  isWithinRadius: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTimeClockRecord = z.infer<typeof insertTimeClockRecordSchema>;
+export type TimeClockRecord = typeof timeClockRecords.$inferSelect;
+
+// Timesheets - Generated from clock records, approved by admins
+export type TimesheetStatus = "draft" | "submitted" | "approved" | "rejected" | "paid";
+
+export const timesheets = pgTable("timesheets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  // Period
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+
+  status: text("status").$type<TimesheetStatus>().default("draft"),
+
+  // Hours summary
+  totalHours: text("total_hours").default("0"),
+  weekdayHours: text("weekday_hours").default("0"),
+  saturdayHours: text("saturday_hours").default("0"),
+  sundayHours: text("sunday_hours").default("0"),
+  publicHolidayHours: text("public_holiday_hours").default("0"),
+  eveningHours: text("evening_hours").default("0"),
+  nightHours: text("night_hours").default("0"),
+
+  // Financial
+  totalAmount: text("total_amount").default("0"),
+
+  // Approval workflow
+  submittedAt: timestamp("submitted_at"),
+  approvedById: varchar("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+  approvedByName: text("approved_by_name"),
+  approvedAt: timestamp("approved_at"),
+
+  rejectionReason: text("rejection_reason"),
+
+  // Payment tracking
+  paidAt: timestamp("paid_at"),
+  paymentReference: text("payment_reference"),
+
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTimesheetSchema = createInsertSchema(timesheets, {
+  status: z.enum(["draft", "submitted", "approved", "rejected", "paid"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTimesheet = z.infer<typeof insertTimesheetSchema>;
+export type Timesheet = typeof timesheets.$inferSelect;
+
+// Timesheet Entries - Individual clock records linked to timesheet
+export const timesheetEntries = pgTable("timesheet_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timesheetId: varchar("timesheet_id").notNull().references(() => timesheets.id, { onDelete: "cascade" }),
+  clockInId: varchar("clock_in_id").notNull().references(() => timeClockRecords.id, { onDelete: "cascade" }),
+  clockOutId: varchar("clock_out_id").references(() => timeClockRecords.id, { onDelete: "set null" }),
+
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }),
+
+  // Calculated values
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time"),
+  totalHours: text("total_hours").default("0"),
+
+  // Rate type (based on time of day/week)
+  rateType: text("rate_type").$type<RateType>(),
+  hourlyRate: text("hourly_rate").default("0"),
+  totalAmount: text("total_amount").default("0"),
+
+  // Adjustments
+  isAdjusted: text("is_adjusted").default("no").$type<"yes" | "no">(),
+  adjustedHours: text("adjusted_hours"),
+  adjustedAmount: text("adjusted_amount"),
+  adjustmentReason: text("adjustment_reason"),
+  adjustedById: varchar("adjusted_by_id").references(() => users.id, { onDelete: "set null" }),
+  adjustedByName: text("adjusted_by_name"),
+
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTimesheetEntrySchema = createInsertSchema(timesheetEntries, {
+  rateType: z.enum(["weekday", "saturday", "sunday", "public_holiday", "evening", "night"]).optional().nullable(),
+  isAdjusted: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTimesheetEntry = z.infer<typeof insertTimesheetEntrySchema>;
+export type TimesheetEntry = typeof timesheetEntries.$inferSelect;
+
+// GPS Compliance Logs - Track all GPS-related compliance events
+export type GpsComplianceEventType = "location_verified" | "location_mismatch" | "location_unavailable" | "radius_exceeded" | "manual_override";
+
+export const gpsComplianceLogs = pgTable("gps_compliance_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  eventType: text("event_type").$type<GpsComplianceEventType>().notNull(),
+
+  staffId: varchar("staff_id").references(() => staff.id, { onDelete: "cascade" }),
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  clockRecordId: varchar("clock_record_id").references(() => timeClockRecords.id, { onDelete: "set null" }),
+
+  // Location data
+  recordedLatitude: text("recorded_latitude"),
+  recordedLongitude: text("recorded_longitude"),
+  expectedLatitude: text("expected_latitude"),
+  expectedLongitude: text("expected_longitude"),
+  distanceMeters: text("distance_meters"),
+  accuracyMeters: text("accuracy_meters"),
+
+  // Compliance status
+  isCompliant: text("is_compliant").$type<"yes" | "no">().default("yes"),
+  radiusThreshold: text("radius_threshold").default("100"),
+
+  // Admin review
+  requiresReview: text("requires_review").default("no").$type<"yes" | "no">(),
+  reviewedById: varchar("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+  reviewedByName: text("reviewed_by_name"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewOutcome: text("review_outcome"), // "approved", "rejected", "escalated"
+  reviewNotes: text("review_notes"),
+
+  notes: text("notes"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGpsComplianceLogSchema = createInsertSchema(gpsComplianceLogs, {
+  eventType: z.enum(["location_verified", "location_mismatch", "location_unavailable", "radius_exceeded", "manual_override"]),
+  isCompliant: z.enum(["yes", "no"]).optional(),
+  requiresReview: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertGpsComplianceLog = z.infer<typeof insertGpsComplianceLogSchema>;
+export type GpsComplianceLog = typeof gpsComplianceLogs.$inferSelect;
+
+// ============================================
 // SCHEDULING CONFLICTS SYSTEM
 // ============================================
 

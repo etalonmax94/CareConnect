@@ -7,7 +7,9 @@
       "Bash(node read-pricing-sheet.js:*)",
       "Bash(npm run db:push:*)",
       "Bash(node:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
