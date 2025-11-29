@@ -6,7 +6,7 @@ import {
   alliedHealthProfessionals,
   documents, clientStaffAssignments, serviceDeliveries, clientGoals, goalUpdates, goalActionPlans,
   clientDocumentFolders, clientDocumentCompliance,
-  ndisPriceGuideItems, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory,
+  ndisPriceGuideItems, pricingServices, quotes, quoteLineItems, quoteStatusHistory, quoteSendHistory, quoteVsActual,
   clientContacts, clientBehaviors, leadershipMeetingNotes,
   // New scheduling and care plan tables
   appointments, appointmentAssignments, appointmentCheckins,
@@ -46,9 +46,11 @@ import {
   type InsertGoalUpdate, type GoalUpdate,
   type InsertGoalActionPlan, type GoalActionPlan,
   type InsertNdisPriceGuideItem, type NdisPriceGuideItem,
+  type InsertPricingService, type PricingService,
   type InsertQuote, type Quote, type InsertQuoteLineItem, type QuoteLineItem,
   type InsertQuoteStatusHistory, type QuoteStatusHistory,
   type InsertQuoteSendHistory, type QuoteSendHistory,
+  type InsertQuoteVsActual, type QuoteVsActual,
   type InsertClientContact, type ClientContact,
   type InsertClientBehavior, type ClientBehavior,
   type InsertLeadershipMeetingNote, type LeadershipMeetingNote,
@@ -1062,6 +1064,81 @@ export class DbStorage implements IStorage {
     const result = await db.update(budgets)
       .set({ ...budgetUpdate as any, updatedAt: new Date() })
       .where(eq(budgets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Pricing Services
+  async getAllPricingServices(): Promise<PricingService[]> {
+    return await db.select().from(pricingServices)
+      .where(eq(pricingServices.isActive, 'yes'))
+      .orderBy(pricingServices.category, pricingServices.serviceName);
+  }
+
+  async getPricingServicesByType(serviceType: string): Promise<PricingService[]> {
+    return await db.select().from(pricingServices)
+      .where(and(
+        eq(pricingServices.serviceType, serviceType as any),
+        eq(pricingServices.isActive, 'yes')
+      ))
+      .orderBy(pricingServices.category, pricingServices.serviceName);
+  }
+
+  async searchPricingServices(searchTerm: string): Promise<PricingService[]> {
+    const search = `%${searchTerm}%`;
+    return await db.select().from(pricingServices)
+      .where(and(
+        or(
+          ilike(pricingServices.serviceName, search),
+          ilike(pricingServices.description, search),
+          ilike(pricingServices.category, search)
+        ),
+        eq(pricingServices.isActive, 'yes')
+      ))
+      .orderBy(pricingServices.category, pricingServices.serviceName)
+      .limit(20);
+  }
+
+  async getPricingServiceById(id: string): Promise<PricingService | undefined> {
+    const result = await db.select().from(pricingServices).where(eq(pricingServices.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createPricingService(service: InsertPricingService): Promise<PricingService> {
+    const result = await db.insert(pricingServices).values(service).returning();
+    return result[0];
+  }
+
+  async updatePricingService(id: string, service: Partial<InsertPricingService>): Promise<PricingService | undefined> {
+    const result = await db.update(pricingServices)
+      .set({ ...service as any, updatedAt: new Date() })
+      .where(eq(pricingServices.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Quote vs Actual Tracking
+  async getQuoteVsActualByQuote(quoteId: string): Promise<QuoteVsActual[]> {
+    return await db.select().from(quoteVsActual)
+      .where(eq(quoteVsActual.quoteId, quoteId))
+      .orderBy(quoteVsActual.serviceName);
+  }
+
+  async getQuoteVsActualByClient(clientId: string): Promise<QuoteVsActual[]> {
+    return await db.select().from(quoteVsActual)
+      .where(eq(quoteVsActual.clientId, clientId))
+      .orderBy(desc(quoteVsActual.createdAt));
+  }
+
+  async createQuoteVsActual(tracking: InsertQuoteVsActual): Promise<QuoteVsActual> {
+    const result = await db.insert(quoteVsActual).values(tracking).returning();
+    return result[0];
+  }
+
+  async updateQuoteVsActual(id: string, tracking: Partial<InsertQuoteVsActual>): Promise<QuoteVsActual | undefined> {
+    const result = await db.update(quoteVsActual)
+      .set({ ...tracking as any, updatedAt: new Date() })
+      .where(eq(quoteVsActual.id, id))
       .returning();
     return result[0];
   }

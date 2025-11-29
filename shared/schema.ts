@@ -823,6 +823,7 @@ export const staff = pgTable("staff", {
   role: text("role").$type<"support_worker" | "nurse" | "care_manager" | "admin">().default("support_worker"),
   isActive: text("is_active").default("yes").$type<"yes" | "no">(),
   notes: text("notes"),
+  supervisorId: varchar("supervisor_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

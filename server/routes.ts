@@ -2932,6 +2932,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get organizational chart hierarchy
+  app.get("/api/org-chart/hierarchy", async (req, res) => {
+    try {
+      const staffList = await storage.getAllStaff();
+      const hierarchy: Record<string, any> = {};
+      
+      staffList.forEach((member) => {
+        const supervisor = member.supervisorId ? staffList.find(s => s.id === member.supervisorId) : undefined;
+        hierarchy[member.id] = {
+          ...member,
+          supervisor,
+          subordinates: staffList.filter(s => s.supervisorId === member.id),
+        };
+      });
+      
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("Error fetching org chart hierarchy:", error);
+      res.status(500).json({ error: "Failed to fetch organization hierarchy" });
+    }
+  });
+
   // ==================== SUPPORT COORDINATORS ROUTES ====================
   
   // Get all support coordinators
@@ -4728,6 +4750,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting price guide item:", error);
       res.status(500).json({ error: "Failed to delete price guide item" });
+    }
+  });
+
+  // ==================== PRICING SERVICES ROUTES ====================
+
+  // Get all pricing services
+  app.get("/api/pricing-services", async (req, res) => {
+    try {
+      const serviceType = req.query.serviceType as string;
+      if (serviceType) {
+        const services = await storage.getPricingServicesByType(serviceType);
+        res.json(services);
+      } else {
+        const services = await storage.getAllPricingServices();
+        res.json(services);
+      }
+    } catch (error) {
+      console.error("Error fetching pricing services:", error);
+      res.status(500).json({ error: "Failed to fetch pricing services" });
+    }
+  });
+
+  // Search pricing services
+  app.get("/api/pricing-services/search", async (req, res) => {
+    try {
+      const searchTerm = (req.query.q as string) || "";
+      const services = await storage.searchPricingServices(searchTerm);
+      res.json(services);
+    } catch (error) {
+      console.error("Error searching pricing services:", error);
+      res.status(500).json({ error: "Failed to search pricing services" });
+    }
+  });
+
+  // Get single pricing service
+  app.get("/api/pricing-services/:id", async (req, res) => {
+    try {
+      const service = await storage.getPricingServiceById(req.params.id);
+      if (!service) {
+        return res.status(404).json({ error: "Pricing service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      console.error("Error fetching pricing service:", error);
+      res.status(500).json({ error: "Failed to fetch pricing service" });
+    }
+  });
+
+  // Create pricing service
+  app.post("/api/pricing-services", async (req, res) => {
+    try {
+      const service = await storage.createPricingService(req.body);
+      res.status(201).json(service);
+    } catch (error) {
+      console.error("Error creating pricing service:", error);
+      res.status(500).json({ error: "Failed to create pricing service" });
+    }
+  });
+
+  // Update pricing service
+  app.patch("/api/pricing-services/:id", async (req, res) => {
+    try {
+      const service = await storage.updatePricingService(req.params.id, req.body);
+      if (!service) {
+        return res.status(404).json({ error: "Pricing service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      console.error("Error updating pricing service:", error);
+      res.status(500).json({ error: "Failed to update pricing service" });
     }
   });
 
