@@ -197,8 +197,8 @@ export const clients = pgTable("clients", {
   onboardedAt: timestamp("onboarded_at"),
   onboardedBy: varchar("onboarded_by"),
   
-  // Client status - Active, Hospital, Paused, Discharged (Archived is separate)
-  status: text("status").default("Active").$type<"Active" | "Hospital" | "Paused" | "Discharged">(),
+  // Client status - Active, Hospital, Paused, Discharged, Referral (Archived is separate)
+  status: text("status").default("Active").$type<"Active" | "Hospital" | "Paused" | "Discharged" | "Referral">(),
   statusChangedAt: timestamp("status_changed_at"),
   statusChangedBy: varchar("status_changed_by"),
   
@@ -310,7 +310,7 @@ export const insertClientSchema = createInsertSchema(clients, {
   notificationPreferences: z.any().optional(),
   isPinned: z.enum(["yes", "no"]).optional(),
   isOnboarded: z.enum(["yes", "no"]).optional(),
-  status: z.enum(["Active", "Hospital", "Paused", "Discharged"]).optional(),
+  status: z.enum(["Active", "Hospital", "Paused", "Discharged", "Referral"]).optional(),
   riskAssessmentScore: z.enum(["Level 1", "Level 2", "Level 3", "Level 4", "Level 5"]).optional().nullable(),
   riskAssessmentDate: z.string().optional().nullable(),
   riskAssessmentNotes: z.string().optional().nullable(),
@@ -358,7 +358,7 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 
 // Client Status type
-export type ClientStatus = "Active" | "Hospital" | "Paused" | "Discharged";
+export type ClientStatus = "Active" | "Hospital" | "Paused" | "Discharged" | "Referral";
 
 // Client Status Change Log - tracks all status changes with reasons
 export const clientStatusLogs = pgTable("client_status_logs", {
@@ -373,8 +373,8 @@ export const clientStatusLogs = pgTable("client_status_logs", {
 });
 
 export const insertClientStatusLogSchema = createInsertSchema(clientStatusLogs, {
-  previousStatus: z.enum(["Active", "Hospital", "Paused", "Discharged"]).nullable().optional(),
-  newStatus: z.enum(["Active", "Hospital", "Paused", "Discharged"]),
+  previousStatus: z.enum(["Active", "Hospital", "Paused", "Discharged", "Referral"]).nullable().optional(),
+  newStatus: z.enum(["Active", "Hospital", "Paused", "Discharged", "Referral"]),
   reason: z.string().optional().nullable(),
 }).omit({
   id: true,
@@ -3989,3 +3989,786 @@ export const insertScheduledMessageSchema = createInsertSchema(scheduledMessages
 
 export type InsertScheduledMessage = z.infer<typeof insertScheduledMessageSchema>;
 export type ScheduledMessage = typeof scheduledMessages.$inferSelect;
+
+// ============================================
+// Learning Management System (LMS) Tables
+// ============================================
+
+// LMS Course Status Types
+export type LmsCourseStatus = "draft" | "published" | "archived";
+export type LmsModuleType = "video" | "text" | "quiz" | "document" | "image" | "poll" | "webinar";
+export type LmsEnrollmentStatus = "not_started" | "in_progress" | "completed" | "expired" | "failed";
+export type LmsComplianceStatus = "compliant" | "due_soon" | "overdue" | "expired" | "not_required";
+export type LmsQuizQuestionType = "multiple_choice" | "true_false" | "short_answer" | "matching" | "fill_blank";
+export type LmsDifficultyLevel = "beginner" | "intermediate" | "advanced" | "expert";
+export type LmsBadgeType = "completion" | "quiz_master" | "streak" | "speed" | "perfect_score" | "milestone" | "special";
+
+// LMS Courses - Main course definitions
+export const lmsCourses = pgTable("lms_courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  shortDescription: text("short_description"),
+  thumbnailUrl: text("thumbnail_url"),
+  coverImageUrl: text("cover_image_url"),
+
+  // Course metadata
+  status: text("status").default("draft").$type<LmsCourseStatus>(),
+  version: integer("version").default(1),
+  estimatedDurationMinutes: integer("estimated_duration_minutes"),
+  difficultyLevel: text("difficulty_level").$type<LmsDifficultyLevel>().default("beginner"),
+
+  // Compliance settings
+  isComplianceRequired: text("is_compliance_required").default("no").$type<"yes" | "no">(),
+  complianceCategory: text("compliance_category"), // e.g., "safety", "ndis_ethics", "manual_handling"
+  expirationDays: integer("expiration_days"), // Days until certification expires (e.g., 365 for annual)
+
+  // Course structure settings
+  requireSequentialProgress: text("require_sequential_progress").default("yes").$type<"yes" | "no">(),
+  minimumPassingScore: integer("minimum_passing_score").default(80), // Percentage
+  maxQuizAttempts: integer("max_quiz_attempts").default(3),
+
+  // Gamification settings
+  gamificationEnabled: text("gamification_enabled").default("yes").$type<"yes" | "no">(),
+  gamificationIntensity: text("gamification_intensity").$type<"low" | "medium" | "high">().default("medium"),
+  basePointsValue: integer("base_points_value").default(100),
+  completionBadgeId: varchar("completion_badge_id"),
+
+  // Targeting/enrollment rules
+  targetRoles: json("target_roles").$type<string[]>().default([]), // Auto-enroll these roles
+  targetDepartments: json("target_departments").$type<string[]>().default([]),
+  prerequisiteCourseIds: json("prerequisite_course_ids").$type<string[]>().default([]),
+
+  // Tags and categorization
+  tags: json("tags").$type<string[]>().default([]),
+  category: text("category"),
+  serviceTypes: json("service_types").$type<string[]>().default([]), // NDIS, Support at Home, Private
+
+  // Accessibility
+  hasClosedCaptions: text("has_closed_captions").default("no").$type<"yes" | "no">(),
+  hasAudioDescription: text("has_audio_description").default("no").$type<"yes" | "no">(),
+  supportsScreenReader: text("supports_screen_reader").default("yes").$type<"yes" | "no">(),
+
+  // Audit fields
+  createdBy: varchar("created_by"),
+  publishedAt: timestamp("published_at"),
+  publishedBy: varchar("published_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsCourseSchema = createInsertSchema(lmsCourses, {
+  title: z.string().min(1, "Course title is required"),
+  status: z.enum(["draft", "published", "archived"]).optional(),
+  difficultyLevel: z.enum(["beginner", "intermediate", "advanced", "expert"]).optional(),
+  isComplianceRequired: z.enum(["yes", "no"]).optional(),
+  requireSequentialProgress: z.enum(["yes", "no"]).optional(),
+  gamificationEnabled: z.enum(["yes", "no"]).optional(),
+  gamificationIntensity: z.enum(["low", "medium", "high"]).optional(),
+  hasClosedCaptions: z.enum(["yes", "no"]).optional(),
+  hasAudioDescription: z.enum(["yes", "no"]).optional(),
+  supportsScreenReader: z.enum(["yes", "no"]).optional(),
+  targetRoles: z.array(z.string()).optional(),
+  targetDepartments: z.array(z.string()).optional(),
+  prerequisiteCourseIds: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+  serviceTypes: z.array(z.string()).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLmsCourse = z.infer<typeof insertLmsCourseSchema>;
+export type LmsCourse = typeof lmsCourses.$inferSelect;
+
+// LMS Course Modules - Individual sections within a course
+export const lmsModules = pgTable("lms_modules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => lmsCourses.id, { onDelete: "cascade" }),
+
+  title: text("title").notNull(),
+  description: text("description"),
+  moduleType: text("module_type").notNull().$type<LmsModuleType>(),
+  orderIndex: integer("order_index").notNull().default(0),
+
+  // Content based on type
+  content: json("content").$type<{
+    // For video type
+    videoUrl?: string;
+    videoDurationSeconds?: number;
+    videoProvider?: "youtube" | "vimeo" | "direct";
+    autoPlayNext?: boolean;
+
+    // For text type (rich text / WYSIWYG)
+    htmlContent?: string;
+
+    // For document type
+    documentUrl?: string;
+    documentName?: string;
+    documentSize?: number;
+    documentType?: string;
+
+    // For image type
+    imageUrl?: string;
+    imageAltText?: string;
+    imageCaption?: string;
+
+    // For poll type
+    pollQuestion?: string;
+    pollOptions?: string[];
+    allowMultiple?: boolean;
+
+    // For webinar type
+    webinarUrl?: string;
+    webinarDate?: string;
+    webinarDuration?: number;
+    webinarProvider?: "zoom" | "teams" | "google_meet" | "other";
+  }>(),
+
+  // Points and gamification
+  pointsValue: integer("points_value").default(10),
+  bonusPointsAvailable: integer("bonus_points_available").default(0),
+
+  // Completion requirements
+  minimumTimeSeconds: integer("minimum_time_seconds"), // Minimum time to spend on module
+  requireInteraction: text("require_interaction").default("no").$type<"yes" | "no">(), // Must interact (e.g., watch full video)
+
+  // Prerequisites within course
+  prerequisiteModuleIds: json("prerequisite_module_ids").$type<string[]>().default([]),
+
+  // Encouragement messages
+  completionMessage: text("completion_message"),
+  encouragementTips: json("encouragement_tips").$type<string[]>().default([]),
+
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsModuleSchema = createInsertSchema(lmsModules, {
+  title: z.string().min(1, "Module title is required"),
+  moduleType: z.enum(["video", "text", "quiz", "document", "image", "poll", "webinar"]),
+  content: z.any().optional(),
+  requireInteraction: z.enum(["yes", "no"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+  prerequisiteModuleIds: z.array(z.string()).optional(),
+  encouragementTips: z.array(z.string()).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLmsModule = z.infer<typeof insertLmsModuleSchema>;
+export type LmsModule = typeof lmsModules.$inferSelect;
+
+// LMS Quizzes - Assessments attached to modules
+export const lmsQuizzes = pgTable("lms_quizzes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  moduleId: varchar("module_id").notNull().references(() => lmsModules.id, { onDelete: "cascade" }),
+
+  title: text("title").notNull(),
+  description: text("description"),
+  instructions: text("instructions"),
+
+  // Quiz settings
+  timeLimitMinutes: integer("time_limit_minutes"),
+  shuffleQuestions: text("shuffle_questions").default("no").$type<"yes" | "no">(),
+  shuffleAnswers: text("shuffle_answers").default("yes").$type<"yes" | "no">(),
+  showCorrectAnswers: text("show_correct_answers").default("yes").$type<"yes" | "no">(),
+  allowReview: text("allow_review").default("yes").$type<"yes" | "no">(),
+
+  // Passing requirements
+  passingScore: integer("passing_score").default(80),
+  maxAttempts: integer("max_attempts").default(3),
+  retryDelayMinutes: integer("retry_delay_minutes").default(0),
+
+  // Gamification
+  pointsPerCorrectAnswer: integer("points_per_correct_answer").default(10),
+  bonusPointsForPerfectScore: integer("bonus_points_for_perfect_score").default(50),
+  bonusPointsForFirstTry: integer("bonus_points_for_first_try").default(25),
+
+  // Encouragement
+  successMessage: text("success_message").default("Great job! You passed!"),
+  failureMessage: text("failure_message").default("Don't give up! Review the material and try again."),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsQuizSchema = createInsertSchema(lmsQuizzes, {
+  title: z.string().min(1),
+  shuffleQuestions: z.enum(["yes", "no"]).optional(),
+  shuffleAnswers: z.enum(["yes", "no"]).optional(),
+  showCorrectAnswers: z.enum(["yes", "no"]).optional(),
+  allowReview: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLmsQuiz = z.infer<typeof insertLmsQuizSchema>;
+export type LmsQuiz = typeof lmsQuizzes.$inferSelect;
+
+// LMS Quiz Questions
+export const lmsQuizQuestions = pgTable("lms_quiz_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quizId: varchar("quiz_id").notNull().references(() => lmsQuizzes.id, { onDelete: "cascade" }),
+
+  questionType: text("question_type").notNull().$type<LmsQuizQuestionType>(),
+  questionText: text("question_text").notNull(),
+  questionImageUrl: text("question_image_url"),
+  explanation: text("explanation"), // Shown after answering
+  hint: text("hint"), // Optional hint for users
+
+  // Answer options (for multiple choice, true/false, matching)
+  options: json("options").$type<{
+    id: string;
+    text: string;
+    imageUrl?: string;
+    isCorrect?: boolean; // For multiple choice
+    matchTo?: string; // For matching questions
+  }[]>(),
+
+  // For short answer / fill in blank
+  correctAnswers: json("correct_answers").$type<string[]>(), // Acceptable answers
+  caseSensitive: text("case_sensitive").default("no").$type<"yes" | "no">(),
+
+  orderIndex: integer("order_index").notNull().default(0),
+  pointValue: integer("point_value").default(10),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLmsQuizQuestionSchema = createInsertSchema(lmsQuizQuestions, {
+  questionType: z.enum(["multiple_choice", "true_false", "short_answer", "matching", "fill_blank"]),
+  questionText: z.string().min(1),
+  options: z.array(z.any()).optional(),
+  correctAnswers: z.array(z.string()).optional(),
+  caseSensitive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLmsQuizQuestion = z.infer<typeof insertLmsQuizQuestionSchema>;
+export type LmsQuizQuestion = typeof lmsQuizQuestions.$inferSelect;
+
+// LMS Badges - Achievement badges for gamification
+export const lmsBadges = pgTable("lms_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  name: text("name").notNull(),
+  description: text("description"),
+  iconUrl: text("icon_url"),
+  iconEmoji: text("icon_emoji"), // Fallback emoji icon
+  color: text("color").default("#6366f1"), // Badge color
+
+  badgeType: text("badge_type").notNull().$type<LmsBadgeType>(),
+
+  // Criteria for earning
+  criteria: json("criteria").$type<{
+    type: "course_completion" | "quiz_score" | "streak" | "points" | "speed" | "custom";
+    courseId?: string;
+    minimumScore?: number;
+    streakDays?: number;
+    pointsRequired?: number;
+    completionTimeMinutes?: number;
+    customCondition?: string;
+  }>(),
+
+  // Gamification
+  pointsAwarded: integer("points_awarded").default(50),
+  isRare: text("is_rare").default("no").$type<"yes" | "no">(), // Highlighted as rare achievement
+
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLmsBadgeSchema = createInsertSchema(lmsBadges, {
+  name: z.string().min(1),
+  badgeType: z.enum(["completion", "quiz_master", "streak", "speed", "perfect_score", "milestone", "special"]),
+  criteria: z.any().optional(),
+  isRare: z.enum(["yes", "no"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLmsBadge = z.infer<typeof insertLmsBadgeSchema>;
+export type LmsBadge = typeof lmsBadges.$inferSelect;
+
+// LMS Staff Enrollments - Tracks staff course assignments
+export const lmsEnrollments = pgTable("lms_enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  courseId: varchar("course_id").notNull().references(() => lmsCourses.id, { onDelete: "cascade" }),
+
+  // Status tracking
+  status: text("status").default("not_started").$type<LmsEnrollmentStatus>(),
+  progressPercentage: integer("progress_percentage").default(0),
+
+  // Dates
+  enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  dueDate: date("due_date"),
+  expiresAt: timestamp("expires_at"), // When certification expires
+
+  // Quiz tracking
+  bestQuizScore: integer("best_quiz_score"),
+  quizAttempts: integer("quiz_attempts").default(0),
+  lastQuizAttemptAt: timestamp("last_quiz_attempt_at"),
+
+  // Time tracking
+  totalTimeSpentSeconds: integer("total_time_spent_seconds").default(0),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  currentModuleId: varchar("current_module_id"),
+
+  // Gamification
+  pointsEarned: integer("points_earned").default(0),
+
+  // Enrollment metadata
+  enrolledBy: varchar("enrolled_by"), // null = auto-enrolled
+  enrollmentReason: text("enrollment_reason"), // e.g., "role_based", "manual", "compliance_required"
+
+  // Certificate
+  certificateIssuedAt: timestamp("certificate_issued_at"),
+  certificateUrl: text("certificate_url"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsEnrollmentSchema = createInsertSchema(lmsEnrollments, {
+  status: z.enum(["not_started", "in_progress", "completed", "expired", "failed"]).optional(),
+  dueDate: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  enrolledAt: true,
+});
+
+export type InsertLmsEnrollment = z.infer<typeof insertLmsEnrollmentSchema>;
+export type LmsEnrollment = typeof lmsEnrollments.$inferSelect;
+
+// LMS Module Progress - Detailed progress for each module
+export const lmsModuleProgress = pgTable("lms_module_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  enrollmentId: varchar("enrollment_id").notNull().references(() => lmsEnrollments.id, { onDelete: "cascade" }),
+  moduleId: varchar("module_id").notNull().references(() => lmsModules.id, { onDelete: "cascade" }),
+
+  // Status
+  isCompleted: text("is_completed").default("no").$type<"yes" | "no">(),
+  isLocked: text("is_locked").default("yes").$type<"yes" | "no">(),
+  completedAt: timestamp("completed_at"),
+
+  // Progress tracking
+  progressPercentage: integer("progress_percentage").default(0),
+  timeSpentSeconds: integer("time_spent_seconds").default(0),
+  lastAccessedAt: timestamp("last_accessed_at"),
+
+  // Video-specific tracking
+  videoWatchedSeconds: integer("video_watched_seconds").default(0),
+  videoCompleted: text("video_completed").default("no").$type<"yes" | "no">(),
+
+  // Interaction tracking
+  interactionData: json("interaction_data").$type<{
+    pollAnswers?: Record<string, string | string[]>;
+    feedbackSubmitted?: boolean;
+    resourcesDownloaded?: string[];
+    notesAdded?: string[];
+  }>(),
+
+  // Gamification
+  pointsEarned: integer("points_earned").default(0),
+  bonusPointsEarned: integer("bonus_points_earned").default(0),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsModuleProgressSchema = createInsertSchema(lmsModuleProgress, {
+  isCompleted: z.enum(["yes", "no"]).optional(),
+  isLocked: z.enum(["yes", "no"]).optional(),
+  videoCompleted: z.enum(["yes", "no"]).optional(),
+  interactionData: z.any().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLmsModuleProgress = z.infer<typeof insertLmsModuleProgressSchema>;
+export type LmsModuleProgress = typeof lmsModuleProgress.$inferSelect;
+
+// LMS Quiz Attempts - Individual quiz attempt records
+export const lmsQuizAttempts = pgTable("lms_quiz_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  enrollmentId: varchar("enrollment_id").notNull().references(() => lmsEnrollments.id, { onDelete: "cascade" }),
+  quizId: varchar("quiz_id").notNull().references(() => lmsQuizzes.id, { onDelete: "cascade" }),
+
+  attemptNumber: integer("attempt_number").notNull().default(1),
+
+  // Results
+  score: integer("score").notNull().default(0), // Percentage
+  pointsEarned: integer("points_earned").default(0),
+  passed: text("passed").default("no").$type<"yes" | "no">(),
+
+  // Timing
+  startedAt: timestamp("started_at").notNull(),
+  completedAt: timestamp("completed_at"),
+  timeSpentSeconds: integer("time_spent_seconds"),
+
+  // Answers
+  answers: json("answers").$type<{
+    questionId: string;
+    answer: string | string[];
+    isCorrect: boolean;
+    pointsAwarded: number;
+    timeSpentSeconds?: number;
+  }[]>(),
+
+  // Feedback shown
+  feedbackViewed: text("feedback_viewed").default("no").$type<"yes" | "no">(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLmsQuizAttemptSchema = createInsertSchema(lmsQuizAttempts, {
+  passed: z.enum(["yes", "no"]).optional(),
+  feedbackViewed: z.enum(["yes", "no"]).optional(),
+  answers: z.array(z.any()).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLmsQuizAttempt = z.infer<typeof insertLmsQuizAttemptSchema>;
+export type LmsQuizAttempt = typeof lmsQuizAttempts.$inferSelect;
+
+// LMS Staff Badges - Badges earned by staff
+export const lmsStaffBadges = pgTable("lms_staff_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  badgeId: varchar("badge_id").notNull().references(() => lmsBadges.id, { onDelete: "cascade" }),
+
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+  courseId: varchar("course_id"), // Course that triggered badge (if applicable)
+  enrollmentId: varchar("enrollment_id"), // Enrollment that triggered badge (if applicable)
+
+  // For display
+  isDisplayed: text("is_displayed").default("yes").$type<"yes" | "no">(),
+  displayOrder: integer("display_order").default(0),
+});
+
+export const insertLmsStaffBadgeSchema = createInsertSchema(lmsStaffBadges, {
+  isDisplayed: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  earnedAt: true,
+});
+
+export type InsertLmsStaffBadge = z.infer<typeof insertLmsStaffBadgeSchema>;
+export type LmsStaffBadge = typeof lmsStaffBadges.$inferSelect;
+
+// LMS Staff Gamification Stats - Aggregated gamification data per staff
+export const lmsStaffStats = pgTable("lms_staff_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  // Points and levels
+  totalPoints: integer("total_points").default(0),
+  currentLevel: integer("current_level").default(1),
+  levelName: text("level_name").default("Beginner"),
+  pointsToNextLevel: integer("points_to_next_level").default(100),
+
+  // Achievements
+  coursesCompleted: integer("courses_completed").default(0),
+  quizzesPassed: integer("quizzes_passed").default(0),
+  perfectScores: integer("perfect_scores").default(0),
+  badgesEarned: integer("badges_earned").default(0),
+
+  // Streaks
+  currentStreak: integer("current_streak").default(0),
+  longestStreak: integer("longest_streak").default(0),
+  lastActivityDate: date("last_activity_date"),
+
+  // Leaderboard
+  leaderboardRank: integer("leaderboard_rank"),
+  weeklyPoints: integer("weekly_points").default(0),
+  monthlyPoints: integer("monthly_points").default(0),
+
+  // Time tracking
+  totalLearningTimeSeconds: integer("total_learning_time_seconds").default(0),
+
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsStaffStatsSchema = createInsertSchema(lmsStaffStats).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertLmsStaffStats = z.infer<typeof insertLmsStaffStatsSchema>;
+export type LmsStaffStats = typeof lmsStaffStats.$inferSelect;
+
+// LMS Compliance Records - Tracks compliance status per staff/course
+export const lmsComplianceRecords = pgTable("lms_compliance_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  courseId: varchar("course_id").notNull().references(() => lmsCourses.id, { onDelete: "cascade" }),
+  enrollmentId: varchar("enrollment_id").references(() => lmsEnrollments.id, { onDelete: "set null" }),
+
+  // Status
+  complianceStatus: text("compliance_status").notNull().$type<LmsComplianceStatus>(),
+
+  // Dates
+  lastCompletedAt: timestamp("last_completed_at"),
+  expiresAt: timestamp("expires_at"),
+  dueDate: date("due_date"),
+
+  // Scores
+  lastScore: integer("last_score"),
+
+  // Certificate
+  certificateUrl: text("certificate_url"),
+  certificateExpiresAt: timestamp("certificate_expires_at"),
+
+  // HR integration
+  capabilityUpdated: text("capability_updated").default("no").$type<"yes" | "no">(),
+  blacklistTriggered: text("blacklist_triggered").default("no").$type<"yes" | "no">(),
+
+  // Audit
+  statusChangedAt: timestamp("status_changed_at"),
+  statusChangedBy: varchar("status_changed_by"),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsComplianceRecordSchema = createInsertSchema(lmsComplianceRecords, {
+  complianceStatus: z.enum(["compliant", "due_soon", "overdue", "expired", "not_required"]),
+  dueDate: z.string().optional(),
+  capabilityUpdated: z.enum(["yes", "no"]).optional(),
+  blacklistTriggered: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLmsComplianceRecord = z.infer<typeof insertLmsComplianceRecordSchema>;
+export type LmsComplianceRecord = typeof lmsComplianceRecords.$inferSelect;
+
+// LMS Activity Log - Audit trail for all LMS activities
+export const lmsActivityLogs = pgTable("lms_activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").references(() => staff.id, { onDelete: "set null" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+
+  // Activity details
+  activityType: text("activity_type").notNull(), // e.g., "course_started", "quiz_completed", "badge_earned"
+  entityType: text("entity_type"), // e.g., "course", "module", "quiz", "badge"
+  entityId: varchar("entity_id"),
+
+  // Context
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  pointsAwarded: integer("points_awarded"),
+
+  // IP and device info
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLmsActivityLogSchema = createInsertSchema(lmsActivityLogs, {
+  activityType: z.string().min(1),
+  metadata: z.any().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLmsActivityLog = z.infer<typeof insertLmsActivityLogSchema>;
+export type LmsActivityLog = typeof lmsActivityLogs.$inferSelect;
+
+// LMS Course Feedback - Staff feedback on courses
+export const lmsCourseFeedback = pgTable("lms_course_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => lmsCourses.id, { onDelete: "cascade" }),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+  enrollmentId: varchar("enrollment_id").references(() => lmsEnrollments.id, { onDelete: "set null" }),
+
+  // Ratings (1-5)
+  overallRating: integer("overall_rating"),
+  difficultyRating: integer("difficulty_rating"),
+  usefulnessRating: integer("usefulness_rating"),
+  engagementRating: integer("engagement_rating"),
+
+  // Comments
+  comment: text("comment"),
+  suggestions: text("suggestions"),
+
+  // Specific feedback
+  moduleId: varchar("module_id"), // If feedback is for specific module
+
+  // Status
+  isPublic: text("is_public").default("no").$type<"yes" | "no">(), // Show on course page
+  isReviewed: text("is_reviewed").default("no").$type<"yes" | "no">(),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+
+  // Gamification
+  pointsAwarded: integer("points_awarded").default(5),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLmsCourseFeedbackSchema = createInsertSchema(lmsCourseFeedback, {
+  isPublic: z.enum(["yes", "no"]).optional(),
+  isReviewed: z.enum(["yes", "no"]).optional(),
+  overallRating: z.number().min(1).max(5).optional(),
+  difficultyRating: z.number().min(1).max(5).optional(),
+  usefulnessRating: z.number().min(1).max(5).optional(),
+  engagementRating: z.number().min(1).max(5).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLmsCourseFeedback = z.infer<typeof insertLmsCourseFeedbackSchema>;
+export type LmsCourseFeedback = typeof lmsCourseFeedback.$inferSelect;
+
+// LMS Notifications - Reminders and alerts
+export const lmsNotifications = pgTable("lms_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  // Notification type
+  notificationType: text("notification_type").notNull().$type<
+    "course_assigned" | "due_reminder" | "overdue_warning" | "course_completed" |
+    "badge_earned" | "level_up" | "streak_reminder" | "compliance_expiring" |
+    "new_content" | "leaderboard_change"
+  >(),
+
+  // Content
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+
+  // Related entities
+  courseId: varchar("course_id"),
+  badgeId: varchar("badge_id"),
+  enrollmentId: varchar("enrollment_id"),
+
+  // Delivery
+  deliveryMethod: text("delivery_method").$type<"in_app" | "email" | "push" | "all">().default("in_app"),
+  isRead: text("is_read").default("no").$type<"yes" | "no">(),
+  readAt: timestamp("read_at"),
+
+  // Email status
+  emailSent: text("email_sent").default("no").$type<"yes" | "no">(),
+  emailSentAt: timestamp("email_sent_at"),
+
+  // Scheduling
+  scheduledFor: timestamp("scheduled_for"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLmsNotificationSchema = createInsertSchema(lmsNotifications, {
+  notificationType: z.enum([
+    "course_assigned", "due_reminder", "overdue_warning", "course_completed",
+    "badge_earned", "level_up", "streak_reminder", "compliance_expiring",
+    "new_content", "leaderboard_change"
+  ]),
+  title: z.string().min(1),
+  message: z.string().min(1),
+  deliveryMethod: z.enum(["in_app", "email", "push", "all"]).optional(),
+  isRead: z.enum(["yes", "no"]).optional(),
+  emailSent: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLmsNotification = z.infer<typeof insertLmsNotificationSchema>;
+export type LmsNotification = typeof lmsNotifications.$inferSelect;
+
+// LMS Certificate Templates - Customizable certificate designs
+export const lmsCertificateTemplates = pgTable("lms_certificate_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  name: text("name").notNull(),
+  description: text("description"),
+
+  // Template design
+  templateHtml: text("template_html"), // HTML template for PDF generation
+  backgroundImageUrl: text("background_image_url"),
+  logoUrl: text("logo_url"),
+
+  // Signature
+  signatureImageUrl: text("signature_image_url"),
+  signatureName: text("signature_name"),
+  signatureTitle: text("signature_title"),
+
+  // Styling
+  primaryColor: text("primary_color").default("#6366f1"),
+  fontFamily: text("font_family").default("Arial"),
+
+  isDefault: text("is_default").default("no").$type<"yes" | "no">(),
+  isActive: text("is_active").default("yes").$type<"yes" | "no">(),
+
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLmsCertificateTemplateSchema = createInsertSchema(lmsCertificateTemplates, {
+  name: z.string().min(1),
+  isDefault: z.enum(["yes", "no"]).optional(),
+  isActive: z.enum(["yes", "no"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLmsCertificateTemplate = z.infer<typeof insertLmsCertificateTemplateSchema>;
+export type LmsCertificateTemplate = typeof lmsCertificateTemplates.$inferSelect;
+
+// Helper: Level thresholds for gamification
+export const LMS_LEVEL_THRESHOLDS: { level: number; name: string; pointsRequired: number; color: string }[] = [
+  { level: 1, name: "Beginner", pointsRequired: 0, color: "#94a3b8" },
+  { level: 2, name: "Novice", pointsRequired: 100, color: "#22c55e" },
+  { level: 3, name: "Apprentice", pointsRequired: 300, color: "#3b82f6" },
+  { level: 4, name: "Practitioner", pointsRequired: 600, color: "#8b5cf6" },
+  { level: 5, name: "Specialist", pointsRequired: 1000, color: "#f59e0b" },
+  { level: 6, name: "Expert", pointsRequired: 1500, color: "#ef4444" },
+  { level: 7, name: "Master", pointsRequired: 2500, color: "#ec4899" },
+  { level: 8, name: "Champion", pointsRequired: 4000, color: "#14b8a6" },
+  { level: 9, name: "Legend", pointsRequired: 6000, color: "#f97316" },
+  { level: 10, name: "Grandmaster", pointsRequired: 10000, color: "#eab308" },
+];
+
+// Helper: Get level from points
+export function getLmsLevelFromPoints(points: number): { level: number; name: string; color: string; pointsToNext: number } {
+  for (let i = LMS_LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (points >= LMS_LEVEL_THRESHOLDS[i].pointsRequired) {
+      const nextLevel = LMS_LEVEL_THRESHOLDS[i + 1];
+      return {
+        level: LMS_LEVEL_THRESHOLDS[i].level,
+        name: LMS_LEVEL_THRESHOLDS[i].name,
+        color: LMS_LEVEL_THRESHOLDS[i].color,
+        pointsToNext: nextLevel ? nextLevel.pointsRequired - points : 0,
+      };
+    }
+  }
+  return { level: 1, name: "Beginner", color: "#94a3b8", pointsToNext: 100 - points };
+}

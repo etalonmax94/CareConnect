@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useRoute, Link } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -153,36 +153,55 @@ const DOCUMENT_TYPE_LABELS: Record<StaffDocumentType, string> = {
 };
 
 // Document categories for organization
-const DOCUMENT_CATEGORIES = {
-  identification: {
-    label: "Identification",
-    types: ["id_document_1", "id_document_2", "right_to_work"] as StaffDocumentType[],
+const DOCUMENT_CATEGORIES: {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  types: StaffDocumentType[];
+}[] = [
+  {
+    id: "identification",
+    name: "Identification",
+    icon: <User className="w-5 h-5 text-blue-500" />,
+    types: ["id_document_1", "id_document_2", "right_to_work"],
   },
-  compliance: {
-    label: "Compliance & Screening",
-    types: ["police_check", "yellow_card", "blue_card"] as StaffDocumentType[],
+  {
+    id: "compliance",
+    name: "Compliance & Screening",
+    icon: <Shield className="w-5 h-5 text-purple-500" />,
+    types: ["police_check", "yellow_card", "blue_card"],
   },
-  qualifications: {
-    label: "Qualifications & Training",
-    types: ["nursing_registration", "qualification_award", "cpr", "first_aid"] as StaffDocumentType[],
+  {
+    id: "qualifications",
+    name: "Qualifications & Training",
+    icon: <Award className="w-5 h-5 text-amber-500" />,
+    types: ["nursing_registration", "qualification_award", "cpr", "first_aid"],
   },
-  ndis: {
-    label: "NDIS Training",
-    types: ["ndis_orientation", "ndis_communication", "ndis_safe_meals"] as StaffDocumentType[],
+  {
+    id: "ndis",
+    name: "NDIS Training",
+    icon: <FileCheck className="w-5 h-5 text-green-500" />,
+    types: ["ndis_orientation", "ndis_communication", "ndis_safe_meals"],
   },
-  health: {
-    label: "Health & Safety",
-    types: ["vaccination_record", "hand_hygiene", "infection_control"] as StaffDocumentType[],
+  {
+    id: "health",
+    name: "Health & Safety",
+    icon: <Heart className="w-5 h-5 text-red-500" />,
+    types: ["vaccination_record", "hand_hygiene", "infection_control"],
   },
-  employment: {
-    label: "Employment Documents",
-    types: ["employment_agreement", "resume_cv", "position_description", "commitment_declaration", "induction_checklist"] as StaffDocumentType[],
+  {
+    id: "employment",
+    name: "Employment Documents",
+    icon: <Briefcase className="w-5 h-5 text-slate-500" />,
+    types: ["employment_agreement", "resume_cv", "position_description", "commitment_declaration", "induction_checklist"],
   },
-  other: {
-    label: "Other",
-    types: ["vehicle_insurance"] as StaffDocumentType[],
+  {
+    id: "other",
+    name: "Other",
+    icon: <FileText className="w-5 h-5 text-gray-500" />,
+    types: ["vehicle_insurance"],
   },
-};
+];
 
 function formatDocumentType(type: StaffDocumentType): string {
   return DOCUMENT_TYPE_LABELS[type] || type;
@@ -198,13 +217,13 @@ function getDocumentStatusColor(status: string): string {
   }
 }
 
-function getDocumentStatusIcon(status: string) {
+function getDocumentStatusIcon(status: string): React.ReactNode {
   switch (status) {
-    case "approved": return CheckCircle2;
-    case "pending": return AlertCircle;
-    case "rejected": return XCircle;
-    case "expired": return Clock;
-    default: return FileText;
+    case "approved": return <CheckCircle2 className="w-4 h-4" />;
+    case "pending": return <AlertCircle className="w-4 h-4" />;
+    case "rejected": return <XCircle className="w-4 h-4" />;
+    case "expired": return <Clock className="w-4 h-4" />;
+    default: return <FileText className="w-4 h-4" />;
   }
 }
 
@@ -374,7 +393,7 @@ export default function StaffProfile() {
         ? "orange"
         : staff?.expiringDocumentsCount && staff.expiringDocumentsCount > 0
           ? "orange"
-          : staff?.approvedDocumentsCount === staff?.documentsCount && staff?.documentsCount > 0
+          : staff?.approvedDocumentsCount === staff?.documentsCount && (staff?.documentsCount ?? 0) > 0
             ? "green"
             : null
     },
@@ -1503,7 +1522,7 @@ export default function StaffProfile() {
                   ) : (
                     <div className="space-y-2">
                       {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => {
-                        const dayWindows = staff.availabilityWindows?.filter(w => w.dayOfWeek === index) || [];
+                        const dayWindows = staff.availabilityWindows?.filter(w => String(w.dayOfWeek) === String(index)) || [];
                         return (
                           <div key={day} className="flex items-center gap-4 py-2 border-b last:border-0">
                             <p className="w-24 font-medium">{day}</p>

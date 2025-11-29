@@ -1834,47 +1834,177 @@ export default function ClientProfile() {
           {/* Overview Section */}
           {activeSection === "overview" && (
             <div className="space-y-6">
-              {/* Critical Alerts Banner */}
+              {/* Critical Alerts Banner - Always visible at top */}
               {(client.allergies || client.advancedCareDirective || client.attentionNotes) && (
-                <div className="space-y-3">
-                  {/* Allergies and Advanced Care Directive - share row when both present */}
-                  {(client.allergies || (client.advancedCareDirective && client.advancedCareDirective !== "None")) && (
-                    <div className={`grid gap-3 ${client.allergies && client.advancedCareDirective && client.advancedCareDirective !== "None" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
-                      {client.allergies && (
-                        <Alert variant="destructive" className="border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
-                          <AlertTriangle className="h-4 w-4" />
-                          <AlertDescription className="font-medium">
-                            <span className="font-bold">ALLERGIES: </span>{client.allergies}
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                      {client.advancedCareDirective && client.advancedCareDirective !== "None" && (
-                        <Alert className={`${client.advancedCareDirective === "NFR" ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30" : "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"}`}>
-                          <FileText className="h-4 w-4" />
-                          <AlertDescription className="font-medium">
-                            <span className="font-bold">Advanced Care Directive: </span>
-                            <Badge className={`ml-2 ${client.advancedCareDirective === "NFR" ? "bg-rose-600" : "bg-emerald-600"} text-white border-0`}>
-                              {client.advancedCareDirective === "NFR" ? "Not For Resuscitation" : "For Resuscitation"}
-                            </Badge>
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                    </div>
+                <div className="space-y-2">
+                  {client.allergies && (
+                    <Alert variant="destructive" className="border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 py-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="font-medium text-sm">
+                        <span className="font-bold">ALLERGIES: </span>{client.allergies}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {client.advancedCareDirective && client.advancedCareDirective !== "None" && (
+                    <Alert className={`py-2 ${client.advancedCareDirective === "NFR" ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30" : "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"}`}>
+                      <Heart className="h-4 w-4" />
+                      <AlertDescription className="font-medium text-sm">
+                        <span className="font-bold">ACD: </span>
+                        <Badge className={`ml-1 ${client.advancedCareDirective === "NFR" ? "bg-rose-600" : "bg-emerald-600"} text-white border-0 text-xs`}>
+                          {client.advancedCareDirective === "NFR" ? "NFR" : "For Resus"}
+                        </Badge>
+                      </AlertDescription>
+                    </Alert>
                   )}
                   {client.attentionNotes && (
-                    <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                    <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 py-2">
                       <AlertCircle className="h-4 w-4 text-amber-600" />
-                      <AlertDescription className="font-medium text-amber-800 dark:text-amber-200">
-                        <span className="font-bold">ATTENTION: </span>{client.attentionNotes}
+                      <AlertDescription className="font-medium text-amber-800 dark:text-amber-200 text-sm">
+                        <span className="font-bold">NOTE: </span>{client.attentionNotes}
                       </AlertDescription>
                     </Alert>
                   )}
                 </div>
               )}
 
+              {/* Quick Stats Row - Key metrics at a glance */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Risk Level */}
+                <Card className={`bg-gradient-to-br ${
+                  !client.riskAssessmentScore ? 'from-slate-50 to-slate-100 dark:from-slate-950/30 dark:to-slate-900/20 border-slate-200 dark:border-slate-800' :
+                  client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'from-emerald-50 to-emerald-100 dark:from-emerald-950/30 dark:to-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
+                  client.riskAssessmentScore === 'Level 3' ? 'from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/20 border-amber-200 dark:border-amber-800' :
+                  'from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 border-red-200 dark:border-red-800'
+                }`}>
+                  <CardContent className="p-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => !isArchived && startEditing("riskScore")}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`text-xs font-medium ${
+                          !client.riskAssessmentScore ? 'text-slate-600 dark:text-slate-400' :
+                          client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'text-emerald-600 dark:text-emerald-400' :
+                          client.riskAssessmentScore === 'Level 3' ? 'text-amber-600 dark:text-amber-400' :
+                          'text-red-600 dark:text-red-400'
+                        }`}>Risk Level</p>
+                        <p className={`text-2xl font-bold ${
+                          !client.riskAssessmentScore ? 'text-slate-500' :
+                          client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'text-emerald-700 dark:text-emerald-300' :
+                          client.riskAssessmentScore === 'Level 3' ? 'text-amber-700 dark:text-amber-300' :
+                          'text-red-700 dark:text-red-300'
+                        }`}>
+                          {client.riskAssessmentScore ? client.riskAssessmentScore.replace('Level ', 'L') : '-'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'Low Risk' :
+                           client.riskAssessmentScore === 'Level 3' ? 'Medium' :
+                           client.riskAssessmentScore ? 'High Risk' : 'Not assessed'}
+                        </p>
+                      </div>
+                      <Shield className={`w-8 h-8 opacity-50 ${
+                        !client.riskAssessmentScore ? 'text-slate-400' :
+                        client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'text-emerald-400' :
+                        client.riskAssessmentScore === 'Level 3' ? 'text-amber-400' :
+                        'text-red-400'
+                      }`} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Services Count */}
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/20 border-purple-200 dark:border-purple-800">
+                  <CardContent className="p-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setActiveSection("services")}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">Services</p>
+                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                          {serviceDeliveries.length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">This month</p>
+                      </div>
+                      <Activity className="w-8 h-8 text-purple-400 opacity-50" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Budget Status */}
+                <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950/30 dark:to-teal-900/20 border-teal-200 dark:border-teal-800">
+                  <CardContent className="p-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setActiveSection("budget")}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-teal-600 dark:text-teal-400 font-medium">Budget</p>
+                        <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">
+                          {budgets && budgets.length > 0 ? `$${Math.round(budgets.reduce((sum, b) => sum + parseFloat(b.remaining || '0'), 0)).toLocaleString()}` : '-'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {budgets && budgets.length > 0 ? 'Remaining' : 'Not set'}
+                        </p>
+                      </div>
+                      <DollarSign className="w-8 h-8 text-teal-400 opacity-50" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Quick Actions Bar */}
+              <Card className="bg-muted/30">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 overflow-x-auto">
+                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Quick Actions:</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 whitespace-nowrap"
+                      onClick={() => setActiveSection("clinical")}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      Add Progress Note
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 whitespace-nowrap"
+                      onClick={() => setActiveSection("services")}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      Log Service
+                    </Button>
+                    {client.phoneNumber && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs gap-1.5 whitespace-nowrap"
+                        asChild
+                      >
+                        <a href={`tel:${client.phoneNumber}`}>
+                          <Phone className="w-3.5 h-3.5" />
+                          Call Client
+                        </a>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 whitespace-nowrap"
+                      onClick={() => setActiveSection("documents")}
+                    >
+                      <FileCheck className="w-3.5 h-3.5" />
+                      Documents
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 whitespace-nowrap"
+                      onClick={() => setActiveSection("goals")}
+                    >
+                      <Target className="w-3.5 h-3.5" />
+                      Goals
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Quick Info Row - Interactive */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Card
                   className="bg-card hover-elevate cursor-pointer"
                   onClick={() => !editingField && startEditing("serviceType")}
                   data-testid="card-service-type"
@@ -1913,62 +2043,7 @@ export default function ClientProfile() {
                     )}
                   </CardContent>
                 </Card>
-                <Card 
-                  className="bg-card hover-elevate cursor-pointer"
-                  onClick={() => !editingField && startEditing("riskScore")}
-                  data-testid="card-risk-score"
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                      <span className="text-xs text-muted-foreground font-medium">Risk Score</span>
-                      {!isArchived && !editingField && (
-                        <Pencil className="w-3 h-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                      )}
-                    </div>
-                    {editingField === "riskScore" ? (
-                      <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Select value={editRiskScore} onValueChange={setEditRiskScore}>
-                          <SelectTrigger className="h-8 text-xs" data-testid="select-risk-score-inline">
-                            <SelectValue placeholder="Select level..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Level 1">Level 1 (Lowest)</SelectItem>
-                            <SelectItem value="Level 2">Level 2</SelectItem>
-                            <SelectItem value="Level 3">Level 3</SelectItem>
-                            <SelectItem value="Level 4">Level 4</SelectItem>
-                            <SelectItem value="Level 5">Level 5 (Highest)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="flex gap-1">
-                          <Button size="sm" className="h-6 text-xs flex-1" onClick={() => saveField("riskScore")} disabled={updateFieldMutation.isPending} data-testid="button-save-risk-score">
-                            {updateFieldMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-6 text-xs flex-1" onClick={cancelEditing} data-testid="button-cancel-risk-score">
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ) : client.riskAssessmentScore ? (
-                      <div className="flex items-center gap-2">
-                        <Badge className={`${
-                          client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'bg-emerald-500' :
-                          client.riskAssessmentScore === 'Level 3' ? 'bg-amber-500' :
-                          'bg-red-500'
-                        } text-white border-0 text-xs`}>
-                          {client.riskAssessmentScore}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {client.riskAssessmentScore === 'Level 1' || client.riskAssessmentScore === 'Level 2' ? 'Low Risk' :
-                           client.riskAssessmentScore === 'Level 3' ? 'Medium Risk' : 'High Risk'}
-                        </span>
-                      </div>
-                    ) : (
-                      <p className="text-sm font-semibold text-muted-foreground">Click to assess</p>
-                    )}
-                  </CardContent>
-                </Card>
-                <Card 
+                <Card
                   className="bg-card md:col-span-2 hover-elevate cursor-pointer"
                   onClick={() => !editingField && startEditing("parkingInstructions")}
                   data-testid="card-parking"
@@ -2758,52 +2833,177 @@ export default function ClientProfile() {
                 </div>
               </div>
 
-              {/* Bottom Section - Recent Incidents */}
+              {/* Bottom Section - Recent Activity & Key Info */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                {/* Recent Incidents */}
-                {incidentReports.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-3">
+                {/* Recent Progress Notes */}
+                <Card className="h-fit lg:min-h-[280px]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        Recent Incidents
+                        <FileText className="w-4 h-4 text-primary" />
+                        Recent Notes
                       </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {incidentReports.slice(0, 3).map((incident) => (
-                          <div key={incident.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-                            <Badge variant={incident.severity === 'high' || incident.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
-                              {incident.incidentType}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(incident.incidentDate).toLocaleDateString()}
-                            </span>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setActiveSection("clinical")}>
+                        View All
+                        <ChevronRight className="w-3 h-3 ml-1" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {progressNotes.length === 0 ? (
+                      <div className="text-center py-6">
+                        <FileText className="w-10 h-10 mx-auto text-muted-foreground/30 mb-2" />
+                        <p className="text-sm text-muted-foreground">No progress notes yet</p>
+                        <Button variant="outline" size="sm" className="mt-3 h-8 text-xs" onClick={() => setActiveSection("clinical")}>
+                          <Plus className="w-3 h-3 mr-1" /> Add Note
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {progressNotes.slice(0, 3).map((note) => (
+                          <div key={note.id} className="p-3 bg-muted/30 rounded-lg border-l-2 border-primary/50">
+                            <div className="flex items-center justify-between mb-1">
+                              <Badge variant="outline" className="text-[10px] h-5">{note.type || 'General'}</Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(note.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+                            <p className="text-xs line-clamp-2">{note.note}</p>
+                            {note.author && (
+                              <p className="text-[10px] text-muted-foreground mt-1">- {note.author}</p>
+                            )}
                           </div>
                         ))}
                       </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Active Goals Summary */}
+                <Card className="h-fit lg:min-h-[280px]">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Target className="w-4 h-4 text-emerald-600" />
+                          Goals Progress
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setActiveSection("goals")}>
+                          Manage
+                          <ChevronRight className="w-3 h-3 ml-1" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {goals.length === 0 ? (
+                        <div className="text-center py-4">
+                          <Target className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+                          <p className="text-xs text-muted-foreground">No goals set</p>
+                          <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => setActiveSection("goals")}>
+                            <Plus className="w-3 h-3 mr-1" /> Add Goal
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {goals.slice(0, 2).map((goal) => (
+                            <div key={goal.id} className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                goal.status === 'achieved' ? 'bg-emerald-500' :
+                                goal.status === 'in_progress' ? 'bg-blue-500' :
+                                goal.status === 'not_started' ? 'bg-slate-400' :
+                                'bg-red-500'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium truncate">{goal.title}</p>
+                                <p className="text-[10px] text-muted-foreground capitalize">{goal.status?.replace('_', ' ')}</p>
+                              </div>
+                              {goal.progress !== null && goal.progress !== undefined && (
+                                <span className="text-xs font-semibold text-muted-foreground">{goal.progress}%</span>
+                              )}
+                            </div>
+                          ))}
+                          {goals.length > 2 && (
+                            <p className="text-[10px] text-muted-foreground text-center pt-1">
+                              +{goals.length - 2} more goals
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                )}
               </div>
+
+              {/* Secondary Row - Incidents & Lifestyle */}
+              {(incidentReports.length > 0 || client.hobbiesInterests || client.culturalBackground || client.dietPatterns) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                  {/* Recent Incidents */}
+                  {incidentReports.length > 0 && (
+                    <Card className="border-amber-200 dark:border-amber-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          Recent Incidents
+                          <Badge variant="outline" className="ml-auto text-[10px] h-5 border-amber-300 text-amber-700">
+                            {incidentReports.length}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2">
+                          {incidentReports.slice(0, 2).map((incident) => (
+                            <div key={incident.id} className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                              <Badge variant={incident.severity === 'high' || incident.severity === 'critical' ? 'destructive' : 'secondary'} className="text-[10px] h-5">
+                                {incident.incidentType}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(incident.incidentDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Lifestyle & Preferences Quick View */}
+                  {(client.hobbiesInterests || client.culturalBackground || client.dietPatterns) && (
+                    <Card className="bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-950/20 dark:to-purple-950/20 border-pink-200 dark:border-pink-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-pink-600" />
+                          About {client.firstName || 'Client'}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0 space-y-2">
+                        {client.hobbiesInterests && (
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-medium">Interests</p>
+                            <p className="text-xs">{client.hobbiesInterests}</p>
+                          </div>
+                        )}
+                        {client.culturalBackground && (
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-medium">Cultural Background</p>
+                            <p className="text-xs">{client.culturalBackground}</p>
+                          </div>
+                        )}
+                        {client.dietPatterns && (
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-medium">Diet</p>
+                            <p className="text-xs">{client.dietPatterns}</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* Other sections - using existing Tabs content */}
           {activeSection !== "overview" && (
             <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as ProfileSection)} className="space-y-6">
-              <TabsList className="w-full justify-start overflow-x-auto lg:hidden">
-                <TabsTrigger value="details" data-testid="tab-details">Personal Details</TabsTrigger>
-                <TabsTrigger value="program" data-testid="tab-program">Program Info</TabsTrigger>
-                <TabsTrigger value="team" data-testid="tab-team">Care Team</TabsTrigger>
-                <TabsTrigger value="goals" data-testid="tab-goals">Goals</TabsTrigger>
-                <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
-                <TabsTrigger value="clinical" data-testid="tab-clinical">Clinical Notes</TabsTrigger>
-                <TabsTrigger value="careplan" data-testid="tab-careplan">Care Plan</TabsTrigger>
-                <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
-                <TabsTrigger value="nonfacetoface" data-testid="tab-nonfacetoface">Non-F2F</TabsTrigger>
-                <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
-              </TabsList>
+              {/* TabsList removed - using sidebar/mobile nav instead to prevent duplicate horizontal menus */}
 
               <TabsContent value="details" className="space-y-6">
                 {/* Identity & Demographics */}

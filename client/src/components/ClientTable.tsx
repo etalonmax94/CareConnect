@@ -89,9 +89,9 @@ export default function ClientTable({
           bVal = b.participantName.toLowerCase();
           break;
         case "status": {
-          const clientStatusOrder: Record<string, number> = { "Active": 0, "Hospital": 1, "Paused": 2, "Discharged": 3 };
-          aVal = a.isArchived === "yes" ? 4 : clientStatusOrder[a.status || "Active"] ?? 0;
-          bVal = b.isArchived === "yes" ? 4 : clientStatusOrder[b.status || "Active"] ?? 0;
+          const clientStatusOrder: Record<string, number> = { "Active": 0, "Hospital": 1, "Paused": 2, "Discharged": 3, "Referral": 4 };
+          aVal = a.isArchived === "yes" ? 5 : clientStatusOrder[a.status || "Active"] ?? 0;
+          bVal = b.isArchived === "yes" ? 5 : clientStatusOrder[b.status || "Active"] ?? 0;
           break;
         }
         case "category":

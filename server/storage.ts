@@ -31,6 +31,10 @@ import {
   // Workforce Management
   staffQualifications, staffBlacklist, timeClockRecords, timesheets, timesheetEntries, gpsComplianceLogs, clientStaffRestrictions,
   staffEmergencyContacts, staffDocuments,
+  // LMS tables
+  lmsCourses, lmsModules, lmsQuizzes, lmsQuizQuestions, lmsBadges, lmsEnrollments,
+  lmsModuleProgress, lmsQuizAttempts, lmsStaffBadges, lmsStaffStats, lmsComplianceRecords,
+  lmsActivityLogs, lmsCourseFeedback, lmsNotifications, lmsCertificateTemplates,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -118,7 +122,24 @@ import {
   // Staff Emergency Contacts
   type InsertStaffEmergencyContact, type StaffEmergencyContact,
   // Staff Documents
-  type InsertStaffDocument, type StaffDocument, type StaffDocumentType, type StaffDocumentStatus
+  type InsertStaffDocument, type StaffDocument, type StaffDocumentType, type StaffDocumentStatus,
+  // LMS types
+  type InsertLmsCourse, type LmsCourse,
+  type InsertLmsModule, type LmsModule,
+  type InsertLmsQuiz, type LmsQuiz,
+  type InsertLmsQuizQuestion, type LmsQuizQuestion,
+  type InsertLmsBadge, type LmsBadge,
+  type InsertLmsEnrollment, type LmsEnrollment,
+  type InsertLmsModuleProgress, type LmsModuleProgress,
+  type InsertLmsQuizAttempt, type LmsQuizAttempt,
+  type InsertLmsStaffBadge, type LmsStaffBadge,
+  type InsertLmsStaffStats, type LmsStaffStats,
+  type InsertLmsComplianceRecord, type LmsComplianceRecord,
+  type InsertLmsActivityLog, type LmsActivityLog,
+  type InsertLmsCourseFeedback, type LmsCourseFeedback,
+  type InsertLmsNotification, type LmsNotification,
+  type InsertLmsCertificateTemplate, type LmsCertificateTemplate,
+  getLmsLevelFromPoints
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
