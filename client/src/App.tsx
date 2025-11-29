@@ -17,6 +17,7 @@ import ClientProfile from "@/pages/ClientProfile";
 import AddClient from "@/pages/AddClient";
 import EditClient from "@/pages/EditClient";
 import Staff from "@/pages/Staff";
+import StaffProfile from "@/pages/StaffProfile";
 import SupportCoordinators from "@/pages/SupportCoordinators";
 import PlanManagers from "@/pages/PlanManagers";
 import GPs from "@/pages/GPs";
