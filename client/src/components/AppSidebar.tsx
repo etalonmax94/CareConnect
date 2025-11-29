@@ -190,7 +190,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             </div>
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" className="font-medium">
+        <TooltipContent side="right" className="font-medium hidden md:block">
           {isCollapsed ? "Expand" : "Collapse"}
         </TooltipContent>
       </Tooltip>
