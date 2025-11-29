@@ -1852,6 +1852,108 @@ export const insertStaffEmergencyContactSchema = createInsertSchema(staffEmergen
 export type InsertStaffEmergencyContact = z.infer<typeof insertStaffEmergencyContactSchema>;
 export type StaffEmergencyContact = typeof staffEmergencyContacts.$inferSelect;
 
+// Staff Document Types - All required compliance and HR documents
+export type StaffDocumentType =
+  | "id_document_1"
+  | "id_document_2"
+  | "right_to_work"
+  | "police_check"
+  | "yellow_card"
+  | "blue_card"
+  | "nursing_registration"
+  | "qualification_award"
+  | "cpr"
+  | "first_aid"
+  | "vaccination_record"
+  | "vehicle_insurance"
+  | "ndis_orientation"
+  | "ndis_communication"
+  | "ndis_safe_meals"
+  | "hand_hygiene"
+  | "infection_control"
+  | "employment_agreement"
+  | "resume_cv"
+  | "position_description"
+  | "commitment_declaration"
+  | "induction_checklist";
+
+export type StaffDocumentStatus = "pending" | "approved" | "rejected" | "expired";
+
+export const staffDocuments = pgTable("staff_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => staff.id, { onDelete: "cascade" }),
+
+  documentType: text("document_type").$type<StaffDocumentType>().notNull(),
+  documentName: text("document_name").notNull(), // Original filename or custom name
+
+  // File storage
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"), // In bytes
+  mimeType: text("mime_type"),
+
+  // Approval workflow
+  status: text("status").$type<StaffDocumentStatus>().default("pending").notNull(),
+  reviewedById: varchar("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+  reviewedByName: text("reviewed_by_name"),
+  reviewedAt: timestamp("reviewed_at"),
+  rejectionReason: text("rejection_reason"),
+
+  // Expiry tracking for compliance documents
+  issueDate: date("issue_date"),
+  expiryDate: date("expiry_date"),
+
+  // Document details
+  documentNumber: text("document_number"), // e.g., license number, card number
+  issuingAuthority: text("issuing_authority"), // Who issued the document
+
+  notes: text("notes"),
+
+  // Uploaded by
+  uploadedById: varchar("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+  uploadedByName: text("uploaded_by_name"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStaffDocumentSchema = createInsertSchema(staffDocuments, {
+  documentType: z.enum([
+    "id_document_1",
+    "id_document_2",
+    "right_to_work",
+    "police_check",
+    "yellow_card",
+    "blue_card",
+    "nursing_registration",
+    "qualification_award",
+    "cpr",
+    "first_aid",
+    "vaccination_record",
+    "vehicle_insurance",
+    "ndis_orientation",
+    "ndis_communication",
+    "ndis_safe_meals",
+    "hand_hygiene",
+    "infection_control",
+    "employment_agreement",
+    "resume_cv",
+    "position_description",
+    "commitment_declaration",
+    "induction_checklist",
+  ]),
+  status: z.enum(["pending", "approved", "rejected", "expired"]).optional(),
+  fileSize: z.number().optional().nullable(),
+  issueDate: z.string().optional().nullable(),
+  expiryDate: z.string().optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStaffDocument = z.infer<typeof insertStaffDocumentSchema>;
+export type StaffDocument = typeof staffDocuments.$inferSelect;
+
 // Staff Blacklist - Service type, category, or general restrictions
 export type BlacklistType = "service_type" | "service_category" | "client_category" | "general";
 export type BlacklistSeverity = "warning" | "soft_block" | "hard_block";

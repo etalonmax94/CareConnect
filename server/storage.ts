@@ -30,7 +30,7 @@ import {
   schedulingConflicts,
   // Workforce Management
   staffQualifications, staffBlacklist, timeClockRecords, timesheets, timesheetEntries, gpsComplianceLogs, clientStaffRestrictions,
-  staffEmergencyContacts,
+  staffEmergencyContacts, staffDocuments,
   computeFullName,
   type InsertClient, type Client, type InsertProgressNote, type ProgressNote, 
   type InsertInvoice, type Invoice, type InsertBudget, type Budget,
@@ -116,7 +116,9 @@ import {
   type InsertTimesheetEntry, type TimesheetEntry,
   type InsertGpsComplianceLog, type GpsComplianceLog,
   // Staff Emergency Contacts
-  type InsertStaffEmergencyContact, type StaffEmergencyContact
+  type InsertStaffEmergencyContact, type StaffEmergencyContact,
+  // Staff Documents
+  type InsertStaffDocument, type StaffDocument, type StaffDocumentType, type StaffDocumentStatus
 } from "@shared/schema";
 import { eq, desc, or, ilike, and, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -768,6 +770,16 @@ export interface IStorage {
   updateStaffEmergencyContact(id: string, contact: Partial<InsertStaffEmergencyContact>): Promise<StaffEmergencyContact | undefined>;
   deleteStaffEmergencyContact(id: string): Promise<boolean>;
   unsetPrimaryStaffEmergencyContacts(staffId: string): Promise<void>;
+
+  // Staff Documents
+  getStaffDocuments(staffId: string): Promise<StaffDocument[]>;
+  getStaffDocumentById(id: string): Promise<StaffDocument | undefined>;
+  getStaffDocumentByType(staffId: string, documentType: StaffDocumentType): Promise<StaffDocument | undefined>;
+  getAllPendingStaffDocuments(): Promise<StaffDocument[]>;
+  getAllExpiredStaffDocuments(): Promise<StaffDocument[]>;
+  createStaffDocument(document: InsertStaffDocument): Promise<StaffDocument>;
+  updateStaffDocument(id: string, document: Partial<InsertStaffDocument>): Promise<StaffDocument | undefined>;
+  deleteStaffDocument(id: string): Promise<boolean>;
 
   // Workforce Management - Staff Blacklist
   getStaffBlacklist(staffId: string): Promise<StaffBlacklist[]>;

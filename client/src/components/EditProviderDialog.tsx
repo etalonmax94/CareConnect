@@ -213,6 +213,69 @@ export function EditProviderDialog({
       );
     }
 
+    if (field === "employmentType" && providerType === "staff") {
+      const employmentTypes = (config as typeof providerConfig.staff).employmentTypes;
+      return (
+        <div key={field} className="space-y-2">
+          <Label htmlFor={field}>{label}</Label>
+          <Select
+            value={formData[field] || ""}
+            onValueChange={(value) => setFormData({ ...formData, [field]: value })}
+          >
+            <SelectTrigger data-testid={`select-edit-provider-${field}`}>
+              <SelectValue placeholder="Select type..." />
+            </SelectTrigger>
+            <SelectContent>
+              {employmentTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+
+    if (field === "department" && providerType === "staff") {
+      const departments = (config as typeof providerConfig.staff).departments;
+      return (
+        <div key={field} className="space-y-2">
+          <Label htmlFor={field}>{label}</Label>
+          <Select
+            value={formData[field] || ""}
+            onValueChange={(value) => setFormData({ ...formData, [field]: value })}
+          >
+            <SelectTrigger data-testid={`select-edit-provider-${field}`}>
+              <SelectValue placeholder="Select department..." />
+            </SelectTrigger>
+            <SelectContent>
+              {departments.map((dept) => (
+                <SelectItem key={dept.value} value={dept.value}>
+                  {dept.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+
+    if (field === "employmentStartDate") {
+      return (
+        <div key={field} className="space-y-2">
+          <Label htmlFor={field}>{label}</Label>
+          <Input
+            id={field}
+            type="date"
+            value={formData[field] || ""}
+            onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
+            data-testid={`input-edit-provider-${field}`}
+          />
+        </div>
+      );
+    }
+
     if (field === "notes" || field === "address") {
       return (
         <div key={field} className="space-y-2 col-span-2">
