@@ -47,6 +47,7 @@ import SchedulingConflicts from "@/pages/SchedulingConflicts";
 import TimesheetApproval from "@/pages/TimesheetApproval";
 import GpsComplianceReview from "@/pages/GpsComplianceReview";
 import StaffQualifications from "@/pages/StaffQualifications";
+import StaffDocumentReview from "@/pages/StaffDocumentReview";
 import MobileClockPortal from "@/pages/MobileClockPortal";
 import NotFound from "@/pages/not-found";
 import NotificationBell from "@/components/NotificationBell";
@@ -107,6 +108,7 @@ function ProtectedRouter() {
       <Route path="/timesheet-approval" component={TimesheetApproval} />
       <Route path="/gps-compliance" component={GpsComplianceReview} />
       <Route path="/staff-qualifications" component={StaffQualifications} />
+      <Route path="/staff-documents" component={StaffDocumentReview} />
       <Route path="/mobile-clock" component={MobileClockPortal} />
       <Route component={NotFound} />
     </Switch>

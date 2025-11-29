@@ -2944,7 +2944,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentStatus,
         blacklistEntries,
         clientAssignments,
-        supervisor
+        supervisor,
+        documents
       ] = await Promise.all([
         storage.getStaffEmergencyContacts(staffId),
         storage.getStaffQualifications(staffId),
@@ -2953,7 +2954,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getCurrentStaffStatus(staffId),
         storage.getStaffBlacklist(staffId),
         storage.getAssignmentsByStaff(staffId),
-        staffMember.supervisorId ? storage.getStaffById(staffMember.supervisorId) : null
+        staffMember.supervisorId ? storage.getStaffById(staffMember.supervisorId) : null,
+        storage.getStaffDocuments(staffId)
       ]);
 
       // Build full profile response
@@ -2964,6 +2966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Related entities
         emergencyContacts,
         qualifications,
+        documents,
         availabilityWindows,
         unavailabilityPeriods,
         currentStatus,
@@ -2988,7 +2991,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
           return expiryDate <= thirtyDaysFromNow && expiryDate > new Date();
         }).length,
-        activeClientCount: clientAssignments.length
+        activeClientCount: clientAssignments.length,
+        // Document statistics
+        documentsCount: documents.length,
+        pendingDocumentsCount: documents.filter((d: any) => d.status === "pending").length,
+        approvedDocumentsCount: documents.filter((d: any) => d.status === "approved").length,
+        expiringDocumentsCount: documents.filter((d: any) => {
+          if (!d.expiryDate || d.status !== "approved") return false;
+          const expiryDate = new Date(d.expiryDate);
+          const thirtyDaysFromNow = new Date();
+          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+          return expiryDate <= thirtyDaysFromNow && expiryDate > new Date();
+        }).length
       };
 
       res.json(fullProfile);

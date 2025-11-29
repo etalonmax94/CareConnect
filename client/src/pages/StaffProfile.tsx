@@ -11,18 +11,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { StaffDocumentUploadDialog } from "@/components/StaffDocumentUploadDialog";
 import {
   ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, Loader2,
   FileText, Clock, Users, Pencil, Building2, Award, AlertTriangle,
   Briefcase, UserCircle, Shield, CheckCircle, Camera, Eye, Plus, Trash2,
-  CalendarDays, Heart, X, Save, ChevronRight
+  CalendarDays, Heart, X, Save, ChevronRight, Upload, Download, FolderOpen,
+  AlertCircle, XCircle, CheckCircle2, FileCheck
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Staff, StaffQualification, StaffEmergencyContact, StaffAvailabilityWindow,
-  StaffUnavailabilityPeriod, StaffStatusLog, StaffBlacklist, ClientStaffAssignment
+  StaffUnavailabilityPeriod, StaffStatusLog, StaffBlacklist, ClientStaffAssignment,
+  StaffDocument, StaffDocumentType
 } from "@shared/schema";
 
 type StaffProfileSection =
@@ -30,6 +33,7 @@ type StaffProfileSection =
   | "personal"
   | "employment"
   | "contact"
+  | "documents"
   | "qualifications"
   | "assignments"
   | "availability"
@@ -38,6 +42,7 @@ type StaffProfileSection =
 interface StaffFullProfile extends Staff {
   emergencyContacts: StaffEmergencyContact[];
   qualifications: StaffQualification[];
+  documents: StaffDocument[];
   availabilityWindows: StaffAvailabilityWindow[];
   unavailabilityPeriods: StaffUnavailabilityPeriod[];
   currentStatus: StaffStatusLog | null;
@@ -48,6 +53,10 @@ interface StaffFullProfile extends Staff {
   activeQualificationsCount: number;
   expiringQualificationsCount: number;
   activeClientCount: number;
+  documentsCount: number;
+  pendingDocumentsCount: number;
+  approvedDocumentsCount: number;
+  expiringDocumentsCount: number;
 }
 
 function getInitials(name: string): string {
@@ -117,11 +126,95 @@ function formatRelationship(rel: string): string {
   return relMap[rel] || rel;
 }
 
+// Staff Document Type Labels
+const DOCUMENT_TYPE_LABELS: Record<StaffDocumentType, string> = {
+  id_document_1: "ID Document 1",
+  id_document_2: "ID Document 2",
+  right_to_work: "Right to Work in Australia",
+  police_check: "Police Check",
+  yellow_card: "Yellow Card | NDIS Worker Screening",
+  blue_card: "Blue Card | Work With Children Check",
+  nursing_registration: "Nursing Registration",
+  qualification_award: "Qualification Award",
+  cpr: "CPR",
+  first_aid: "First Aid",
+  vaccination_record: "Vaccination Record",
+  vehicle_insurance: "Vehicle Comprehensive Insurance",
+  ndis_orientation: "NDIS Worker Orientation Module",
+  ndis_communication: "NDIS Supporting Effective Communication",
+  ndis_safe_meals: "NDIS Supporting Safe and Enjoyable Meals",
+  hand_hygiene: "Hand Hygiene Training Certificate",
+  infection_control: "Infection Control Certificate",
+  employment_agreement: "Employment Agreement",
+  resume_cv: "Resume and CV",
+  position_description: "Position Description",
+  commitment_declaration: "Staff Commitment Declaration Form",
+  induction_checklist: "Staff Induction Checklist",
+};
+
+// Document categories for organization
+const DOCUMENT_CATEGORIES = {
+  identification: {
+    label: "Identification",
+    types: ["id_document_1", "id_document_2", "right_to_work"] as StaffDocumentType[],
+  },
+  compliance: {
+    label: "Compliance & Screening",
+    types: ["police_check", "yellow_card", "blue_card"] as StaffDocumentType[],
+  },
+  qualifications: {
+    label: "Qualifications & Training",
+    types: ["nursing_registration", "qualification_award", "cpr", "first_aid"] as StaffDocumentType[],
+  },
+  ndis: {
+    label: "NDIS Training",
+    types: ["ndis_orientation", "ndis_communication", "ndis_safe_meals"] as StaffDocumentType[],
+  },
+  health: {
+    label: "Health & Safety",
+    types: ["vaccination_record", "hand_hygiene", "infection_control"] as StaffDocumentType[],
+  },
+  employment: {
+    label: "Employment Documents",
+    types: ["employment_agreement", "resume_cv", "position_description", "commitment_declaration", "induction_checklist"] as StaffDocumentType[],
+  },
+  other: {
+    label: "Other",
+    types: ["vehicle_insurance"] as StaffDocumentType[],
+  },
+};
+
+function formatDocumentType(type: StaffDocumentType): string {
+  return DOCUMENT_TYPE_LABELS[type] || type;
+}
+
+function getDocumentStatusColor(status: string): string {
+  switch (status) {
+    case "approved": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    case "pending": return "bg-amber-100 text-amber-700 border-amber-200";
+    case "rejected": return "bg-red-100 text-red-700 border-red-200";
+    case "expired": return "bg-slate-100 text-slate-700 border-slate-200";
+    default: return "bg-slate-100 text-slate-600";
+  }
+}
+
+function getDocumentStatusIcon(status: string) {
+  switch (status) {
+    case "approved": return CheckCircle2;
+    case "pending": return AlertCircle;
+    case "rejected": return XCircle;
+    case "expired": return Clock;
+    default: return FileText;
+  }
+}
+
 export default function StaffProfile() {
   const [, params] = useRoute("/staff/:id");
   const [activeSection, setActiveSection] = useState<StaffProfileSection>("overview");
   const [editingField, setEditingField] = useState<string | null>(null);
   const [addEmergencyContactOpen, setAddEmergencyContactOpen] = useState(false);
+  const [uploadDocumentOpen, setUploadDocumentOpen] = useState(false);
+  const [preselectedDocType, setPreselectedDocType] = useState<StaffDocumentType | undefined>(undefined);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -272,6 +365,19 @@ export default function StaffProfile() {
     { id: "personal", label: "Personal Details", icon: UserCircle },
     { id: "employment", label: "Employment", icon: Briefcase },
     { id: "contact", label: "Contact Info", icon: Phone },
+    {
+      id: "documents",
+      label: "Documents",
+      icon: FolderOpen,
+      badge: staff?.documentsCount?.toString(),
+      statusDot: staff?.pendingDocumentsCount && staff.pendingDocumentsCount > 0
+        ? "orange"
+        : staff?.expiringDocumentsCount && staff.expiringDocumentsCount > 0
+          ? "orange"
+          : staff?.approvedDocumentsCount === staff?.documentsCount && staff?.documentsCount > 0
+            ? "green"
+            : null
+    },
     {
       id: "qualifications",
       label: "Qualifications",
@@ -1104,6 +1210,179 @@ export default function StaffProfile() {
             </div>
           )}
 
+          {/* Documents Section */}
+          {activeSection === "documents" && (
+            <div className="space-y-6">
+              {/* Section Header with Upload Button */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <FolderOpen className="w-5 h-5" />
+                    Staff Documents
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Compliance documents, certifications, and employment records</p>
+                </div>
+                <Button
+                  onClick={() => {
+                    setPreselectedDocType(undefined);
+                    setUploadDocumentOpen(true);
+                  }}
+                >
+                  <Upload className="w-4 h-4 mr-2" /> Upload Document
+                </Button>
+              </div>
+
+              {/* Document Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{staff.documentsCount || 0}</p>
+                        <p className="text-xs text-muted-foreground">Total Documents</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{staff.approvedDocumentsCount || 0}</p>
+                        <p className="text-xs text-muted-foreground">Approved</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-yellow-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{staff.pendingDocumentsCount || 0}</p>
+                        <p className="text-xs text-muted-foreground">Pending Review</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      <div>
+                        <p className="text-2xl font-bold">{staff.expiringDocumentsCount || 0}</p>
+                        <p className="text-xs text-muted-foreground">Expiring Soon</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Document Categories */}
+              {DOCUMENT_CATEGORIES.map((category) => {
+                const categoryDocs = staff.documents?.filter(doc =>
+                  category.types.includes(doc.documentType as StaffDocumentType)
+                ) || [];
+                const missingTypes = category.types.filter(type =>
+                  !staff.documents?.some(doc => doc.documentType === type)
+                );
+
+                return (
+                  <Card key={category.id}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        {category.icon}
+                        {category.name}
+                      </CardTitle>
+                      <CardDescription>
+                        {categoryDocs.length} of {category.types.length} documents uploaded
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {/* Uploaded Documents */}
+                        {categoryDocs.map((doc) => (
+                          <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-full ${getDocumentStatusColor(doc.status)}`}>
+                                {getDocumentStatusIcon(doc.status)}
+                              </div>
+                              <div>
+                                <p className="font-medium">{formatDocumentType(doc.documentType as StaffDocumentType)}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{doc.documentName}</span>
+                                  {doc.expiryDate && (
+                                    <>
+                                      <span>•</span>
+                                      <span className={new Date(doc.expiryDate) < new Date() ? "text-red-500" : ""}>
+                                        Expires: {new Date(doc.expiryDate).toLocaleDateString('en-AU')}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={
+                                doc.status === "approved" ? "default" :
+                                doc.status === "pending" ? "secondary" :
+                                doc.status === "rejected" ? "destructive" : "outline"
+                              }>
+                                {doc.status === "approved" ? "Approved" :
+                                 doc.status === "pending" ? "Pending Review" :
+                                 doc.status === "rejected" ? "Rejected" : "Expired"}
+                              </Badge>
+                              {doc.fileUrl && (
+                                <Button variant="ghost" size="icon" asChild>
+                                  <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
+                                    <Download className="w-4 h-4" />
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Missing Documents */}
+                        {missingTypes.map((type) => (
+                          <div key={type} className="flex items-center justify-between p-3 border border-dashed rounded-lg bg-muted/30">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-gray-100">
+                                <Upload className="w-4 h-4 text-gray-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-muted-foreground">{formatDocumentType(type)}</p>
+                                <p className="text-xs text-muted-foreground">Not uploaded</p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPreselectedDocType(type);
+                                setUploadDocumentOpen(true);
+                              }}
+                            >
+                              <Upload className="w-4 h-4 mr-1" /> Upload
+                            </Button>
+                          </div>
+                        ))}
+
+                        {categoryDocs.length === 0 && missingTypes.length === 0 && (
+                          <div className="text-center py-4 text-muted-foreground">
+                            <p>No documents in this category</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
           {/* Qualifications Section */}
           {activeSection === "qualifications" && (
             <div className="space-y-6">
@@ -1412,6 +1691,14 @@ export default function StaffProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Document Dialog */}
+      <StaffDocumentUploadDialog
+        staffId={staff?.id || ""}
+        open={uploadDocumentOpen}
+        onOpenChange={setUploadDocumentOpen}
+        preselectedType={preselectedDocType}
+      />
     </div>
   );
 }

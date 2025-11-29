@@ -271,7 +271,7 @@ export default function GlobalSearch() {
         data-testid="button-global-search"
       >
         <Search className="h-4 w-4 mr-3 flex-shrink-0" />
-        <span className="flex-1 text-left">Search anything...</span>
+        <span className="flex-1 text-left">Find anything...</span>
         <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
           {isMac ? "⌘" : "Ctrl"}+K
         </kbd>

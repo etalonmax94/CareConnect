@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck, ChevronRight } from "lucide-react";
+import { Home, Users, FileText, BarChart3, UserCog, Building2, Briefcase, LogOut, User, Stethoscope, Pill, Calculator, Shield, History, HeartPulse, Calendar, ClipboardList, HomeIcon, LifeBuoy, ListTodo, MessageSquare, Network, Clock, MapPin, Award, ClipboardCheck, ChevronRight, FileCheck } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -77,6 +77,7 @@ const menuCategories: MenuCategory[] = [
       { title: "Timesheet Approval", url: "/timesheet-approval", icon: ClipboardCheck, iconColor: "text-green-500" },
       { title: "GPS Compliance", url: "/gps-compliance", icon: MapPin, iconColor: "text-red-500" },
       { title: "Staff Qualifications", url: "/staff-qualifications", icon: Award, iconColor: "text-yellow-600" },
+      { title: "Staff Documents", url: "/staff-documents", icon: FileCheck, iconColor: "text-purple-500" },
     ],
   },
   {
